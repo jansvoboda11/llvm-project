@@ -288,17 +288,6 @@ multiclass OptInCC1FFlag<string name, string pos_prefix, string neg_prefix="",
                   Group<f_Group>, HelpText<neg_prefix # help>;
 }
 
-// A boolean option which is opt-out in CC1. The negative option exists in CC1 and
-// Args.hasArg(OPT_fno_foo) can be used to check that the flag is disabled.
-// Use this only when the option cannot be declared via BoolFOption.
-multiclass OptOutCC1FFlag<string name, string pos_prefix, string neg_prefix,
-                       string help="", list<OptionFlag> flags=[]> {
-  def f#NAME : Flag<["-"], "f"#name>, Flags<flags>,
-               Group<f_Group>, HelpText<pos_prefix # help>;
-  def fno_#NAME : Flag<["-"], "fno-"#name>, Flags<[CC1Option] # flags>,
-                  Group<f_Group>, HelpText<neg_prefix # help>;
-}
-
 // A boolean option which is opt-in in FC1. The positive option exists in FC1 and
 // Args.hasArg(OPT_ffoo) can be used to check that the flag is enabled.
 // This is useful if the option is usually disabled.
@@ -318,6 +307,17 @@ multiclass OptOutFC1FFlag<string name, string pos_prefix, string neg_prefix,
                Group<f_Group>, HelpText<pos_prefix # help>;
   def fno_#NAME : Flag<["-"], "fno-"#name>, Flags<[FC1Option] # flags>,
                   Group<f_Group>, HelpText<neg_prefix # help>;
+}
+
+// Creates a positive and negative flags where both of them are prefixed with
+// "f", have help text specified for positive and negative option, and
+// Group<m_Group>.
+multiclass SimpleFFlag<string name, string pos_prefix, string neg_prefix,
+                       string help=""> {
+  def f#NAME : Flag<["-"], "f"#name>, Group<f_Group>,
+    HelpText<pos_prefix # help>;
+  def fno_#NAME : Flag<["-"], "fno-"#name>, Group<f_Group>,
+    HelpText<neg_prefix # help>;
 }
 
 // Creates a positive and negative flags where both of them are prefixed with
@@ -1093,8 +1093,7 @@ def emit_llvm : Flag<["-"], "emit-llvm">, Group<Action_Group>,
 def emit_interface_stubs : Flag<["-"], "emit-interface-stubs">,
   Flags<[CC1Option]>, MarshalledManually, Group<Action_Group>,
   HelpText<"Generate Interface Stub Files.">;
-def emit_merged_ifs : Flag<["-"], "emit-merged-ifs">,
-  Flags<[CC1Option]>, Group<Action_Group>,
+def emit_merged_ifs : Flag<["-"], "emit-merged-ifs">, Group<Action_Group>,
   HelpText<"Generate Interface Stub Files, emit merged text not binary.">;
 def end_no_unused_arguments : Flag<["--"], "end-no-unused-arguments">, Flags<[CoreOption]>,
   HelpText<"Start emitting warnings for unused driver arguments">;
@@ -1318,7 +1317,7 @@ defm pseudo_probe_for_profiling : BoolFOption<"pseudo-probe-for-profiling",
   PosFlag<SetTrue, [], "Emit">, NegFlag<SetFalse, [], "Do not emit">,
   BothFlags<[NoXarchOption, CC1Option], " pseudo probes for sample profiling">>;
 def forder_file_instrumentation : Flag<["-"], "forder-file-instrumentation">,
-    Group<f_Group>, Flags<[CC1Option, CoreOption]>,
+    Group<f_Group>, Flags<[CoreOption]>,
     HelpText<"Generate instrumented code to collect order file into default.profraw file (overridden by '=' form of option or LLVM_PROFILE_FILE env var)">;
 def fprofile_list_EQ : Joined<["-"], "fprofile-list=">,
     Group<f_Group>, Flags<[CC1Option, CoreOption]>,
@@ -1476,7 +1475,7 @@ def fno_elide_type : Flag<["-"], "fno-elide-type">, Group<f_Group>,
     HelpText<"Do not elide types when printing diagnostics">,
     MarshallingInfoNegativeFlag<DiagnosticOpts<"ElideType">>;
 def feliminate_unused_debug_symbols : Flag<["-"], "feliminate-unused-debug-symbols">, Group<f_Group>;
-defm eliminate_unused_debug_types : OptOutCC1FFlag<"eliminate-unused-debug-types",
+defm eliminate_unused_debug_types : SimpleFFlag<"eliminate-unused-debug-types",
   "Do not emit ", "Emit ", " debug info for defined but unused types">;
 def femit_all_decls : Flag<["-"], "femit-all-decls">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Emit all declarations, even if unused">,
@@ -2046,8 +2045,7 @@ defm xray_function_index : BoolFOption<"xray-function-index",
 def fxray_link_deps : Flag<["-"], "fxray-link-deps">, Group<f_Group>,
   Flags<[CC1Option]>,
   HelpText<"Tells clang to add the link dependencies for XRay.">;
-def fnoxray_link_deps : Flag<["-"], "fnoxray-link-deps">, Group<f_Group>,
-  Flags<[CC1Option]>;
+def fnoxray_link_deps : Flag<["-"], "fnoxray-link-deps">, Group<f_Group>;
 
 def fxray_instrumentation_bundle :
   JoinedOrSeparate<["-"], "fxray-instrumentation-bundle=">,
@@ -2110,7 +2108,7 @@ def flto_EQ_auto : Flag<["-"], "flto=auto">, Group<f_Group>,
   Alias<flto_EQ>, AliasArgs<["full"]>, HelpText<"Enable LTO in 'full' mode">;
 def flto : Flag<["-"], "flto">, Flags<[CoreOption, CC1Option]>, Group<f_Group>,
   Alias<flto_EQ>, AliasArgs<["full"]>, HelpText<"Enable LTO in 'full' mode">;
-def fno_lto : Flag<["-"], "fno-lto">, Flags<[CoreOption, CC1Option]>, Group<f_Group>,
+def fno_lto : Flag<["-"], "fno-lto">, Flags<[CoreOption]>, Group<f_Group>,
   HelpText<"Disable LTO mode (default)">;
 def foffload_lto_EQ : Joined<["-"], "foffload-lto=">, Flags<[CoreOption]>, Group<f_Group>,
   HelpText<"Set LTO mode for offload compilation">, Values<"thin,full">;
@@ -2118,8 +2116,7 @@ def foffload_lto : Flag<["-"], "foffload-lto">, Flags<[CoreOption]>, Group<f_Gro
   Alias<foffload_lto_EQ>, AliasArgs<["full"]>, HelpText<"Enable LTO in 'full' mode for offload compilation">;
 def fno_offload_lto : Flag<["-"], "fno-offload-lto">, Flags<[CoreOption]>, Group<f_Group>,
   HelpText<"Disable LTO mode (default) for offload compilation">;
-def flto_jobs_EQ : Joined<["-"], "flto-jobs=">,
-  Flags<[CC1Option]>, Group<f_Group>,
+def flto_jobs_EQ : Joined<["-"], "flto-jobs=">, Group<f_Group>,
   HelpText<"Controls the backend parallelism of -flto=thin (default "
            "of 0 means the number of threads will be derived from "
            "the number of CPUs detected)">;
@@ -2257,9 +2254,9 @@ defm pch_instantiate_templates : BoolFOption<"pch-instantiate-templates",
   LangOpts<"PCHInstantiateTemplates">, DefaultFalse,
   PosFlag<SetTrue, [], "Instantiate templates already while building a PCH">,
   NegFlag<SetFalse>, BothFlags<[CC1Option, CoreOption]>>;
-defm pch_codegen: OptInCC1FFlag<"pch-codegen", "Generate ", "Do not generate ",
+defm pch_codegen: SimpleFFlag<"pch-codegen", "Generate ", "Do not generate ",
   "code for uses of this PCH that assumes an explicit object file will be built for the PCH">;
-defm pch_debuginfo: OptInCC1FFlag<"pch-debuginfo", "Generate ", "Do not generate ",
+defm pch_debuginfo: SimpleFFlag<"pch-debuginfo", "Generate ", "Do not generate ",
   "debug info for types in an object file built from this PCH and do not generate them elsewhere">;
 
 def fimplicit_module_maps : Flag <["-"], "fimplicit-module-maps">, Group<f_Group>,
@@ -2337,7 +2334,7 @@ def fno_builtin : Flag<["-"], "fno-builtin">, Group<f_Group>,
 def fno_builtin_ : Joined<["-"], "fno-builtin-">, Group<f_Group>,
   Flags<[CC1Option, CoreOption]>, MarshalledManually,
   HelpText<"Disable implicit builtin knowledge of a specific function">;
-def fno_common : Flag<["-"], "fno-common">, Group<f_Group>, Flags<[CC1Option]>,
+def fno_common : Flag<["-"], "fno-common">, Group<f_Group>,
     HelpText<"Compile common globals like normal definitions">;
 defm digraphs : BoolFOption<"digraphs",
   LangOpts<"Digraphs">, Default<std#".hasDigraphs()">,
@@ -2503,9 +2500,9 @@ def fopenmp_targets_EQ : CommaJoined<["-"], "fopenmp-targets=">,
   Flags<[NoXarchOption, CC1Option]>, MarshalledManually,
   HelpText<"Specify comma-separated list of triples OpenMP offloading targets to be supported">;
 def fopenmp_relocatable_target : Flag<["-"], "fopenmp-relocatable-target">,
-  Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
+  Group<f_Group>, Flags<[NoArgumentUnused, HelpHidden]>;
 def fnoopenmp_relocatable_target : Flag<["-"], "fnoopenmp-relocatable-target">,
-  Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
+  Group<f_Group>, Flags<[NoArgumentUnused, HelpHidden]>;
 def fopenmp_simd : Flag<["-"], "fopenmp-simd">, Group<f_Group>,
   Flags<[CC1Option, NoArgumentUnused]>, MarshalledManually,
   HelpText<"Emit OpenMP code only for SIMD-based constructs.">;
@@ -2539,9 +2536,9 @@ def fopenmp_assume_teams_oversubscription : Flag<["-"], "fopenmp-assume-teams-ov
 def fopenmp_assume_threads_oversubscription : Flag<["-"], "fopenmp-assume-threads-oversubscription">,
   Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>, MarshalledManually;
 def fno_openmp_assume_teams_oversubscription : Flag<["-"], "fno-openmp-assume-teams-oversubscription">,
-  Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
+  Group<f_Group>, Flags<[NoArgumentUnused, HelpHidden]>;
 def fno_openmp_assume_threads_oversubscription : Flag<["-"], "fno-openmp-assume-threads-oversubscription">,
-  Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
+  Group<f_Group>, Flags<[NoArgumentUnused, HelpHidden]>;
 def fopenmp_assume_no_thread_state : Flag<["-"], "fopenmp-assume-no-thread-state">, Group<f_Group>,
   Flags<[CC1Option, NoArgumentUnused, HelpHidden]>,
   HelpText<"Assert no thread in a parallel region modifies an ICV">,
@@ -2551,17 +2548,17 @@ def fopenmp_offload_mandatory : Flag<["-"], "fopenmp-offload-mandatory">, Group<
   HelpText<"Do not create a host fallback if offloading to the device fails.">,
   MarshallingInfoFlag<LangOpts<"OpenMPOffloadMandatory">>;
 def fopenmp_target_new_runtime : Flag<["-"], "fopenmp-target-new-runtime">,
-  Group<f_Group>, Flags<[CC1Option, HelpHidden]>;
+  Group<f_Group>, Flags<[HelpHidden]>;
 def fno_openmp_target_new_runtime : Flag<["-"], "fno-openmp-target-new-runtime">,
-  Group<f_Group>, Flags<[CC1Option, HelpHidden]>;
+  Group<f_Group>, Flags<[HelpHidden]>;
 defm openmp_optimistic_collapse : BoolFOption<"openmp-optimistic-collapse",
   LangOpts<"OpenMPOptimisticCollapse">, DefaultFalse,
   PosFlag<SetTrue, [CC1Option]>, NegFlag<SetFalse>, BothFlags<[NoArgumentUnused, HelpHidden]>>;
 def static_openmp: Flag<["-"], "static-openmp">,
   HelpText<"Use the static host OpenMP runtime while linking.">;
-def offload_new_driver : Flag<["--"], "offload-new-driver">, Flags<[CC1Option]>, Group<Action_Group>,
+def offload_new_driver : Flag<["--"], "offload-new-driver">, Group<Action_Group>,
   HelpText<"Use the new driver for offloading compilation.">;
-def no_offload_new_driver : Flag<["--"], "no-offload-new-driver">, Flags<[CC1Option]>, Group<Action_Group>,
+def no_offload_new_driver : Flag<["--"], "no-offload-new-driver">, Group<Action_Group>,
   HelpText<"Don't Use the new driver for offloading compilation.">;
 def offload_device_only : Flag<["--"], "offload-device-only">,
   HelpText<"Only compile for the offloading device.">;
@@ -2576,7 +2573,7 @@ def cuda_host_only : Flag<["--"], "cuda-host-only">, Alias<offload_host_only>,
 def cuda_compile_host_device : Flag<["--"], "cuda-compile-host-device">, Alias<offload_host_device>,
   HelpText<"Compile CUDA code for both host and device (default). Has no "
            "effect on non-CUDA compilations.">;
-def fopenmp_new_driver : Flag<["-"], "fopenmp-new-driver">, Flags<[CC1Option]>, Group<Action_Group>,
+def fopenmp_new_driver : Flag<["-"], "fopenmp-new-driver">, Group<Action_Group>,
   HelpText<"Use the new driver for OpenMP offloading.">;
 def fno_openmp_new_driver : Flag<["-"], "fno-openmp-new-driver">, Flags<[CC1Option]>, Group<Action_Group>,
   Alias<no_offload_new_driver>, HelpText<"Don't use the new driver for OpenMP offloading.">;
@@ -2735,7 +2732,7 @@ def ftrivial_auto_var_init : Joined<["-"], "ftrivial-auto-var-init=">, Group<f_G
   NormalizedValues<["Uninitialized", "Zero", "Pattern"]>,
   MarshallingInfoEnum<LangOpts<"TrivialAutoVarInit">, "Uninitialized">;
 def enable_trivial_var_init_zero : Flag<["-"], "enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang">,
-  Flags<[CC1Option, CoreOption, NoArgumentUnused]>,
+  Flags<[CoreOption, NoArgumentUnused]>,
   HelpText<"Trivial automatic variable initialization to zero is only here for benchmarks, it'll eventually be removed, and I'm OK with that because I'm only using it to benchmark">;
 def ftrivial_auto_var_init_stop_after : Joined<["-"], "ftrivial-auto-var-init-stop-after=">, Group<f_Group>,
   Flags<[CC1Option, CoreOption]>, HelpText<"Stop initializing trivial automatic stack variables after the specified number of instances">,
@@ -3089,7 +3086,7 @@ def gdwarf64 : Flag<["-"], "gdwarf64">, Group<g_Group>,
   HelpText<"Enables DWARF64 format for ELF binaries, if debug information emission is enabled.">,
   MarshallingInfoFlag<CodeGenOpts<"Dwarf64">>;
 def gdwarf32 : Flag<["-"], "gdwarf32">, Group<g_Group>,
-  Flags<[CC1Option, CC1AsOption]>,
+  Flags<[CC1AsOption]>,
   HelpText<"Enables DWARF32 format for ELF binaries, if debug information emission is enabled.">;
 
 def gcodeview : Flag<["-"], "gcodeview">,
@@ -3180,7 +3177,7 @@ def imacros : JoinedOrSeparate<["-", "--"], "imacros">, Group<clang_i_Group>, Fl
   MarshallingInfoStringVector<PreprocessorOpts<"MacroIncludes">>;
 def image__base : Separate<["-"], "image_base">;
 def include_ : JoinedOrSeparate<["-", "--"], "include">, Group<clang_i_Group>, EnumName<"include">,
-    MetaVarName<"<file>">, HelpText<"Include file before parsing">, Flags<[CC1Option]>;
+    MetaVarName<"<file>">, HelpText<"Include file before parsing">, Flags<[CC1Option]>; //
 def include_pch : Separate<["-"], "include-pch">, Group<clang_i_Group>, Flags<[CC1Option]>,
   HelpText<"Include precompiled header file">, MetaVarName<"<file>">,
   MarshallingInfoString<PreprocessorOpts<"ImplicitPCHInclude">>;
@@ -3321,7 +3318,7 @@ def mfpmath_EQ : Joined<["-"], "mfpmath=">, Group<m_Group>;
 def mfpu_EQ : Joined<["-"], "mfpu=">, Group<m_Group>;
 def mhwdiv_EQ : Joined<["-"], "mhwdiv=">, Group<m_Group>;
 def mhwmult_EQ : Joined<["-"], "mhwmult=">, Group<m_Group>;
-def mglobal_merge : Flag<["-"], "mglobal-merge">, Group<m_Group>, Flags<[CC1Option]>,
+def mglobal_merge : Flag<["-"], "mglobal-merge">, Group<m_Group>,
   HelpText<"Enable merging of globals">;
 def mhard_float : Flag<["-"], "mhard-float">, Group<m_Group>;
 def miphoneos_version_min_EQ : Joined<["-"], "miphoneos-version-min=">, Group<m_Group>;
@@ -3347,16 +3344,16 @@ def mmacos_version_min_EQ : Joined<["-"], "mmacos-version-min=">,
 def mms_bitfields : Flag<["-"], "mms-bitfields">, Group<m_Group>, Flags<[CC1Option]>,
   HelpText<"Set the default structure layout to be compatible with the Microsoft compiler standard">,
   MarshallingInfoFlag<LangOpts<"MSBitfields">>;
-def moutline : Flag<["-"], "moutline">, Group<f_clang_Group>, Flags<[CC1Option]>,
+def moutline : Flag<["-"], "moutline">, Group<f_clang_Group>,
     HelpText<"Enable function outlining (AArch64 only)">;
-def mno_outline : Flag<["-"], "mno-outline">, Group<f_clang_Group>, Flags<[CC1Option]>,
+def mno_outline : Flag<["-"], "mno-outline">, Group<f_clang_Group>,
     HelpText<"Disable function outlining (AArch64 only)">;
 def mno_ms_bitfields : Flag<["-"], "mno-ms-bitfields">, Group<m_Group>,
   HelpText<"Do not set the default structure layout to be compatible with the Microsoft compiler standard">;
 def mskip_rax_setup : Flag<["-"], "mskip-rax-setup">, Group<m_Group>, Flags<[CC1Option]>,
   HelpText<"Skip setting up RAX register when passing variable arguments (x86 only)">,
   MarshallingInfoFlag<CodeGenOpts<"SkipRaxSetup">>;
-def mno_skip_rax_setup : Flag<["-"], "mno-skip-rax-setup">, Group<m_Group>, Flags<[CC1Option]>;
+def mno_skip_rax_setup : Flag<["-"], "mno-skip-rax-setup">, Group<m_Group>;
 def mstackrealign : Flag<["-"], "mstackrealign">, Group<m_Group>, Flags<[CC1Option]>,
   HelpText<"Force realign the stack at entry to every function">,
   MarshallingInfoFlag<CodeGenOpts<"StackRealignment">>;
@@ -3384,7 +3381,7 @@ def mtargetos_EQ : Joined<["-"], "mtargetos=">, Group<m_Group>,
   HelpText<"Set the deployment target to be the specified OS and OS version">;
 
 def mno_constant_cfstrings : Flag<["-"], "mno-constant-cfstrings">, Group<m_Group>;
-def mno_global_merge : Flag<["-"], "mno-global-merge">, Group<m_Group>, Flags<[CC1Option]>,
+def mno_global_merge : Flag<["-"], "mno-global-merge">, Group<m_Group>,
   HelpText<"Disable merging of globals">;
 def mno_pascal_strings : Flag<["-"], "mno-pascal-strings">,
   Alias<fno_pascal_strings>;
@@ -3720,9 +3717,9 @@ def msmall_data_threshold_EQ : Joined <["-"], "msmall-data-threshold=">,
 def msoft_float : Flag<["-"], "msoft-float">, Group<m_Group>, Flags<[CC1Option]>,
   HelpText<"Use software floating point">,
   MarshallingInfoFlag<CodeGenOpts<"SoftFloat">>;
-def moutline_atomics : Flag<["-"], "moutline-atomics">, Group<f_clang_Group>, Flags<[CC1Option]>,
+def moutline_atomics : Flag<["-"], "moutline-atomics">, Group<f_clang_Group>,
   HelpText<"Generate local calls to out-of-line atomic operations">;
-def mno_outline_atomics : Flag<["-"], "mno-outline-atomics">, Group<f_clang_Group>, Flags<[CC1Option]>,
+def mno_outline_atomics : Flag<["-"], "mno-outline-atomics">, Group<f_clang_Group>,
   HelpText<"Don't generate local calls to out-of-line atomic operations">;
 def mno_implicit_float : Flag<["-"], "mno-implicit-float">, Group<m_Group>,
   HelpText<"Don't generate implicit floating point instructions">;
@@ -3754,7 +3751,7 @@ def mrecord_mcount : Flag<["-"], "mrecord-mcount">, HelpText<"Generate a __mcoun
 def mpacked_stack : Flag<["-"], "mpacked-stack">, HelpText<"Use packed stack layout (SystemZ only).">,
   Flags<[CC1Option]>, Group<m_Group>,
   MarshallingInfoFlag<CodeGenOpts<"PackedStack">>;
-def mno_packed_stack : Flag<["-"], "mno-packed-stack">, Flags<[CC1Option]>, Group<m_Group>;
+def mno_packed_stack : Flag<["-"], "mno-packed-stack">, Group<m_Group>;
 def mips16 : Flag<["-"], "mips16">, Group<m_mips_Features_Group>;
 def mno_mips16 : Flag<["-"], "mno-mips16">, Group<m_mips_Features_Group>;
 def mmicromips : Flag<["-"], "mmicromips">, Group<m_mips_Features_Group>;
@@ -4090,7 +4087,7 @@ def stdlibxx_isystem : JoinedOrSeparate<["-"], "stdlib++-isystem">,
   Group<clang_i_Group>,
   HelpText<"Use directory as the C++ standard library include path">,
   Flags<[NoXarchOption]>, MetaVarName<"<directory>">;
-def unwindlib_EQ : Joined<["-", "--"], "unwindlib=">, Flags<[CC1Option]>,
+def unwindlib_EQ : Joined<["-", "--"], "unwindlib=">,
   HelpText<"Unwind library to use">, Values<"libgcc,unwindlib,platform">;
 def sub__library : JoinedOrSeparate<["-"], "sub_library">;
 def sub__umbrella : JoinedOrSeparate<["-"], "sub_umbrella">;
@@ -4350,21 +4347,21 @@ def mno_hexagon_hvx_ieee_fp : Flag<["-"], "mno-hvx-ieee-fp">,
 def ffixed_r19: Flag<["-"], "ffixed-r19">,
   HelpText<"Reserve register r19 (Hexagon only)">;
 def mmemops : Flag<["-"], "mmemops">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Enable generation of memop instructions">;
+  HelpText<"Enable generation of memop instructions">;
 def mno_memops : Flag<["-"], "mno-memops">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Disable generation of memop instructions">;
+  HelpText<"Disable generation of memop instructions">;
 def mpackets : Flag<["-"], "mpackets">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Enable generation of instruction packets">;
+  HelpText<"Enable generation of instruction packets">;
 def mno_packets : Flag<["-"], "mno-packets">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Disable generation of instruction packets">;
+  HelpText<"Disable generation of instruction packets">;
 def mnvj : Flag<["-"], "mnvj">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Enable generation of new-value jumps">;
+  HelpText<"Enable generation of new-value jumps">;
 def mno_nvj : Flag<["-"], "mno-nvj">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Disable generation of new-value jumps">;
+  HelpText<"Disable generation of new-value jumps">;
 def mnvs : Flag<["-"], "mnvs">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Enable generation of new-value stores">;
+  HelpText<"Enable generation of new-value stores">;
 def mno_nvs : Flag<["-"], "mno-nvs">, Group<m_hexagon_Features_Group>,
-  Flags<[CC1Option]>, HelpText<"Disable generation of new-value stores">;
+  HelpText<"Disable generation of new-value stores">;
 
 // M68k features flags
 def m68000 : Flag<["-"], "m68000">, Group<m_m68k_Features_Group>;
