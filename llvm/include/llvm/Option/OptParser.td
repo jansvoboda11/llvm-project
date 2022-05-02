@@ -106,6 +106,7 @@ class Option<list<string> prefixes, string name, OptionKind kind> {
   bit ShouldAlwaysEmit = false;
   code NormalizerRetTy = ?;
   code NormalizedValuesScope = "";
+  bit MarshalledManually = false;
   code Normalizer = "";
   code Denormalizer = "";
   code ValueMerger = "mergeForwardValue";
@@ -168,6 +169,7 @@ class MarshallingInfo<KeyPathAndMacro kpm, code defaultvalue> {
   code KeyPath = kpm.KeyPath;
   code MacroPrefix = kpm.MacroPrefix;
   code DefaultValue = defaultvalue;
+  bit MarshalledManually = false;
 }
 
 // Marshalled option accepting a string argument.
@@ -233,6 +235,7 @@ class MarshallingInfoEnum<KeyPathAndMacro kpm, code defaultvalue>
 
 class ShouldParseIf<code condition> { code ShouldParse = condition; }
 class AlwaysEmit { bit ShouldAlwaysEmit = true; }
+class MarshalledManually { bit MarshalledManually = true; }
 class Normalizer<code normalizer> { code Normalizer = normalizer; }
 class Denormalizer<code denormalizer> { code Denormalizer = denormalizer; }
 class NormalizedValuesScope<code scope> { code NormalizedValuesScope = scope; }

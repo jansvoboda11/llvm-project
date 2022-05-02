@@ -718,8 +718,9 @@ that the ``-cc1`` command line interface is intended only for Clang developers,
 meaning it does not need to mirror the driver interface, maintain backward
 compatibility or be compatible with GCC.
 
-If the option semantics cannot be encoded via marshalling annotations, you can
-resort to parsing/serializing the command line arguments manually:
+If the option semantics cannot be encoded via marshalling annotations, use the
+`MarshalledManually` annotation instead and parse/serialize the command line
+arguments manually:
 
 .. code-block:: diff
 

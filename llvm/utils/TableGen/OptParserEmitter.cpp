@@ -11,6 +11,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
 #include <cstring>
@@ -395,14 +396,40 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
            !R.getValueAsString("KeyPath").empty();
   };
 
+  Record *MustBeMarshalled;
+  std::vector<Record *> MustBeMarshalledFlags;
+  if ((MustBeMarshalled = Records.getClass("__tablegen_must_be_marshalled")))
+    MustBeMarshalledFlags = MustBeMarshalled->getValueAsListOfDefs("Flags");
+
+  auto DiagnoseOptionWithoutMarshalling = [&](const Record &R) {
+    if (IsMarshallingOption(R))
+      return false;
+    if (R.getValueAsBit("MarshalledManually"))
+      return false;
+    if (dyn_cast<DefInit>(R.getValueInit("Alias")))
+      return false;
+    for (Record *Flag : R.getValueAsListOfDefs("Flags"))
+      for (Record *MustBeMarshalledFlag : MustBeMarshalledFlags)
+        if (Flag == MustBeMarshalledFlag) {
+          PrintWarning(R.getLoc()[0], "missing marshalling");
+          PrintNote(MustBeMarshalledFlag->getLoc()[0], "despite this");
+          PrintNote(MustBeMarshalled->getLoc(), "requiring marshalling");
+          return true;
+        }
+    return false;
+  };
+
   std::vector<const Record *> OptsWithMarshalling;
   for (const Record &R : llvm::make_pointee_range(Opts)) {
     // Start a single option entry.
     OS << "OPTION(";
     WriteOptRecordFields(OS, R);
     OS << ")\n";
-    if (IsMarshallingOption(R))
+    if (IsMarshallingOption(R)) {
       OptsWithMarshalling.push_back(&R);
+      continue;
+    }
+    DiagnoseOptionWithoutMarshalling(R);
   }
   OS << "#endif // OPTION\n";
 
