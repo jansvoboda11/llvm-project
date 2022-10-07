@@ -780,30 +780,35 @@ def V : JoinedOrSeparate<["-"], "V">, Flags<[NoXarchOption, Unsupported]>;
 def Wa_COMMA : CommaJoined<["-"], "Wa,">,
   HelpText<"Pass the comma separated arguments in <arg> to the assembler">,
   MetaVarName<"<arg>">;
+def Wl_COMMA : CommaJoined<["-"], "Wl,">, Flags<[LinkerInput, RenderAsInput]>,
+  HelpText<"Pass the comma separated arguments in <arg> to the linker">,
+  MetaVarName<"<arg>">, Group<Link_Group>;
+def Wp_COMMA : CommaJoined<["-"], "Wp,">,
+  HelpText<"Pass the comma separated arguments in <arg> to the preprocessor">,
+  MetaVarName<"<arg>">, Group<Preprocessor_Group>;
+
+let MarshalledManually = true in {
 def Wall : Flag<["-"], "Wall">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
 def WCL4 : Flag<["-"], "WCL4">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
 def Wdeprecated : Flag<["-"], "Wdeprecated">, Group<W_Group>, Flags<[CC1Option]>,
   HelpText<"Enable warnings for deprecated constructs and define __DEPRECATED">;
 def Wno_deprecated : Flag<["-"], "Wno-deprecated">, Group<W_Group>, Flags<[CC1Option]>;
-def Wl_COMMA : CommaJoined<["-"], "Wl,">, Flags<[LinkerInput, RenderAsInput]>,
-  HelpText<"Pass the comma separated arguments in <arg> to the linker">,
-  MetaVarName<"<arg>">, Group<Link_Group>;
 // FIXME: This is broken; these should not be Joined arguments.
 def Wno_nonportable_cfstrings : Joined<["-"], "Wno-nonportable-cfstrings">, Group<W_Group>,
   Flags<[CC1Option]>;
 def Wnonportable_cfstrings : Joined<["-"], "Wnonportable-cfstrings">, Group<W_Group>,
   Flags<[CC1Option]>;
-def Wp_COMMA : CommaJoined<["-"], "Wp,">,
-  HelpText<"Pass the comma separated arguments in <arg> to the preprocessor">,
-  MetaVarName<"<arg>">, Group<Preprocessor_Group>;
+def Wno_write_strings : Flag<["-"], "Wno-write-strings">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
+def Wwrite_strings : Flag<["-"], "Wwrite-strings">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
+def W_Joined : Joined<["-"], "W">, Group<W_Group>, Flags<[CC1Option, CoreOption, FC1Option, FlangOption]>,
+  MetaVarName<"<warning>">, HelpText<"Enable the specified warning">;
+} // end let MarshalledManually = true
+
 def Wundef_prefix_EQ : CommaJoined<["-"], "Wundef-prefix=">, Group<W_value_Group>,
   Flags<[CC1Option, CoreOption, HelpHidden]>, MetaVarName<"<arg>">,
   HelpText<"Enable warnings for undefined macros with a prefix in the comma separated list <arg>">,
   MarshallingInfoStringVector<DiagnosticOpts<"UndefPrefixes">>;
-def Wwrite_strings : Flag<["-"], "Wwrite-strings">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
-def Wno_write_strings : Flag<["-"], "Wno-write-strings">, Group<W_Group>, Flags<[CC1Option, HelpHidden]>;
-def W_Joined : Joined<["-"], "W">, Group<W_Group>, Flags<[CC1Option, CoreOption, FC1Option, FlangOption]>,
-  MetaVarName<"<warning>">, HelpText<"Enable the specified warning">;
+
 def Xanalyzer : Separate<["-"], "Xanalyzer">,
   HelpText<"Pass <arg> to the static analyzer">, MetaVarName<"<arg>">,
   Group<StaticAnalyzer_Group>;
@@ -2804,7 +2809,7 @@ def Wlarger_than_ : Joined<["-"], "Wlarger-than-">, Alias<Wlarger_than_EQ>;
 // This is converted to -fwarn-stack-size=N and also passed through by the driver.
 // FIXME: The driver should strip out the =<value> when passing W_value_Group through.
 def Wframe_larger_than_EQ : Joined<["-"], "Wframe-larger-than=">, Group<W_value_Group>,
-                            Flags<[NoXarchOption, CC1Option]>;
+                            Flags<[NoXarchOption, CC1Option]>, MarshalledManually;
 def Wframe_larger_than : Flag<["-"], "Wframe-larger-than">, Alias<Wframe_larger_than_EQ>;
 
 def : Flag<["-"], "fterminated-vtables">, Alias<fapple_kext>;
