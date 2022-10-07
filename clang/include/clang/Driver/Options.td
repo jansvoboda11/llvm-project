@@ -1586,11 +1586,7 @@ def fmemory_profile_EQ : Joined<["-"], "fmemory-profile=">,
     Group<f_Group>, Flags<[CC1Option]>, MarshalledManually, MetaVarName<"<directory>">,
     HelpText<"Enable heap memory profiling and dump results into <directory>">;
 
-// Begin sanitizer flags. These should all be core options exposed in all driver
-// modes.
-let Flags = [CC1Option, CoreOption] in {
-
-def fsanitize_EQ : CommaJoined<["-"], "fsanitize=">, Group<f_clang_Group>,
+def fsanitize_EQ : CommaJoined<["-"], "fsanitize=">, Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                    MetaVarName<"<check>">, MarshalledManually,
                    HelpText<"Turn on runtime checks for various forms of undefined "
                             "or suspicious behavior. See user manual for available checks">;
@@ -1598,26 +1594,26 @@ def fno_sanitize_EQ : CommaJoined<["-"], "fno-sanitize=">, Group<f_clang_Group>,
                       Flags<[CoreOption, NoXarchOption]>;
 
 def fsanitize_ignorelist_EQ : Joined<["-"], "fsanitize-ignorelist=">,
-  Group<f_clang_Group>, MarshalledManually,
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>, MarshalledManually,
   HelpText<"Path to ignorelist file for sanitizers">;
 def : Joined<["-"], "fsanitize-blacklist=">,
-  Group<f_clang_Group>, Flags<[HelpHidden]>, Alias<fsanitize_ignorelist_EQ>,
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption, HelpHidden]>, Alias<fsanitize_ignorelist_EQ>,
   HelpText<"Alias for -fsanitize-ignorelist=">;
 
 def fsanitize_system_ignorelist_EQ : Joined<["-"], "fsanitize-system-ignorelist=">,
   HelpText<"Path to system ignorelist file for sanitizers">,
-  Flags<[CC1Option]>, MarshalledManually;
+  Flags<[CC1Option, CoreOption]>, MarshalledManually;
 def : Joined<["-"], "fsanitize-system-blacklist=">,
   HelpText<"Alias for -fsanitize-system-ignorelist=">,
-  Flags<[CC1Option, HelpHidden]>, Alias<fsanitize_system_ignorelist_EQ>;
+  Flags<[CC1Option, CoreOption, HelpHidden]>, Alias<fsanitize_system_ignorelist_EQ>;
 
 def fno_sanitize_ignorelist : Flag<["-"], "fno-sanitize-ignorelist">,
-  Group<f_clang_Group>, MarshalledManually, HelpText<"Don't use ignorelist file for sanitizers">;
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>, MarshalledManually, HelpText<"Don't use ignorelist file for sanitizers">;
 def : Flag<["-"], "fno-sanitize-blacklist">,
-  Group<f_clang_Group>, Flags<[HelpHidden]>, Alias<fno_sanitize_ignorelist>;
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption, HelpHidden]>, Alias<fno_sanitize_ignorelist>;
 
 def fsanitize_coverage : CommaJoined<["-"], "fsanitize-coverage=">,
-  Group<f_clang_Group>,
+  Group<f_clang_Group>, Flags<[CoreOption]>,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers">;
 def fno_sanitize_coverage : CommaJoined<["-"], "fno-sanitize-coverage=">,
   Group<f_clang_Group>, Flags<[CoreOption, NoXarchOption]>,
@@ -1626,23 +1622,23 @@ def fno_sanitize_coverage : CommaJoined<["-"], "fno-sanitize-coverage=">,
          "8bit-counters,trace-pc,trace-pc-guard,no-prune,inline-8bit-counters,"
          "inline-bool-flag">;
 def fsanitize_coverage_allowlist : Joined<["-"], "fsanitize-coverage-allowlist=">,
-    Group<f_clang_Group>, Flags<[CoreOption, NoXarchOption]>,
+    Group<f_clang_Group>, Flags<[CC1Option, CoreOption, NoXarchOption]>,
     HelpText<"Restrict sanitizer coverage instrumentation exclusively to modules and functions that match the provided special case list, except the blocked ones">,
     MarshallingInfoStringVector<CodeGenOpts<"SanitizeCoverageAllowlistFiles">>;
 def : Joined<["-"], "fsanitize-coverage-whitelist=">,
-  Group<f_clang_Group>, Flags<[CoreOption, HelpHidden]>, Alias<fsanitize_coverage_allowlist>,
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption, HelpHidden]>, Alias<fsanitize_coverage_allowlist>,
   HelpText<"Deprecated, use -fsanitize-coverage-allowlist= instead">;
 def fsanitize_coverage_ignorelist : Joined<["-"], "fsanitize-coverage-ignorelist=">,
-    Group<f_clang_Group>, Flags<[CoreOption, NoXarchOption]>,
+    Group<f_clang_Group>, Flags<[CC1Option, CoreOption, NoXarchOption]>,
     HelpText<"Disable sanitizer coverage instrumentation for modules and functions "
              "that match the provided special case list, even the allowed ones">,
     MarshallingInfoStringVector<CodeGenOpts<"SanitizeCoverageIgnorelistFiles">>;
 def : Joined<["-"], "fsanitize-coverage-blacklist=">,
-  Group<f_clang_Group>, Flags<[CoreOption, HelpHidden]>,
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption, HelpHidden]>,
   Alias<fsanitize_coverage_ignorelist>,
   HelpText<"Deprecated, use -fsanitize-coverage-ignorelist= instead">;
 def fsanitize_memory_track_origins_EQ : Joined<["-"], "fsanitize-memory-track-origins=">,
-                                        Group<f_clang_Group>,
+                                        Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                                         HelpText<"Enable origins tracking in MemorySanitizer">,
                                         MarshallingInfoInt<CodeGenOpts<"SanitizeMemoryTrackOrigins">>;
 def fsanitize_memory_track_origins : Flag<["-"], "fsanitize-memory-track-origins">,
@@ -1653,17 +1649,17 @@ def fno_sanitize_memory_track_origins : Flag<["-"], "fno-sanitize-memory-track-o
                                         Flags<[CoreOption, NoXarchOption]>,
                                         HelpText<"Disable origins tracking in MemorySanitizer">;
 def fsanitize_address_outline_instrumentation : Flag<["-"], "fsanitize-address-outline-instrumentation">,
-                                                Group<f_clang_Group>,
+                                                Group<f_clang_Group>, Flags<[CoreOption]>,
                                                 HelpText<"Always generate function calls for address sanitizer instrumentation">;
 def fno_sanitize_address_outline_instrumentation : Flag<["-"], "fno-sanitize-address-outline-instrumentation">,
-                                                   Group<f_clang_Group>,
+                                                   Group<f_clang_Group>, Flags<[CoreOption]>,
                                                    HelpText<"Use default code inlining logic for the address sanitizer">;
 def fsanitize_memtag_mode_EQ : Joined<["-"], "fsanitize-memtag-mode=">,
-                                        Group<f_clang_Group>,
+                                        Group<f_clang_Group>, Flags<[CoreOption]>,
                                         HelpText<"Set default MTE mode to 'sync' (default) or 'async'">;
 def fsanitize_hwaddress_experimental_aliasing
   : Flag<["-"], "fsanitize-hwaddress-experimental-aliasing">,
-    Group<f_clang_Group>,
+    Group<f_clang_Group>, Flags<[CoreOption]>,
     HelpText<"Enable aliasing mode in HWAddressSanitizer">;
 def fno_sanitize_hwaddress_experimental_aliasing
   : Flag<["-"], "fno-sanitize-hwaddress-experimental-aliasing">,
@@ -1671,22 +1667,22 @@ def fno_sanitize_hwaddress_experimental_aliasing
     HelpText<"Disable aliasing mode in HWAddressSanitizer">;
 defm sanitize_memory_use_after_dtor : BoolOption<"f", "sanitize-memory-use-after-dtor",
   CodeGenOpts<"SanitizeMemoryUseAfterDtor">, DefaultFalse,
-  PosFlag<SetTrue, [CC1Option], "Enable">, NegFlag<SetFalse, [], "Disable">,
-  BothFlags<[], " use-after-destroy detection in MemorySanitizer">>,
+  PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [], "Disable">,
+  BothFlags<[CC1Option, CoreOption], " use-after-destroy detection in MemorySanitizer">>,
   Group<f_clang_Group>;
 def fsanitize_address_field_padding : Joined<["-"], "fsanitize-address-field-padding=">,
-                                        Group<f_clang_Group>,
+                                        Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                                         HelpText<"Level of field padding for AddressSanitizer">,
                                         MarshallingInfoInt<LangOpts<"SanitizeAddressFieldPadding">>;
 defm sanitize_address_use_after_scope : BoolOption<"f", "sanitize-address-use-after-scope",
   CodeGenOpts<"SanitizeAddressUseAfterScope">, DefaultFalse,
-  PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Disable">,
-  BothFlags<[], " use-after-scope detection in AddressSanitizer">>,
+  PosFlag<SetTrue, [CC1Option], "Enable">, NegFlag<SetFalse, [NoXarchOption], "Disable">,
+  BothFlags<[CoreOption], " use-after-scope detection in AddressSanitizer">>,
   Group<f_clang_Group>;
 def sanitize_address_use_after_return_EQ
   : Joined<["-"], "fsanitize-address-use-after-return=">,
     MetaVarName<"<mode>">,
-    Flags<[CC1Option]>,
+    Flags<[CC1Option, CoreOption]>,
     HelpText<"Select the mode of detecting stack use-after-return in AddressSanitizer">,
     Group<f_clang_Group>,
     Values<"never,runtime,always">,
@@ -1696,22 +1692,23 @@ def sanitize_address_use_after_return_EQ
 defm sanitize_address_poison_custom_array_cookie : BoolOption<"f", "sanitize-address-poison-custom-array-cookie",
   CodeGenOpts<"SanitizeAddressPoisonCustomArrayCookie">, DefaultFalse,
   PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [], "Disable">,
-  BothFlags<[], " poisoning array cookies when using custom operator new[] in AddressSanitizer">>,
+  BothFlags<[CC1Option, CoreOption], " poisoning array cookies when using custom operator new[] in AddressSanitizer">>,
   Group<f_clang_Group>;
 defm sanitize_address_globals_dead_stripping : BoolOption<"f", "sanitize-address-globals-dead-stripping",
   CodeGenOpts<"SanitizeAddressGlobalsDeadStripping">, DefaultFalse,
-  PosFlag<SetTrue, [], "Enable linker dead stripping of globals in AddressSanitizer">,
-  NegFlag<SetFalse, [], "Disable linker dead stripping of globals in AddressSanitizer">>,
+  PosFlag<SetTrue, [CC1Option], "Enable linker dead stripping of globals in AddressSanitizer">,
+  NegFlag<SetFalse, [], "Disable linker dead stripping of globals in AddressSanitizer">,
+  BothFlags<[CoreOption]>>,
   Group<f_clang_Group>;
 defm sanitize_address_use_odr_indicator : BoolOption<"f", "sanitize-address-use-odr-indicator",
   CodeGenOpts<"SanitizeAddressUseOdrIndicator">, DefaultFalse,
   PosFlag<SetTrue, [], "Enable ODR indicator globals to avoid false ODR violation"
             " reports in partially sanitized programs at the cost of an increase in binary size">,
-  NegFlag<SetFalse, [], "Disable ODR indicator globals">>,
+  NegFlag<SetFalse, [], "Disable ODR indicator globals">, BothFlags<[CC1Option, CoreOption]>>,
   Group<f_clang_Group>;
 def sanitize_address_destructor_EQ
     : Joined<["-"], "fsanitize-address-destructor=">,
-      Flags<[CC1Option]>,
+      Flags<[CC1Option, CoreOption]>,
       HelpText<"Set destructor type used in ASan instrumentation">,
       Group<f_clang_Group>,
       Values<"none,global">,
@@ -1722,8 +1719,8 @@ defm sanitize_memory_param_retval
     : BoolFOption<"sanitize-memory-param-retval",
         CodeGenOpts<"SanitizeMemoryParamRetval">,
         DefaultFalse,
-        PosFlag<SetTrue, [CC1Option], "Enable">, NegFlag<SetFalse, [], "Disable">,
-        BothFlags<[], " detection of uninitialized parameters and return values">>;
+        PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [], "Disable">,
+        BothFlags<[CC1Option, CoreOption], " detection of uninitialized parameters and return values">>;
 //// Note: This flag was introduced when it was necessary to distinguish between
 //       ABI for correct codegen.  This is no longer needed, but the flag is
 //       not removed since targeting either ABI will behave the same.
@@ -1732,25 +1729,25 @@ defm sanitize_memory_param_retval
 //       either.
 def fsanitize_hwaddress_abi_EQ
     : Joined<["-"], "fsanitize-hwaddress-abi=">,
-      Group<f_clang_Group>,
+      Group<f_clang_Group>, Flags<[CoreOption]>,
       HelpText<"Select the HWAddressSanitizer ABI to target (interceptor or platform, default interceptor). This option is currently unused.">;
 def fsanitize_recover_EQ : CommaJoined<["-"], "fsanitize-recover=">,
-                           Group<f_clang_Group>, MarshalledManually,
+                           Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>, MarshalledManually,
                            HelpText<"Enable recovery for specified sanitizers">;
 def fno_sanitize_recover_EQ : CommaJoined<["-"], "fno-sanitize-recover=">,
                               Group<f_clang_Group>, Flags<[CoreOption, NoXarchOption]>,
                               HelpText<"Disable recovery for specified sanitizers">;
-def fsanitize_recover : Flag<["-"], "fsanitize-recover">, Group<f_clang_Group>,
+def fsanitize_recover : Flag<["-"], "fsanitize-recover">, Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                         Alias<fsanitize_recover_EQ>, AliasArgs<["all"]>;
 def fno_sanitize_recover : Flag<["-"], "fno-sanitize-recover">,
                            Flags<[CoreOption, NoXarchOption]>, Group<f_clang_Group>,
                            Alias<fno_sanitize_recover_EQ>, AliasArgs<["all"]>;
-def fsanitize_trap_EQ : CommaJoined<["-"], "fsanitize-trap=">, Group<f_clang_Group>, MarshalledManually,
-                        HelpText<"Enable trapping for specified sanitizers">;
+def fsanitize_trap_EQ : CommaJoined<["-"], "fsanitize-trap=">, Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
+                        MarshalledManually, HelpText<"Enable trapping for specified sanitizers">;
 def fno_sanitize_trap_EQ : CommaJoined<["-"], "fno-sanitize-trap=">, Group<f_clang_Group>,
                            Flags<[CoreOption, NoXarchOption]>,
                            HelpText<"Disable trapping for specified sanitizers">;
-def fsanitize_trap : Flag<["-"], "fsanitize-trap">, Group<f_clang_Group>,
+def fsanitize_trap : Flag<["-"], "fsanitize-trap">, Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                      Alias<fsanitize_trap_EQ>, AliasArgs<["all"]>,
                      HelpText<"Enable trapping for all sanitizers">;
 def fno_sanitize_trap : Flag<["-"], "fno-sanitize-trap">, Group<f_clang_Group>,
@@ -1758,44 +1755,44 @@ def fno_sanitize_trap : Flag<["-"], "fno-sanitize-trap">, Group<f_clang_Group>,
                         Flags<[CoreOption, NoXarchOption]>,
                         HelpText<"Disable trapping for all sanitizers">;
 def fsanitize_undefined_trap_on_error
-    : Flag<["-"], "fsanitize-undefined-trap-on-error">, Group<f_clang_Group>,
+    : Flag<["-"], "fsanitize-undefined-trap-on-error">, Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
       Alias<fsanitize_trap_EQ>, AliasArgs<["undefined"]>;
 def fno_sanitize_undefined_trap_on_error
-    : Flag<["-"], "fno-sanitize-undefined-trap-on-error">, Group<f_clang_Group>,
+    : Flag<["-"], "fno-sanitize-undefined-trap-on-error">, Group<f_clang_Group>, Flags<[CoreOption]>,
       Alias<fno_sanitize_trap_EQ>, AliasArgs<["undefined"]>;
 defm sanitize_minimal_runtime : BoolOption<"f", "sanitize-minimal-runtime",
   CodeGenOpts<"SanitizeMinimalRuntime">, DefaultFalse,
-  PosFlag<SetTrue>, NegFlag<SetFalse>>,
+  PosFlag<SetTrue, [CC1Option]>, NegFlag<SetFalse>, BothFlags<[CoreOption]>>,
   Group<f_clang_Group>;
 def fsanitize_link_runtime : Flag<["-"], "fsanitize-link-runtime">,
-                           Group<f_clang_Group>;
+                           Group<f_clang_Group>, Flags<[CoreOption]>;
 def fno_sanitize_link_runtime : Flag<["-"], "fno-sanitize-link-runtime">,
-                              Group<f_clang_Group>;
+                              Group<f_clang_Group>, Flags<[CoreOption]>;
 def fsanitize_link_cxx_runtime : Flag<["-"], "fsanitize-link-c++-runtime">,
-                                 Group<f_clang_Group>;
+                                 Group<f_clang_Group>, Flags<[CoreOption]>;
 def fno_sanitize_link_cxx_runtime : Flag<["-"], "fno-sanitize-link-c++-runtime">,
-                                    Group<f_clang_Group>;
+                                    Group<f_clang_Group>, Flags<[CoreOption]>;
 defm sanitize_cfi_cross_dso : BoolOption<"f", "sanitize-cfi-cross-dso",
   CodeGenOpts<"SanitizeCfiCrossDso">, DefaultFalse,
-  PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Disable">,
-  BothFlags<[], " control flow integrity (CFI) checks for cross-DSO calls.">>,
+  PosFlag<SetTrue, [CC1Option], "Enable">, NegFlag<SetFalse, [NoXarchOption], "Disable">,
+  BothFlags<[CoreOption], " control flow integrity (CFI) checks for cross-DSO calls.">>,
   Group<f_clang_Group>;
 def fsanitize_cfi_icall_generalize_pointers : Flag<["-"], "fsanitize-cfi-icall-generalize-pointers">,
-                                              Group<f_clang_Group>,
+                                              Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>,
                                               HelpText<"Generalize pointers in CFI indirect call type signature checks">,
                                               MarshallingInfoFlag<CodeGenOpts<"SanitizeCfiICallGeneralizePointers">>;
 defm sanitize_cfi_canonical_jump_tables : BoolOption<"f", "sanitize-cfi-canonical-jump-tables",
   CodeGenOpts<"SanitizeCfiCanonicalJumpTables">, DefaultFalse,
-  PosFlag<SetTrue, [], "Make">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Do not make">,
-  BothFlags<[], " the jump table addresses canonical in the symbol table">>,
+  PosFlag<SetTrue, [CC1Option], "Make">, NegFlag<SetFalse, [NoXarchOption], "Do not make">,
+  BothFlags<[CoreOption], " the jump table addresses canonical in the symbol table">>,
   Group<f_clang_Group>;
 defm sanitize_stats : BoolOption<"f", "sanitize-stats",
   CodeGenOpts<"SanitizeStats">, DefaultFalse,
-  PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Disable">,
-  BothFlags<[], " sanitizer statistics gathering.">>,
+  PosFlag<SetTrue, [CC1Option], "Enable">, NegFlag<SetFalse, [NoXarchOption], "Disable">,
+  BothFlags<[CoreOption], " sanitizer statistics gathering.">>,
   Group<f_clang_Group>;
 def fsanitize_thread_memory_access : Flag<["-"], "fsanitize-thread-memory-access">,
-                                     Group<f_clang_Group>,
+                                     Group<f_clang_Group>, Flags<[CoreOption]>,
                                      HelpText<"Enable memory access instrumentation in ThreadSanitizer (default)">;
 def fno_sanitize_thread_memory_access : Flag<["-"], "fno-sanitize-thread-memory-access">,
                                         Group<f_clang_Group>,
@@ -1816,12 +1813,10 @@ def fno_sanitize_thread_atomics : Flag<["-"], "fno-sanitize-thread-atomics">,
                                   Flags<[CoreOption, NoXarchOption]>,
                                   HelpText<"Disable atomic operations instrumentation in ThreadSanitizer">;
 def fsanitize_undefined_strip_path_components_EQ : Joined<["-"], "fsanitize-undefined-strip-path-components=">,
-  Group<f_clang_Group>, MetaVarName<"<number>">,
+  Group<f_clang_Group>, Flags<[CC1Option, CoreOption]>, MetaVarName<"<number>">,
   HelpText<"Strip (or keep only, if negative) a given number of path components "
            "when emitting check metadata.">,
   MarshallingInfoInt<CodeGenOpts<"EmitCheckPathComponentsToStrip">, "0", "int">;
-
-} // end -f[no-]sanitize* flags
 
 def funsafe_math_optimizations : Flag<["-"], "funsafe-math-optimizations">,
   Group<f_Group>;
@@ -5315,7 +5310,7 @@ def funwind_tables_EQ : Joined<["-"], "funwind-tables=">,
 defm constructor_aliases : BoolOption<"m", "constructor-aliases",
   CodeGenOpts<"CXXCtorDtorAliases">, DefaultFalse,
   PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [], "Disable">,
-  BothFlags<[CC1Option], " emitting complete constructors and destructors as aliases when possible">>;
+  BothFlags<[], " emitting complete constructors and destructors as aliases when possible">>;
 def mlink_bitcode_file : Separate<["-"], "mlink-bitcode-file">, MarshalledManually,
   HelpText<"Link the given bitcode file before performing optimizations.">;
 def mlink_builtin_bitcode : Separate<["-"], "mlink-builtin-bitcode">, MarshalledManually,
