@@ -4037,7 +4037,7 @@ static void renderDwarfFormat(const Driver &D, const llvm::Triple &T,
           << DwarfFormatArg->getAsString(Args) << "ELF platforms";
   }
 
-  DwarfFormatArg->render(Args, CmdArgs);
+  Args.addOptInFlag(CmdArgs, options::OPT_gdwarf64, options::OPT_gdwarf32);
 }
 
 static void renderDebugOptions(const ToolChain &TC, const Driver &D,
