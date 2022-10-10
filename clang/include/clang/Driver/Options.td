@@ -5295,8 +5295,6 @@ def mabi_EQ_ieeelongdouble : Flag<["-"], "mabi=ieeelongdouble">,
 def mfloat_abi : Separate<["-"], "mfloat-abi">,
   HelpText<"The float ABI to use">,
   MarshallingInfoString<CodeGenOpts<"FloatABI">>;
-def mtp : Separate<["-"], "mtp">,
-  HelpText<"Mode for reading thread pointer">;
 def mlimit_float_precision : Separate<["-"], "mlimit-float-precision">,
   HelpText<"Limit float precision to the given value">,
   MarshallingInfoString<CodeGenOpts<"LimitFloatPrecision">>;
