@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 %s -emit-llvm -o - | FileCheck %s -check-prefix=CHECK-DEFAULT
-// RUN: %clang_cc1 %s -fno-common -emit-llvm -o - | FileCheck %s -check-prefix=CHECK-DEFAULT
 // RUN: %clang_cc1 %s -fcommon -emit-llvm -o - | FileCheck %s -check-prefix=CHECK-COMMON
 
 // CHECK-COMMON: @x = common {{(dso_local )?}}global
