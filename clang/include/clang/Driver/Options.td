@@ -1996,7 +1996,7 @@ def fxray_instruction_threshold_EQ :
   MarshallingInfoInt<CodeGenOpts<"XRayInstructionThreshold">, "200">;
 def fxray_instruction_threshold_ :
   JoinedOrSeparate<["-"], "fxray-instruction-threshold">,
-  Group<f_Group>, Flags<[CC1Option]>;
+  Group<f_Group>;
 
 def fxray_always_instrument :
   JoinedOrSeparate<["-"], "fxray-always-instrument=">,
@@ -2015,7 +2015,7 @@ def fxray_attr_list :
   MarshallingInfoStringVector<LangOpts<"XRayAttrListFiles">>;
 def fxray_modes :
   JoinedOrSeparate<["-"], "fxray-modes=">,
-  Group<f_Group>, Flags<[CC1Option]>,
+  Group<f_Group>,
   HelpText<"List of modes to link in by default into XRay instrumented binaries.">;
 
 defm xray_always_emit_customevents : BoolFOption<"xray-always-emit-customevents",
@@ -2043,7 +2043,6 @@ defm xray_function_index : BoolFOption<"xray-function-index",
   PosFlag<SetTrue>>;
 
 def fxray_link_deps : Flag<["-"], "fxray-link-deps">, Group<f_Group>,
-  Flags<[CC1Option]>,
   HelpText<"Tells clang to add the link dependencies for XRay.">;
 def fnoxray_link_deps : Flag<["-"], "fnoxray-link-deps">, Group<f_Group>;
 

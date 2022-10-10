@@ -237,9 +237,6 @@ void XRayArgs::addArgs(const ToolChain &TC, const ArgList &Args,
                            Twine(XRaySelectedFunctionGroup)));
   }
 
-  CmdArgs.push_back(Args.MakeArgString(Twine(XRayInstructionThresholdOption) +
-                                       Twine(InstructionThreshold)));
-
   for (const auto &Always : AlwaysInstrumentFiles) {
     SmallString<64> AlwaysInstrumentOpt("-fxray-always-instrument=");
     AlwaysInstrumentOpt += Always;
@@ -262,12 +259,6 @@ void XRayArgs::addArgs(const ToolChain &TC, const ArgList &Args,
     SmallString<64> ExtraDepOpt("-fdepfile-entry=");
     ExtraDepOpt += Dep;
     CmdArgs.push_back(Args.MakeArgString(ExtraDepOpt));
-  }
-
-  for (const auto &Mode : Modes) {
-    SmallString<64> ModeOpt("-fxray-modes=");
-    ModeOpt += Mode;
-    CmdArgs.push_back(Args.MakeArgString(ModeOpt));
   }
 
   SmallString<64> Bundle("-fxray-instrumentation-bundle=");
