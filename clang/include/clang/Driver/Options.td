@@ -714,7 +714,7 @@ def MJ : JoinedOrSeparate<["-"], "MJ">, Group<M_Group>,
 def MP : Flag<["-"], "MP">, Group<M_Group>, Flags<[CC1Option]>,
     HelpText<"Create phony target for each dependency (other than main file)">,
     MarshallingInfoFlag<DependencyOutputOpts<"UsePhonyTargets">>;
-def MQ : JoinedOrSeparate<["-"], "MQ">, Group<M_Group>, Flags<[CC1Option]>,
+def MQ : JoinedOrSeparate<["-"], "MQ">, Group<M_Group>,
     HelpText<"Specify name of main file output to quote in depfile">;
 def MT : JoinedOrSeparate<["-"], "MT">, Group<M_Group>, Flags<[CC1Option]>,
     HelpText<"Specify name of main file output in depfile">,
