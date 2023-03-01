@@ -1,4 +1,8 @@
 // REQUIRES: shell
+
+//--- frameworks/Framework.framework/Headers/Framework.h
+//---
+
 // RUN: rm -rf %t.dir
 // RUN: rm -rf %t.cdb
 // RUN: mkdir -p %t.dir
