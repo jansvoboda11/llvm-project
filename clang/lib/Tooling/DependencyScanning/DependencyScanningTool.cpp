@@ -40,7 +40,6 @@ public:
   void handlePrebuiltModuleDependency(PrebuiltModuleDep PMD) override {}
   void handleModuleDependency(ModuleDeps MD) override {}
   void handleDirectModuleDependency(ModuleID ID) override {}
-  void handleContextHash(std::string Hash) override {}
 
   void printDependencies(std::string &S) {
     assert(Opts && "Handled dependency output options.");
@@ -168,7 +167,6 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
 TranslationUnitDeps FullDependencyConsumer::takeTranslationUnitDeps() {
   TranslationUnitDeps TU;
 
-  TU.ID.ContextHash = std::move(ContextHash);
   TU.FileDeps = std::move(Dependencies);
   TU.PrebuiltModuleDeps = std::move(PrebuiltModuleDeps);
   TU.Commands = std::move(Commands);

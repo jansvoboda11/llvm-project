@@ -166,10 +166,6 @@ public:
     DirectModuleDeps.push_back(ID);
   }
 
-  void handleContextHash(std::string Hash) override {
-    ContextHash = std::move(Hash);
-  }
-
   TranslationUnitDeps takeTranslationUnitDeps();
   ModuleDepsGraph takeModuleGraphDeps();
 
@@ -179,7 +175,6 @@ private:
   llvm::MapVector<ModuleID, ModuleDeps> ClangModuleDeps;
   std::vector<ModuleID> DirectModuleDeps;
   std::vector<Command> Commands;
-  std::string ContextHash;
   std::vector<std::string> OutputPaths;
   const llvm::DenseSet<ModuleID> &AlreadySeen;
 };

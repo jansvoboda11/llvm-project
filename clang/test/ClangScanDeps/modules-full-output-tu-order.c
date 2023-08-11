@@ -29,7 +29,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [],
 // CHECK-NEXT:           "command-line": [
 // CHECK:                  "-D"
@@ -46,7 +45,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [],
 // CHECK-NEXT:           "command-line": [
 // CHECK:                  "-D"

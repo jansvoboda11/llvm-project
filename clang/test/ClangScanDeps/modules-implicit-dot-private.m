@@ -52,8 +52,7 @@ framework module FW_Private { umbrella header "FW_Private.h" }
 // CHECK:        ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
 // CHECK-NEXT:           "module-name": "FW"

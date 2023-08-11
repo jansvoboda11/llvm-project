@@ -339,7 +339,6 @@ public:
 
     InputDeps ID;
     ID.FileName = std::string(Input);
-    ID.ContextHash = std::move(TUDeps.ID.ContextHash);
     ID.FileDeps = std::move(TUDeps.FileDeps);
     ID.ModuleDeps = std::move(TUDeps.ClangModuleDeps);
     ID.DriverCommandLine = std::move(TUDeps.DriverCommandLine);
@@ -423,7 +422,6 @@ public:
         for (const auto &Cmd : I.Commands) {
           Object O{
               {"input-file", I.FileName},
-              {"clang-context-hash", I.ContextHash},
               {"file-deps", I.FileDeps},
               {"clang-module-deps", toJSONSorted(I.ModuleDeps)},
               {"executable", Cmd.Executable},
@@ -434,7 +432,6 @@ public:
       } else {
         Object O{
             {"input-file", I.FileName},
-            {"clang-context-hash", I.ContextHash},
             {"file-deps", I.FileDeps},
             {"clang-module-deps", toJSONSorted(I.ModuleDeps)},
             {"executable", "clang"},
@@ -492,7 +489,6 @@ private:
 
   struct InputDeps {
     std::string FileName;
-    std::string ContextHash;
     std::vector<std::string> FileDeps;
     std::vector<ModuleID> ModuleDeps;
     std::vector<std::string> DriverCommandLine;

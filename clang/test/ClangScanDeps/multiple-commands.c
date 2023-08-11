@@ -43,7 +43,6 @@
 // CHECK-NEXT:   {
 // CHECK:          "commands": [
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "clang-context-hash":
 // CHECK-NEXT:         "clang-module-deps": []
 // CHECK-NEXT:         "command-line": [
 // CHECK-NEXT:           "-cc1"
@@ -55,7 +54,6 @@
 // CHECK:              "input-file": "[[PREFIX]]{{.}}tu_no_integrated_cpp.c"
 // CHECK-NEXT:       }
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "clang-context-hash":
 // CHECK-NEXT:         "clang-module-deps": []
 // CHECK-NEXT:         "command-line": [
 // CHECK-NEXT:           "-cc1"
