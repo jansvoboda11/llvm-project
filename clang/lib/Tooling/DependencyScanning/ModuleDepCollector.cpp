@@ -636,5 +636,5 @@ void ModuleDepCollector::addFileDep(StringRef Path) {
 void ModuleDepCollector::addFileDep(ModuleDeps &MD, StringRef Path) {
   llvm::SmallString<256> Storage;
   Path = makeAbsoluteAndPreferred(ScanInstance, Path, Storage);
-  MD.FileDeps.insert(Path);
+  MD.FileDeps.push_back(Path.str());
 }

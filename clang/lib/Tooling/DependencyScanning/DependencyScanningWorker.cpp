@@ -231,12 +231,8 @@ public:
     Opts->IncludeSystemHeaders = true;
 
     switch (Format) {
-    case ScanningOutputFormat::Make:
-      ScanInstance.addDependencyCollector(
-          std::make_shared<DependencyConsumerForwarder>(
-              std::move(Opts), WorkingDirectory, Consumer));
-      break;
     case ScanningOutputFormat::P1689:
+    case ScanningOutputFormat::Make:
     case ScanningOutputFormat::Full:
       MDC = std::make_shared<ModuleDepCollector>(
           std::move(Opts), ScanInstance, Consumer, Controller,

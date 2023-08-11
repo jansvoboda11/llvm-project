@@ -82,15 +82,6 @@ public:
                          llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
                              llvm::vfs::createPhysicalFileSystem());
 
-  /// Print out the dependency information into a string using the dependency
-  /// file format that is specified in the options (-MD is the default) and
-  /// return it.
-  ///
-  /// \returns A \c StringError with the diagnostic output if clang errors
-  /// occurred, dependency file contents otherwise.
-  llvm::Expected<std::string>
-  getDependencyFile(const std::vector<std::string> &CommandLine, StringRef CWD);
-
   /// Collect the module dependency in P1689 format for C++20 named modules.
   ///
   /// \param MakeformatOutput The output parameter for dependency information

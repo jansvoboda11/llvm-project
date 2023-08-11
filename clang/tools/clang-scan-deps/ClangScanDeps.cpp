@@ -407,7 +407,7 @@ public:
       Object O{
           {"name", MD.ID.ModuleName},
           {"context-hash", MD.ID.ContextHash},
-          {"file-deps", toJSONSorted(MD.FileDeps)},
+          {"file-deps", MD.FileDeps},
           {"clang-module-deps", toJSONSorted(MD.ClangModuleDeps)},
           {"clang-modulemap-file", MD.ClangModuleMapFile},
           {"command-line", MD.BuildArguments},
@@ -450,6 +450,49 @@ public:
     };
 
     OS << llvm::formatv("{0:2}\n", Value(std::move(Output)));
+  }
+
+  void printMakeOutput(raw_ostream &OS) {
+    llvm::DenseMap<ModuleID, std::string> ModuleOutputs;
+    auto PrintModuleOutput = [&OS, &ModuleOutputs](const ModuleID &MID) {
+      OS << ModuleOutputs[MID];
+    };
+
+    const InputDeps &Input = Inputs[0];
+    const Command &Cmd = Input.Commands[0];
+
+    for (const auto &[IMID, MD] : Modules) {
+      std::string ModuleOutput = *(++llvm::find(MD.BuildArguments, "-o"));
+
+      OS << ModuleOutput;
+      OS << ": ";
+      llvm::interleave(MD.FileDeps, OS, " ");
+      OS << "\n";
+      OS << "\t" << Cmd.Executable;
+      OS << " ";
+      llvm::interleave(MD.BuildArguments, OS, " ");
+      OS << "\n";
+
+      ModuleOutputs.insert({IMID.ID, std::move(ModuleOutput)});
+    }
+
+    OS << ".PHONY: all\n";
+
+    OS << "all: ";
+    OS << *(++llvm::find(Cmd.Arguments, "-o"));
+    OS << "\n";
+
+    OS << *(++llvm::find(Cmd.Arguments, "-o"));
+    OS << ": ";
+    llvm::interleave(Input.FileDeps, OS, " ");
+    OS << " ";
+    llvm::interleave(Input.ModuleDeps, OS, PrintModuleOutput, " ");
+    OS << "\n";
+
+    OS << "\t" << Cmd.Executable;
+    OS << " ";
+    llvm::interleave(Cmd.Arguments, OS, " ");
+    OS << "\n";
   }
 
 private:
@@ -855,7 +898,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
     return {};
   };
 
-  if (Format == ScanningOutputFormat::Full)
+  if (Format == ScanningOutputFormat::Full || Format == ScanningOutputFormat::Make)
     FD.emplace(ModuleName.empty() ? Inputs.size() : 0);
 
   if (Verbose) {
@@ -887,13 +930,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
         };
 
         // Run the tool on it.
-        if (Format == ScanningOutputFormat::Make) {
-          auto MaybeFile =
-              WorkerTools[I]->getDependencyFile(Input->CommandLine, CWD);
-          if (handleMakeDependencyToolResult(Filename, MaybeFile, DependencyOS,
-                                             Errs))
-            HadErrors = true;
-        } else if (Format == ScanningOutputFormat::P1689) {
+        if (Format == ScanningOutputFormat::P1689) {
           // It is useful to generate the make-format dependency output during
           // the scanning for P1689. Otherwise the users need to scan again for
           // it. We will generate the make-format dependency output if we find
@@ -967,6 +1004,8 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
 
   if (Format == ScanningOutputFormat::Full)
     FD->printFullOutput(llvm::outs());
+  else if (Format == ScanningOutputFormat::Make)
+    FD->printMakeOutput(llvm::outs());
   else if (Format == ScanningOutputFormat::P1689)
     PD.printDependencies(llvm::outs());
 
