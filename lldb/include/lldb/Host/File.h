@@ -33,7 +33,7 @@ LLVM_ENABLE_BITMASK_ENUMS_IN_NAMESPACE();
 /// around host OS file functionality.   But it
 /// is also possible to subclass file to provide objects that have file
 /// or stream functionality but are not backed by any host OS file.
-class File : public IOObject {
+class File : public IOObject, public llvm::RTTIExtends<File, llvm::RTTIRoot> {
 public:
   static int kInvalidDescriptor;
   static FILE *kInvalidStream;
@@ -360,8 +360,6 @@ public:
   bool operator!() const { return !IsValid(); };
 
   static char ID;
-  virtual bool isA(const void *classID) const { return classID == &ID; }
-  static bool classof(const File *file) { return file->isA(&ID); }
 
 protected:
   LazyBool m_is_interactive = eLazyBoolCalculate;
@@ -375,7 +373,7 @@ private:
   const File &operator=(const File &) = delete;
 };
 
-class NativeFile : public File {
+class NativeFile : public llvm::RTTIExtends<NativeFile, File> {
 public:
   NativeFile() : m_descriptor(kInvalidDescriptor), m_stream(kInvalidStream) {}
 
@@ -409,10 +407,6 @@ public:
   llvm::Expected<OpenOptions> GetOptions() const override;
 
   static char ID;
-  bool isA(const void *classID) const override {
-    return classID == &ID || File::isA(classID);
-  }
-  static bool classof(const File *file) { return file->isA(&ID); }
 
 protected:
   struct ValueGuard {
@@ -455,7 +449,7 @@ private:
   const NativeFile &operator=(const NativeFile &) = delete;
 };
 
-class SerialPort : public NativeFile {
+class SerialPort : public llvm::RTTIExtends<SerialPort, NativeFile> {
 public:
   struct Options {
     std::optional<unsigned int> BaudRate;
@@ -479,10 +473,6 @@ public:
   Status Close() override;
 
   static char ID;
-  bool isA(const void *classID) const override {
-    return classID == &ID || File::isA(classID);
-  }
-  static bool classof(const File *file) { return file->isA(&ID); }
 
 private:
   SerialPort(int fd, OpenOptions options, Options serial_options,

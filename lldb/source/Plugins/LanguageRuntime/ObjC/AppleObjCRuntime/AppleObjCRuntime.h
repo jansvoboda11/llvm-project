@@ -20,7 +20,8 @@
 
 namespace lldb_private {
 
-class AppleObjCRuntime : public lldb_private::ObjCLanguageRuntime {
+class AppleObjCRuntime
+    : public llvm::RTTIExtends<AppleObjCRuntime, ObjCLanguageRuntime> {
 public:
   ~AppleObjCRuntime() override;
 
@@ -34,14 +35,6 @@ public:
   static void Initialize();
 
   static void Terminate();
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjCLanguageRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
 
   // These are generic runtime functions:
   bool GetObjectDescription(Stream &str, Value &value,

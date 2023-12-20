@@ -116,6 +116,9 @@ public:
   // Inherit constructors from ParentT.
   using ParentT::ParentT;
 
+  // Inherit the isA() function template from ParentT.
+  using ParentT::isA;
+
   static const void *classID() { return &ThisT::ID; }
 
   const void *dynamicClassID() const override { return &ThisT::ID; }

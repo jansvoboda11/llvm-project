@@ -100,7 +100,8 @@ LanguageRuntime *GNUstepObjCRuntime::CreateInstance(Process *process,
 GNUstepObjCRuntime::~GNUstepObjCRuntime() = default;
 
 GNUstepObjCRuntime::GNUstepObjCRuntime(Process *process)
-    : ObjCLanguageRuntime(process), m_objc_module_sp(nullptr) {
+    : llvm::RTTIExtends<GNUstepObjCRuntime, ObjCLanguageRuntime>(process),
+      m_objc_module_sp(nullptr) {
   ReadObjCLibraryIfNeeded(process->GetTarget().GetImages());
 }
 

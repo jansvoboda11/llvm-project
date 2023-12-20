@@ -151,7 +151,8 @@ ObjectFileJSON::ObjectFileJSON(const ModuleSP &module_sp, DataBufferSP &data_sp,
                                UUID uuid, Type type,
                                std::vector<JSONSymbol> symbols,
                                std::vector<JSONSection> sections)
-    : ObjectFile(module_sp, file, offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFileJSON, ObjectFile>(
+          module_sp, file, offset, length, data_sp, data_offset),
       m_arch(std::move(arch)), m_uuid(std::move(uuid)), m_type(type),
       m_symbols(std::move(symbols)), m_sections(std::move(sections)) {}
 

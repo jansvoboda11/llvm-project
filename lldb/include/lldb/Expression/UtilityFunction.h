@@ -27,13 +27,10 @@ namespace lldb_private {
 /// and as a backend for the expr command.  UtilityFunction encapsulates a
 /// self-contained function meant to be used from other code.  Utility
 /// functions can perform error-checking for ClangUserExpressions,
-class UtilityFunction : public Expression {
+class UtilityFunction : public llvm::RTTIExtends<UtilityFunction, Expression> {
+public:
   // LLVM RTTI support
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   /// Constructor
   ///

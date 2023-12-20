@@ -30,7 +30,7 @@ public:
   virtual ArchSpec GetArchitecture() = 0;
 };
 
-class ObjectFileJIT : public ObjectFile {
+class ObjectFileJIT : public llvm::RTTIExtends<ObjectFileJIT, ObjectFile> {
 public:
   ObjectFileJIT(const lldb::ModuleSP &module_sp,
                 const lldb::ObjectFileJITDelegateSP &delegate_sp);
@@ -66,10 +66,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   // Member Functions
   bool ParseHeader() override;

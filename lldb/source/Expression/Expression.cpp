@@ -12,6 +12,8 @@
 
 using namespace lldb_private;
 
+char Expression::ID = 0;
+
 Expression::Expression(Target &target)
     : m_target_wp(target.shared_from_this()),
       m_jit_start_addr(LLDB_INVALID_ADDRESS),

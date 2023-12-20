@@ -32,13 +32,10 @@ namespace lldb_private {
 /// JIT an expression.  The actual parsing part will be provided by the specific
 /// implementations of UserExpression - which will be vended through the
 /// appropriate TypeSystem.
-class UserExpression : public Expression {
+class UserExpression : public llvm::RTTIExtends<UserExpression, Expression> {
+public:
   /// LLVM RTTI support.
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   enum { kDefaultTimeout = 500000u };
 

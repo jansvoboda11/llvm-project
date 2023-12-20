@@ -58,7 +58,10 @@ protected:
   void UpdateModuleListIfNeeded();
 };
 
-class LanguageRuntime : public Runtime, public PluginInterface {
+class LanguageRuntime
+    : public Runtime,
+      public PluginInterface,
+      public llvm::RTTIExtends<LanguageRuntime, llvm::RTTIRoot> {
 public:
   static LanguageRuntime *FindPlugin(Process *process,
                                      lldb::LanguageType language);
@@ -203,7 +206,6 @@ public:
     return LLDB_INVALID_ADDRESS;
   }
 
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
   static char ID;
 
   /// A language runtime may be able to provide a special UnwindPlan for

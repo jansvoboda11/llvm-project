@@ -49,9 +49,9 @@ UserExpression::UserExpression(ExecutionContextScope &exe_scope,
                                lldb::LanguageType language,
                                ResultType desired_type,
                                const EvaluateExpressionOptions &options)
-    : Expression(exe_scope), m_expr_text(std::string(expr)),
-      m_expr_prefix(std::string(prefix)), m_language(language),
-      m_desired_type(desired_type), m_options(options) {}
+    : llvm::RTTIExtends<UserExpression, Expression>(exe_scope),
+      m_expr_text(std::string(expr)), m_expr_prefix(std::string(prefix)),
+      m_language(language), m_desired_type(desired_type), m_options(options) {}
 
 UserExpression::~UserExpression() = default;
 

@@ -36,7 +36,8 @@ LLDB_PLUGIN_DEFINE(SymbolFileJSON)
 char SymbolFileJSON::ID;
 
 SymbolFileJSON::SymbolFileJSON(lldb::ObjectFileSP objfile_sp)
-    : SymbolFileCommon(std::move(objfile_sp)) {}
+    : llvm::RTTIExtends<SymbolFileJSON, SymbolFileCommon>(
+          std::move(objfile_sp)) {}
 
 void SymbolFileJSON::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),

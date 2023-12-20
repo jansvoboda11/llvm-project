@@ -15,6 +15,7 @@
 #include "lldb/lldb-types.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/ExtensibleRTTI.h"
 
 namespace lldb_private {
 
@@ -39,7 +40,7 @@ namespace lldb_private {
 /// This class currently expects all data to be available without any extra
 /// calls being made, but we can modify it to optionally get data on demand
 /// with some extra function calls to load the data before it gets accessed.
-class DataBuffer {
+class DataBuffer : public llvm::RTTIExtends<DataBuffer, llvm::RTTIRoot> {
 public:
   virtual ~DataBuffer() = default;
 
@@ -61,13 +62,7 @@ public:
   }
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
 
 protected:
   /// Get a const pointer to the data.
@@ -87,7 +82,8 @@ protected:
 /// DataExtractor objects can share the same data and sub-ranges of that
 /// shared data, and the last object that contains a reference to the shared
 /// data will free it.
-class WritableDataBuffer : public DataBuffer {
+class WritableDataBuffer
+    : public llvm::RTTIExtends<WritableDataBuffer, DataBuffer> {
 public:
   /// Destructor
   ///
@@ -112,18 +108,11 @@ public:
   }
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || DataBuffer::isA(ClassID);
-  }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
 };
 
-class DataBufferUnowned : public WritableDataBuffer {
+class DataBufferUnowned
+    : public llvm::RTTIExtends<DataBufferUnowned, WritableDataBuffer> {
 public:
   DataBufferUnowned(uint8_t *bytes, lldb::offset_t size)
       : m_bytes(bytes), m_size(size) {}
@@ -132,15 +121,8 @@ public:
   lldb::offset_t GetByteSize() const override { return m_size; }
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || WritableDataBuffer::isA(ClassID);
-  }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
+
 private:
   uint8_t *m_bytes;
   lldb::offset_t m_size;

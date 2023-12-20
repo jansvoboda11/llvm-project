@@ -32,7 +32,7 @@ char ClangUtilityFunction::ID;
 ClangUtilityFunction::ClangUtilityFunction(ExecutionContextScope &exe_scope,
                                            std::string text, std::string name,
                                            bool enable_debugging)
-    : UtilityFunction(
+    : llvm::RTTIExtends<ClangUtilityFunction, UtilityFunction>(
           exe_scope,
           std::string(ClangExpressionSourceCode::g_expression_prefix) + text +
               std::string(ClangExpressionSourceCode::g_expression_suffix),

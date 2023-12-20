@@ -21,6 +21,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/ExtensibleRTTI.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
@@ -42,9 +43,9 @@ class ErrorSuccess;
 
 /// Base class for error info classes. Do not extend this directly: Extend
 /// the ErrorInfo template subclass instead.
-class ErrorInfoBase {
+class ErrorInfoBase : public RTTIExtends<ErrorInfoBase, RTTIRoot> {
 public:
-  virtual ~ErrorInfoBase() = default;
+  static char ID;
 
   /// Print an error message to an output stream.
   virtual void log(raw_ostream &OS) const = 0;
@@ -63,27 +64,8 @@ public:
   /// using std::error_code. It will be removed in the future.
   virtual std::error_code convertToErrorCode() const = 0;
 
-  // Returns the class ID for this type.
-  static const void *classID() { return &ID; }
-
-  // Returns the class ID for the dynamic type of this ErrorInfoBase instance.
-  virtual const void *dynamicClassID() const = 0;
-
-  // Check whether this instance is a subclass of the class identified by
-  // ClassID.
-  virtual bool isA(const void *const ClassID) const {
-    return ClassID == classID();
-  }
-
-  // Check whether this instance is a subclass of ErrorInfoT.
-  template <typename ErrorInfoT> bool isA() const {
-    return isA(ErrorInfoT::classID());
-  }
-
 private:
-  virtual void anchor();
-
-  static char ID;
+  void anchor() override;
 };
 
 /// Lightweight error class with error context and mandatory checking.
@@ -349,17 +331,8 @@ template <typename ErrT, typename... ArgTs> Error make_error(ArgTs &&... Args) {
 /// This class provides an implementation of the ErrorInfoBase::kind
 /// method, which is used by the Error RTTI system.
 template <typename ThisErrT, typename ParentErrT = ErrorInfoBase>
-class ErrorInfo : public ParentErrT {
-public:
-  using ParentErrT::ParentErrT; // inherit constructors
-
-  static const void *classID() { return &ThisErrT::ID; }
-
-  const void *dynamicClassID() const override { return &ThisErrT::ID; }
-
-  bool isA(const void *const ClassID) const override {
-    return ClassID == classID() || ParentErrT::isA(ClassID);
-  }
+class ErrorInfo : public RTTIExtends<ThisErrT, ParentErrT> {
+  using RTTIExtends<ThisErrT, ParentErrT>::RTTIExtends;
 };
 
 /// Special ErrorInfo subclass representing a list of ErrorInfos.

@@ -35,14 +35,15 @@ namespace clang {
 /// An abstract interface that should be implemented by
 /// external AST sources that also provide information for semantic
 /// analysis.
-class MultiplexExternalSemaSource : public ExternalSemaSource {
-  /// LLVM-style RTTI.
-  static char ID;
-
-private:
+class MultiplexExternalSemaSource
+    : public llvm::RTTIExtends<MultiplexExternalSemaSource,
+                               ExternalSemaSource> {
   SmallVector<ExternalSemaSource *, 2> Sources;
 
 public:
+  /// LLVM-style RTTI.
+  static char ID;
+
   /// Constructs a new multiplexing external sema source and appends the
   /// given element to it.
   ///
@@ -362,14 +363,6 @@ public:
 
   // Inform all attached sources that a mangling number was assigned.
   void AssignedLambdaNumbering(const CXXRecordDecl *Lambda) override;
-
-  /// LLVM-style RTTI.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ExternalSemaSource::isA(ClassID);
-  }
-  static bool classof(const ExternalASTSource *S) { return S->isA(&ID); }
-  /// \}
 };
 
 } // end namespace clang

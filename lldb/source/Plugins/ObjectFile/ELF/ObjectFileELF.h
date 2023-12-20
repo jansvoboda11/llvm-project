@@ -55,7 +55,8 @@ struct ELFNote {
 ///
 /// This class provides a generic ELF (32/64 bit) reader plugin implementing
 /// the ObjectFile protocol.
-class ObjectFileELF : public lldb_private::ObjectFile {
+class ObjectFileELF
+    : public llvm::RTTIExtends<ObjectFileELF, lldb_private::ObjectFile> {
 public:
   // Static Functions
   static void Initialize();
@@ -92,10 +93,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   // ObjectFile Protocol.
   bool ParseHeader() override;

@@ -937,7 +937,8 @@ ObjectFileMachO::ObjectFileMachO(const lldb::ModuleSP &module_sp,
                                  const FileSpec *file,
                                  lldb::offset_t file_offset,
                                  lldb::offset_t length)
-    : ObjectFile(module_sp, file, file_offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFileMachO, lldb_private::ObjectFile>(
+          module_sp, file, file_offset, length, data_sp, data_offset),
       m_mach_sections(), m_entry_point_address(), m_thread_context_offsets(),
       m_thread_context_offsets_valid(false), m_reexported_dylibs(),
       m_allow_assembly_emulation_unwind_plans(true) {
@@ -949,7 +950,8 @@ ObjectFileMachO::ObjectFileMachO(const lldb::ModuleSP &module_sp,
                                  lldb::WritableDataBufferSP header_data_sp,
                                  const lldb::ProcessSP &process_sp,
                                  lldb::addr_t header_addr)
-    : ObjectFile(module_sp, process_sp, header_addr, header_data_sp),
+    : llvm::RTTIExtends<ObjectFileMachO, lldb_private::ObjectFile>(
+          module_sp, process_sp, header_addr, header_data_sp),
       m_mach_sections(), m_entry_point_address(), m_thread_context_offsets(),
       m_thread_context_offsets_valid(false), m_reexported_dylibs(),
       m_allow_assembly_emulation_unwind_plans(true) {

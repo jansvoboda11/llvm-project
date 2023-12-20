@@ -27,7 +27,8 @@ namespace lldb_private {
 /// pages in. Large amounts of data that comes from files should probably use
 /// DataBufferLLVM, which can intelligently determine when memory mapping is
 /// optimal.
-class DataBufferHeap : public WritableDataBuffer {
+class DataBufferHeap
+    : public llvm::RTTIExtends<DataBufferHeap, WritableDataBuffer> {
 public:
   /// Default constructor
   ///
@@ -104,15 +105,7 @@ public:
   void Clear();
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || WritableDataBuffer::isA(ClassID);
-  }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
 
 private:
   // This object uses a std::vector<uint8_t> to store its data. This takes care

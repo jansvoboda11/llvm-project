@@ -13,6 +13,7 @@
 #include "lldb/lldb-types.h"
 
 #include <cstdint>
+#include <llvm/Support/ExtensibleRTTI.h>
 #include <memory>
 
 namespace llvm {
@@ -24,7 +25,7 @@ class Twine;
 namespace lldb_private {
 class FileSystem;
 
-class DataBufferLLVM : public DataBuffer {
+class DataBufferLLVM : public llvm::RTTIExtends<DataBufferLLVM, DataBuffer> {
 public:
   ~DataBufferLLVM() override;
 
@@ -32,15 +33,7 @@ public:
   lldb::offset_t GetByteSize() const override;
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || DataBuffer::isA(ClassID);
-  }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
 
   /// Construct a DataBufferLLVM from \p Buffer.  \p Buffer must be a valid
   /// pointer.
@@ -50,7 +43,8 @@ protected:
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
 };
 
-class WritableDataBufferLLVM : public WritableDataBuffer {
+class WritableDataBufferLLVM
+    : public llvm::RTTIExtends<WritableDataBufferLLVM, WritableDataBuffer> {
 public:
   ~WritableDataBufferLLVM() override;
 
@@ -58,15 +52,7 @@ public:
   lldb::offset_t GetByteSize() const override;
 
   /// LLVM RTTI support.
-  /// {
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || WritableDataBuffer::isA(ClassID);
-  }
-  static bool classof(const DataBuffer *data_buffer) {
-    return data_buffer->isA(&ID);
-  }
-  /// }
 
   /// Construct a DataBufferLLVM from \p Buffer.  \p Buffer must be a valid
   /// pointer.

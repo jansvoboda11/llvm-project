@@ -30,18 +30,11 @@ namespace lldb_private {
 /// By default SymbolFileOnDemand will skip load the underlying
 /// symbols. Any client can on demand hydrate the underlying
 /// SymbolFile via SymbolFile::SetLoadDebugInfoEnabled().
-class SymbolFileOnDemand : public lldb_private::SymbolFile {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileOnDemand
+    : public llvm::RTTIExtends<SymbolFileOnDemand, SymbolFile> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFile::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   SymbolFileOnDemand(std::unique_ptr<SymbolFile> &&symbol_file);
   ~SymbolFileOnDemand() override;

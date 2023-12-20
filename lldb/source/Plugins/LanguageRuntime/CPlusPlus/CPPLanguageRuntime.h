@@ -19,7 +19,8 @@
 
 namespace lldb_private {
 
-class CPPLanguageRuntime : public LanguageRuntime {
+class CPPLanguageRuntime
+    : public llvm::RTTIExtends<CPPLanguageRuntime, LanguageRuntime> {
 public:
   enum class LibCppStdFunctionCallableCase {
     Lambda = 0,
@@ -41,14 +42,6 @@ public:
   FindLibCppStdFunctionCallableInfo(lldb::ValueObjectSP &valobj_sp);
 
   static char ID;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || LanguageRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
 
   lldb::LanguageType GetLanguageType() const override {
     return lldb::eLanguageTypeC_plus_plus;

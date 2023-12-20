@@ -47,16 +47,11 @@ namespace lldb_private {
 /// the behaviors except SymbolFileOnDemand which inherits
 /// public interfaces from SymbolFile and forward to underlying concrete
 /// SymbolFile implementation.
-class SymbolFile : public PluginInterface {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFile : public PluginInterface,
+                   public llvm::RTTIExtends<SymbolFile, llvm::RTTIRoot> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   // Symbol file ability bits.
   //
@@ -485,18 +480,11 @@ private:
 
 /// Containing protected virtual methods for child classes to override.
 /// Most actual SymbolFile implementations should inherit from this class.
-class SymbolFileCommon : public SymbolFile {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileCommon
+    : public llvm::RTTIExtends<SymbolFileCommon, SymbolFile> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFile::isA(ClassID);
-  }
-  static bool classof(const SymbolFileCommon *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   // Constructors and Destructors
   SymbolFileCommon(lldb::ObjectFileSP objfile_sp)

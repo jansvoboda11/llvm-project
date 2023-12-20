@@ -19,18 +19,11 @@
 
 namespace lldb_private {
 
-class SymbolFileCTF : public lldb_private::SymbolFileCommon {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileCTF
+    : public llvm::RTTIExtends<SymbolFileCTF, SymbolFileCommon> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   SymbolFileCTF(lldb::ObjectFileSP objfile_sp);
 

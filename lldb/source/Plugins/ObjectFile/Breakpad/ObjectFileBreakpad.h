@@ -15,7 +15,8 @@
 namespace lldb_private {
 namespace breakpad {
 
-class ObjectFileBreakpad : public ObjectFile {
+class ObjectFileBreakpad
+    : public llvm::RTTIExtends<ObjectFileBreakpad, ObjectFile> {
 public:
   // Static Functions
   static void Initialize();
@@ -48,10 +49,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   // ObjectFile Protocol.
 

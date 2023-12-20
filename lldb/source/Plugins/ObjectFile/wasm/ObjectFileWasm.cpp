@@ -231,7 +231,8 @@ size_t ObjectFileWasm::GetModuleSpecifications(
 ObjectFileWasm::ObjectFileWasm(const ModuleSP &module_sp, DataBufferSP data_sp,
                                offset_t data_offset, const FileSpec *file,
                                offset_t offset, offset_t length)
-    : ObjectFile(module_sp, file, offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFileWasm, ObjectFile>(
+          module_sp, file, offset, length, data_sp, data_offset),
       m_arch("wasm32-unknown-unknown-wasm") {
   m_data.SetAddressByteSize(4);
 }
@@ -240,7 +241,8 @@ ObjectFileWasm::ObjectFileWasm(const lldb::ModuleSP &module_sp,
                                lldb::WritableDataBufferSP header_data_sp,
                                const lldb::ProcessSP &process_sp,
                                lldb::addr_t header_addr)
-    : ObjectFile(module_sp, process_sp, header_addr, header_data_sp),
+    : llvm::RTTIExtends<ObjectFileWasm, ObjectFile>(
+          module_sp, process_sp, header_addr, header_data_sp),
       m_arch("wasm32-unknown-unknown-wasm") {}
 
 bool ObjectFileWasm::ParseHeader() {

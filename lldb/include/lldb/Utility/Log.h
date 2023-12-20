@@ -45,59 +45,53 @@ class raw_ostream;
 // Logging Functions
 namespace lldb_private {
 
-class LogHandler {
+class LogHandler : public llvm::RTTIExtends<LogHandler, llvm::RTTIRoot> {
 public:
   virtual ~LogHandler() = default;
   virtual void Emit(llvm::StringRef message) = 0;
 
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
-  static bool classof(const LogHandler *obj) { return obj->isA(&ID); }
-
-private:
   static char ID;
 };
 
-class StreamLogHandler : public LogHandler {
+class StreamLogHandler
+    : public llvm::RTTIExtends<StreamLogHandler, LogHandler> {
 public:
+  static char ID;
+
   StreamLogHandler(int fd, bool should_close, size_t buffer_size = 0);
   ~StreamLogHandler() override;
 
   void Emit(llvm::StringRef message) override;
   void Flush();
 
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const LogHandler *obj) { return obj->isA(&ID); }
-
 private:
   std::mutex m_mutex;
   llvm::raw_fd_ostream m_stream;
-  static char ID;
 };
 
-class CallbackLogHandler : public LogHandler {
+class CallbackLogHandler
+    : public llvm::RTTIExtends<CallbackLogHandler, LogHandler> {
 public:
+  static char ID;
+
   CallbackLogHandler(lldb::LogOutputCallback callback, void *baton);
 
   void Emit(llvm::StringRef message) override;
 
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const LogHandler *obj) { return obj->isA(&ID); }
-
 private:
   lldb::LogOutputCallback m_callback;
   void *m_baton;
-  static char ID;
 };
 
-class RotatingLogHandler : public LogHandler {
+class RotatingLogHandler
+    : public llvm::RTTIExtends<RotatingLogHandler, LogHandler> {
 public:
+  static char ID;
+
   RotatingLogHandler(size_t size);
 
   void Emit(llvm::StringRef message) override;
   void Dump(llvm::raw_ostream &stream) const;
-
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const LogHandler *obj) { return obj->isA(&ID); }
 
 private:
   size_t NormalizeIndex(size_t i) const;
@@ -109,7 +103,6 @@ private:
   const size_t m_size = 0;
   size_t m_next_index = 0;
   size_t m_total_count = 0;
-  static char ID;
 };
 
 class Log final {

@@ -258,15 +258,12 @@ protected:
 };
 
 /// Log handler that emits log messages to the operating system log.
-class SystemLogHandler : public LogHandler {
+class SystemLogHandler
+    : public llvm::RTTIExtends<SystemLogHandler, LogHandler> {
 public:
   SystemLogHandler();
   void Emit(llvm::StringRef message) override;
 
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const LogHandler *obj) { return obj->isA(&ID); }
-
-private:
   static char ID;
 };
 

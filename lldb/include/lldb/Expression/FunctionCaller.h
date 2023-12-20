@@ -53,13 +53,10 @@ namespace lldb_private {
 ///
 /// Any of the methods that take arg_addr_ptr can be passed nullptr, and the
 /// argument space will be managed for you.
-class FunctionCaller : public Expression {
+class FunctionCaller : public llvm::RTTIExtends<FunctionCaller, Expression> {
+public:
   // LLVM RTTI support
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   /// Constructor
   ///

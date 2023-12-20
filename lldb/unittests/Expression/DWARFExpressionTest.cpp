@@ -530,16 +530,12 @@ DWARF:
   ASSERT_EQ(result.GetScalar().UInt(), 0xdeadbeefu);
 }
 
-class CustomSymbolFileDWARF : public SymbolFileDWARF {
+class CustomSymbolFileDWARF
+    : public llvm::RTTIExtends<CustomSymbolFileDWARF, SymbolFileDWARF> {
+public:
   static char ID;
 
-public:
-  using SymbolFileDWARF::SymbolFileDWARF;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFile::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
+  using RTTIExtends::RTTIExtends;
 
   static llvm::StringRef GetPluginNameStatic() { return "custom_dwarf"; }
 

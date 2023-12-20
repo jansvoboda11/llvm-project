@@ -52,8 +52,9 @@ char AppleObjCRuntime::ID = 0;
 AppleObjCRuntime::~AppleObjCRuntime() = default;
 
 AppleObjCRuntime::AppleObjCRuntime(Process *process)
-    : ObjCLanguageRuntime(process), m_read_objc_library(false),
-      m_objc_trampoline_handler_up(), m_Foundation_major() {
+    : llvm::RTTIExtends<AppleObjCRuntime, ObjCLanguageRuntime>(process),
+      m_read_objc_library(false), m_objc_trampoline_handler_up(),
+      m_Foundation_major() {
   ReadObjCLibraryIfNeeded(process->GetTarget().GetImages());
 }
 

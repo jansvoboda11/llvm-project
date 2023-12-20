@@ -103,18 +103,14 @@ public:
 /// itself or it can adopt an existing clang::ASTContext (for example, when
 /// it is necessary to provide a TypeSystem interface for an existing
 /// clang::ASTContext that was created by clang::CompilerInstance).
-class TypeSystemClang : public TypeSystem {
+class TypeSystemClang : public llvm::RTTIExtends<TypeSystemClang, TypeSystem> {
+public:
   // LLVM RTTI support
   static char ID;
 
-public:
   typedef void (*CompleteTagDeclCallback)(void *baton, clang::TagDecl *);
   typedef void (*CompleteObjCInterfaceDeclCallback)(void *baton,
                                                     clang::ObjCInterfaceDecl *);
-
-  // llvm casting support
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const TypeSystem *ts) { return ts->isA(&ID); }
 
   /// Constructs a TypeSystemClang with an ASTContext using the given triple.
   ///
@@ -1200,11 +1196,12 @@ private:
 
 /// The TypeSystemClang instance used for the scratch ASTContext in a
 /// lldb::Target.
-class ScratchTypeSystemClang : public TypeSystemClang {
+class ScratchTypeSystemClang
+    : public llvm::RTTIExtends<ScratchTypeSystemClang, TypeSystemClang> {
+public:
   /// LLVM RTTI support
   static char ID;
 
-public:
   ScratchTypeSystemClang(Target &target, llvm::Triple triple);
 
   ~ScratchTypeSystemClang() override = default;
@@ -1289,12 +1286,6 @@ public:
   /// all sub-ASTs).
   /// \see ClangASTImporter::ForgetSource
   void ForgetSource(clang::ASTContext *src_ctx, ClangASTImporter &importer);
-
-  // llvm casting support
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || TypeSystemClang::isA(ClassID);
-  }
-  static bool classof(const TypeSystem *ts) { return ts->isA(&ID); }
 
 private:
   std::unique_ptr<ClangASTSource> CreateASTSource();

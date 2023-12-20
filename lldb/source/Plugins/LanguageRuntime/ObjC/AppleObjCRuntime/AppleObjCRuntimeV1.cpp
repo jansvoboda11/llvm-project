@@ -40,8 +40,8 @@ using namespace lldb_private;
 char AppleObjCRuntimeV1::ID = 0;
 
 AppleObjCRuntimeV1::AppleObjCRuntimeV1(Process *process)
-    : AppleObjCRuntime(process), m_hash_signature(),
-      m_isa_hash_table_ptr(LLDB_INVALID_ADDRESS) {}
+    : llvm::RTTIExtends<AppleObjCRuntimeV1, AppleObjCRuntime>(process),
+      m_hash_signature(), m_isa_hash_table_ptr(LLDB_INVALID_ADDRESS) {}
 
 // for V1 runtime we just try to return a class name as that is the minimum
 // level of support required for the data formatters to work

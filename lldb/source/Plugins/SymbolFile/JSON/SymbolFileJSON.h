@@ -18,18 +18,11 @@
 
 namespace lldb_private {
 
-class SymbolFileJSON : public lldb_private::SymbolFileCommon {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileJSON
+    : public llvm::RTTIExtends<SymbolFileJSON, SymbolFileCommon> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   SymbolFileJSON(lldb::ObjectFileSP objfile_sp);
 

@@ -27,8 +27,9 @@ char SymbolFileDWARFDwo::ID;
 
 SymbolFileDWARFDwo::SymbolFileDWARFDwo(SymbolFileDWARF &base_symbol_file,
                                        ObjectFileSP objfile, uint32_t id)
-    : SymbolFileDWARF(objfile, objfile->GetSectionList(
-                                   /*update_module_section_list*/ false)),
+    : llvm::RTTIExtends<SymbolFileDWARFDwo, SymbolFileDWARF>(
+          objfile, objfile->GetSectionList(
+                       /*update_module_section_list*/ false)),
       m_base_symbol_file(base_symbol_file) {
   SetFileIndex(id);
 

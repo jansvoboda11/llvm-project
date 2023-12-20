@@ -15,7 +15,8 @@
 #include "lldb/Symbol/ObjectFile.h"
 #include "llvm/Object/COFF.h"
 
-class ObjectFilePECOFF : public lldb_private::ObjectFile {
+class ObjectFilePECOFF
+    : public llvm::RTTIExtends<ObjectFilePECOFF, lldb_private::ObjectFile> {
 public:
   enum MachineType {
     MachineUnknown = 0x0,
@@ -92,10 +93,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   bool ParseHeader() override;
 
@@ -288,5 +285,4 @@ private:
   std::unique_ptr<llvm::object::COFFObjectFile> m_binary;
   lldb_private::UUID m_uuid;
 };
-
 #endif // LLDB_SOURCE_PLUGINS_OBJECTFILE_PECOFF_OBJECTFILEPECOFF_H

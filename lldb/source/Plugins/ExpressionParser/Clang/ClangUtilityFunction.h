@@ -31,15 +31,11 @@ namespace lldb_private {
 /// functions can perform error-checking for ClangUserExpressions, or can
 /// simply provide a way to push a function into the target for the debugger
 /// to call later on.
-class ClangUtilityFunction : public UtilityFunction {
+class ClangUtilityFunction
+    : public llvm::RTTIExtends<ClangUtilityFunction, UtilityFunction> {
+public:
   // LLVM RTTI support
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || UtilityFunction::isA(ClassID);
-  }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   /// Constructor
   ///

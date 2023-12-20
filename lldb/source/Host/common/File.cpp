@@ -895,7 +895,9 @@ SerialPort::Create(int fd, OpenOptions options, Options serial_options,
 SerialPort::SerialPort(int fd, OpenOptions options,
                        SerialPort::Options serial_options,
                        bool transfer_ownership)
-    : NativeFile(fd, options, transfer_ownership), m_state(fd) {}
+    : llvm::RTTIExtends<SerialPort, NativeFile>(fd, options,
+                                                transfer_ownership),
+      m_state(fd) {}
 
 Status SerialPort::Close() {
   m_state.Restore();

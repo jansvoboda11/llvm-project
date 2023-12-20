@@ -64,14 +64,14 @@ namespace npdb {
 /// \see lldb_private::CompilerDecl
 /// \see lldb_private::CompilerDeclContext
 class TypeSystem : public PluginInterface,
+                   public llvm::RTTIExtends<TypeSystem, llvm::RTTIRoot>,
                    public std::enable_shared_from_this<TypeSystem> {
 public:
+  static char ID;
+
   // Constructors and Destructors
   TypeSystem();
   ~TypeSystem() override;
-
-  // LLVM RTTI support
-  virtual bool isA(const void *ClassID) const = 0;
 
   static lldb::TypeSystemSP CreateInstance(lldb::LanguageType language,
                                            Module *module);

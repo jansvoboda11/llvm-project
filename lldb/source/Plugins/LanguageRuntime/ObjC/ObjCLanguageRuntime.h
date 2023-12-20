@@ -34,7 +34,8 @@ namespace lldb_private {
 class TypeSystemClang;
 class UtilityFunction;
 
-class ObjCLanguageRuntime : public LanguageRuntime {
+class ObjCLanguageRuntime
+    : public llvm::RTTIExtends<ObjCLanguageRuntime, LanguageRuntime> {
 public:
   enum class ObjCRuntimeVersions {
     eObjC_VersionUnknown = 0,
@@ -210,14 +211,6 @@ public:
   ~ObjCLanguageRuntime() override;
 
   static char ID;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || LanguageRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
 
   static ObjCLanguageRuntime *Get(Process &process) {
     return llvm::cast_or_null<ObjCLanguageRuntime>(

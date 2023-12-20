@@ -16,7 +16,8 @@
 
 namespace lldb_private {
 
-class AppleObjCRuntimeV1 : public AppleObjCRuntime {
+class AppleObjCRuntimeV1
+    : public llvm::RTTIExtends<AppleObjCRuntimeV1, AppleObjCRuntime> {
 public:
   ~AppleObjCRuntimeV1() override = default;
 
@@ -31,14 +32,6 @@ public:
   static llvm::StringRef GetPluginNameStatic() { return "apple-objc-v1"; }
 
   static char ID;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || AppleObjCRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
 
   lldb::addr_t GetTaggedPointerObfuscator();
 

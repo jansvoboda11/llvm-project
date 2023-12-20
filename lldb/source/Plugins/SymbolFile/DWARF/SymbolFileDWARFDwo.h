@@ -14,18 +14,11 @@
 
 namespace lldb_private::plugin {
 namespace dwarf {
-class SymbolFileDWARFDwo : public SymbolFileDWARF {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileDWARFDwo
+    : public llvm::RTTIExtends<SymbolFileDWARFDwo, SymbolFileDWARF> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileDWARF::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   SymbolFileDWARFDwo(SymbolFileDWARF &m_base_symbol_file,
                      lldb::ObjectFileSP objfile, uint32_t id);

@@ -41,7 +41,8 @@ namespace lldb_private {
 /// extracted from this abstract class.
 class ObjectFile : public std::enable_shared_from_this<ObjectFile>,
                    public PluginInterface,
-                   public ModuleChild {
+                   public ModuleChild,
+                   public llvm::RTTIExtends<ObjectFile, llvm::RTTIRoot> {
   friend class lldb_private::Module;
 
 public:
@@ -207,7 +208,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
 
   /// Gets the address size in bytes for the current object file.
   ///

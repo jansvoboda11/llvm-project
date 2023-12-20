@@ -40,20 +40,13 @@ namespace lldb_private {
 
 namespace npdb {
 
-class SymbolFileNativePDB : public SymbolFileCommon {
+class SymbolFileNativePDB
+    : public llvm::RTTIExtends<SymbolFileNativePDB, SymbolFileCommon> {
   friend class UdtRecordCompleter;
-
-  /// LLVM RTTI support.
-  static char ID;
 
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   // Static Functions
   static void Initialize();

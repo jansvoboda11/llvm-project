@@ -70,7 +70,9 @@ size_t ObjectFileJIT::GetModuleSpecifications(
 
 ObjectFileJIT::ObjectFileJIT(const lldb::ModuleSP &module_sp,
                              const ObjectFileJITDelegateSP &delegate_sp)
-    : ObjectFile(module_sp, nullptr, 0, 0, DataBufferSP(), 0), m_delegate_wp() {
+    : llvm::RTTIExtends<ObjectFileJIT, ObjectFile>(module_sp, nullptr, 0, 0,
+                                                   DataBufferSP(), 0),
+      m_delegate_wp() {
   if (delegate_sp) {
     m_delegate_wp = delegate_sp;
     m_data.SetByteOrder(delegate_sp->GetByteOrder());

@@ -425,8 +425,9 @@ SymbolFileDWARF::GetParentSymbolContextDIE(const DWARFDIE &child_die) {
 
 SymbolFileDWARF::SymbolFileDWARF(ObjectFileSP objfile_sp,
                                  SectionList *dwo_section_list)
-    : SymbolFileCommon(std::move(objfile_sp)), m_debug_map_module_wp(),
-      m_debug_map_symfile(nullptr),
+    : llvm::RTTIExtends<SymbolFileDWARF, SymbolFileCommon>(
+          std::move(objfile_sp)),
+      m_debug_map_module_wp(), m_debug_map_symfile(nullptr),
       m_context(m_objfile_sp->GetModule()->GetSectionList(), dwo_section_list),
       m_fetched_external_modules(false),
       m_supports_DW_AT_APPLE_objc_complete_type(eLazyBoolCalculate) {}

@@ -49,7 +49,8 @@ LLDB_PLUGIN_DEFINE(SymbolFileCTF)
 char SymbolFileCTF::ID;
 
 SymbolFileCTF::SymbolFileCTF(lldb::ObjectFileSP objfile_sp)
-    : SymbolFileCommon(std::move(objfile_sp)) {}
+    : llvm::RTTIExtends<SymbolFileCTF, SymbolFileCommon>(
+          std::move(objfile_sp)) {}
 
 void SymbolFileCTF::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),

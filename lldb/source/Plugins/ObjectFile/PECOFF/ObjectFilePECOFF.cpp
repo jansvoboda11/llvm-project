@@ -419,7 +419,8 @@ ObjectFilePECOFF::ObjectFilePECOFF(const lldb::ModuleSP &module_sp,
                                    const FileSpec *file,
                                    lldb::offset_t file_offset,
                                    lldb::offset_t length)
-    : ObjectFile(module_sp, file, file_offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFilePECOFF, lldb_private::ObjectFile>(
+          module_sp, file, file_offset, length, data_sp, data_offset),
       m_dos_header(), m_coff_header(), m_coff_header_opt(), m_sect_headers(),
       m_image_base(LLDB_INVALID_ADDRESS), m_entry_point_address(),
       m_deps_filespec() {}
@@ -428,7 +429,8 @@ ObjectFilePECOFF::ObjectFilePECOFF(const lldb::ModuleSP &module_sp,
                                    WritableDataBufferSP header_data_sp,
                                    const lldb::ProcessSP &process_sp,
                                    addr_t header_addr)
-    : ObjectFile(module_sp, process_sp, header_addr, header_data_sp),
+    : llvm::RTTIExtends<ObjectFilePECOFF, lldb_private::ObjectFile>(
+          module_sp, process_sp, header_addr, header_data_sp),
       m_dos_header(), m_coff_header(), m_coff_header_opt(), m_sect_headers(),
       m_image_base(LLDB_INVALID_ADDRESS), m_entry_point_address(),
       m_deps_filespec() {}

@@ -140,7 +140,9 @@ SymbolFilePDB::CreateInstance(ObjectFileSP objfile_sp) {
 }
 
 SymbolFilePDB::SymbolFilePDB(lldb::ObjectFileSP objfile_sp)
-    : SymbolFileCommon(std::move(objfile_sp)), m_session_up(), m_global_scope_up() {}
+    : llvm::RTTIExtends<SymbolFilePDB, lldb_private::SymbolFileCommon>(
+          std::move(objfile_sp)),
+      m_session_up(), m_global_scope_up() {}
 
 SymbolFilePDB::~SymbolFilePDB() = default;
 

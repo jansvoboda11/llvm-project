@@ -302,7 +302,8 @@ SymbolFile *SymbolFileNativePDB::CreateInstance(ObjectFileSP objfile_sp) {
 }
 
 SymbolFileNativePDB::SymbolFileNativePDB(ObjectFileSP objfile_sp)
-    : SymbolFileCommon(std::move(objfile_sp)) {}
+    : llvm::RTTIExtends<SymbolFileNativePDB, SymbolFileCommon>(
+          std::move(objfile_sp)) {}
 
 SymbolFileNativePDB::~SymbolFileNativePDB() = default;
 

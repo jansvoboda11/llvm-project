@@ -21,18 +21,11 @@ namespace lldb_private {
 
 namespace breakpad {
 
-class SymbolFileBreakpad : public SymbolFileCommon {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileBreakpad
+    : public llvm::RTTIExtends<SymbolFileBreakpad, SymbolFileCommon> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   // Static Functions
   static void Initialize();
@@ -50,7 +43,8 @@ public:
 
   // Constructors and Destructors
   SymbolFileBreakpad(lldb::ObjectFileSP objfile_sp)
-      : SymbolFileCommon(std::move(objfile_sp)) {}
+      : llvm::RTTIExtends<SymbolFileBreakpad, SymbolFileCommon>(
+            std::move(objfile_sp)) {}
 
   ~SymbolFileBreakpad() override = default;
 

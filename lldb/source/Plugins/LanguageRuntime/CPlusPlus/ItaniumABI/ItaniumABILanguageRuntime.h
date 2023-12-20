@@ -23,7 +23,8 @@
 
 namespace lldb_private {
 
-class ItaniumABILanguageRuntime : public lldb_private::CPPLanguageRuntime {
+class ItaniumABILanguageRuntime
+    : public llvm::RTTIExtends<ItaniumABILanguageRuntime, CPPLanguageRuntime> {
 public:
   ~ItaniumABILanguageRuntime() override = default;
 
@@ -38,15 +39,6 @@ public:
   static llvm::StringRef GetPluginNameStatic() { return "itanium"; }
 
   static char ID;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || CPPLanguageRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
-
 
   llvm::Expected<LanguageRuntime::VTableInfo>
   GetVTableInfo(ValueObject &in_value, bool check_type) override;
@@ -97,7 +89,8 @@ private:
 
   ItaniumABILanguageRuntime(Process *process)
       : // Call CreateInstance instead.
-        lldb_private::CPPLanguageRuntime(process) {}
+        llvm::RTTIExtends<ItaniumABILanguageRuntime, CPPLanguageRuntime>(
+            process) {}
 
   lldb::BreakpointSP m_cxx_exception_bp_sp;
   DynamicTypeCache m_dynamic_type_map;

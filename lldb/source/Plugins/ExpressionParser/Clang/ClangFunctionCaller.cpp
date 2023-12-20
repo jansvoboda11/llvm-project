@@ -51,8 +51,8 @@ ClangFunctionCaller::ClangFunctionCaller(ExecutionContextScope &exe_scope,
                                          const Address &functionAddress,
                                          const ValueList &arg_value_list,
                                          const char *name)
-    : FunctionCaller(exe_scope, return_type, functionAddress, arg_value_list,
-                     name),
+    : llvm::RTTIExtends<ClangFunctionCaller, FunctionCaller>(
+          exe_scope, return_type, functionAddress, arg_value_list, name),
       m_type_system_helper(*this) {
   m_jit_process_wp = lldb::ProcessWP(exe_scope.CalculateProcess());
   // Can't make a ClangFunctionCaller without a process.

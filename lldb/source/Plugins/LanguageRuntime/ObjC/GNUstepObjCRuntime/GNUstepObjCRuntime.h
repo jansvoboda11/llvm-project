@@ -21,7 +21,8 @@
 
 namespace lldb_private {
 
-class GNUstepObjCRuntime : public lldb_private::ObjCLanguageRuntime {
+class GNUstepObjCRuntime
+    : public llvm::RTTIExtends<GNUstepObjCRuntime, ObjCLanguageRuntime> {
 public:
   ~GNUstepObjCRuntime() override;
 
@@ -45,14 +46,6 @@ public:
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
   void ModulesDidLoad(const ModuleList &module_list) override;
-
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjCLanguageRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
 
   //
   // LanguageRuntime implementation

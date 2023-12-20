@@ -15,14 +15,12 @@
 
 namespace lldb_private {
 
-class ClangExternalASTSourceCallbacks : public clang::ExternalASTSource {
-  /// LLVM RTTI support.
-  static char ID;
-
+class ClangExternalASTSourceCallbacks
+    : public llvm::RTTIExtends<ClangExternalASTSourceCallbacks,
+                               clang::ExternalASTSource> {
 public:
   /// LLVM RTTI support.
-  bool isA(const void *ClassID) const override { return ClassID == &ID; }
-  static bool classof(const clang::ExternalASTSource *s) { return s->isA(&ID); }
+  static char ID;
 
   ClangExternalASTSourceCallbacks(TypeSystemClang &ast) : m_ast(ast) {}
 

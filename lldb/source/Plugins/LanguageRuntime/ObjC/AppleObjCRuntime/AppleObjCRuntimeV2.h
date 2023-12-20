@@ -42,14 +42,6 @@ public:
 
   static char ID;
 
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || AppleObjCRuntime::isA(ClassID);
-  }
-
-  static bool classof(const LanguageRuntime *runtime) {
-    return runtime->isA(&ID);
-  }
-
   bool GetDynamicTypeAndAddress(ValueObject &in_value,
                                 lldb::DynamicValueType use_dynamic,
                                 TypeAndOrName &class_type_or_name,

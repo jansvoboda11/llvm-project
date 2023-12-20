@@ -47,11 +47,12 @@ struct ExternalVTableUse {
 /// An abstract interface that should be implemented by
 /// external AST sources that also provide information for semantic
 /// analysis.
-class ExternalSemaSource : public ExternalASTSource {
+class ExternalSemaSource
+    : public llvm::RTTIExtends<ExternalSemaSource, ExternalASTSource> {
+public:
   /// LLVM-style RTTI.
   static char ID;
 
-public:
   ExternalSemaSource() = default;
 
   ~ExternalSemaSource() override;
@@ -234,14 +235,6 @@ public:
   /// This enables the external source to track the correspondence between
   /// lambdas and mangling numbers if necessary.
   virtual void AssignedLambdaNumbering(const CXXRecordDecl *Lambda) {}
-
-  /// LLVM-style RTTI.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ExternalASTSource::isA(ClassID);
-  }
-  static bool classof(const ExternalASTSource *S) { return S->isA(&ID); }
-  /// \}
 };
 
 } // end namespace clang

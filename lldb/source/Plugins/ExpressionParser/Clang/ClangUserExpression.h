@@ -39,15 +39,11 @@ class ClangExpressionParser;
 /// and as a backend for the expr command.  ClangUserExpression encapsulates
 /// the objects needed to parse and interpret or JIT an expression.  It uses
 /// the Clang parser to produce LLVM IR from the expression.
-class ClangUserExpression : public LLVMUserExpression {
+class ClangUserExpression
+    : public llvm::RTTIExtends<ClangUserExpression, LLVMUserExpression> {
+public:
   // LLVM RTTI support
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || LLVMUserExpression::isA(ClassID);
-  }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   enum { kDefaultTimeout = 500000u };
 

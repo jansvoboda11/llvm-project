@@ -41,7 +41,7 @@ static ConstString g_coro_frame = ConstString("__coro_frame");
 char CPPLanguageRuntime::ID = 0;
 
 CPPLanguageRuntime::CPPLanguageRuntime(Process *process)
-    : LanguageRuntime(process) {}
+    : llvm::RTTIExtends<CPPLanguageRuntime, LanguageRuntime>(process) {}
 
 bool CPPLanguageRuntime::IsAllowedRuntimeValue(ConstString name) {
   return name == g_this || name == g_promise || name == g_coro_frame;

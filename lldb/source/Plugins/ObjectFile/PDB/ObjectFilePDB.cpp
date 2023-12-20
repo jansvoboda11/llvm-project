@@ -161,7 +161,8 @@ size_t ObjectFilePDB::GetModuleSpecifications(
 ObjectFilePDB::ObjectFilePDB(const ModuleSP &module_sp, DataBufferSP &data_sp,
                              offset_t data_offset, const FileSpec *file,
                              offset_t offset, offset_t length)
-    : ObjectFile(module_sp, file, offset, length, data_sp, data_offset) {}
+    : llvm::RTTIExtends<ObjectFilePDB, ObjectFile>(
+          module_sp, file, offset, length, data_sp, data_offset) {}
 
 std::unique_ptr<PDBFile>
 ObjectFilePDB::loadPDBFile(std::string PdbPath,

@@ -681,7 +681,8 @@ ObjectFileELF::ObjectFileELF(const lldb::ModuleSP &module_sp,
                              DataBufferSP data_sp, lldb::offset_t data_offset,
                              const FileSpec *file, lldb::offset_t file_offset,
                              lldb::offset_t length)
-    : ObjectFile(module_sp, file, file_offset, length, data_sp, data_offset) {
+    : llvm::RTTIExtends<ObjectFileELF, ObjectFile>(
+          module_sp, file, file_offset, length, data_sp, data_offset) {
   if (file)
     m_file = *file;
 }
@@ -690,7 +691,8 @@ ObjectFileELF::ObjectFileELF(const lldb::ModuleSP &module_sp,
                              DataBufferSP header_data_sp,
                              const lldb::ProcessSP &process_sp,
                              addr_t header_addr)
-    : ObjectFile(module_sp, process_sp, header_addr, header_data_sp) {}
+    : llvm::RTTIExtends<ObjectFileELF, ObjectFile>(
+          module_sp, process_sp, header_addr, header_data_sp) {}
 
 bool ObjectFileELF::IsExecutable() const {
   return ((m_header.e_type & ET_EXEC) != 0) || (m_header.e_entry != 0);

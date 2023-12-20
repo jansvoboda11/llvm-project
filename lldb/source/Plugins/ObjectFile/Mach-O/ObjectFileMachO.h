@@ -21,7 +21,8 @@
 
 // This class needs to be hidden as eventually belongs in a plugin that
 // will export the ObjectFile protocol
-class ObjectFileMachO : public lldb_private::ObjectFile {
+class ObjectFileMachO
+    : public llvm::RTTIExtends<ObjectFileMachO, lldb_private::ObjectFile> {
 public:
   ObjectFileMachO(const lldb::ModuleSP &module_sp, lldb::DataBufferSP data_sp,
                   lldb::offset_t data_offset,
@@ -71,10 +72,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   // Member Functions
   bool ParseHeader() override;

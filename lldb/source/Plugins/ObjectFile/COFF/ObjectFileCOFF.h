@@ -19,7 +19,8 @@
 /// This class provides a generic COFF reader plugin implementing the ObjectFile
 /// protocol.  Assumes that the COFF object format is a Microsoft style COFF
 /// rather than the full generality afforded by it.
-class ObjectFileCOFF : public lldb_private::ObjectFile {
+class ObjectFileCOFF
+    : public llvm::RTTIExtends<ObjectFileCOFF, lldb_private::ObjectFile> {
   std::unique_ptr<llvm::object::COFFObjectFile> m_object;
   lldb_private::UUID m_uuid;
 
@@ -27,7 +28,8 @@ class ObjectFileCOFF : public lldb_private::ObjectFile {
                  const lldb::ModuleSP &module_sp, lldb::DataBufferSP data_sp,
                  lldb::offset_t data_offset, const lldb_private::FileSpec *file,
                  lldb::offset_t file_offset, lldb::offset_t length)
-    : ObjectFile(module_sp, file, file_offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFileCOFF, lldb_private::ObjectFile>(
+          module_sp, file, file_offset, length, data_sp, data_offset),
       m_object(std::move(object)) {}
 
 public:
@@ -60,10 +62,6 @@ public:
 
   // LLVM RTTI support
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
 
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }

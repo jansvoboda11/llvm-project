@@ -29,15 +29,11 @@ namespace lldb_private {
 /// expression. The actual parsing part will be provided by the specific
 /// implementations of LLVMUserExpression - which will be vended through the
 /// appropriate TypeSystem.
-class LLVMUserExpression : public UserExpression {
+class LLVMUserExpression
+    : public llvm::RTTIExtends<LLVMUserExpression, UserExpression> {
+public:
   // LLVM RTTI support
   static char ID;
-
-public:
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || UserExpression::isA(ClassID);
-  }
-  static bool classof(const Expression *obj) { return obj->isA(&ID); }
 
   // The IRPasses struct is filled in by a runtime after an expression is
   // compiled and can be used to run fixups/analysis passes as required.

@@ -109,7 +109,8 @@ ObjectFileBreakpad::ObjectFileBreakpad(const ModuleSP &module_sp,
                                        const FileSpec *file, offset_t offset,
                                        offset_t length, ArchSpec arch,
                                        UUID uuid)
-    : ObjectFile(module_sp, file, offset, length, data_sp, data_offset),
+    : llvm::RTTIExtends<ObjectFileBreakpad, ObjectFile>(
+          module_sp, file, offset, length, data_sp, data_offset),
       m_arch(std::move(arch)), m_uuid(std::move(uuid)) {}
 
 bool ObjectFileBreakpad::ParseHeader() {

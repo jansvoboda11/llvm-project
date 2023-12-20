@@ -64,18 +64,11 @@ class SymbolFileDWARFDwp;
 
 #define DIE_IS_BEING_PARSED ((lldb_private::Type *)1)
 
-class SymbolFileDWARF : public SymbolFileCommon {
-  /// LLVM RTTI support.
-  static char ID;
-
+class SymbolFileDWARF
+    : public llvm::RTTIExtends<SymbolFileDWARF, SymbolFileCommon> {
 public:
   /// LLVM RTTI support.
-  /// \{
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
-  }
-  static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
-  /// \}
+  static char ID;
 
   friend class SymbolFileDWARFDebugMap;
   friend class SymbolFileDWARFDwo;

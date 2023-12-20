@@ -247,8 +247,9 @@ SymbolFile *SymbolFileDWARFDebugMap::CreateInstance(ObjectFileSP objfile_sp) {
 }
 
 SymbolFileDWARFDebugMap::SymbolFileDWARFDebugMap(ObjectFileSP objfile_sp)
-    : SymbolFileCommon(std::move(objfile_sp)), m_flags(), m_compile_unit_infos(),
-      m_func_indexes(), m_glob_indexes(),
+    : llvm::RTTIExtends<SymbolFileDWARFDebugMap, SymbolFileCommon>(
+          std::move(objfile_sp)),
+      m_flags(), m_compile_unit_infos(), m_func_indexes(), m_glob_indexes(),
       m_supports_DW_AT_APPLE_objc_complete_type(eLazyBoolCalculate) {}
 
 SymbolFileDWARFDebugMap::~SymbolFileDWARFDebugMap() = default;

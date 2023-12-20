@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator.h"
+#include "llvm/Support/ExtensibleRTTI.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <cstddef>
@@ -57,17 +58,19 @@ class TagDecl;
 /// sources can resolve types and declarations from abstract IDs into
 /// actual type and declaration nodes, and read parts of declaration
 /// contexts.
-class ExternalASTSource : public RefCountedBase<ExternalASTSource> {
+class ExternalASTSource
+    : public RefCountedBase<ExternalASTSource>,
+      public llvm::RTTIExtends<ExternalASTSource, llvm::RTTIRoot> {
   friend class ExternalSemaSource;
 
   /// Generation number for this external AST source. Must be increased
   /// whenever we might have added new redeclarations for existing decls.
   uint32_t CurrentGeneration = 0;
 
+public:
   /// LLVM-style RTTI.
   static char ID;
 
-public:
   ExternalASTSource() = default;
   virtual ~ExternalASTSource();
 
@@ -292,12 +295,6 @@ public:
   }
 
   virtual void getMemoryBufferSizes(MemoryBufferSizes &sizes) const;
-
-  /// LLVM-style RTTI.
-  /// \{
-  virtual bool isA(const void *ClassID) const { return ClassID == &ID; }
-  static bool classof(const ExternalASTSource *S) { return S->isA(&ID); }
-  /// \}
 
 protected:
   static DeclContextLookupResult

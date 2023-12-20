@@ -18,6 +18,8 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private.h"
 
+#include "llvm/Support/ExtensibleRTTI.h"
+
 namespace lldb_private {
 
 /// \class Expression Expression.h "lldb/Expression/Expression.h" Encapsulates
@@ -28,8 +30,10 @@ namespace lldb_private {
 /// objects needed to parse and interpret or JIT an expression.  It uses the
 /// expression parser appropriate to the language of the expression to produce
 /// LLVM IR from the expression.
-class Expression {
+class Expression : public llvm::RTTIExtends<Expression, llvm::RTTIRoot> {
 public:
+  static char ID;
+
   enum ResultType { eResultTypeAny, eResultTypeId };
 
   Expression(Target &target);
@@ -82,9 +86,6 @@ public:
   virtual void DidFinishExecuting() {}
 
   virtual ExpressionTypeSystemHelper *GetTypeSystemHelper() { return nullptr; }
-
-  // LLVM RTTI support
-  virtual bool isA(const void *ClassID) const = 0;
 
 protected:
   lldb::TargetWP m_target_wp; /// Expression's always have to have a target...

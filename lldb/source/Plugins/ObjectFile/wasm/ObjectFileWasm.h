@@ -20,7 +20,7 @@ namespace wasm {
 ///
 /// This class provides a generic wasm32 reader plugin implementing the
 /// ObjectFile protocol.
-class ObjectFileWasm : public ObjectFile {
+class ObjectFileWasm : public llvm::RTTIExtends<ObjectFileWasm, ObjectFile> {
 public:
   static void Initialize();
   static void Terminate();
@@ -53,13 +53,7 @@ public:
   /// \}
 
   /// LLVM RTTI support
-  /// \{
   static char ID;
-  bool isA(const void *ClassID) const override {
-    return ClassID == &ID || ObjectFile::isA(ClassID);
-  }
-  static bool classof(const ObjectFile *obj) { return obj->isA(&ID); }
-  /// \}
 
   /// ObjectFile Protocol.
   /// \{

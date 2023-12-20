@@ -1129,17 +1129,14 @@ protected:
 // A SimplePythonFile is a OwnedPythonFile that just does all I/O as
 // a NativeFile
 namespace {
-class SimplePythonFile : public OwnedPythonFile<NativeFile> {
+class SimplePythonFile
+    : public llvm::RTTIExtends<SimplePythonFile, OwnedPythonFile<NativeFile>> {
 public:
   SimplePythonFile(const PythonFile &file, bool borrowed, int fd,
                    File::OpenOptions options)
       : OwnedPythonFile(file, borrowed, fd, options, false) {}
 
   static char ID;
-  bool isA(const void *classID) const override {
-    return classID == &ID || NativeFile::isA(classID);
-  }
-  static bool classof(const File *file) { return file->isA(&ID); }
 };
 char SimplePythonFile::ID = 0;
 } // namespace
@@ -1180,7 +1177,8 @@ private:
 
 // Shared methods between TextPythonFile and BinaryPythonFile
 namespace {
-class PythonIOFile : public OwnedPythonFile<File> {
+class PythonIOFile
+    : public llvm::RTTIExtends<PythonIOFile, OwnedPythonFile<File>> {
 public:
   PythonIOFile(const PythonFile &file, bool borrowed)
       : OwnedPythonFile(file, borrowed) {}
@@ -1214,10 +1212,6 @@ public:
   }
 
   static char ID;
-  bool isA(const void *classID) const override {
-    return classID == &ID || File::isA(classID);
-  }
-  static bool classof(const File *file) { return file->isA(&ID); }
 };
 char PythonIOFile::ID = 0;
 } // namespace
