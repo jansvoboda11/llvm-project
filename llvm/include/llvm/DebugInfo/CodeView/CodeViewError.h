@@ -43,7 +43,7 @@ public:
   using ErrorInfo<CodeViewError,
                   StringError>::ErrorInfo; // inherit constructors
   CodeViewError(const Twine &S) : ErrorInfo(S, cv_error_code::unspecified) {}
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::codeview::CodeViewError);
 };
 
 } // namespace codeview

@@ -59,8 +59,6 @@
 
 using namespace lldb_private;
 
-char ClangUserExpression::ID;
-
 ClangUserExpression::ClangUserExpression(
     ExecutionContextScope &exe_scope, llvm::StringRef expr,
     llvm::StringRef prefix, lldb::LanguageType language,
@@ -977,8 +975,6 @@ lldb::ExpressionVariableSP ClangUserExpression::GetResultAfterDematerialization(
     ExecutionContextScope *exe_scope) {
   return m_result_delegate.GetVariable();
 }
-
-char ClangUserExpression::ClangUserExpressionHelper::ID;
 
 void ClangUserExpression::ClangUserExpressionHelper::ResetDeclMap(
     ExecutionContext &exe_ctx,

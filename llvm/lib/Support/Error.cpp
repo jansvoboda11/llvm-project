@@ -55,12 +55,7 @@ ErrorErrorCategory &getErrorErrorCat() {
 namespace llvm {
 
 void ErrorInfoBase::anchor() {}
-char ErrorInfoBase::ID = 0;
-char ErrorList::ID = 0;
 void ECError::anchor() {}
-char ECError::ID = 0;
-char StringError::ID = 0;
-char FileError::ID = 0;
 
 void logAllUnhandledErrors(Error E, raw_ostream &OS, Twine ErrorBanner) {
   if (!E)
@@ -181,9 +176,7 @@ char *LLVMGetErrorMessage(LLVMErrorRef Err) {
 
 void LLVMDisposeErrorMessage(char *ErrMsg) { delete[] ErrMsg; }
 
-LLVMErrorTypeId LLVMGetStringErrorTypeId() {
-  return reinterpret_cast<void *>(&StringError::ID);
-}
+LLVMErrorTypeId LLVMGetStringErrorTypeId() { return &StringError::ID; }
 
 LLVMErrorRef LLVMCreateStringError(const char *ErrMsg) {
   return wrap(make_error<StringError>(ErrMsg, inconvertibleErrorCode()));

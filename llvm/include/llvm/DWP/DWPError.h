@@ -13,7 +13,7 @@ public:
   std::error_code convertToErrorCode() const override {
     llvm_unreachable("Not implemented");
   }
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::DWPError);
 
 private:
   std::string Info;

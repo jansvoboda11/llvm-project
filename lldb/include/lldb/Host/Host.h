@@ -264,7 +264,7 @@ public:
   SystemLogHandler();
   void Emit(llvm::StringRef message) override;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SystemLogHandler);
 };
 
 } // namespace lldb_private

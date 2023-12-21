@@ -88,7 +88,7 @@ public:
 /// This is actually not an error but a marker to indicate that
 /// the instruction stream is paused.
 struct InstStreamPause : public ErrorInfo<InstStreamPause> {
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::mca::InstStreamPause);
 
   std::error_code convertToErrorCode() const override {
     return llvm::inconvertibleErrorCode();

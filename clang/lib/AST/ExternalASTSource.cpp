@@ -26,8 +26,6 @@
 
 using namespace clang;
 
-char ExternalASTSource::ID;
-
 ExternalASTSource::~ExternalASTSource() = default;
 
 std::optional<ASTSourceDescriptor>

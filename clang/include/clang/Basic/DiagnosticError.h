@@ -45,7 +45,7 @@ public:
     return Result;
   }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::DiagnosticError);
 
 private:
   // Users are not expected to use error_code.

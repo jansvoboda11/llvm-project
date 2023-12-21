@@ -17,8 +17,6 @@
 using namespace lldb;
 using namespace lldb_private;
 
-char SymbolFileOnDemand::ID;
-
 SymbolFileOnDemand::SymbolFileOnDemand(
     std::unique_ptr<SymbolFile> &&symbol_file)
     : m_sym_file_impl(std::move(symbol_file)) {}

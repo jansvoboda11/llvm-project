@@ -244,8 +244,6 @@ std::string InstrProfError::message() const {
   return getInstrProfErrString(Err, Msg);
 }
 
-char InstrProfError::ID = 0;
-
 std::string getPGOFuncName(StringRef Name, GlobalValue::LinkageTypes Linkage,
                            StringRef FileName,
                            uint64_t Version LLVM_ATTRIBUTE_UNUSED) {

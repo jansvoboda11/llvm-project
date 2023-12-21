@@ -79,7 +79,7 @@ class LSPError : public llvm::ErrorInfo<LSPError> {
 public:
   std::string message;
   ErrorCode code;
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(mlir::lsp::LSPError);
 
   LSPError(std::string message, ErrorCode code)
       : message(std::move(message)), code(code) {}

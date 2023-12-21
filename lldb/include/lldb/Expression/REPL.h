@@ -22,8 +22,7 @@ namespace lldb_private {
 class REPL : public IOHandlerDelegate,
              public llvm::RTTIExtends<REPL, llvm::RTTIRoot> {
 public:
-  /// LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::REPL);
 
   REPL(Target &target);
 

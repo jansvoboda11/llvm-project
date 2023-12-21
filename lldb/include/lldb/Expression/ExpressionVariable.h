@@ -26,8 +26,7 @@ class ExpressionVariable
     : public std::enable_shared_from_this<ExpressionVariable>,
       public llvm::RTTIExtends<ExpressionVariable, llvm::RTTIRoot> {
 public:
-  /// LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ExpressionVariable);
 
   ExpressionVariable();
 
@@ -204,8 +203,7 @@ class PersistentExpressionState
     : public ExpressionVariableList,
       public llvm::RTTIExtends<PersistentExpressionState, llvm::RTTIRoot> {
 public:
-  /// LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::PersistentExpressionState);
 
   PersistentExpressionState();
 

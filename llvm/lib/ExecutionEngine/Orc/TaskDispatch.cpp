@@ -11,8 +11,6 @@
 namespace llvm {
 namespace orc {
 
-char Task::ID = 0;
-char GenericNamedTask::ID = 0;
 const char *GenericNamedTask::DefaultDescription = "Generic Task";
 
 void Task::anchor() {}

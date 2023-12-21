@@ -31,7 +31,7 @@ public:
 
   static llvm::StringRef GetPluginNameStatic() { return "apple-objc-v1"; }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::AppleObjCRuntimeV1);
 
   lldb::addr_t GetTaggedPointerObfuscator();
 

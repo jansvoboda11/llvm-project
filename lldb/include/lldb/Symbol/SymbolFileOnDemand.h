@@ -33,8 +33,7 @@ namespace lldb_private {
 class SymbolFileOnDemand
     : public llvm::RTTIExtends<SymbolFileOnDemand, SymbolFile> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SymbolFileOnDemand);
 
   SymbolFileOnDemand(std::unique_ptr<SymbolFile> &&symbol_file);
   ~SymbolFileOnDemand() override;

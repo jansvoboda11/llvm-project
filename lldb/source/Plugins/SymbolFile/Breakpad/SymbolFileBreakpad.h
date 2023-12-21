@@ -24,8 +24,7 @@ namespace breakpad {
 class SymbolFileBreakpad
     : public llvm::RTTIExtends<SymbolFileBreakpad, SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::breakpad::SymbolFileBreakpad);
 
   // Static Functions
   static void Initialize();

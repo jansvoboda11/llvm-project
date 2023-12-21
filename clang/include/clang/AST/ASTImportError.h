@@ -29,7 +29,7 @@ public:
 
   ErrorKind Error;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::ASTImportError);
 
   ASTImportError() : Error(Unknown) {}
   ASTImportError(const ASTImportError &Other) : Error(Other.Error) {}

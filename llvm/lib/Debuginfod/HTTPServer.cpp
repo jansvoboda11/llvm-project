@@ -28,8 +28,6 @@
 
 using namespace llvm;
 
-char HTTPServerError::ID = 0;
-
 HTTPServerError::HTTPServerError(const Twine &Msg) : Msg(Msg.str()) {}
 
 void HTTPServerError::log(raw_ostream &OS) const { OS << Msg; }

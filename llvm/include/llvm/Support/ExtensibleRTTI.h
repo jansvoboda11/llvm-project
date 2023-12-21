@@ -24,27 +24,24 @@
 // E.g.
 //
 //   @code{.cpp}
+//   namespace MyNamespace {
 //   class MyBaseClass : public RTTIExtends<MyBaseClass, RTTIRoot> {
 //   public:
-//     static char ID;
+//     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyNamespace::MyBaseClass);
 //     virtual void foo() = 0;
 //   };
 //
 //   class MyDerivedClass1 : public RTTIExtends<MyDerivedClass1, MyBaseClass> {
 //   public:
-//     static char ID;
+//     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyNamespace::MyDerivedClass1);
 //     void foo() override {}
 //   };
 //
 //   class MyDerivedClass2 : public RTTIExtends<MyDerivedClass2, MyBaseClass> {
 //   public:
-//     static char ID;
+//     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyNamespace::MyDerivedClass2);
 //     void foo() override {}
 //   };
-//
-//   char MyBaseClass::ID = 0;
-//   char MyDerivedClass1::ID = 0;
-//   char MyDerivedClass2:: ID = 0;
 //
 //   void fn() {
 //     std::unique_ptr<MyBaseClass> B = llvm::make_unique<MyDerivedClass1>();
@@ -52,6 +49,7 @@
 //     llvm::outs() << isa<MyDerivedClass1>(B) << "\n"; // Outputs "1".
 //     llvm::outs() << isa<MyDerivedClass2>(B) << "\n"; // Outputs "0'.
 //   }
+//   } // namespace MyNamespace
 //
 //   @endcode
 //
@@ -60,7 +58,43 @@
 #ifndef LLVM_SUPPORT_EXTENSIBLERTTI_H
 #define LLVM_SUPPORT_EXTENSIBLERTTI_H
 
+#include "llvm/ADT/StringRef.h"
+
 namespace llvm {
+
+namespace detail {
+/// Helper class template that we initialize with the type passed to
+/// \c LLVM_EXTENSIBLE_RTTI_DEFINE_ID. If the type does not exist (or it's name
+/// is not fully qualified), the compiler will error out.
+template <class> class RTTIFullyQualifiedNameConsumer {};
+
+#if defined(_MSC_VER) || defined(_AIX)
+class RTTIID {
+  llvm::StringLiteral ID;
+
+public:
+  constexpr RTTIID(llvm::StringLiteral ID) : ID(ID) {}
+
+  static bool equals(const RTTIID *LHS, const RTTIID *RHS) {
+    return LHS == RHS || *LHS == *RHS;
+  }
+};
+#else
+class RTTIID {
+public:
+  constexpr RTTIID(llvm::StringLiteral) {}
+
+  static bool equals(const RTTIID *LHS, const RTTIID *RHS) {
+    return LHS == RHS;
+  }
+};
+#endif
+} // namespace detail
+
+#define LLVM_EXTENSIBLE_RTTI_DEFINE_ID(FULLY_QUALIFIED_TYPE)                   \
+  using RTTI_VerifiedFullyQualifiedType =                                      \
+      llvm::detail::RTTIFullyQualifiedNameConsumer<::FULLY_QUALIFIED_TYPE>;    \
+  static constexpr llvm::detail::RTTIID ID { #FULLY_QUALIFIED_TYPE }
 
 /// Base class for the extensible RTTI hierarchy.
 ///
@@ -71,14 +105,14 @@ public:
   virtual ~RTTIRoot() = default;
 
   /// Returns the class ID for this type.
-  static const void *classID() { return &ID; }
+  static const detail::RTTIID *classID() { return &ID; }
 
   /// Returns the class ID for the dynamic type of this RTTIRoot instance.
-  virtual const void *dynamicClassID() const = 0;
+  virtual const detail::RTTIID *dynamicClassID() const = 0;
 
   /// Returns true if this class's ID matches the given class ID.
-  virtual bool isA(const void *const ClassID) const {
-    return ClassID == classID();
+  virtual bool isA(const detail::RTTIID *ClassID) const {
+    return detail::RTTIID::equals(ClassID, classID());
   }
 
   /// Check whether this instance is a subclass of QueryT.
@@ -88,7 +122,7 @@ public:
 private:
   virtual void anchor();
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::RTTIRoot);
 };
 
 /// Inheritance utility for extensible RTTI.
@@ -119,12 +153,12 @@ public:
   // Inherit the isA() function template from ParentT.
   using ParentT::isA;
 
-  static const void *classID() { return &ThisT::ID; }
+  static const detail::RTTIID *classID() { return &ThisT::ID; }
 
-  const void *dynamicClassID() const override { return &ThisT::ID; }
+  const detail::RTTIID *dynamicClassID() const override { return &ThisT::ID; }
 
-  bool isA(const void *const ClassID) const override {
-    return ClassID == classID() || ParentT::isA(ClassID);
+  bool isA(const detail::RTTIID *ClassID) const override {
+    return detail::RTTIID::equals(ClassID, classID()) || ParentT::isA(ClassID);
   }
 
   static bool classof(const RTTIRoot *R) { return R->isA<ThisT>(); }

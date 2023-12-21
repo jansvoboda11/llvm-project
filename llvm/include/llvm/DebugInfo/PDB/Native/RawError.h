@@ -49,7 +49,7 @@ class RawError : public ErrorInfo<RawError, StringError> {
 public:
   using ErrorInfo<RawError, StringError>::ErrorInfo; // inherit constructors
   RawError(const Twine &S) : ErrorInfo(S, raw_error_code::unspecified) {}
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::pdb::RawError);
 };
 } // namespace pdb
 } // namespace llvm

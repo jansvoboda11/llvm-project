@@ -103,8 +103,6 @@ namespace clang {
     llvm_unreachable("Function not implemented.");
   }
 
-  char ASTImportError::ID;
-
   template <class T>
   SmallVector<Decl *, 2>
   getCanonicalForwardRedeclChain(Redeclarable<T>* D) {

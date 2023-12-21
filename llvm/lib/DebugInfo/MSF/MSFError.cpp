@@ -55,5 +55,3 @@ const std::error_category &llvm::msf::MSFErrCategory() {
   static MSFErrorCategory MSFCategory;
   return MSFCategory;
 }
-
-char MSFError::ID;

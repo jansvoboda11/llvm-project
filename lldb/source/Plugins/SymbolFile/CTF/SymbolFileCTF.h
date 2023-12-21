@@ -22,8 +22,7 @@ namespace lldb_private {
 class SymbolFileCTF
     : public llvm::RTTIExtends<SymbolFileCTF, SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SymbolFileCTF);
 
   SymbolFileCTF(lldb::ObjectFileSP objfile_sp);
 

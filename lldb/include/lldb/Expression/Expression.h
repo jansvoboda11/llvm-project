@@ -32,7 +32,7 @@ namespace lldb_private {
 /// LLVM IR from the expression.
 class Expression : public llvm::RTTIExtends<Expression, llvm::RTTIRoot> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::Expression);
 
   enum ResultType { eResultTypeAny, eResultTypeId };
 

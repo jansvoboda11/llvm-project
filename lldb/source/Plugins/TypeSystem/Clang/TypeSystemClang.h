@@ -105,8 +105,7 @@ public:
 /// clang::ASTContext that was created by clang::CompilerInstance).
 class TypeSystemClang : public llvm::RTTIExtends<TypeSystemClang, TypeSystem> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::TypeSystemClang);
 
   typedef void (*CompleteTagDeclCallback)(void *baton, clang::TagDecl *);
   typedef void (*CompleteObjCInterfaceDeclCallback)(void *baton,
@@ -1199,8 +1198,7 @@ private:
 class ScratchTypeSystemClang
     : public llvm::RTTIExtends<ScratchTypeSystemClang, TypeSystemClang> {
 public:
-  /// LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ScratchTypeSystemClang);
 
   ScratchTypeSystemClang(Target &target, llvm::Triple triple);
 

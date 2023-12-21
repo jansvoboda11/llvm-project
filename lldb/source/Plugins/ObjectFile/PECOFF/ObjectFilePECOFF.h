@@ -91,8 +91,7 @@ public:
 
   static lldb::SymbolType MapSymbolType(uint16_t coff_symbol_type);
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(ObjectFilePECOFF);
 
   bool ParseHeader() override;
 

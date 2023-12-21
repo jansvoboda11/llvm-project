@@ -1223,5 +1223,3 @@ PartialDiagnostic::DiagStorageAllocator::~DiagStorageAllocator() {
           llvm::CrashRecoveryContext::isRecoveringFromCrash()) &&
          "A partial is on the lam");
 }
-
-char DiagnosticError::ID;

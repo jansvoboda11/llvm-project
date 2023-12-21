@@ -104,7 +104,7 @@ public:
 /// value.
 class OverflowError : public ErrorInfo<OverflowError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::OverflowError);
 
   std::error_code convertToErrorCode() const override {
     return std::make_error_code(std::errc::value_too_large);
@@ -169,7 +169,7 @@ private:
   StringRef VarName;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::UndefVarError);
 
   UndefVarError(StringRef VarName) : VarName(VarName) {}
 
@@ -490,7 +490,7 @@ private:
   SMRange Range;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ErrorDiagnostic);
 
   ErrorDiagnostic(SMDiagnostic &&Diag, SMRange Range)
       : Diagnostic(Diag), Range(Range) {}
@@ -520,7 +520,7 @@ public:
 
 class NotFoundError : public ErrorInfo<NotFoundError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::NotFoundError);
 
   std::error_code convertToErrorCode() const override {
     return inconvertibleErrorCode();
@@ -544,7 +544,7 @@ public:
 /// a call like \c consumeError.
 class ErrorReported final : public ErrorInfo<ErrorReported> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ErrorReported);
 
   std::error_code convertToErrorCode() const override {
     return inconvertibleErrorCode();

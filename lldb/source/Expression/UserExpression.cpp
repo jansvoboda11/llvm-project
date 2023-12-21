@@ -42,8 +42,6 @@
 
 using namespace lldb_private;
 
-char UserExpression::ID;
-
 UserExpression::UserExpression(ExecutionContextScope &exe_scope,
                                llvm::StringRef expr, llvm::StringRef prefix,
                                lldb::LanguageType language,

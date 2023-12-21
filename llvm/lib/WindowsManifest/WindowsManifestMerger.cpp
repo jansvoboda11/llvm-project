@@ -24,8 +24,6 @@
 using namespace llvm;
 using namespace windows_manifest;
 
-char WindowsManifestError::ID = 0;
-
 WindowsManifestError::WindowsManifestError(const Twine &Msg) : Msg(Msg.str()) {}
 
 void WindowsManifestError::log(raw_ostream &OS) const { OS << Msg; }

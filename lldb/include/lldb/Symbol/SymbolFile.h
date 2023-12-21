@@ -50,8 +50,7 @@ namespace lldb_private {
 class SymbolFile : public PluginInterface,
                    public llvm::RTTIExtends<SymbolFile, llvm::RTTIRoot> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SymbolFile);
 
   // Symbol file ability bits.
   //
@@ -483,8 +482,7 @@ private:
 class SymbolFileCommon
     : public llvm::RTTIExtends<SymbolFileCommon, SymbolFile> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SymbolFileCommon);
 
   // Constructors and Destructors
   SymbolFileCommon(lldb::ObjectFileSP objfile_sp)

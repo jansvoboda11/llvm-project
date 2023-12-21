@@ -359,8 +359,6 @@ static void SetMemberOwningModule(clang::Decl *member,
     }
 }
 
-char TypeSystemClang::ID;
-
 bool TypeSystemClang::IsOperator(llvm::StringRef name,
                                  clang::OverloadedOperatorKind &op_kind) {
   // All operators have to start with "operator".
@@ -9438,7 +9436,6 @@ public:
 };
 } // namespace
 
-char ScratchTypeSystemClang::ID;
 const std::nullopt_t ScratchTypeSystemClang::DefaultAST = std::nullopt;
 
 ScratchTypeSystemClang::ScratchTypeSystemClang(Target &target,

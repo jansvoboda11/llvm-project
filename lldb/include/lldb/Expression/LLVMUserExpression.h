@@ -32,8 +32,7 @@ namespace lldb_private {
 class LLVMUserExpression
     : public llvm::RTTIExtends<LLVMUserExpression, UserExpression> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::LLVMUserExpression);
 
   // The IRPasses struct is filled in by a runtime after an expression is
   // compiled and can be used to run fixups/analysis passes as required.

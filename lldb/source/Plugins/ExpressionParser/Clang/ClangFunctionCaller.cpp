@@ -43,8 +43,6 @@
 
 using namespace lldb_private;
 
-char ClangFunctionCaller::ID;
-
 // ClangFunctionCaller constructor
 ClangFunctionCaller::ClangFunctionCaller(ExecutionContextScope &exe_scope,
                                          const CompilerType &return_type,
@@ -206,8 +204,6 @@ ClangFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
 
   return num_errors;
 }
-
-char ClangFunctionCaller::ClangFunctionCallerHelper::ID;
 
 clang::ASTConsumer *
 ClangFunctionCaller::ClangFunctionCallerHelper::ASTTransformer(

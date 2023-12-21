@@ -26,8 +26,7 @@ namespace lldb_private {
 class ExpressionTypeSystemHelper
     : public llvm::RTTIExtends<ExpressionTypeSystemHelper, llvm::RTTIRoot> {
 public:
-  /// LLVM RTTI support
-  static char ID;
+LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ExpressionTypeSystemHelper);
 
   virtual ~ExpressionTypeSystemHelper() = default;
 };

@@ -76,8 +76,6 @@ private:
 namespace llvm {
 namespace orc {
 
-char RTDyldObjectLinkingLayer::ID;
-
 using BaseT = RTTIExtends<RTDyldObjectLinkingLayer, ObjectLayer>;
 
 RTDyldObjectLinkingLayer::RTDyldObjectLinkingLayer(

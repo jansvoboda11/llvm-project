@@ -20,8 +20,6 @@
 using namespace lldb_private;
 using namespace clang;
 
-char ClangExpressionVariable::ID;
-
 ClangExpressionVariable::ClangExpressionVariable(
     ExecutionContextScope *exe_scope, lldb::ByteOrder byte_order,
     uint32_t addr_byte_size)

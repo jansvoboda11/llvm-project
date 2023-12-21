@@ -139,8 +139,6 @@ public:
 static llvm::ManagedStatic<IndexErrorCategory> Category;
 } // end anonymous namespace
 
-char IndexError::ID;
-
 void IndexError::log(raw_ostream &OS) const {
   OS << Category->message(static_cast<int>(Code)) << '\n';
 }

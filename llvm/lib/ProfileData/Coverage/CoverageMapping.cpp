@@ -1410,5 +1410,3 @@ const std::error_category &llvm::coverage::coveragemap_category() {
   static CoverageMappingErrorCategoryType ErrorCategory;
   return ErrorCategory;
 }
-
-char CoverageMapError::ID = 0;

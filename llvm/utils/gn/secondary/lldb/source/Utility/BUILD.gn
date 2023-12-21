@@ -52,7 +52,6 @@ static_library("Utility") {
     "TraceGDBRemotePackets.cpp",
     "TraceIntelPTGDBRemotePackets.cpp",
     "UUID.cpp",
-    "UnimplementedError.cpp",
     "UriParser.cpp",
     "UserID.cpp",
     "UserIDResolver.cpp",

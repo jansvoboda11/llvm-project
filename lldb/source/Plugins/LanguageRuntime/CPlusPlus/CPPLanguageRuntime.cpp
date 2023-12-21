@@ -38,8 +38,6 @@ static ConstString g_this = ConstString("this");
 static ConstString g_promise = ConstString("__promise");
 static ConstString g_coro_frame = ConstString("__coro_frame");
 
-char CPPLanguageRuntime::ID = 0;
-
 CPPLanguageRuntime::CPPLanguageRuntime(Process *process)
     : llvm::RTTIExtends<CPPLanguageRuntime, LanguageRuntime>(process) {}
 

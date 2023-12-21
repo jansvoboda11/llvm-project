@@ -93,7 +93,7 @@ public:
   coveragemap_error get() const { return Err; }
   const std::string &getMessage() const { return Msg; }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::coverage::CoverageMapError);
 
 private:
   coveragemap_error Err;

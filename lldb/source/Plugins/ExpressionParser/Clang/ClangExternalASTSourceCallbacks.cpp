@@ -15,8 +15,6 @@
 
 using namespace lldb_private;
 
-char ClangExternalASTSourceCallbacks::ID;
-
 void ClangExternalASTSourceCallbacks::CompleteType(clang::TagDecl *tag_decl) {
   m_ast.CompleteTagDecl(tag_decl);
 }

@@ -67,8 +67,7 @@ class SymbolFileDWARFDwp;
 class SymbolFileDWARF
     : public llvm::RTTIExtends<SymbolFileDWARF, SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::plugin::dwarf::SymbolFileDWARF);
 
   friend class SymbolFileDWARFDebugMap;
   friend class SymbolFileDWARFDwo;

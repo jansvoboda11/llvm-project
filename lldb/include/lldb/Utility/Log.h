@@ -50,13 +50,13 @@ public:
   virtual ~LogHandler() = default;
   virtual void Emit(llvm::StringRef message) = 0;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::LogHandler);
 };
 
 class StreamLogHandler
     : public llvm::RTTIExtends<StreamLogHandler, LogHandler> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::StreamLogHandler);
 
   StreamLogHandler(int fd, bool should_close, size_t buffer_size = 0);
   ~StreamLogHandler() override;
@@ -72,7 +72,7 @@ private:
 class CallbackLogHandler
     : public llvm::RTTIExtends<CallbackLogHandler, LogHandler> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::CallbackLogHandler);
 
   CallbackLogHandler(lldb::LogOutputCallback callback, void *baton);
 
@@ -86,7 +86,7 @@ private:
 class RotatingLogHandler
     : public llvm::RTTIExtends<RotatingLogHandler, LogHandler> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::RotatingLogHandler);
 
   RotatingLogHandler(size_t size);
 

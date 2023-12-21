@@ -23,8 +23,6 @@ using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(ObjectFileJSON)
 
-char ObjectFileJSON::ID;
-
 void ObjectFileJSON::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),
                                 GetPluginDescriptionStatic(), CreateInstance,

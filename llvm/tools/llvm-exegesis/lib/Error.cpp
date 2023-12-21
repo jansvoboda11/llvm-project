@@ -16,21 +16,15 @@
 namespace llvm {
 namespace exegesis {
 
-char ClusteringError::ID;
-
 void ClusteringError::log(raw_ostream &OS) const { OS << Msg; }
 
 std::error_code ClusteringError::convertToErrorCode() const {
   return inconvertibleErrorCode();
 }
 
-char SnippetExecutionFailure::ID;
-
 std::error_code SnippetExecutionFailure::convertToErrorCode() const {
   return inconvertibleErrorCode();
 }
-
-char SnippetSegmentationFault::ID;
 
 void SnippetSegmentationFault::log(raw_ostream &OS) const {
   OS << "The snippet encountered a segmentation fault at address "

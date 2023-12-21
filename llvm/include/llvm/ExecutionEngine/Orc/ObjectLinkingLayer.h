@@ -51,7 +51,7 @@ class ObjectLinkingLayer : public RTTIExtends<ObjectLinkingLayer, ObjectLayer>,
   friend class ObjectLinkingLayerJITLinkContext;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::ObjectLinkingLayer);
 
   /// Plugin instances can be added to the ObjectLinkingLayer to receive
   /// callbacks when code is loaded or emitted, and when JITLink is being

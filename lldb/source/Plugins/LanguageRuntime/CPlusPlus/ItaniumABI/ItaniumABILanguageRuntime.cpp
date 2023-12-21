@@ -45,8 +45,6 @@ LLDB_PLUGIN_DEFINE_ADV(ItaniumABILanguageRuntime, CXXItaniumABI)
 
 static const char *vtable_demangled_prefix = "vtable for ";
 
-char ItaniumABILanguageRuntime::ID = 0;
-
 bool ItaniumABILanguageRuntime::CouldHaveDynamicValue(ValueObject &in_value) {
   const bool check_cxx = true;
   const bool check_objc = false;

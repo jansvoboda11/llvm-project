@@ -66,8 +66,7 @@ class ModuleFileExtensionWriter;
 class ModuleFileExtension
     : public llvm::RTTIExtends<ModuleFileExtension, llvm::RTTIRoot> {
 public:
-  /// Discriminator for LLVM RTTI.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::ModuleFileExtension);
 
   virtual ~ModuleFileExtension();
 

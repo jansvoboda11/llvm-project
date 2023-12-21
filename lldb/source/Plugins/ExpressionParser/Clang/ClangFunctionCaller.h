@@ -62,8 +62,8 @@ class ClangFunctionCaller
       : public llvm::RTTIExtends<ClangFunctionCallerHelper,
                                  ClangExpressionHelper> {
   public:
-    // LLVM RTTI support
-    static char ID;
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(
+        lldb_private::ClangFunctionCaller::ClangFunctionCallerHelper);
 
     ClangFunctionCallerHelper(ClangFunctionCaller &owner) : m_owner(owner) {}
 
@@ -89,8 +89,7 @@ class ClangFunctionCaller
   };
 
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangFunctionCaller);
 
   /// Constructor
   ///

@@ -26,7 +26,7 @@ struct Remark;
 
 class EndOfFileError : public ErrorInfo<EndOfFileError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::remarks::EndOfFileError);
 
   EndOfFileError() = default;
 

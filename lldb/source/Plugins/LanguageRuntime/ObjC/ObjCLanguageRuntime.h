@@ -210,7 +210,7 @@ public:
 
   ~ObjCLanguageRuntime() override;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ObjCLanguageRuntime);
 
   static ObjCLanguageRuntime *Get(Process &process) {
     return llvm::cast_or_null<ObjCLanguageRuntime>(

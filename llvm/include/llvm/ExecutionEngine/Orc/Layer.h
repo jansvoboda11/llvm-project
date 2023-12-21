@@ -132,7 +132,7 @@ private:
 /// Interface for Layers that accept object files.
 class ObjectLayer : public RTTIExtends<ObjectLayer, RTTIRoot> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::ObjectLayer);
 
   ObjectLayer(ExecutionSession &ES);
   virtual ~ObjectLayer();

@@ -628,8 +628,6 @@ private:
 
 ObjectLinkingLayer::Plugin::~Plugin() = default;
 
-char ObjectLinkingLayer::ID;
-
 using BaseT = RTTIExtends<ObjectLinkingLayer, ObjectLayer>;
 
 ObjectLinkingLayer::ObjectLinkingLayer(ExecutionSession &ES)

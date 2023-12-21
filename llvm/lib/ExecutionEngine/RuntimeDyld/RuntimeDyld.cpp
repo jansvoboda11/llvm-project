@@ -52,8 +52,6 @@ public:
 
 }
 
-char RuntimeDyldError::ID = 0;
-
 void RuntimeDyldError::log(raw_ostream &OS) const {
   OS << ErrMsg << "\n";
 }

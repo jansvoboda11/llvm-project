@@ -41,8 +41,6 @@ bool mapOptOrNull(const llvm::json::Value &Params, llvm::StringLiteral Prop,
 }
 } // namespace
 
-char LSPError::ID;
-
 URIForFile URIForFile::canonicalize(llvm::StringRef AbsPath,
                                     llvm::StringRef TUPath) {
   assert(llvm::sys::path::is_absolute(AbsPath) && "the path is relative");

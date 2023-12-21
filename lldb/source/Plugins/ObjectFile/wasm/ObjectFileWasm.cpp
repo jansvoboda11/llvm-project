@@ -76,8 +76,6 @@ GetWasmString(llvm::DataExtractor &data, llvm::DataExtractor::Cursor &c) {
   return ConstString(str);
 }
 
-char ObjectFileWasm::ID;
-
 void ObjectFileWasm::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),
                                 GetPluginDescriptionStatic(), CreateInstance,

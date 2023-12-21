@@ -38,7 +38,7 @@ bool isAvailable();
 
 class WindowsManifestError : public ErrorInfo<WindowsManifestError, ECError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::windows_manifest::WindowsManifestError);
   WindowsManifestError(const Twine &Msg);
   void log(raw_ostream &OS) const override;
 

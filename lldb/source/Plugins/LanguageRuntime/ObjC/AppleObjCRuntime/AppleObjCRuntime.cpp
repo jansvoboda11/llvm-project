@@ -47,8 +47,6 @@ using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(AppleObjCRuntime)
 
-char AppleObjCRuntime::ID = 0;
-
 AppleObjCRuntime::~AppleObjCRuntime() = default;
 
 AppleObjCRuntime::AppleObjCRuntime(Process *process)

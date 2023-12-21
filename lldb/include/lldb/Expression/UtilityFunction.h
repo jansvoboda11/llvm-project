@@ -29,8 +29,7 @@ namespace lldb_private {
 /// functions can perform error-checking for ClangUserExpressions,
 class UtilityFunction : public llvm::RTTIExtends<UtilityFunction, Expression> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::UtilityFunction);
 
   /// Constructor
   ///

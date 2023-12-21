@@ -206,7 +206,7 @@ public:
     return LLDB_INVALID_ADDRESS;
   }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::LanguageRuntime);
 
   /// A language runtime may be able to provide a special UnwindPlan for
   /// the frame represented by the register contents \a regctx when that

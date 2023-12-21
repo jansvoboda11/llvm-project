@@ -60,8 +60,7 @@ public:
                                         lldb::offset_t length,
                                         lldb_private::ModuleSpecList &specs);
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(ObjectFileCOFF);
 
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }

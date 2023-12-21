@@ -45,7 +45,7 @@ class ErrorSuccess;
 /// the ErrorInfo template subclass instead.
 class ErrorInfoBase : public RTTIExtends<ErrorInfoBase, RTTIRoot> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ErrorInfoBase);
 
   /// Print an error message to an output stream.
   virtual void log(raw_ostream &OS) const = 0;
@@ -229,7 +229,7 @@ public:
 
   /// Returns the dynamic class id of this error, or null if this is a success
   /// value.
-  const void* dynamicClassID() const {
+  const detail::RTTIID* dynamicClassID() const {
     if (!getPtr())
       return nullptr;
     return getPtr()->dynamicClassID();
@@ -357,8 +357,7 @@ public:
 
   std::error_code convertToErrorCode() const override;
 
-  // Used by ErrorInfo::classID.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ErrorList);
 
 private:
   ErrorList(std::unique_ptr<ErrorInfoBase> Payload1,
@@ -1126,8 +1125,7 @@ public:
   std::error_code convertToErrorCode() const override { return EC; }
   void log(raw_ostream &OS) const override { OS << EC.message(); }
 
-  // Used by ErrorInfo::classID.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ECError);
 
 protected:
   ECError() = default;
@@ -1193,7 +1191,7 @@ template <typename T> ErrorOr<T> expectedToErrorOr(Expected<T> &&E) {
 ///
 class StringError : public ErrorInfo<StringError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::StringError);
 
   // Prints EC + S and converts to EC
   StringError(std::error_code EC, const Twine &S = Twine());
@@ -1265,8 +1263,7 @@ public:
 
   std::error_code convertToErrorCode() const override;
 
-  // Used by ErrorInfo::classID.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::FileError);
 
 private:
   FileError(const Twine &F, std::optional<size_t> LineNum,

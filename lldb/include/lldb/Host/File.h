@@ -359,7 +359,7 @@ public:
 
   bool operator!() const { return !IsValid(); };
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::File);
 
 protected:
   LazyBool m_is_interactive = eLazyBoolCalculate;
@@ -406,7 +406,7 @@ public:
   size_t PrintfVarArg(const char *format, va_list args) override;
   llvm::Expected<OpenOptions> GetOptions() const override;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::NativeFile);
 
 protected:
   struct ValueGuard {
@@ -472,7 +472,7 @@ public:
 
   Status Close() override;
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SerialPort);
 
 private:
   SerialPort(int fd, OpenOptions options, Options serial_options,

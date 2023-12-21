@@ -28,7 +28,7 @@ namespace remarks {
 
 class YAMLParseError : public ErrorInfo<YAMLParseError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::remarks::YAMLParseError);
 
   YAMLParseError(StringRef Message, SourceMgr &SM, yaml::Stream &Stream,
                  yaml::Node &Node);

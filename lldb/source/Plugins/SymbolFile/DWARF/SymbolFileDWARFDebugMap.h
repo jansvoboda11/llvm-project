@@ -33,8 +33,8 @@ class DWARFDeclContext;
 class SymbolFileDWARFDebugMap
     : public llvm::RTTIExtends<SymbolFileDWARFDebugMap, SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(
+      lldb_private::plugin::dwarf::SymbolFileDWARFDebugMap);
 
   // Static Functions
   static void Initialize();

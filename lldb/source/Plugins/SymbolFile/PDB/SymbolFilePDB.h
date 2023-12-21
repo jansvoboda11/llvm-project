@@ -25,8 +25,7 @@ class PDBASTParser;
 class SymbolFilePDB
     : public llvm::RTTIExtends<SymbolFilePDB, lldb_private::SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(SymbolFilePDB);
 
   // Static Functions
   static void Initialize();

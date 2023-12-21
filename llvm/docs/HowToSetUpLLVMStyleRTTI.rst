@@ -427,8 +427,9 @@ The ``RTTIRoot`` class describes an interface for performing RTTI checks. The
 for classes derived from ``RTTIRoot``. ``RTTIExtends`` uses the "`Curiously
 Recurring Template Idiom`_", taking the class being defined as its first
 template argument and the parent class as the second argument. Any class that
-uses ``RTTIExtends`` must define a ``static char ID`` member, the address of
-which will be used to identify the type.
+uses ``RTTIExtends`` must invoke the `LLVM_EXTENSIBLE_RTTI_DEFINE_ID()` macro
+with a unique string identifier. This will define a static member variable
+whose address or value will be used to identiy the type.
 
 This open-hierarchy RTTI support should only be used if your use case requires
 it. Otherwise the standard LLVM RTTI system should be preferred.
@@ -440,16 +441,17 @@ E.g.
 
 .. code-block:: c++
 
+   namespace geometry {
    class Shape : public RTTIExtends<Shape, RTTIRoot> {
    public:
-     static char ID;
+     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(geometry::Shape);
      virtual double computeArea() = 0;
    };
 
    class Square : public RTTIExtends<Square, Shape> {
      double SideLength;
    public:
-     static char ID;
+     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(geometry::Square);
 
      Square(double S) : SideLength(S) {}
      double computeArea() override;
@@ -458,15 +460,12 @@ E.g.
    class Circle : public RTTIExtends<Circle, Shape> {
      double Radius;
    public:
-     static char ID;
+     LLVM_EXTENSIBLE_RTTI_DEFINE_ID(geometry::Circle);
 
      Circle(double R) : Radius(R) {}
      double computeArea() override;
    };
-
-   char Shape::ID = 0;
-   char Square::ID = 0;
-   char Circle::ID = 0;
+   } // namespace geometry
 
 Advanced Use Cases
 ==================

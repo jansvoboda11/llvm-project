@@ -61,8 +61,7 @@ public:
     return llvm::ArrayRef<uint8_t>(GetBytes(), GetByteSize());
   }
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::DataBuffer);
 
 protected:
   /// Get a const pointer to the data.
@@ -107,8 +106,7 @@ public:
     return llvm::MutableArrayRef<uint8_t>(GetBytes(), GetByteSize());
   }
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::WritableDataBuffer);
 };
 
 class DataBufferUnowned
@@ -120,8 +118,7 @@ public:
   const uint8_t *GetBytesImpl() const override { return m_bytes; }
   lldb::offset_t GetByteSize() const override { return m_size; }
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::DataBufferUnowned);
 
 private:
   uint8_t *m_bytes;

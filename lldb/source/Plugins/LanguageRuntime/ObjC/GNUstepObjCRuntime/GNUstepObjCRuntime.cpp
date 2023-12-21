@@ -25,8 +25,6 @@ using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(GNUstepObjCRuntime)
 
-char GNUstepObjCRuntime::ID = 0;
-
 void GNUstepObjCRuntime::Initialize() {
   PluginManager::RegisterPlugin(
       GetPluginNameStatic(), "GNUstep Objective-C Language Runtime - libobjc2",

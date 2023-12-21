@@ -24,15 +24,6 @@
 namespace llvm {
 namespace orc {
 
-char ResourceTrackerDefunct::ID = 0;
-char FailedToMaterialize::ID = 0;
-char SymbolsNotFound::ID = 0;
-char SymbolsCouldNotBeRemoved::ID = 0;
-char MissingSymbolDefinitions::ID = 0;
-char UnexpectedSymbolDefinitions::ID = 0;
-char MaterializationTask::ID = 0;
-char LookupTask::ID = 0;
-
 RegisterDependenciesFunction NoDependenciesToRegister =
     RegisterDependenciesFunction();
 

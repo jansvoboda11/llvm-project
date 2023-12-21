@@ -38,7 +38,7 @@ public:
 
   static llvm::StringRef GetPluginNameStatic() { return "itanium"; }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ItaniumABILanguageRuntime);
 
   llvm::Expected<LanguageRuntime::VTableInfo>
   GetVTableInfo(ValueObject &in_value, bool check_type) override;

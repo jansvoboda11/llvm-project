@@ -30,8 +30,7 @@ class ClangExpressionHelper
     : public llvm::RTTIExtends<ClangExpressionHelper,
                                ExpressionTypeSystemHelper> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangExpressionHelper);
 
   /// Return the object that the parser should use when resolving external
   /// values.  May be NULL if everything should be self-contained.

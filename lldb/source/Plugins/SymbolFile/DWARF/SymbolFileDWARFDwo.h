@@ -17,8 +17,8 @@ namespace dwarf {
 class SymbolFileDWARFDwo
     : public llvm::RTTIExtends<SymbolFileDWARFDwo, SymbolFileDWARF> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(
+      lldb_private::plugin::dwarf::SymbolFileDWARFDwo);
 
   SymbolFileDWARFDwo(SymbolFileDWARF &m_base_symbol_file,
                      lldb::ObjectFileSP objfile, uint32_t id);

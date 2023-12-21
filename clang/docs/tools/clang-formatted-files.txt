@@ -320,7 +320,6 @@ clang/lib/APINotes/APINotesTypes.cpp
 clang/lib/APINotes/APINotesYAMLCompiler.cpp
 clang/lib/AST/DataCollection.cpp
 clang/lib/AST/Linkage.h
-clang/lib/AST/Interp/ByteCodeGenError.cpp
 clang/lib/AST/Interp/ByteCodeGenError.h
 clang/lib/AST/Interp/Context.cpp
 clang/lib/AST/Interp/Context.h
@@ -4693,7 +4692,6 @@ lldb/source/Utility/TildeExpressionResolver.cpp
 lldb/source/Utility/Timer.cpp
 lldb/source/Utility/TraceGDBRemotePackets.cpp
 lldb/source/Utility/TraceIntelPTGDBRemotePackets.cpp
-lldb/source/Utility/UnimplementedError.cpp
 lldb/source/Utility/UriParser.cpp
 lldb/source/Utility/UserID.cpp
 lldb/source/Utility/UserIDResolver.cpp
@@ -5990,7 +5988,6 @@ llvm/lib/DWARFLinker/DWARFLinkerCompileUnit.cpp
 llvm/lib/DWARFLinker/DWARFLinkerDeclContext.cpp
 llvm/lib/DWARFLinker/DWARFStreamer.cpp
 llvm/lib/DWP/DWP.cpp
-llvm/lib/DWP/DWPError.cpp
 llvm/lib/ExecutionEngine/SectionMemoryManager.cpp
 llvm/lib/ExecutionEngine/JITLink/aarch64.cpp
 llvm/lib/ExecutionEngine/JITLink/DefineExternalSectionStartAndEndSymbols.h

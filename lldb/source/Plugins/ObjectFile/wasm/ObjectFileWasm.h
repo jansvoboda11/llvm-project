@@ -52,8 +52,7 @@ public:
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
   /// \}
 
-  /// LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::wasm::ObjectFileWasm);
 
   /// ObjectFile Protocol.
   /// \{

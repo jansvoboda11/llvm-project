@@ -34,8 +34,7 @@ namespace lldb_private {
 class ClangUtilityFunction
     : public llvm::RTTIExtends<ClangUtilityFunction, UtilityFunction> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangUtilityFunction);
 
   /// Constructor
   ///
@@ -72,8 +71,8 @@ private:
       : public llvm::RTTIExtends<ClangUtilityFunctionHelper,
                                  ClangExpressionHelper> {
   public:
-    // LLVM RTTI support
-    static char ID;
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(
+        lldb_private::ClangUtilityFunction::ClangUtilityFunctionHelper);
 
     /// Return the object that the parser should use when resolving external
     /// values.  May be NULL if everything should be self-contained.

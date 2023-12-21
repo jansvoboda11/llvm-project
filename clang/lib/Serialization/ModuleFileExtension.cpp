@@ -9,8 +9,6 @@
 #include "llvm/ADT/Hashing.h"
 using namespace clang;
 
-char ModuleFileExtension::ID = 0;
-
 ModuleFileExtension::~ModuleFileExtension() {}
 
 void ModuleFileExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {}

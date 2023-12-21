@@ -20,8 +20,7 @@ class SymbolFileSymtab
     : public llvm::RTTIExtends<SymbolFileSymtab,
                                lldb_private::SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(SymbolFileSymtab);
 
   // Constructors and Destructors
   SymbolFileSymtab(lldb::ObjectFileSP objfile_sp);

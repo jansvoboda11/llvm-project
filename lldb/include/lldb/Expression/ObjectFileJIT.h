@@ -64,8 +64,7 @@ public:
                                         lldb::offset_t length,
                                         lldb_private::ModuleSpecList &specs);
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ObjectFileJIT);
 
   // Member Functions
   bool ParseHeader() override;

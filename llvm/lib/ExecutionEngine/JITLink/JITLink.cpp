@@ -51,8 +51,6 @@ public:
 namespace llvm {
 namespace jitlink {
 
-char JITLinkError::ID = 0;
-
 void JITLinkError::log(raw_ostream &OS) const { OS << ErrMsg; }
 
 std::error_code JITLinkError::convertToErrorCode() const {

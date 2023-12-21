@@ -46,6 +46,3 @@ const uint8_t *WritableDataBufferLLVM::GetBytesImpl() const {
 lldb::offset_t WritableDataBufferLLVM::GetByteSize() const {
   return Buffer->getBufferSize();
 }
-
-char DataBufferLLVM::ID;
-char WritableDataBufferLLVM::ID;

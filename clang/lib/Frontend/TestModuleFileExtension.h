@@ -44,7 +44,7 @@ class TestModuleFileExtension
   };
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::TestModuleFileExtension);
 
   TestModuleFileExtension(StringRef BlockName, unsigned MajorVersion,
                           unsigned MinorVersion, bool Hashed,

@@ -60,8 +60,7 @@ class ValueObjectConstResult;
 class ClangExpressionVariable
     : public llvm::RTTIExtends<ClangExpressionVariable, ExpressionVariable> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangExpressionVariable);
 
   ClangExpressionVariable(ExecutionContextScope *exe_scope,
                           lldb::ByteOrder byte_order, uint32_t addr_byte_size);

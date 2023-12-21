@@ -50,8 +50,7 @@ public:
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ObjectFilePDB);
 
   // ObjectFile Protocol.
   uint32_t GetAddressByteSize() const override { return 8; }

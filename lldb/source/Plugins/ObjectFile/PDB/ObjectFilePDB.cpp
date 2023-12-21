@@ -34,8 +34,6 @@ static UUID GetPDBUUID(InfoStream &IS, DbiStream &DS) {
   return UUID(debug_info);
 }
 
-char ObjectFilePDB::ID;
-
 void ObjectFilePDB::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),
                                 GetPluginDescriptionStatic(), CreateInstance,

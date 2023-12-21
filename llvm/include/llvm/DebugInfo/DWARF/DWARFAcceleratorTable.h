@@ -478,7 +478,7 @@ public:
   /// the entry list.
   class SentinelError : public ErrorInfo<SentinelError> {
   public:
-    static char ID;
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::DWARFDebugNames::SentinelError);
 
     void log(raw_ostream &OS) const override { OS << "Sentinel"; }
     std::error_code convertToErrorCode() const override;

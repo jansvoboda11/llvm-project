@@ -145,7 +145,7 @@ private:
 
 class ResolverError : public ErrorInfo<ResolverError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::ResolverError);
 
   ResolverError(uint32_t Index, dwarf::LoclistEntries Kind) : Index(Index), Kind(Kind) {}
 

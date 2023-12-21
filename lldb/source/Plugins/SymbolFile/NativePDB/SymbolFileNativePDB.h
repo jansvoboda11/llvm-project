@@ -45,8 +45,7 @@ class SymbolFileNativePDB
   friend class UdtRecordCompleter;
 
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::npdb::SymbolFileNativePDB);
 
   // Static Functions
   static void Initialize();

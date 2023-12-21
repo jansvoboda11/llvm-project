@@ -30,7 +30,7 @@ public:
   //  PluginManager, PluginInterface and LLVM RTTI implementation
   //
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::GNUstepObjCRuntime);
 
   static void Initialize();
 

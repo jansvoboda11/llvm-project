@@ -408,7 +408,7 @@ extern RegisterDependenciesFunction NoDependenciesToRegister;
 
 class ResourceTrackerDefunct : public ErrorInfo<ResourceTrackerDefunct> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::ResourceTrackerDefunct);
 
   ResourceTrackerDefunct(ResourceTrackerSP RT);
   std::error_code convertToErrorCode() const override;
@@ -422,7 +422,7 @@ private:
 /// materialize.
 class FailedToMaterialize : public ErrorInfo<FailedToMaterialize> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::FailedToMaterialize);
 
   FailedToMaterialize(std::shared_ptr<SymbolStringPool> SSP,
                       std::shared_ptr<SymbolDependenceMap> Symbols);
@@ -439,7 +439,7 @@ private:
 /// Used to notify clients when symbols can not be found during a lookup.
 class SymbolsNotFound : public ErrorInfo<SymbolsNotFound> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::SymbolsNotFound);
 
   SymbolsNotFound(std::shared_ptr<SymbolStringPool> SSP, SymbolNameSet Symbols);
   SymbolsNotFound(std::shared_ptr<SymbolStringPool> SSP,
@@ -457,7 +457,7 @@ private:
 /// Used to notify clients that a set of symbols could not be removed.
 class SymbolsCouldNotBeRemoved : public ErrorInfo<SymbolsCouldNotBeRemoved> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::SymbolsCouldNotBeRemoved);
 
   SymbolsCouldNotBeRemoved(std::shared_ptr<SymbolStringPool> SSP,
                            SymbolNameSet Symbols);
@@ -477,7 +477,7 @@ private:
 /// a broken transformation / compiler / object cache.
 class MissingSymbolDefinitions : public ErrorInfo<MissingSymbolDefinitions> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::MissingSymbolDefinitions);
 
   MissingSymbolDefinitions(std::shared_ptr<SymbolStringPool> SSP,
                            std::string ModuleName, SymbolNameVector Symbols)
@@ -500,7 +500,7 @@ private:
 /// a broken transformation / compiler / object cache.
 class UnexpectedSymbolDefinitions : public ErrorInfo<UnexpectedSymbolDefinitions> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::UnexpectedSymbolDefinitions);
 
   UnexpectedSymbolDefinitions(std::shared_ptr<SymbolStringPool> SSP,
                               std::string ModuleName, SymbolNameVector Symbols)
@@ -1357,7 +1357,7 @@ public:
 /// A materialization task.
 class MaterializationTask : public RTTIExtends<MaterializationTask, Task> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::MaterializationTask);
 
   MaterializationTask(std::unique_ptr<MaterializationUnit> MU,
                       std::unique_ptr<MaterializationResponsibility> MR)
@@ -1375,7 +1375,7 @@ private:
 /// state.
 class LookupTask : public RTTIExtends<LookupTask, Task> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::LookupTask);
 
   LookupTask(LookupState LS) : LS(std::move(LS)) {}
   void printDescription(raw_ostream &OS) override;

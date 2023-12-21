@@ -29,8 +29,6 @@ static bool IsCOFFObjectFile(const DataBufferSP &data) {
 
 LLDB_PLUGIN_DEFINE(ObjectFileCOFF)
 
-char ObjectFileCOFF::ID;
-
 ObjectFileCOFF::~ObjectFileCOFF() = default;
 
 void ObjectFileCOFF::Initialize() {

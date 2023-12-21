@@ -12,8 +12,6 @@
 namespace clang {
 namespace clangd {
 
-char CancelledError::ID = 0;
-
 // We don't want a cancelable scope to "shadow" an enclosing one.
 struct CancelState {
   std::shared_ptr<std::atomic<int>> Cancelled;

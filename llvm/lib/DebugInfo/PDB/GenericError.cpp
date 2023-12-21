@@ -45,5 +45,3 @@ const std::error_category &llvm::pdb::PDBErrCategory() {
   static PDBErrorCategory PDBCategory;
   return PDBCategory;
 }
-
-char PDBError::ID;

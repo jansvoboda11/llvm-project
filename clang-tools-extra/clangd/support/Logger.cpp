@@ -71,10 +71,8 @@ public:
   void log(llvm::raw_ostream &OS) const override { OS << Message; }
   std::string message() const override { return Message; }
   std::error_code convertToErrorCode() const override { return EC; }
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::clangd::SimpleStringError);
 };
-char SimpleStringError::ID;
-
 } // namespace
 
 llvm::Error detail::error(std::error_code EC, std::string &&Msg) {

@@ -70,8 +70,7 @@ public:
   static bool MagicBytesMatch(lldb::DataBufferSP data_sp, lldb::addr_t offset,
                               lldb::addr_t length);
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(ObjectFileMachO);
 
   // Member Functions
   bool ParseHeader() override;

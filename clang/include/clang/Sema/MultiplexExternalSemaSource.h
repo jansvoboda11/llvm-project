@@ -41,8 +41,7 @@ class MultiplexExternalSemaSource
   SmallVector<ExternalSemaSource *, 2> Sources;
 
 public:
-  /// LLVM-style RTTI.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::MultiplexExternalSemaSource);
 
   /// Constructs a new multiplexing external sema source and appends the
   /// given element to it.

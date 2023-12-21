@@ -15,8 +15,6 @@
 using namespace clang;
 using namespace clang::serialization;
 
-char TestModuleFileExtension::ID = 0;
-
 TestModuleFileExtension::Writer::~Writer() { }
 
 void TestModuleFileExtension::Writer::writeExtensionContents(

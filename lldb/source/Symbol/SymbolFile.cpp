@@ -26,9 +26,6 @@
 using namespace lldb_private;
 using namespace lldb;
 
-char SymbolFile::ID;
-char SymbolFileCommon::ID;
-
 void SymbolFile::PreloadSymbols() {
   // No-op for most implementations.
 }

@@ -32,8 +32,7 @@ public:
   const uint8_t *GetBytesImpl() const override;
   lldb::offset_t GetByteSize() const override;
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::DataBufferLLVM);
 
   /// Construct a DataBufferLLVM from \p Buffer.  \p Buffer must be a valid
   /// pointer.
@@ -51,8 +50,7 @@ public:
   const uint8_t *GetBytesImpl() const override;
   lldb::offset_t GetByteSize() const override;
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::WritableDataBufferLLVM);
 
   /// Construct a DataBufferLLVM from \p Buffer.  \p Buffer must be a valid
   /// pointer.

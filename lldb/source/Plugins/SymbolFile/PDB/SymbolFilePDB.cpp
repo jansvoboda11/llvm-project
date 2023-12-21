@@ -67,8 +67,6 @@ using namespace llvm::pdb;
 
 LLDB_PLUGIN_DEFINE(SymbolFilePDB)
 
-char SymbolFilePDB::ID;
-
 namespace {
 lldb::LanguageType TranslateLanguage(PDB_Lang lang) {
   switch (lang) {

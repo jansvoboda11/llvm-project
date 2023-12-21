@@ -11,8 +11,6 @@
 
 using namespace llvm;
 
-char BinaryStreamError::ID = 0;
-
 BinaryStreamError::BinaryStreamError(stream_error_code C)
     : BinaryStreamError(C, "") {}
 

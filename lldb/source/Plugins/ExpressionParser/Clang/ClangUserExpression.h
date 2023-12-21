@@ -42,8 +42,7 @@ class ClangExpressionParser;
 class ClangUserExpression
     : public llvm::RTTIExtends<ClangUserExpression, LLVMUserExpression> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangUserExpression);
 
   enum { kDefaultTimeout = 500000u };
 
@@ -51,8 +50,8 @@ public:
       : public llvm::RTTIExtends<ClangUserExpressionHelper,
                                  ClangExpressionHelper> {
   public:
-    // LLVM RTTI support
-    static char ID;
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(
+        lldb_private::ClangUserExpression::ClangUserExpressionHelper);
 
     ClangUserExpressionHelper(Target &target, bool top_level)
         : m_target(target), m_top_level(top_level) {}

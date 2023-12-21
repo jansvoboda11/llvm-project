@@ -49,7 +49,7 @@ class Section;
 /// support.
 class JITLinkError : public ErrorInfo<JITLinkError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::jitlink::JITLinkError);
 
   JITLinkError(Twine ErrMsg) : ErrMsg(ErrMsg.str()) {}
 

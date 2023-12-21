@@ -31,7 +31,7 @@ class RecycledInstErr : public ErrorInfo<RecycledInstErr> {
   Instruction *RecycledInst;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::mca::RecycledInstErr);
 
   explicit RecycledInstErr(Instruction *Inst) : RecycledInst(Inst) {}
   // Always need to carry an Instruction

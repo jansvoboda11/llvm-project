@@ -47,8 +47,7 @@ public:
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::breakpad::ObjectFileBreakpad);
 
   // ObjectFile Protocol.
 

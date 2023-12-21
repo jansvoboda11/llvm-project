@@ -36,8 +36,6 @@ size_t LanguageSet::Size() const { return bitvector.count(); }
 bool LanguageSet::Empty() const { return bitvector.none(); }
 bool LanguageSet::operator[](unsigned i) const { return bitvector[i]; }
 
-char TypeSystem::ID = 0;
-
 TypeSystem::TypeSystem() = default;
 TypeSystem::~TypeSystem() = default;
 

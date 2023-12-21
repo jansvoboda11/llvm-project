@@ -27,7 +27,7 @@ enum class TextAPIErrorCode {
 
 class TextAPIError : public llvm::ErrorInfo<TextAPIError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::MachO::TextAPIError);
   TextAPIErrorCode EC;
   std::string Msg;
 

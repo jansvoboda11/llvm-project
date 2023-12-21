@@ -16,8 +16,6 @@
 using namespace llvm;
 using namespace llvm::MachO;
 
-char TextAPIError::ID = 0;
-
 void TextAPIError::log(raw_ostream &OS) const {
   switch (EC) {
   case TextAPIErrorCode::NoSuchArchitecture:

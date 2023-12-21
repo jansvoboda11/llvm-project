@@ -83,7 +83,7 @@ public:
   int64_t getLineNum() const { return Line; }
   StringRef getMessage() const { return Message; }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::SymbolRemappingParseError);
 
 private:
   std::string File;

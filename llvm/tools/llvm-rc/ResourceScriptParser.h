@@ -44,7 +44,7 @@ public:
     }
     const std::string &getMessage() const { return CurMessage; }
 
-    static char ID; // Keep llvm::Error happy.
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::rc::RCParser::ParserError);
 
   private:
     std::string CurMessage;

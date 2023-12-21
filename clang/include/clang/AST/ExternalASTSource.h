@@ -68,8 +68,7 @@ class ExternalASTSource
   uint32_t CurrentGeneration = 0;
 
 public:
-  /// LLVM-style RTTI.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::ExternalASTSource);
 
   ExternalASTSource() = default;
   virtual ~ExternalASTSource();

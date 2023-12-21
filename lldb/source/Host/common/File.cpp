@@ -903,7 +903,3 @@ Status SerialPort::Close() {
   m_state.Restore();
   return NativeFile::Close();
 }
-
-char File::ID = 0;
-char NativeFile::ID = 0;
-char SerialPort::ID = 0;

@@ -50,8 +50,7 @@ struct ExternalVTableUse {
 class ExternalSemaSource
     : public llvm::RTTIExtends<ExternalSemaSource, ExternalASTSource> {
 public:
-  /// LLVM-style RTTI.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::ExternalSemaSource);
 
   ExternalSemaSource() = default;
 

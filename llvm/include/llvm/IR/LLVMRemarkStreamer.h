@@ -62,21 +62,21 @@ struct LLVMRemarkSetupErrorInfo : public ErrorInfo<ThisError> {
 
 struct LLVMRemarkSetupFileError
     : LLVMRemarkSetupErrorInfo<LLVMRemarkSetupFileError> {
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::LLVMRemarkSetupFileError);
   using LLVMRemarkSetupErrorInfo<
       LLVMRemarkSetupFileError>::LLVMRemarkSetupErrorInfo;
 };
 
 struct LLVMRemarkSetupPatternError
     : LLVMRemarkSetupErrorInfo<LLVMRemarkSetupPatternError> {
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::LLVMRemarkSetupPatternError);
   using LLVMRemarkSetupErrorInfo<
       LLVMRemarkSetupPatternError>::LLVMRemarkSetupErrorInfo;
 };
 
 struct LLVMRemarkSetupFormatError
     : LLVMRemarkSetupErrorInfo<LLVMRemarkSetupFormatError> {
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::LLVMRemarkSetupFormatError);
   using LLVMRemarkSetupErrorInfo<
       LLVMRemarkSetupFormatError>::LLVMRemarkSetupErrorInfo;
 };

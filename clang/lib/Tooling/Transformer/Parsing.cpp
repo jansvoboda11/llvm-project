@@ -58,8 +58,7 @@ template <typename T> using ParseFunction = ExpectedProgress<T> (*)(ParseState);
 
 class ParseError : public llvm::ErrorInfo<ParseError> {
 public:
-  // Required field for all ErrorInfo derivatives.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(ParseError);
 
   ParseError(size_t Pos, std::string ErrorMsg, std::string InputExcerpt)
       : Pos(Pos), ErrorMsg(std::move(ErrorMsg)),
@@ -80,8 +79,6 @@ public:
   // Excerpt of the input starting at the error position.
   std::string Excerpt;
 };
-
-char ParseError::ID;
 } // namespace
 
 static const llvm::StringMap<RangeSelectorOp<std::string>> &

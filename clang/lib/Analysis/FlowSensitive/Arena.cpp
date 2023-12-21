@@ -180,7 +180,7 @@ class FormulaParseError : public llvm::ErrorInfo<FormulaParseError> {
   unsigned Offset;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::dataflow::FormulaParseError);
   FormulaParseError(llvm::StringRef Formula, unsigned Offset)
       : Formula(Formula), Offset(Offset) {}
 
@@ -194,8 +194,6 @@ public:
     return std::make_error_code(std::errc::invalid_argument);
   }
 };
-
-char FormulaParseError::ID = 0;
 
 } // namespace
 

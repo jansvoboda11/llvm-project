@@ -41,7 +41,7 @@ public:
   LibCppStdFunctionCallableInfo
   FindLibCppStdFunctionCallableInfo(lldb::ValueObjectSP &valobj_sp);
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::CPPLanguageRuntime);
 
   lldb::LanguageType GetLanguageType() const override {
     return lldb::eLanguageTypeC_plus_plus;

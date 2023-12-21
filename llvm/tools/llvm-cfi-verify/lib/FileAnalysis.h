@@ -232,7 +232,7 @@ private:
 
 class UnsupportedDisassembly : public ErrorInfo<UnsupportedDisassembly> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::cfi_verify::UnsupportedDisassembly);
   std::string Text;
 
   UnsupportedDisassembly(StringRef Text);

@@ -9,6 +9,5 @@ static_library("DWP") {
   ]
   sources = [
     "DWP.cpp",
-    "DWPError.cpp",
   ]
 }

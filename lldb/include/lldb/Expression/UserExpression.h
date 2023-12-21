@@ -34,8 +34,7 @@ namespace lldb_private {
 /// appropriate TypeSystem.
 class UserExpression : public llvm::RTTIExtends<UserExpression, Expression> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::UserExpression);
 
   enum { kDefaultTimeout = 500000u };
 

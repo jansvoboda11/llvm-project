@@ -85,7 +85,7 @@ int isCancelled(const Context &Ctx = Context::current());
 /// Conventional error when no result is returned due to cancellation.
 class CancelledError : public llvm::ErrorInfo<CancelledError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(clang::clangd::CancelledError);
   const int Reason;
 
   CancelledError(int Reason) : Reason(Reason) {}

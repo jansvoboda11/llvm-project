@@ -25,8 +25,6 @@
 namespace llvm {
 namespace mca {
 
-char RecycledInstErr::ID = 0;
-
 InstrBuilder::InstrBuilder(const llvm::MCSubtargetInfo &sti,
                            const llvm::MCInstrInfo &mcii,
                            const llvm::MCRegisterInfo &mri,

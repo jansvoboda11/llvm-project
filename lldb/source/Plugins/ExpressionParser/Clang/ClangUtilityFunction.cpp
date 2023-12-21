@@ -27,8 +27,6 @@
 
 using namespace lldb_private;
 
-char ClangUtilityFunction::ID;
-
 ClangUtilityFunction::ClangUtilityFunction(ExecutionContextScope &exe_scope,
                                            std::string text, std::string name,
                                            bool enable_debugging)
@@ -174,8 +172,6 @@ bool ClangUtilityFunction::Install(DiagnosticManager &diagnostic_manager,
     return false;
   }
 }
-
-char ClangUtilityFunction::ClangUtilityFunctionHelper::ID;
 
 void ClangUtilityFunction::ClangUtilityFunctionHelper::ResetDeclMap(
     ExecutionContext &exe_ctx, bool keep_result_in_memory) {

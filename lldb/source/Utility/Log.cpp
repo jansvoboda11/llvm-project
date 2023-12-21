@@ -35,11 +35,6 @@
 
 using namespace lldb_private;
 
-char LogHandler::ID;
-char StreamLogHandler::ID;
-char CallbackLogHandler::ID;
-char RotatingLogHandler::ID;
-
 llvm::ManagedStatic<Log::ChannelMap> Log::g_channel_map;
 
 void Log::ForEachCategory(

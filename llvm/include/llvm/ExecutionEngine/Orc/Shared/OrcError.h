@@ -46,7 +46,7 @@ std::error_code orcError(OrcErrorCode ErrCode);
 
 class DuplicateDefinition : public ErrorInfo<DuplicateDefinition> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::DuplicateDefinition);
 
   DuplicateDefinition(std::string SymbolName);
   std::error_code convertToErrorCode() const override;
@@ -58,7 +58,7 @@ private:
 
 class JITSymbolNotFound : public ErrorInfo<JITSymbolNotFound> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::JITSymbolNotFound);
 
   JITSymbolNotFound(std::string SymbolName);
   std::error_code convertToErrorCode() const override;

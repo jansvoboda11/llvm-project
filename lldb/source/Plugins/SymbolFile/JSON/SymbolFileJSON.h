@@ -21,8 +21,7 @@ namespace lldb_private {
 class SymbolFileJSON
     : public llvm::RTTIExtends<SymbolFileJSON, SymbolFileCommon> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::SymbolFileJSON);
 
   SymbolFileJSON(lldb::ObjectFileSP objfile_sp);
 

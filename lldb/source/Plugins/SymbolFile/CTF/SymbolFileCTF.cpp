@@ -46,8 +46,6 @@ using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(SymbolFileCTF)
 
-char SymbolFileCTF::ID;
-
 SymbolFileCTF::SymbolFileCTF(lldb::ObjectFileSP objfile_sp)
     : llvm::RTTIExtends<SymbolFileCTF, SymbolFileCommon>(
           std::move(objfile_sp)) {}

@@ -21,8 +21,6 @@
 using namespace llvm;
 using namespace llvm::remarks;
 
-char EndOfFileError::ID = 0;
-
 ParsedStringTable::ParsedStringTable(StringRef InBuffer) : Buffer(InBuffer) {
   while (!InBuffer.empty()) {
     // Strings are separated by '\0' bytes.

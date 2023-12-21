@@ -36,7 +36,7 @@ class HTTPServer;
 
 class HTTPServerError : public ErrorInfo<HTTPServerError, ECError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::HTTPServerError);
   HTTPServerError(const Twine &Msg);
   void log(raw_ostream &OS) const override;
 

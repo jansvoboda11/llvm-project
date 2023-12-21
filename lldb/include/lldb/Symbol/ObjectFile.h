@@ -206,8 +206,7 @@ public:
       llvm::StringRef path_with_object, lldb_private::FileSpec &archive_file,
       lldb_private::ConstString &archive_object, bool must_exist);
 
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ObjectFile);
 
   /// Gets the address size in bytes for the current object file.
   ///

@@ -882,7 +882,7 @@ class ParseError : public llvm::ErrorInfo<ParseError> {
   unsigned Line, Column, Offset;
 
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::json::ParseError);
   ParseError(const char *Msg, unsigned Line, unsigned Column, unsigned Offset)
       : Msg(Msg), Line(Line), Column(Column), Offset(Offset) {}
   void log(llvm::raw_ostream &OS) const override {

@@ -173,8 +173,6 @@ static UUID GetCoffUUID(llvm::object::COFFObjectFile &coff_obj) {
   return UUID(&data, sizeof(data));
 }
 
-char ObjectFilePECOFF::ID;
-
 void ObjectFilePECOFF::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),
                                 GetPluginDescriptionStatic(), CreateInstance,

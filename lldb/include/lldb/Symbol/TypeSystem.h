@@ -67,7 +67,7 @@ class TypeSystem : public PluginInterface,
                    public llvm::RTTIExtends<TypeSystem, llvm::RTTIRoot>,
                    public std::enable_shared_from_this<TypeSystem> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::TypeSystem);
 
   // Constructors and Destructors
   TypeSystem();

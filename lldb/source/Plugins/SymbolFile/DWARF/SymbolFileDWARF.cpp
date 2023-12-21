@@ -102,8 +102,6 @@ using namespace lldb_private::plugin::dwarf;
 
 LLDB_PLUGIN_DEFINE(SymbolFileDWARF)
 
-char SymbolFileDWARF::ID;
-
 namespace {
 
 #define LLDB_PROPERTIES_symbolfiledwarf

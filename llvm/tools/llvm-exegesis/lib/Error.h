@@ -25,7 +25,7 @@ public:
 // A class representing failures that happened during clustering calculations.
 class ClusteringError : public ErrorInfo<ClusteringError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::exegesis::ClusteringError);
   ClusteringError(const Twine &S) : Msg(S.str()) {}
 
   void log(raw_ostream &OS) const override;
@@ -42,7 +42,7 @@ private:
 // halting the program, the errors are reported in the output.
 class SnippetExecutionFailure : public ErrorInfo<SnippetExecutionFailure> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::exegesis::SnippetExecutionFailure);
 
   std::error_code convertToErrorCode() const override;
 };
@@ -51,7 +51,7 @@ public:
 // snippet execution.
 class SnippetSegmentationFault : public SnippetExecutionFailure {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::exegesis::SnippetSegmentationFault);
   SnippetSegmentationFault(intptr_t SegFaultAddress)
       : Address(SegFaultAddress){};
 

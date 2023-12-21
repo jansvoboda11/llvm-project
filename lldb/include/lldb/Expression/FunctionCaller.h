@@ -55,8 +55,7 @@ namespace lldb_private {
 /// argument space will be managed for you.
 class FunctionCaller : public llvm::RTTIExtends<FunctionCaller, Expression> {
 public:
-  // LLVM RTTI support
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::FunctionCaller);
 
   /// Constructor
   ///

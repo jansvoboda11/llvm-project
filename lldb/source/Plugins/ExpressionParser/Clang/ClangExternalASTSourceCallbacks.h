@@ -19,8 +19,7 @@ class ClangExternalASTSourceCallbacks
     : public llvm::RTTIExtends<ClangExternalASTSourceCallbacks,
                                clang::ExternalASTSource> {
 public:
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::ClangExternalASTSourceCallbacks);
 
   ClangExternalASTSourceCallbacks(TypeSystemClang &ast) : m_ast(ast) {}
 

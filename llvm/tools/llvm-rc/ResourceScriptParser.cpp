@@ -39,8 +39,6 @@ RCParser::ParserError::ParserError(const Twine &Expected, const LocIter CurLoc,
                (CurLoc == End ? "<EOF>" : CurLoc->value()).str();
 }
 
-char RCParser::ParserError::ID = 0;
-
 RCParser::RCParser(std::vector<RCToken> TokenList)
     : Tokens(std::move(TokenList)), CurLoc(Tokens.begin()), End(Tokens.end()) {}
 

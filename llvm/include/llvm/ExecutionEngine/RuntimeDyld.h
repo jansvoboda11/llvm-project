@@ -41,7 +41,7 @@ template <typename T> class OwningBinary;
 /// support.
 class RuntimeDyldError : public ErrorInfo<RuntimeDyldError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::RuntimeDyldError);
 
   RuntimeDyldError(std::string ErrMsg) : ErrMsg(std::move(ErrMsg)) {}
 

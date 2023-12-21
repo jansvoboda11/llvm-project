@@ -408,5 +408,3 @@ void llvm::ResolverError::log(raw_ostream &OS) const {
   OS << format("unable to resolve indirect address %u for: %s", Index,
                dwarf::LocListEncodingString(Kind).data());
 }
-
-char llvm::ResolverError::ID;

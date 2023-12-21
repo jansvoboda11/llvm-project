@@ -104,8 +104,7 @@ public:
 
   void Clear();
 
-  /// LLVM RTTI support.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::DataBufferHeap);
 
 private:
   // This object uses a std::vector<uint8_t> to store its data. This takes care

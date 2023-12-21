@@ -88,10 +88,6 @@ void LLVMRemarkStreamer::emit(const DiagnosticInfoOptimizationBase &Diag) {
   RS.getSerializer().emit(R);
 }
 
-char LLVMRemarkSetupFileError::ID = 0;
-char LLVMRemarkSetupPatternError::ID = 0;
-char LLVMRemarkSetupFormatError::ID = 0;
-
 Expected<std::unique_ptr<ToolOutputFile>> llvm::setupLLVMOptimizationRemarks(
     LLVMContext &Context, StringRef RemarksFilename, StringRef RemarksPasses,
     StringRef RemarksFormat, bool RemarksWithHotness,

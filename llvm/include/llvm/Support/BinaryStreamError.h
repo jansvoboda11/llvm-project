@@ -26,7 +26,7 @@ enum class stream_error_code {
 /// Base class for errors originating when parsing raw PDB files
 class BinaryStreamError : public ErrorInfo<BinaryStreamError> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::BinaryStreamError);
   explicit BinaryStreamError(stream_error_code C);
   explicit BinaryStreamError(StringRef Context);
   BinaryStreamError(stream_error_code C, StringRef Context);

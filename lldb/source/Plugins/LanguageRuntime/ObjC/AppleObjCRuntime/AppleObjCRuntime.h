@@ -30,7 +30,7 @@ public:
   // because
   // you can't make an instance of this generic runtime.
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lldb_private::AppleObjCRuntime);
 
   static void Initialize();
 

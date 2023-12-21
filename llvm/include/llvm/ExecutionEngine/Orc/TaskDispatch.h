@@ -33,7 +33,7 @@ namespace orc {
 /// Represents an abstract task for ORC to run.
 class Task : public RTTIExtends<Task, RTTIRoot> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::Task);
 
   virtual ~Task() = default;
 
@@ -50,7 +50,7 @@ private:
 /// Base class for generic tasks.
 class GenericNamedTask : public RTTIExtends<GenericNamedTask, Task> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::GenericNamedTask);
   static const char *DefaultDescription;
 };
 

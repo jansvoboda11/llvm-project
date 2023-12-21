@@ -321,12 +321,6 @@ static char popFront(StringRef &S) {
   return C;
 }
 
-char OverflowError::ID = 0;
-char UndefVarError::ID = 0;
-char ErrorDiagnostic::ID = 0;
-char NotFoundError::ID = 0;
-char ErrorReported::ID = 0;
-
 Expected<NumericVariable *> Pattern::parseNumericVariableDefinition(
     StringRef &Expr, FileCheckPatternContext *Context,
     std::optional<size_t> LineNumber, ExpressionFormat ImplicitFormat,

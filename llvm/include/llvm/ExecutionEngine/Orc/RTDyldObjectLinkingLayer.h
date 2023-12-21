@@ -37,7 +37,7 @@ class RTDyldObjectLinkingLayer
     : public RTTIExtends<RTDyldObjectLinkingLayer, ObjectLayer>,
       private ResourceManager {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::orc::RTDyldObjectLinkingLayer);
 
   /// Functor for receiving object-loaded notifications.
   using NotifyLoadedFunction = std::function<void(

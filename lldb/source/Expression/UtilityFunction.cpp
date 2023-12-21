@@ -26,8 +26,6 @@
 using namespace lldb_private;
 using namespace lldb;
 
-char UtilityFunction::ID;
-
 /// Constructor
 ///
 /// \param[in] text

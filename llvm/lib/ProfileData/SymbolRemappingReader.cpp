@@ -19,8 +19,6 @@
 
 using namespace llvm;
 
-char SymbolRemappingParseError::ID;
-
 /// Load a set of name remappings from a text file.
 ///
 /// See the documentation at the top of the file for an explanation of

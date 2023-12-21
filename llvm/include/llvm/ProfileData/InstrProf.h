@@ -402,7 +402,7 @@ public:
     return {Err, Msg};
   }
 
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::InstrProfError);
 
 private:
   instrprof_error Err;

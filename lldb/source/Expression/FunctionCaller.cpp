@@ -30,8 +30,6 @@
 
 using namespace lldb_private;
 
-char FunctionCaller::ID;
-
 // FunctionCaller constructor
 FunctionCaller::FunctionCaller(ExecutionContextScope &exe_scope,
                                const CompilerType &return_type,

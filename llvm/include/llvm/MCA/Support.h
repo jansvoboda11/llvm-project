@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCSchedule.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MathExtras.h"
@@ -26,7 +27,8 @@ namespace mca {
 template <typename T>
 class InstructionError : public ErrorInfo<InstructionError<T>> {
 public:
-  static char ID;
+  // FIXME: We are unable to distinguish between instances with different Ts.
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(llvm::mca::InstructionError<llvm::MCInst>);
   std::string Message;
   const T &Inst;
 
@@ -39,8 +41,6 @@ public:
     return inconvertibleErrorCode();
   }
 };
-
-template <typename T> char InstructionError<T>::ID;
 
 /// This class represents the number of cycles per resource (fractions of
 /// cycles).  That quantity is managed here as a ratio, and accessed via the
