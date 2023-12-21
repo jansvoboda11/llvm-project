@@ -907,7 +907,7 @@ TEST_F(CommandLineTest, DigraphsEnabled) {
 
 struct DummyModuleFileExtension
     : public llvm::RTTIExtends<DummyModuleFileExtension, ModuleFileExtension> {
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(DummyModuleFileExtension);
 
   ModuleFileExtensionMetadata getExtensionMetadata() const override {
     return {};
@@ -927,8 +927,6 @@ struct DummyModuleFileExtension
     return {};
   }
 };
-
-char DummyModuleFileExtension::ID = 0;
 
 TEST_F(CommandLineTest, TestModuleFileExtension) {
   const char *Args[] = {"-ftest-module-file-extension=first:2:1:0:first",

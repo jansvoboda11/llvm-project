@@ -17,29 +17,24 @@ namespace {
 
 class MyBaseType : public RTTIExtends<MyBaseType, RTTIRoot> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyBaseType);
 };
 
 class MyDerivedType : public RTTIExtends<MyDerivedType, MyBaseType> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyDerivedType);
 };
 
 class MyOtherDerivedType : public RTTIExtends<MyOtherDerivedType, MyBaseType> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyOtherDerivedType);
 };
 
 class MyDeeperDerivedType
     : public RTTIExtends<MyDeeperDerivedType, MyDerivedType> {
 public:
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(MyDeeperDerivedType);
 };
-
-char MyBaseType::ID = 0;
-char MyDerivedType::ID = 0;
-char MyOtherDerivedType::ID = 0;
-char MyDeeperDerivedType::ID = 0;
 
 TEST(ExtensibleRTTI, isa) {
   MyBaseType B;

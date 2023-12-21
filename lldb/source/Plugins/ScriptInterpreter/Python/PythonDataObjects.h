@@ -660,6 +660,7 @@ private:
   PyObject *m_repr_bytes;
 
 public:
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(lld_private::python::PythonException);
   static char ID;
   const char *toCString() const;
   PythonException(const char *caller = nullptr);

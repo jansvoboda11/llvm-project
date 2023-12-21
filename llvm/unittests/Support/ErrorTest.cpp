@@ -39,8 +39,7 @@ public:
     llvm_unreachable("CustomError doesn't support ECError conversion");
   }
 
-  // Used by ErrorInfo::classID.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(CustomError);
 
 protected:
   // This error is subclassed below, but we can't use inheriting constructors
@@ -51,8 +50,6 @@ protected:
 
   int Info;
 };
-
-char CustomError::ID = 0;
 
 // Custom error class with a custom base class and some additional random
 // 'info'.
@@ -75,14 +72,11 @@ public:
     llvm_unreachable("CustomSubError doesn't support ECError conversion");
   }
 
-  // Used by ErrorInfo::classID.
-  static char ID;
+  LLVM_EXTENSIBLE_RTTI_DEFINE_ID(CustomSubError);
 
 protected:
   int ExtraInfo;
 };
-
-char CustomSubError::ID = 0;
 
 static Error handleCustomError(const CustomError &CE) {
   return Error::success();
@@ -1019,7 +1013,7 @@ class TestDebugError : public ErrorInfo<TestDebugError, StringError> {
 public:
     using ErrorInfo<TestDebugError, StringError >::ErrorInfo; // inherit constructors
     TestDebugError(const Twine &S) : ErrorInfo(S, test_error_code::unspecified) {}
-    static char ID;
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(TestDebugError);
 };
 
 class TestErrorCategory : public std::error_category {
@@ -1042,8 +1036,6 @@ const std::error_category &TErrorCategory() {
   static TestErrorCategory TestErrCategory;
   return TestErrCategory;
 }
-
-char TestDebugError::ID;
 
 TEST(Error, SubtypeStringErrorTest) {
   auto E1 = make_error<TestDebugError>(test_error_code::error_1);

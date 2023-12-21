@@ -1043,8 +1043,6 @@ std::string PythonException::ReadBacktrace() const {
   return std::move(backtrace.get());
 }
 
-char PythonException::ID = 0;
-
 llvm::Expected<File::OpenOptions>
 GetOptionsForPyObject(const PythonObject &obj) {
   auto options = File::OpenOptions(0);

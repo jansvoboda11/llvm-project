@@ -34,5 +34,3 @@ const std::error_category &llvm::pdb::DIAErrCategory() {
   static DIAErrorCategory DIACategory;
   return DIACategory;
 }
-
-char DIAError::ID;

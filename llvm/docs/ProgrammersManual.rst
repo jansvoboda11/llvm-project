@@ -483,6 +483,7 @@ that inherits from the ErrorInfo utility, E.g.:
 
   class BadFileFormat : public ErrorInfo<BadFileFormat> {
   public:
+    LLVM_EXTENSIBLE_RTTI_DEFINE_ID(BadFileFormat);
     static char ID;
     std::string Path;
 
@@ -496,8 +497,6 @@ that inherits from the ErrorInfo utility, E.g.:
       return make_error_code(object_error::parse_failed);
     }
   };
-
-  char BadFileFormat::ID; // This should be declared in the C++ file.
 
   Error printFormattedFile(StringRef Path) {
     if (<check for valid format>)
