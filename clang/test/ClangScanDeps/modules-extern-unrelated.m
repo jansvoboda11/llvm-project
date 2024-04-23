@@ -71,7 +71,6 @@ module second { header "second.h" }
 // CHECK-NEXT:       "context-hash": "{{.*}}",
 // CHECK-NEXT:       "file-deps": [
 // CHECK-NEXT:         "[[PREFIX]]/first/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/second/module.modulemap",
 // CHECK-NEXT:         "[[PREFIX]]/second/second.h",
 // CHECK-NEXT:         "[[PREFIX]]/second/second.modulemap"
 // CHECK-NEXT:       ],
@@ -94,7 +93,6 @@ module second { header "second.h" }
 // CHECK-NEXT:       "context-hash": "{{.*}}",
 // CHECK-NEXT:       "file-deps": [
 // CHECK-NEXT:         "[[PREFIX]]/first/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/second/module.modulemap",
 // CHECK-NEXT:         "[[PREFIX]]/second/second.modulemap",
 // CHECK-NEXT:         "[[PREFIX]]/zeroth/module.modulemap",
 // CHECK-NEXT:         "[[PREFIX]]/zeroth/zeroth.h"

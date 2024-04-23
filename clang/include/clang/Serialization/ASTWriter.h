@@ -76,6 +76,10 @@ class StoredDeclsList;
 class SwitchCase;
 class Token;
 
+namespace SrcMgr {
+class FileInfo;
+} // namespace SrcMgr
+
 /// Writes an AST file containing the contents of a translation unit.
 ///
 /// The ASTWriter class produces a bitstream containing the serialized
@@ -490,6 +494,9 @@ private:
   /// and initializes data structures necessary for leaving those files out
   /// during \c SourceManager serialization.
   void computeNonAffectingInputFiles();
+
+  SourceLocation getAffectingIncludeLoc(const SourceManager &SourceMgr,
+                                        const SrcMgr::FileInfo &File);
 
   /// Returns an adjusted \c FileID, accounting for any non-affecting input
   /// files.
