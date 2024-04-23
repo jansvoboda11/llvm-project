@@ -240,32 +240,24 @@ ModuleDepCollector::getInvocationAdjustedForModuleBuildWithoutOutputs(
   CI.getMutFrontendOpts().Inputs.emplace_back(Deps.ClangModuleMapFile,
                                               ModuleMapInputKind);
 
-  auto CurrentModuleMapEntry =
-      ScanInstance.getFileManager().getFile(Deps.ClangModuleMapFile);
-  assert(CurrentModuleMapEntry && "module map file entry not found");
-
   // Remove directly passed modulemap files. They will get added back if they
   // were actually used.
   CI.getMutFrontendOpts().ModuleMapFiles.clear();
 
-  auto DepModuleMapFiles = collectModuleMapFiles(Deps.ClangModuleDeps);
+  auto DirectDepsModuleMapFiles = collectModuleMapFilesForDirectDeps(Deps);
   for (StringRef ModuleMapFile : Deps.ModuleMapFileDeps) {
-    // TODO: Track these as `FileEntryRef` to simplify the equality check below.
-    auto ModuleMapEntry = ScanInstance.getFileManager().getFile(ModuleMapFile);
-    assert(ModuleMapEntry && "module map file entry not found");
-
     // Don't report module maps describing eagerly-loaded dependency. This
     // information will be deserialized from the PCM.
     // TODO: Verify this works fine when modulemap for module A is eagerly
     // loaded from A.pcm, and module map passed on the command line contains
     // definition of a submodule: "explicit module A.Private { ... }".
-    if (EagerLoadModules && DepModuleMapFiles.contains(*ModuleMapEntry))
+    if (EagerLoadModules && DirectDepsModuleMapFiles.contains(ModuleMapFile))
       continue;
 
     // Don't report module map file of the current module unless it also
     // describes a dependency (for symmetry).
-    if (*ModuleMapEntry == *CurrentModuleMapEntry &&
-        !DepModuleMapFiles.contains(*ModuleMapEntry))
+    if (ModuleMapFile == Deps.ClangModuleMapFile &&
+        !DirectDepsModuleMapFiles.contains(ModuleMapFile))
       continue;
 
     CI.getMutFrontendOpts().ModuleMapFiles.emplace_back(ModuleMapFile);
@@ -292,16 +284,13 @@ ModuleDepCollector::getInvocationAdjustedForModuleBuildWithoutOutputs(
   return CI;
 }
 
-llvm::DenseSet<const FileEntry *> ModuleDepCollector::collectModuleMapFiles(
-    ArrayRef<ModuleID> ClangModuleDeps) const {
-  llvm::DenseSet<const FileEntry *> ModuleMapFiles;
-  for (const ModuleID &MID : ClangModuleDeps) {
+llvm::StringSet<> ModuleDepCollector::collectModuleMapFilesForDirectDeps(
+    const ModuleDeps &Deps) const {
+  llvm::StringSet<> ModuleMapFiles;
+  for (const ModuleID &MID : Deps.ClangModuleDeps) {
     ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
-    // TODO: Track ClangModuleMapFile as `FileEntryRef`.
-    auto FE = ScanInstance.getFileManager().getFile(MD->ClangModuleMapFile);
-    assert(FE && "Missing module map file that was previously found");
-    ModuleMapFiles.insert(*FE);
+    ModuleMapFiles.insert(MD->ClangModuleMapFile);
   }
   return ModuleMapFiles;
 }
@@ -557,6 +546,13 @@ void ModuleDepCollectorPP::EndOfMainFile() {
     MDC.Consumer.handlePrebuiltModuleDependency(I.second);
 }
 
+static std::string canonicalizeModuleMap(ModuleMap &ModMap,
+                                         StringRef ModuleMapPath) {
+  SmallString<128> Path{ModuleMapPath};
+  ModMap.canonicalizeModuleMapPath(Path);
+  return std::string(Path);
+}
+
 std::optional<ModuleID>
 ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
   assert(M == M->getTopLevelModule() && "Expected top level module!");
@@ -583,12 +579,9 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
       MDC.ScanInstance.getPreprocessor().getHeaderSearchInfo().getModuleMap();
 
   OptionalFileEntryRef ModuleMap = ModMapInfo.getModuleMapFileForUniquing(M);
-
-  if (ModuleMap) {
-    SmallString<128> Path = ModuleMap->getNameAsRequested();
-    ModMapInfo.canonicalizeModuleMapPath(Path);
-    MD.ClangModuleMapFile = std::string(Path);
-  }
+  assert(ModuleMap && "Top-level module with no module map");
+  MD.ClangModuleMapFile =
+      canonicalizeModuleMap(ModMapInfo, ModuleMap->getNameAsRequested());
 
   serialization::ModuleFile *MF =
       MDC.ScanInstance.getASTReader()->getModuleManager().lookup(
@@ -621,7 +614,8 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
         if (StringRef(IFI.FilenameAsRequested)
                 .ends_with("__inferred_module.map"))
           return;
-        MD.ModuleMapFileDeps.emplace_back(IFI.FilenameAsRequested);
+        MD.ModuleMapFileDeps.emplace_back(
+            canonicalizeModuleMap(ModMapInfo, IFI.FilenameAsRequested));
       });
 
   CowCompilerInvocation CI =

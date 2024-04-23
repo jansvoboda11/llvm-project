@@ -286,9 +286,9 @@ private:
       const ModuleDeps &Deps,
       llvm::function_ref<void(CowCompilerInvocation &)> Optimize) const;
 
-  /// Collect module map files for given modules.
-  llvm::DenseSet<const FileEntry *>
-  collectModuleMapFiles(ArrayRef<ModuleID> ClangModuleDeps) const;
+  /// Collect module map files of direct dependencies.
+  llvm::StringSet<>
+  collectModuleMapFilesForDirectDeps(const ModuleDeps &Dep) const;
 
   /// Add module map files to the invocation, if needed.
   void addModuleMapFiles(CompilerInvocation &CI,
