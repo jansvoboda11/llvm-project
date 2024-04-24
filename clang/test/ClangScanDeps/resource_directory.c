@@ -1,7 +1,21 @@
 // REQUIRES: shell
 
-// RUN: rm -rf %t && mkdir %t
-// RUN: cp %S/Inputs/resource_directory/* %t
+// RUN: rm -rf %t
+// RUN: split-file %s %t
+
+//--- cdb.json.template
+[
+  {
+    "directory": "DIR",
+    "command": "CLANG -fmodules -gmodules -fimplicit-module-maps -fmodules-cache-path=DIR/cache -c DIR/tu.c -o DIR/tu.o",
+    "file": "DIR/tu.c"
+  }
+]
+//--- module.modulemap
+module mod { header "mod.h" }
+//--- mod.h
+//--- tu.c
+#include "mod.h"
 
 // Deduce the resource directory from the compiler path.
 //
@@ -14,7 +28,7 @@
 //
 // RUN: EXPECTED_RESOURCE_DIR=`%clang -print-resource-dir`
 // RUN: sed -e "s|CLANG|%clang|g" -e "s|DIR|%/t|g" \
-// RUN:   %S/Inputs/resource_directory/cdb.json.template > %t/cdb_path.json
+// RUN:   %t/cdb.json.template > %t/cdb_path.json
 //
 // RUN: clang-scan-deps -compilation-database %t/cdb_path.json --format experimental-full \
 // RUN:   --resource-dir-recipe modify-compiler-path > %t/result_path.json
@@ -36,7 +50,7 @@
 // RUN: echo "echo '$EXPECTED_RESOURCE_DIR'" >> %t/compiler
 // RUN: chmod +x %t/compiler
 // RUN: sed -e "s|CLANG|%/t/compiler|g" -e "s|DIR|%/t|g" \
-// RUN:   %S/Inputs/resource_directory/cdb.json.template > %t/cdb_invocation.json
+// RUN:   %t/cdb.json.template > %t/cdb_invocation.json
 //
 // RUN: clang-scan-deps -compilation-database %t/cdb_invocation.json --format experimental-full \
 // RUN:   --resource-dir-recipe invoke-compiler > %t/result_invocation.json
