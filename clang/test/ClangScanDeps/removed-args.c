@@ -6,13 +6,33 @@
 // such as '-fmodules-cache-path=' are only relevant for implicit modules, and
 // are removed to better-canonicalize the compilation.
 
-// RUN: rm -rf %t && mkdir %t
-// RUN: cp %S/Inputs/removed-args/* %t
+// RUN: rm -rf %t
+// RUN: split-file %s %t
+
+//--- cdb.json.template
+[
+  {
+    "directory": "DIR",
+    "command": "clang -fsyntax-only DIR/tu.c -fmodules -fimplicit-module-maps -fmodules-validate-once-per-build-session -fbuild-session-file=DIR/build-session -fmodules-prune-interval=123 -fmodules-prune-after=123 -fmodules-cache-path=DIR/cache -include DIR/header.h -grecord-command-line -fdebug-compilation-dir=DIR/debug -fcoverage-compilation-dir=DIR/coverage -ftest-coverage -fprofile-instr-use=DIR/tu.profdata -o DIR/tu.o -serialize-diagnostics DIR/tu.diag -MT tu -MD -MF DIR/tu.d",
+    "file": "DIR/tu.c"
+  }
+]
+
+//--- module.modulemap
+module ModHeader { header "mod_header.h" }
+module ModTU     { header "mod_tu.h"     }
+//--- header.h
+#include "mod_header.h"
+//--- mod_header.h
+//--- mod_tu.h
+//--- tu.c
+#include "mod_tu.h"
+
 // RUN: touch %t/build-session
 // RUN: touch %t/tu.proftext
 // RUN: llvm-profdata merge %t/tu.proftext -o %t/tu.profdata
 
-// RUN: sed "s|DIR|%/t|g" %S/Inputs/removed-args/cdb.json.template > %t/cdb.json
+// RUN: sed "s|DIR|%/t|g" %t/cdb.json.template > %t/cdb.json
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' | FileCheck %s -DPREFIX=%/t
 //
@@ -96,7 +116,6 @@
 
 // Check for removed args for PCH invocations.
 
-// RUN: split-file %s %t
 // RUN: sed "s|DIR|%/t|g" %t/cdb-pch.json.template > %t/cdb-pch.json
 // RUN: clang-scan-deps -compilation-database %t/cdb-pch.json -format experimental-full > %t/result-pch.json
 // RUN: cat %t/result-pch.json | sed 's:\\\\\?:/:g' | FileCheck %s -DPREFIX=%/t -check-prefix=PCH
