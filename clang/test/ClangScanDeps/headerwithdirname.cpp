@@ -1,15 +1,32 @@
-// RUN: rm -rf %t.dir
-// RUN: rm -rf %t.dir/foodir
-// RUN: rm -rf %t.cdb
-// RUN: mkdir -p %t.dir
-// RUN: mkdir -p %t.dir/foodir
-// RUN: cp %s %t.dir/headerwithdirname_input.cpp
-// RUN: cp %s %t.dir/headerwithdirname_input_clangcl.cpp
+// RUN: rm -rf %t
+// RUN: split-file %s %t
+// RUN: mkdir %t/foodir
+
+//--- cdb.json.in
+[
+    {
+      "directory": "DIR",
+      "command": "clang -c -IDIR -IDIR/foodir -IInputs DIR/headerwithdirname_input.cpp",
+      "file": "DIR/headerwithdirname_input.cpp"
+    },
+    {
+      "directory": "DIR",
+      "command": "clang-cl /c /IDIR /IDIR/foodir -IInputs -- DIR/headerwithdirname_input_clangcl.cpp",
+      "file": "DIR/headerwithdirname_input_clangcl.cpp"
+    }
+]
+//--- Inputs/foodir
+// A C++ header with same name as that of a directory in the include path.
+//--- headerwithdirname_input.cpp
+#include <foodir>
+//--- headerwithdirname_input_clangcl.cpp
+#include <foodir>
+
+// RUN: mkdir %t/foodir
 // RUN: mkdir %t.dir/Inputs
-// RUN: cp %S/Inputs/foodir %t.dir/Inputs/foodir
-// RUN: sed -e "s|DIR|%/t.dir|g" %S/Inputs/headerwithdirname.json > %t.cdb
+// RUN: sed -e "s|DIR|%/t|g" %t/cdb.json.in > %t/cdb.json
 //
-// RUN: clang-scan-deps -compilation-database %t.cdb -j 1 | FileCheck %s
+// RUN: clang-scan-deps -compilation-database %t/cdb.json -j 1 | FileCheck %s
 
 #include <foodir>
 
