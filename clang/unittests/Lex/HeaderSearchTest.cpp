@@ -234,7 +234,6 @@ TEST_F(HeaderSearchTest, HeaderFrameworkLookup) {
   auto FI = Search.getExistingFileInfo(FE);
   EXPECT_TRUE(FI);
   EXPECT_TRUE(FI->IsValid);
-  EXPECT_EQ(FI->Framework.str(), "Foo");
   EXPECT_EQ(Search.getIncludeNameForHeader(FE), "Foo/Foo.h");
 }
 
@@ -304,7 +303,6 @@ TEST_F(HeaderSearchTest, HeaderMapFrameworkLookup) {
   auto FI = Search.getExistingFileInfo(FE);
   EXPECT_TRUE(FI);
   EXPECT_TRUE(FI->IsValid);
-  EXPECT_EQ(FI->Framework.str(), "Foo");
   EXPECT_EQ(Search.getIncludeNameForHeader(FE), "Foo/Foo.h");
 }
 

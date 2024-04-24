@@ -130,10 +130,6 @@ struct HeaderFileInfo {
   /// external storage.
   const IdentifierInfo *ControllingMacro = nullptr;
 
-  /// If this header came from a framework include, this is the name
-  /// of the framework.
-  StringRef Framework;
-
   HeaderFileInfo()
       : isImport(false), isPragmaOnce(false), DirInfo(SrcMgr::C_User),
         External(false), isModuleHeader(false), isTextualModuleHeader(false),
@@ -151,6 +147,8 @@ struct HeaderFileInfo {
   /// isTextualModuleHeader will be set or cleared based on the role update.
   void mergeModuleMembership(ModuleMap::ModuleHeaderRole Role);
 };
+
+static_assert(sizeof(HeaderFileInfo) == 16);
 
 /// An external source of header file information, which may supply
 /// information about header files already included.

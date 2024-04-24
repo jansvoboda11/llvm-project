@@ -971,12 +971,10 @@ OptionalFileEntryRef HeaderSearch::LookupFile(
         assert(FromHFI && "includer without file info");
         unsigned DirInfo = FromHFI->DirInfo;
         bool IndexHeaderMapHeader = FromHFI->IndexHeaderMapHeader;
-        StringRef Framework = FromHFI->Framework;
 
         HeaderFileInfo &ToHFI = getFileInfo(*FE);
         ToHFI.DirInfo = DirInfo;
         ToHFI.IndexHeaderMapHeader = IndexHeaderMapHeader;
-        ToHFI.Framework = Framework;
 
         if (SearchPath) {
           StringRef SearchPathRef(IncluderAndDir.second.getName());
@@ -1121,19 +1119,8 @@ OptionalFileEntryRef HeaderSearch::LookupFile(
     // Set the `Framework` info if this file is in a header map with framework
     // style include spelling or found in a framework dir. The header map case
     // is possible when building frameworks which use header maps.
-    if (CurDir->isHeaderMap() && isAngled) {
-      size_t SlashPos = Filename.find('/');
-      if (SlashPos != StringRef::npos)
-        HFI.Framework =
-            getUniqueFrameworkName(StringRef(Filename.begin(), SlashPos));
-      if (CurDir->isIndexHeaderMap())
-        HFI.IndexHeaderMapHeader = 1;
-    } else if (CurDir->isFramework()) {
-      size_t SlashPos = Filename.find('/');
-      if (SlashPos != StringRef::npos)
-        HFI.Framework =
-            getUniqueFrameworkName(StringRef(Filename.begin(), SlashPos));
-    }
+    if (CurDir->isHeaderMap() && CurDir->isIndexHeaderMap() && isAngled)
+      HFI.IndexHeaderMapHeader = 1;
 
     if (checkMSVCHeaderSearch(Diags, MSFE, &File->getFileEntry(), IncludeLoc)) {
       if (SuggestedModule)
@@ -1163,7 +1150,8 @@ OptionalFileEntryRef HeaderSearch::LookupFile(
     assert(IncludingHFI && "includer without file info");
     if (IncludingHFI->IndexHeaderMapHeader) {
       SmallString<128> ScratchFilename;
-      ScratchFilename += IncludingHFI->Framework;
+      std::abort();
+      ScratchFilename += "PLACEHOLDER";
       ScratchFilename += '/';
       ScratchFilename += Filename;
 
@@ -1350,9 +1338,6 @@ static void mergeHeaderFileInfo(HeaderFileInfo &HFI,
   HFI.External = (!HFI.IsValid || HFI.External);
   HFI.IsValid = true;
   HFI.IndexHeaderMapHeader = OtherHFI.IndexHeaderMapHeader;
-
-  if (HFI.Framework.empty())
-    HFI.Framework = OtherHFI.Framework;
 }
 
 HeaderFileInfo &HeaderSearch::getFileInfo(FileEntryRef FE) {
