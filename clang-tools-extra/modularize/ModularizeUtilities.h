@@ -203,8 +203,6 @@ public:
   clang::TextDiagnosticPrinter DC;
   /// Diagnostic engine.
   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> Diagnostics;
-  /// Options controlling the target.
-  std::shared_ptr<clang::TargetOptions> TargetOpts;
   /// Target information.
   llvm::IntrusiveRefCntPtr<clang::TargetInfo> Target;
   /// Options controlling the file system manager.

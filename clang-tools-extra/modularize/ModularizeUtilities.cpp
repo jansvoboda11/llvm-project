@@ -28,14 +28,11 @@ using namespace clang;
 using namespace llvm;
 using namespace Modularize;
 
-namespace {
-// Subclass TargetOptions so we can construct it inline with
-// the minimal option, the triple.
-class ModuleMapTargetOptions : public clang::TargetOptions {
-public:
-  ModuleMapTargetOptions() { Triple = llvm::sys::getDefaultTargetTriple(); }
-};
-} // namespace
+static clang::TargetOptions moduleMapTargetOptions() {
+  clang::TargetOptions TargetOpts;
+  TargetOpts.Triple = llvm::sys::getDefaultTargetTriple();
+  return TargetOpts;
+}
 
 // ModularizeUtilities class implementation.
 
@@ -52,8 +49,8 @@ ModularizeUtilities::ModularizeUtilities(std::vector<std::string> &InputPaths,
       DC(llvm::errs(), DiagnosticOpts.get()),
       Diagnostics(
           new DiagnosticsEngine(DiagIDs, DiagnosticOpts.get(), &DC, false)),
-      TargetOpts(new ModuleMapTargetOptions()),
-      Target(TargetInfo::CreateTargetInfo(*Diagnostics, TargetOpts)),
+      Target(
+          TargetInfo::CreateTargetInfo(*Diagnostics, moduleMapTargetOptions())),
       FileMgr(new FileManager(FileSystemOpts)),
       SourceMgr(new SourceManager(*Diagnostics, *FileMgr, false)),
       HeaderInfo(new HeaderSearch(std::make_shared<HeaderSearchOptions>(),

@@ -251,12 +251,12 @@ template <> struct DenseMapInfo<DriverArgs> {
 namespace clang::clangd {
 namespace {
 bool isValidTarget(llvm::StringRef Triple) {
-  std::shared_ptr<TargetOptions> TargetOpts(new TargetOptions);
-  TargetOpts->Triple = Triple.str();
+  TargetOptions TargetOpts;
+  TargetOpts.Triple = Triple.str();
   DiagnosticsEngine Diags(new DiagnosticIDs, new DiagnosticOptions,
                           new IgnoringDiagConsumer);
   llvm::IntrusiveRefCntPtr<TargetInfo> Target =
-      TargetInfo::CreateTargetInfo(Diags, TargetOpts);
+      TargetInfo::CreateTargetInfo(Diags, std::move(TargetOpts));
   return bool(Target);
 }
 
