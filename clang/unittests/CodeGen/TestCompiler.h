@@ -45,7 +45,7 @@ struct TestCompiler {
     compiler.getTargetOpts().Triple = Tr.getTriple();
     compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
         compiler.getDiagnostics(),
-        std::make_shared<clang::TargetOptions>(compiler.getTargetOpts())));
+        clang::TargetOptions(compiler.getTargetOpts())));
 
     const clang::TargetInfo &TInfo = compiler.getTarget();
     PtrSize = TInfo.getPointerWidth(clang::LangAS::Default) / 8;

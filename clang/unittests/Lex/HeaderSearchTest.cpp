@@ -32,11 +32,12 @@ protected:
       : VFS(new llvm::vfs::InMemoryFileSystem), FileMgr(FileMgrOpts, VFS),
         DiagID(new DiagnosticIDs()),
         Diags(DiagID, new DiagnosticOptions, new IgnoringDiagConsumer()),
-        SourceMgr(Diags, FileMgr), TargetOpts(new TargetOptions),
+        SourceMgr(Diags, FileMgr),
         Search(std::make_shared<HeaderSearchOptions>(), SourceMgr, Diags,
                LangOpts, Target.get()) {
-    TargetOpts->Triple = "x86_64-apple-darwin11.1.0";
-    Target = TargetInfo::CreateTargetInfo(Diags, TargetOpts);
+    TargetOptions TargetOpts;
+    TargetOpts.Triple = "x86_64-apple-darwin11.1.0";
+    Target = TargetInfo::CreateTargetInfo(Diags, std::move(TargetOpts));
   }
 
   void addSearchDir(llvm::StringRef Dir) {
@@ -87,7 +88,6 @@ protected:
   DiagnosticsEngine Diags;
   SourceManager SourceMgr;
   LangOptions LangOpts;
-  std::shared_ptr<TargetOptions> TargetOpts;
   IntrusiveRefCntPtr<TargetInfo> Target;
   HeaderSearch Search;
   std::unique_ptr<HeaderMap> HMap;

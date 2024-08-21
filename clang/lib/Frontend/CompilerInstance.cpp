@@ -107,7 +107,7 @@ void CompilerInstance::setAuxTarget(TargetInfo *Value) { AuxTarget = Value; }
 bool CompilerInstance::createTarget() {
   // Create the target instance.
   setTarget(TargetInfo::CreateTargetInfo(getDiagnostics(),
-                                         getInvocation().TargetOpts));
+                                         &getInvocation().getTargetOpts()));
   if (!hasTarget())
     return false;
 
@@ -117,14 +117,14 @@ bool CompilerInstance::createTarget() {
       (getLangOpts().CUDA || getLangOpts().OpenMPIsTargetDevice ||
        getLangOpts().SYCLIsDevice) &&
       !getFrontendOpts().AuxTriple.empty()) {
-    auto TO = std::make_shared<TargetOptions>();
-    TO->Triple = llvm::Triple::normalize(getFrontendOpts().AuxTriple);
+    TargetOptions TO;
+    TO.Triple = llvm::Triple::normalize(getFrontendOpts().AuxTriple);
     if (getFrontendOpts().AuxTargetCPU)
-      TO->CPU = *getFrontendOpts().AuxTargetCPU;
+      TO.CPU = *getFrontendOpts().AuxTargetCPU;
     if (getFrontendOpts().AuxTargetFeatures)
-      TO->FeaturesAsWritten = *getFrontendOpts().AuxTargetFeatures;
-    TO->HostTriple = getTarget().getTriple().str();
-    setAuxTarget(TargetInfo::CreateTargetInfo(getDiagnostics(), TO));
+      TO.FeaturesAsWritten = *getFrontendOpts().AuxTargetFeatures;
+    TO.HostTriple = getTarget().getTriple().str();
+    setAuxTarget(TargetInfo::CreateTargetInfo(getDiagnostics(), std::move(TO)));
   }
 
   if (!getTarget().hasStrictFP() && !getLangOpts().ExpStrictFP) {

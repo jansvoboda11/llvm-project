@@ -56,9 +56,10 @@ protected:
   ModuleDeclStateTest()
       : FileMgr(FileMgrOpts), DiagID(new DiagnosticIDs()),
         Diags(DiagID, new DiagnosticOptions, new IgnoringDiagConsumer()),
-        SourceMgr(Diags, FileMgr), TargetOpts(new TargetOptions) {
-    TargetOpts->Triple = "x86_64-unknown-linux-gnu";
-    Target = TargetInfo::CreateTargetInfo(Diags, TargetOpts);
+        SourceMgr(Diags, FileMgr) {
+    TargetOptions TargetOpts;
+    TargetOpts.Triple = "x86_64-unknown-linux-gnu";
+    Target = TargetInfo::CreateTargetInfo(Diags, std::move(TargetOpts));
   }
 
   std::unique_ptr<Preprocessor>
@@ -98,7 +99,6 @@ protected:
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID;
   DiagnosticsEngine Diags;
   SourceManager SourceMgr;
-  std::shared_ptr<TargetOptions> TargetOpts;
   IntrusiveRefCntPtr<TargetInfo> Target;
   LangOptions LangOpts;
   TrivialModuleLoader ModLoader;

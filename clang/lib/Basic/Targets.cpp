@@ -748,18 +748,29 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
 using namespace clang::targets;
 /// CreateTargetInfo - Return the target info object for the specified target
 /// options.
-TargetInfo *
-TargetInfo::CreateTargetInfo(DiagnosticsEngine &Diags,
-                             const std::shared_ptr<TargetOptions> &Opts) {
-  llvm::Triple Triple(llvm::Triple::normalize(Opts->Triple));
+TargetInfo *TargetInfo::CreateTargetInfo(DiagnosticsEngine &Diags,
+                                    TargetOptions *Opts) {
+  return CreateTargetInfoImpl(Diags, Opts);
+}
+
+TargetInfo *TargetInfo::CreateTargetInfo(DiagnosticsEngine &Diags,
+                                    TargetOptions &&Opts) {
+  return CreateTargetInfoImpl(Diags, std::move(Opts));
+}
+
+TargetInfo *TargetInfo::CreateTargetInfoImpl(DiagnosticsEngine &Diags,
+                                             OptsStorage OptsArg) {
+  llvm::Triple Triple(static_cast<TargetOptions>(OptsArg).Triple);
 
   // Construct the target
-  std::unique_ptr<TargetInfo> Target = AllocateTarget(Triple, *Opts);
+  std::unique_ptr<TargetInfo> Target = AllocateTarget(Triple, OptsArg);
   if (!Target) {
     Diags.Report(diag::err_target_unknown_triple) << Triple.str();
     return nullptr;
   }
-  Target->TargetOpts = Opts;
+
+  Target->TargetOpts = std::move(OptsArg);
+  TargetOptions *Opts = &Target->getTargetOpts();
 
   // Set the target CPU if specified.
   if (!Opts->CPU.empty() && !Target->setCPU(Opts->CPU)) {

@@ -216,8 +216,29 @@ enum OpenCLTypeKind : uint8_t {
 ///
 class TargetInfo : public TransferrableTargetInfo,
                    public RefCountedBase<TargetInfo> {
-  std::shared_ptr<TargetOptions> TargetOpts;
+  class OptsStorage {
+    std::variant<std::monostate, TargetOptions *, TargetOptions> Storage;
+
+  public:
+    OptsStorage() = default;
+    OptsStorage(TargetOptions *Opts) : Storage(Opts) {}
+    OptsStorage(TargetOptions &&Opts) : Storage(std::move(Opts)) {}
+
+    operator TargetOptions &() const {
+      if (const auto *Opts = std::get_if<TargetOptions *>(&Storage))
+        return const_cast<TargetOptions &>(**Opts);
+      if (const auto *Opts = std::get_if<TargetOptions>(&Storage))
+        return const_cast<TargetOptions &>(*Opts);
+      assert(false && "Missing target options");
+    }
+  };
+
+  OptsStorage TargetOpts;
   llvm::Triple Triple;
+
+  static TargetInfo *CreateTargetInfoImpl(DiagnosticsEngine &Diags,
+                                          OptsStorage Opts);
+
 protected:
   // Target values set by the ctor of the actual target implementation.  Default
   // values are specified by the TargetInfo constructor.
@@ -302,17 +323,16 @@ public:
   /// \param Opts - The options to use to initialize the target. The target may
   /// modify the options to canonicalize the target feature information to match
   /// what the backend expects.
-  static TargetInfo *
-  CreateTargetInfo(DiagnosticsEngine &Diags,
-                   const std::shared_ptr<TargetOptions> &Opts);
+  static TargetInfo *CreateTargetInfo(DiagnosticsEngine &Diags,
+                                      TargetOptions *Opts);
+
+  static TargetInfo *CreateTargetInfo(DiagnosticsEngine &Diags,
+                                      TargetOptions &&Opts);
 
   virtual ~TargetInfo();
 
   /// Retrieve the target options.
-  TargetOptions &getTargetOpts() const {
-    assert(TargetOpts && "Missing target options");
-    return *TargetOpts;
-  }
+  TargetOptions &getTargetOpts() const { return TargetOpts; }
 
   /// The different kinds of __builtin_va_list types defined by
   /// the target implementation.
