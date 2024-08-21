@@ -139,6 +139,7 @@ private:
   /// Optional owned invocation, just used to make the invocation used in
   /// LoadFromCommandLine available.
   std::shared_ptr<CompilerInvocation> Invocation;
+  std::shared_ptr<CompilerInvocation> CCInvocation;
 
   /// Fake module loader: the AST unit doesn't need to load any modules.
   TrivialModuleLoader ModuleLoader;
