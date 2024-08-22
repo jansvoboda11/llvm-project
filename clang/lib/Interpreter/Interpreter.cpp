@@ -131,7 +131,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   // times, reusing the same AST.
   Clang->getMutCodeGenOpts().ClearASTBeforeBackend = false;
 
-  Clang->getFrontendOpts().DisableFree = false;
+  Clang->getMutFrontendOpts().DisableFree = false;
   Clang->getMutCodeGenOpts().DisableFree = false;
   return std::move(Clang);
 }

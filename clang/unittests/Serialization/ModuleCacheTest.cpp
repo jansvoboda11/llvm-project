@@ -95,7 +95,7 @@ public:
     std::unique_ptr<CompilerInvocation> Invocation =
         createInvocation(Args, Opts);
     if (Invocation)
-      Invocation->getFrontendOpts().DisableFree = false;
+      Invocation->getMutFrontendOpts().DisableFree = false;
 
     return Invocation;
   }

@@ -1138,8 +1138,8 @@ void CompilerInstance::LoadRequestedPlugins() {
        FrontendPluginRegistry::entries()) {
     std::unique_ptr<PluginASTAction> P(Plugin.instantiate());
     if (P->getActionType() == PluginASTAction::ReplaceAction) {
-      getFrontendOpts().ProgramAction = clang::frontend::PluginAction;
-      getFrontendOpts().ActionName = Plugin.getName().str();
+      getMutFrontendOpts().ProgramAction = clang::frontend::PluginAction;
+      getMutFrontendOpts().ActionName = Plugin.getName().str();
       break;
     }
   }
@@ -1209,7 +1209,7 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
   // If there is a module map file, build the module using the module map.
   // Set up the inputs/outputs so that we build the module from its umbrella
   // header.
-  FrontendOptions &FrontendOpts = Invocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = Invocation->getMutFrontendOpts();
   FrontendOpts.OutputFile = ModuleFileName.str();
   FrontendOpts.DisableFree = false;
   FrontendOpts.GenerateGlobalModuleIndex = false;

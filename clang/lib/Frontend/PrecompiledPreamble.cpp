@@ -420,7 +420,7 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   assert(VFS && "VFS is null");
 
   auto PreambleInvocation = std::make_shared<CompilerInvocation>(Invocation);
-  FrontendOptions &FrontendOpts = PreambleInvocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = PreambleInvocation->getMutFrontendOpts();
   PreprocessorOptions &PreprocessorOpts =
       PreambleInvocation->getMutPreprocessorOpts();
 

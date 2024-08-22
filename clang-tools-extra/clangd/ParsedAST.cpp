@@ -424,7 +424,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
 
   // Command-line parsing sets DisableFree to true by default, but we don't want
   // to leak memory in clangd.
-  CI->getFrontendOpts().DisableFree = false;
+  CI->getMutFrontendOpts().DisableFree = false;
   const PrecompiledPreamble *PreamblePCH =
       Preamble ? &Preamble->Preamble : nullptr;
 

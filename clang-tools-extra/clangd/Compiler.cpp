@@ -75,11 +75,11 @@ void disableUnsupportedOptions(CompilerInvocation &CI) {
   CI.getMutHeaderSearchOpts().ModuleFormat =
       PCHContainerOperations().getRawReader().getFormats().front().str();
 
-  CI.getFrontendOpts().Plugins.clear();
-  CI.getFrontendOpts().AddPluginActions.clear();
-  CI.getFrontendOpts().PluginArgs.clear();
-  CI.getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  CI.getFrontendOpts().ActionName.clear();
+  CI.getMutFrontendOpts().Plugins.clear();
+  CI.getMutFrontendOpts().AddPluginActions.clear();
+  CI.getMutFrontendOpts().PluginArgs.clear();
+  CI.getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  CI.getMutFrontendOpts().ActionName.clear();
 
   // These options mostly affect codegen, and aren't relevant to clangd. And
   // clang will die immediately when these files are not existed.
@@ -117,7 +117,7 @@ buildCompilerInvocation(const ParseInputs &Inputs, clang::DiagnosticConsumer &D,
   if (!CI)
     return nullptr;
   // createInvocationFromCommandLine sets DisableFree.
-  CI->getFrontendOpts().DisableFree = false;
+  CI->getMutFrontendOpts().DisableFree = false;
   CI->getMutLangOpts().CommentOpts.ParseAllComments = true;
   CI->getMutLangOpts().RetainCommentsFromSystemHeaders = true;
 

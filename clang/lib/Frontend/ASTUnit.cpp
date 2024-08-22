@@ -1411,14 +1411,14 @@ ASTUnit::getMainBufferWithPrecompiledPreamble(
     const bool PreviousSkipFunctionBodies =
         PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies;
     if (SkipFunctionBodies == SkipFunctionBodiesScope::Preamble)
-      PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies = true;
+      PreambleInvocationIn.getMutFrontendOpts().SkipFunctionBodies = true;
 
     llvm::ErrorOr<PrecompiledPreamble> NewPreamble = PrecompiledPreamble::Build(
         PreambleInvocationIn, MainFileBuffer.get(), Bounds, *Diagnostics, VFS,
         PCHContainerOps, StorePreamblesInMemory, PreambleStoragePath,
         Callbacks);
 
-    PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies =
+    PreambleInvocationIn.getMutFrontendOpts().SkipFunctionBodies =
         PreviousSkipFunctionBodies;
 
     if (NewPreamble) {
@@ -1590,7 +1590,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
 
   // We'll manage file buffers ourselves.
   CI->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
-  CI->getFrontendOpts().DisableFree = false;
+  CI->getMutFrontendOpts().DisableFree = false;
   ProcessWarningOptions(AST->getDiagnostics(), CI->getDiagnosticOpts());
 
   // Create the compiler instance to use for building the AST.
@@ -1697,7 +1697,7 @@ bool ASTUnit::LoadFromCompilerInvocation(
 
   // We'll manage file buffers ourselves.
   Invocation->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
-  Invocation->getFrontendOpts().DisableFree = false;
+  Invocation->getMutFrontendOpts().DisableFree = false;
   getDiagnostics().Reset();
   ProcessWarningOptions(getDiagnostics(), Invocation->getDiagnosticOpts());
 
@@ -1810,7 +1810,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
   // Override the resources path.
   CI->getMutHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
 
-  CI->getFrontendOpts().SkipFunctionBodies =
+  CI->getMutFrontendOpts().SkipFunctionBodies =
       SkipFunctionBodies == SkipFunctionBodiesScope::PreambleAndMainFile;
 
   if (ModuleFormat)
@@ -2195,7 +2195,7 @@ void ASTUnit::CodeComplete(
 
   auto CCInvocation = std::make_shared<CompilerInvocation>(*Invocation);
 
-  FrontendOptions &FrontendOpts = CCInvocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = CCInvocation->getMutFrontendOpts();
   CodeCompleteOptions &CodeCompleteOpts = FrontendOpts.CodeCompleteOpts;
   PreprocessorOptions &PreprocessorOpts =
       CCInvocation->getMutPreprocessorOpts();

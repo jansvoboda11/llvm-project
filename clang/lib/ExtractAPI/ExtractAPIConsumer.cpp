@@ -509,8 +509,9 @@ bool ExtractAPIAction::PrepareToExecuteAction(CompilerInstance &CI) {
                                                 getInputBufferName());
 
   // Set that buffer up as our "real" input in the CompilerInstance.
-  Inputs.clear();
-  Inputs.emplace_back(Buffer->getMemBufferRef(), Kind, /*IsSystem*/ false);
+  CI.getMutFrontendOpts().Inputs.clear();
+  CI.getMutFrontendOpts().Inputs.emplace_back(Buffer->getMemBufferRef(), Kind,
+                                              /*IsSystem*/ false);
 
   return true;
 }

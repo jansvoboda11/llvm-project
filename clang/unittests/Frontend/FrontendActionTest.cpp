@@ -84,9 +84,9 @@ TEST(ASTFrontendAction, Sanity) {
   invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
@@ -104,9 +104,9 @@ TEST(ASTFrontendAction, IncrementalParsing) {
   invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
@@ -131,9 +131,9 @@ TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
       "  B(B const& b): A<T>(b.data) {}\n"
       "};\n"
       "B<char> c() { return B<char>(); }\n").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
@@ -177,9 +177,9 @@ TEST(PreprocessorFrontendAction, EndSourceFile) {
   Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
@@ -238,9 +238,9 @@ TEST(ASTFrontendAction, ExternalSemaSource) {
       "test.cc", MemoryBuffer::getMemBuffer("void fooo();\n"
                                             "int main() { foo(); }")
                      .release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
@@ -270,10 +270,10 @@ TEST(GeneratePCHFrontendAction, CacheGeneratedPCH) {
     Invocation->getMutPreprocessorOpts().addRemappedFile(
         "test.h",
         MemoryBuffer::getMemBuffer("int foo(void) { return 1; }\n").release());
-    Invocation->getFrontendOpts().Inputs.push_back(
+    Invocation->getMutFrontendOpts().Inputs.push_back(
         FrontendInputFile("test.h", Language::C));
-    Invocation->getFrontendOpts().OutputFile = PCHFilename.str().str();
-    Invocation->getFrontendOpts().ProgramAction = frontend::GeneratePCH;
+    Invocation->getMutFrontendOpts().OutputFile = PCHFilename.str().str();
+    Invocation->getMutFrontendOpts().ProgramAction = frontend::GeneratePCH;
     Invocation->getMutTargetOpts().Triple = "x86_64-apple-darwin19.0.0";
     CompilerInstance Compiler;
     Compiler.setInvocation(std::move(Invocation));

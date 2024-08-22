@@ -250,7 +250,7 @@ GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
       ModuleMapFile = InFile;
 
     HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
-    CI.getFrontendOpts().OutputFile =
+    CI.getMutFrontendOpts().OutputFile =
         HS.getCachedModuleFileName(CI.getLangOpts().CurrentModule,
                                    ModuleMapFile);
   }

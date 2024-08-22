@@ -249,12 +249,12 @@ public:
     Instance.createDiagnostics(
         new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
         /*ShouldOwnClient=*/true);
-    Instance.getFrontendOpts().DisableFree = false;
-    Instance.getFrontendOpts().Inputs.clear();
-    Instance.getFrontendOpts().Inputs.emplace_back(
+    Instance.getMutFrontendOpts().DisableFree = false;
+    Instance.getMutFrontendOpts().Inputs.clear();
+    Instance.getMutFrontendOpts().Inputs.emplace_back(
         Filename, InputKind(Language::Unknown, InputKind::Precompiled));
-    Instance.getFrontendOpts().ModuleFiles.clear();
-    Instance.getFrontendOpts().ModuleMapFiles.clear();
+    Instance.getMutFrontendOpts().ModuleFiles.clear();
+    Instance.getMutFrontendOpts().ModuleMapFiles.clear();
     // Don't recursively rewrite imports. We handle them all at the top level.
     Instance.getPreprocessorOutputOpts().RewriteImports = false;
 

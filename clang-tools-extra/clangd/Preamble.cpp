@@ -640,7 +640,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
   // Skip function bodies when building the preamble to speed up building
   // the preamble and make it smaller.
   assert(!CI.getFrontendOpts().SkipFunctionBodies);
-  CI.getFrontendOpts().SkipFunctionBodies = true;
+  CI.getMutFrontendOpts().SkipFunctionBodies = true;
   // We don't want to write comment locations into PCH. They are racy and slow
   // to read back. We rely on dynamic index for the comments instead.
   CI.getMutPreprocessorOpts().WriteCommentListToPCH = false;
@@ -676,7 +676,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
 
   // When building the AST for the main file, we do want the function
   // bodies.
-  CI.getFrontendOpts().SkipFunctionBodies = false;
+  CI.getMutFrontendOpts().SkipFunctionBodies = false;
 
   if (Stats != nullptr) {
     Stats->TotalBuildTime = PreambleTimer.getTime();

@@ -102,14 +102,14 @@ export namespace Fibonacci
   std::shared_ptr<CompilerInvocation> Invocation =
       createInvocation(Args, CIOpts);
   ASSERT_TRUE(Invocation);
-  Invocation->getFrontendOpts().DisableFree = false;
+  Invocation->getMutFrontendOpts().DisableFree = false;
 
   CompilerInstance Instance;
   Instance.setDiagnostics(Diags.get());
   Instance.setInvocation(Invocation);
 
   std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
-  Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+  Instance.getMutFrontendOpts().OutputFile = CacheBMIPath;
 
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));

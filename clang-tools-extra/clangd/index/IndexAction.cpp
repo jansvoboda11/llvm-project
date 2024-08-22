@@ -176,7 +176,7 @@ public:
     // Instruct the parser to ask our ASTConsumer if it should skip function
     // bodies. The ASTConsumer will take care of skipping only functions inside
     // the files that we have already processed.
-    CI.getFrontendOpts().SkipFunctionBodies = true;
+    CI.getMutFrontendOpts().SkipFunctionBodies = true;
     return true;
   }
 

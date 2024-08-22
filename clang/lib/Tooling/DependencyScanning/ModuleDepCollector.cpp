@@ -187,10 +187,10 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // Remove options incompatible with explicit module build or are likely to
   // differ between identical modules discovered from different translation
   // units.
-  CI.getFrontendOpts().Inputs.clear();
-  CI.getFrontendOpts().OutputFile.clear();
+  CI.getMutFrontendOpts().Inputs.clear();
+  CI.getMutFrontendOpts().OutputFile.clear();
   // LLVM options are not going to affect the AST
-  CI.getFrontendOpts().LLVMArgs.clear();
+  CI.getMutFrontendOpts().LLVMArgs.clear();
 
   resetBenignCodeGenOptions(frontend::GenerateModule, CI.getLangOpts(),
                             CI.getMutCodeGenOpts());
@@ -203,10 +203,10 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
     CI.getDependencyOutputOpts().OutputFile = "-";
   CI.getDependencyOutputOpts().Targets.clear();
 
-  CI.getFrontendOpts().ProgramAction = frontend::GenerateModule;
-  CI.getFrontendOpts().ARCMTAction = FrontendOptions::ARCMT_None;
-  CI.getFrontendOpts().ObjCMTAction = FrontendOptions::ObjCMT_None;
-  CI.getFrontendOpts().MTMigrateDir.clear();
+  CI.getMutFrontendOpts().ProgramAction = frontend::GenerateModule;
+  CI.getMutFrontendOpts().ARCMTAction = FrontendOptions::ARCMT_None;
+  CI.getMutFrontendOpts().ObjCMTAction = FrontendOptions::ObjCMT_None;
+  CI.getMutFrontendOpts().MTMigrateDir.clear();
   CI.getMutLangOpts().ModuleName.clear();
 
   // Remove any macro definitions that are explicitly ignored.
@@ -314,7 +314,7 @@ void ModuleDepCollector::addModuleMapFiles(
   for (const ModuleID &MID : ClangModuleDeps) {
     ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
-    CI.getFrontendOpts().ModuleMapFiles.push_back(MD->ClangModuleMapFile);
+    CI.getMutFrontendOpts().ModuleMapFiles.push_back(MD->ClangModuleMapFile);
   }
 }
 
@@ -324,7 +324,7 @@ void ModuleDepCollector::addModuleFiles(
     std::string PCMPath =
         Controller.lookupModuleOutput(MID, ModuleOutputKind::ModuleFile);
     if (EagerLoadModules)
-      CI.getFrontendOpts().ModuleFiles.push_back(std::move(PCMPath));
+      CI.getMutFrontendOpts().ModuleFiles.push_back(std::move(PCMPath));
     else
       CI.getMutHeaderSearchOpts().PrebuiltModuleFiles.insert(
           {MID.ModuleName, std::move(PCMPath)});
@@ -367,7 +367,7 @@ void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
               PP.getHeaderSearchInfo()
                   .getModuleMap()
                   .getModuleMapFileForUniquing(CurrentModule))
-        CI.getFrontendOpts().ModuleMapFiles.emplace_back(
+        CI.getMutFrontendOpts().ModuleMapFiles.emplace_back(
             CurrentModuleMap->getNameAsRequested());
 
     SmallVector<ModuleID> DirectDeps;
@@ -381,7 +381,7 @@ void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
     addModuleFiles(CI, DirectDeps);
 
     for (const auto &KV : DirectPrebuiltModularDeps)
-      CI.getFrontendOpts().ModuleFiles.push_back(KV.second.PCMFile);
+      CI.getMutFrontendOpts().ModuleFiles.push_back(KV.second.PCMFile);
   }
 }
 

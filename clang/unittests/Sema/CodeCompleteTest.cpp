@@ -128,7 +128,7 @@ public:
       : CompletePosition(std::move(P)), Consumer(Consumer) {}
 
   bool BeginInvocation(CompilerInstance &CI) override {
-    CI.getFrontendOpts().CodeCompletionAt = CompletePosition;
+    CI.getMutFrontendOpts().CodeCompletionAt = CompletePosition;
     CI.setCodeCompletionConsumer(Consumer);
     return true;
   }

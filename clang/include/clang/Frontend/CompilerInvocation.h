@@ -256,7 +256,7 @@ public:
   APINotesOptions &getMutAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getMutCodeGenOpts() { return *CodeGenOpts; }
   FileSystemOptions &getMutFileSystemOpts() { return *FSOpts; }
-  FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
+  FrontendOptions &getMutFrontendOpts() { return *FrontendOpts; }
   DependencyOutputOptions &getDependencyOutputOpts() {
     return *DependencyOutputOpts;
   }

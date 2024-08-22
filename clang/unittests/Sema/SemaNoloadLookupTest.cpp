@@ -83,7 +83,7 @@ public:
     CompilerInstance Instance;
     Instance.setDiagnostics(Diags.get());
     Instance.setInvocation(Invocation);
-    Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+    Instance.getMutFrontendOpts().OutputFile = CacheBMIPath;
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
     EXPECT_FALSE(Diags->hasErrorOccurred());

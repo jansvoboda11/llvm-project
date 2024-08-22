@@ -574,7 +574,7 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
   LangOptions &LangOpts = Invocation.getMutLangOpts();
   CodeGenOptions &CodeGenOpts = Invocation.getMutCodeGenOpts();
   TargetOptions &TargetOpts = Invocation.getMutTargetOpts();
-  FrontendOptions &FrontendOpts = Invocation.getFrontendOpts();
+  FrontendOptions &FrontendOpts = Invocation.getMutFrontendOpts();
   CodeGenOpts.XRayInstrumentFunctions = LangOpts.XRayInstrument;
   CodeGenOpts.XRayAlwaysEmitCustomEvents = LangOpts.XRayAlwaysEmitCustomEvents;
   CodeGenOpts.XRayAlwaysEmitTypedEvents = LangOpts.XRayAlwaysEmitTypedEvents;
@@ -4834,7 +4834,8 @@ bool CompilerInvocation::CreateFromArgsImpl(
   ParseAnalyzerArgs(Res.getMutAnalyzerOpts(), Args, Diags);
   ParseDiagnosticArgs(Res.getMutDiagnosticOpts(), Args, &Diags,
                       /*DefaultDiagColor=*/false);
-  ParseFrontendArgs(Res.getFrontendOpts(), Args, Diags, LangOpts.IsHeaderFile);
+  ParseFrontendArgs(Res.getMutFrontendOpts(), Args, Diags,
+                    LangOpts.IsHeaderFile);
   // FIXME: We shouldn't have to pass the DashX option around here
   InputKind DashX = Res.getFrontendOpts().DashX;
   ParseTargetArgs(Res.getMutTargetOpts(), Args, Diags);

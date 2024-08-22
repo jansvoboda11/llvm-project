@@ -113,9 +113,9 @@ IntrusiveRefCntPtr<ExternalSemaSource> clang::createChainedIncludesSource(
     CInvok->getMutPreprocessorOpts().MacroIncludes.clear();
     CInvok->getMutPreprocessorOpts().Macros.clear();
 
-    CInvok->getFrontendOpts().Inputs.clear();
+    CInvok->getMutFrontendOpts().Inputs.clear();
     FrontendInputFile InputFile(includes[i], IK);
-    CInvok->getFrontendOpts().Inputs.push_back(InputFile);
+    CInvok->getMutFrontendOpts().Inputs.push_back(InputFile);
 
     TextDiagnosticPrinter *DiagClient =
       new TextDiagnosticPrinter(llvm::errs(), new DiagnosticOptions());

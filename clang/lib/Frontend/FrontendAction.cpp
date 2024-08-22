@@ -214,9 +214,8 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
     }
     if ((ActionType == PluginASTAction::AddBeforeMainAction ||
          ActionType == PluginASTAction::AddAfterMainAction) &&
-        P->ParseArgs(
-            CI,
-            CI.getFrontendOpts().PluginArgs[std::string(Plugin.getName())])) {
+        P->ParseArgs(CI, CI.getMutFrontendOpts()
+                             .PluginArgs[std::string(Plugin.getName())])) {
       std::unique_ptr<ASTConsumer> PluginConsumer = P->CreateASTConsumer(CI, InFile);
       if (ActionType == PluginASTAction::AddBeforeMainAction) {
         Consumers.push_back(std::move(PluginConsumer));
@@ -652,10 +651,10 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
       for (serialization::ModuleFile &MF : MM)
         if (&MF != &PrimaryModule)
-          CI.getFrontendOpts().ModuleFiles.push_back(MF.FileName);
+          CI.getMutFrontendOpts().ModuleFiles.push_back(MF.FileName);
 
       ASTReader->visitTopLevelModuleMaps(PrimaryModule, [&](FileEntryRef FE) {
-        CI.getFrontendOpts().ModuleMapFiles.push_back(
+        CI.getMutFrontendOpts().ModuleMapFiles.push_back(
             std::string(FE.getName()));
       });
     }

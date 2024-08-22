@@ -45,7 +45,7 @@ public:
   std::unique_ptr<ASTUnit> ParseAST(StringRef EntryFile) {
     PCHContainerOpts = std::make_shared<PCHContainerOperations>();
     auto CI = std::make_shared<CompilerInvocation>();
-    CI->getFrontendOpts().Inputs.push_back(FrontendInputFile(
+    CI->getMutFrontendOpts().Inputs.push_back(FrontendInputFile(
         EntryFile, FrontendOptions::getInputKindForExtension(
                        llvm::sys::path::extension(EntryFile).substr(1))));
 

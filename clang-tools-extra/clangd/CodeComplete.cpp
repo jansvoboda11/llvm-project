@@ -1364,7 +1364,7 @@ bool semaCodeComplete(std::unique_ptr<CodeCompleteConsumer> Consumer,
     elog("Couldn't create CompilerInvocation");
     return false;
   }
-  auto &FrontendOpts = CI->getFrontendOpts();
+  auto &FrontendOpts = CI->getMutFrontendOpts();
   FrontendOpts.SkipFunctionBodies = true;
   // Disable typo correction in Sema.
   CI->getMutLangOpts().SpellChecking = false;

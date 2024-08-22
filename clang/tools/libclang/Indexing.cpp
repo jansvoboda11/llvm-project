@@ -571,7 +571,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   bool SkipBodies = (index_options & CXIndexOpt_SkipParsedBodiesInSession) &&
       CInvok->getLangOpts().CPlusPlus;
   if (SkipBodies)
-    CInvok->getFrontendOpts().SkipFunctionBodies = true;
+    CInvok->getMutFrontendOpts().SkipFunctionBodies = true;
 
   auto DataConsumer =
     std::make_shared<CXIndexDataConsumer>(client_data, CB, index_options,

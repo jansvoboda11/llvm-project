@@ -313,8 +313,8 @@ public:
     return Invocation->getFileSystemOpts();
   }
 
-  FrontendOptions &getFrontendOpts() {
-    return Invocation->getFrontendOpts();
+  FrontendOptions &getMutFrontendOpts() {
+    return Invocation->getMutFrontendOpts();
   }
   const FrontendOptions &getFrontendOpts() const {
     return Invocation->getFrontendOpts();

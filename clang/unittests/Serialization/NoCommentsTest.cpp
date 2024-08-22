@@ -100,7 +100,7 @@ void foo() {}
   CompilerInstance Instance;
   Instance.setDiagnostics(Diags.get());
   Instance.setInvocation(Invocation);
-  Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+  Instance.getMutFrontendOpts().OutputFile = CacheBMIPath;
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
   ASSERT_FALSE(Diags->hasErrorOccurred());

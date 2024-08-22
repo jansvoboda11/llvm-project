@@ -226,7 +226,7 @@ llvm::Error buildModuleFile(llvm::StringRef ModuleName,
 
   BuiltModuleFiles.adjustHeaderSearchOptions(CI->getMutHeaderSearchOpts());
 
-  CI->getFrontendOpts().OutputFile = Inputs.CompileCommand.Output;
+  CI->getMutFrontendOpts().OutputFile = Inputs.CompileCommand.Output;
   auto Clang =
       prepareCompilerInstance(std::move(CI), /*Preamble=*/nullptr,
                               std::move(*Buf), std::move(FS), IgnoreDiags);

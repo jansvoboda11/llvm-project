@@ -300,7 +300,7 @@ public:
     // Make a deep copy of the original Clang invocation.
     CompilerInvocation OriginalInvocation(*Invocation);
     // Restore the value of DisableFree, which may be modified by Tooling.
-    OriginalInvocation.getFrontendOpts().DisableFree = DisableFree;
+    OriginalInvocation.getMutFrontendOpts().DisableFree = DisableFree;
     if (any(OptimizeArgs & ScanningOptimizations::Macros))
       canonicalizeDefines(OriginalInvocation.getMutPreprocessorOpts());
 
@@ -333,9 +333,9 @@ public:
     ScanInstance.getMutPreprocessorOpts()
         .AllowPCHWithDifferentModulesCachePath = true;
 
-    ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
-    ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
-    ScanInstance.getFrontendOpts().ModulesShareFileManager = false;
+    ScanInstance.getMutFrontendOpts().GenerateGlobalModuleIndex = false;
+    ScanInstance.getMutFrontendOpts().UseGlobalModuleIndex = false;
+    ScanInstance.getMutFrontendOpts().ModulesShareFileManager = false;
     ScanInstance.getMutHeaderSearchOpts().ModuleFormat = "raw";
     ScanInstance.getMutHeaderSearchOpts().ModulesIncludeVFSUsage =
         any(OptimizeArgs & ScanningOptimizations::VFS);

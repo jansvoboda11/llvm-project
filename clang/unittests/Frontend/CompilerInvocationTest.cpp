@@ -940,7 +940,7 @@ TEST_F(CommandLineTest, TestModuleFileExtension) {
   // Exercise the check that only serializes instances of
   // TestModuleFileExtension by providing an instance of another
   // ModuleFileExtension subclass.
-  Invocation.getFrontendOpts().ModuleFileExtensions.push_back(
+  Invocation.getMutFrontendOpts().ModuleFileExtensions.push_back(
       std::make_shared<DummyModuleFileExtension>());
 
   Invocation.generateCC1CommandLine(GeneratedArgs, *this);

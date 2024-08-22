@@ -248,8 +248,8 @@ bool arcmt::checkForManualIssues(
   std::unique_ptr<CompilerInvocation> CInvok;
   CInvok.reset(
       createInvocationForMigration(origCI, PCHContainerOps->getRawReader()));
-  CInvok->getFrontendOpts().Inputs.clear();
-  CInvok->getFrontendOpts().Inputs.push_back(Input);
+  CInvok->getMutFrontendOpts().Inputs.clear();
+  CInvok->getMutFrontendOpts().Inputs.push_back(Input);
 
   CapturedDiagList capturedDiags;
 
@@ -348,8 +348,8 @@ applyTransforms(CompilerInvocation &origCI, const FrontendInputFile &Input,
     return true;
 
   CompilerInvocation CInvok(origCI);
-  CInvok.getFrontendOpts().Inputs.clear();
-  CInvok.getFrontendOpts().Inputs.push_back(Input);
+  CInvok.getMutFrontendOpts().Inputs.clear();
+  CInvok.getMutFrontendOpts().Inputs.push_back(Input);
 
   MigrationProcess migration(CInvok, PCHContainerOps, DiagClient, outputDir);
   bool NoFinalizeRemoval = origCI.getMigratorOpts().NoFinalizeRemoval;

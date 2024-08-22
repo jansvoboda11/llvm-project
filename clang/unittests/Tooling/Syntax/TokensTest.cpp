@@ -129,7 +129,7 @@ public:
     CIOpts.VFS = FS;
     auto CI = createInvocation(Args, std::move(CIOpts));
     assert(CI);
-    CI->getFrontendOpts().DisableFree = false;
+    CI->getMutFrontendOpts().DisableFree = false;
     CI->getMutPreprocessorOpts().addRemappedFile(
         FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
     CompilerInstance Compiler;

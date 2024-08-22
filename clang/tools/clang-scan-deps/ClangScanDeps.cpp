@@ -743,7 +743,7 @@ getCompilationDatabase(int argc, char **argv, std::string &ErrorMessage) {
   if (!CI)
     return nullptr;
 
-  FrontendOptions &FEOpts = CI->getFrontendOpts();
+  const FrontendOptions &FEOpts = CI->getFrontendOpts();
   if (FEOpts.Inputs.size() != 1) {
     llvm::errs()
         << "Exactly one input file is required in the per-file mode ('--').\n";
