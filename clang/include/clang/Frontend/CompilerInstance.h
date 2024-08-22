@@ -278,7 +278,12 @@ public:
   /// @name Forwarding Methods
   /// @{
 
-  AnalyzerOptions &getAnalyzerOpts() { return Invocation->getAnalyzerOpts(); }
+  AnalyzerOptions &getMutAnalyzerOpts() {
+    return Invocation->getMutAnalyzerOpts();
+  }
+  const AnalyzerOptions &getAnalyzerOpts() {
+    return Invocation->getMutAnalyzerOpts();
+  }
 
   CodeGenOptions &getCodeGenOpts() {
     return Invocation->getCodeGenOpts();

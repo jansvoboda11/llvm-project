@@ -58,11 +58,11 @@ protected:
 public:
   ExprEngineConsumer(CompilerInstance &C)
       : C(C),
-        ChkMgr(C.getASTContext(), C.getAnalyzerOpts(), C.getPreprocessor()),
+        ChkMgr(C.getASTContext(), C.getMutAnalyzerOpts(), C.getPreprocessor()),
         CTU(C), Consumers(),
         AMgr(C.getASTContext(), C.getPreprocessor(), Consumers,
              CreateRegionStoreManager, CreateRangeConstraintManager, &ChkMgr,
-             C.getAnalyzerOpts()),
+             C.getMutAnalyzerOpts()),
         VisitedCallees(), FS(),
         Eng(CTU, AMgr, &VisitedCallees, &FS, ExprEngine::Inline_Regular) {}
 };

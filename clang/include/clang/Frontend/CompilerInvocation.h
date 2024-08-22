@@ -251,7 +251,7 @@ public:
   DiagnosticOptions &getMutDiagnosticOpts() { return *DiagnosticOpts; }
   HeaderSearchOptions &getMutHeaderSearchOpts() { return *HSOpts; }
   PreprocessorOptions &getMutPreprocessorOpts() { return *PPOpts; }
-  AnalyzerOptions &getAnalyzerOpts() { return *AnalyzerOpts; }
+  AnalyzerOptions &getMutAnalyzerOpts() { return *AnalyzerOpts; }
   MigratorOptions &getMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }

@@ -120,7 +120,7 @@ public:
       Registry.addChecker<InterestingnessTestChecker>("test.Interestingness",
                                                       "Description", "");
     });
-    Compiler.getAnalyzerOpts().CheckersAndPackages = {
+    Compiler.getMutAnalyzerOpts().CheckersAndPackages = {
         {"test.Interestingness", true}};
     return std::move(AnalysisConsumer);
   }

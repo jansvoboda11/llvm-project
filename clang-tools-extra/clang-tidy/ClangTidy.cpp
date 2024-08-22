@@ -452,7 +452,7 @@ ClangTidyASTConsumerFactory::createASTConsumer(
     Consumers.push_back(Finder->newASTConsumer());
 
 #if CLANG_TIDY_ENABLE_STATIC_ANALYZER
-  AnalyzerOptions &AnalyzerOptions = Compiler.getAnalyzerOpts();
+  AnalyzerOptions &AnalyzerOptions = Compiler.getMutAnalyzerOpts();
   AnalyzerOptions.CheckersAndPackages = getAnalyzerCheckersAndPackages(
       Context, Context.canEnableAnalyzerAlphaCheckers());
   if (!AnalyzerOptions.CheckersAndPackages.empty()) {

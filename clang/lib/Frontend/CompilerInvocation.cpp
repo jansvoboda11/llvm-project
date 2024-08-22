@@ -4831,7 +4831,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
 
   ParseFileSystemArgs(Res.getFileSystemOpts(), Args, Diags);
   ParseMigratorArgs(Res.getMigratorOpts(), Args, Diags);
-  ParseAnalyzerArgs(Res.getAnalyzerOpts(), Args, Diags);
+  ParseAnalyzerArgs(Res.getMutAnalyzerOpts(), Args, Diags);
   ParseDiagnosticArgs(Res.getMutDiagnosticOpts(), Args, &Diags,
                       /*DefaultDiagColor=*/false);
   ParseFrontendArgs(Res.getFrontendOpts(), Args, Diags, LangOpts.IsHeaderFile);

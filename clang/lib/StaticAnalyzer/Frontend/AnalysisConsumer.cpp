@@ -759,7 +759,7 @@ ento::CreateAnalysisConsumer(CompilerInstance &CI) {
   // Disable the effects of '-Werror' when using the AnalysisConsumer.
   CI.getPreprocessor().getDiagnostics().setWarningsAsErrors(false);
 
-  AnalyzerOptions &analyzerOpts = CI.getAnalyzerOpts();
+  AnalyzerOptions &analyzerOpts = CI.getMutAnalyzerOpts();
   bool hasModelPath = analyzerOpts.Config.count("model-path") > 0;
 
   return std::make_unique<AnalysisConsumer>(
