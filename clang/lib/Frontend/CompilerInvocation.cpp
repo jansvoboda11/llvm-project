@@ -4829,7 +4829,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
           << ArgString << Nearest;
   }
 
-  ParseFileSystemArgs(Res.getFileSystemOpts(), Args, Diags);
+  ParseFileSystemArgs(Res.getMutFileSystemOpts(), Args, Diags);
   ParseMigratorArgs(Res.getMutMigratorOpts(), Args, Diags);
   ParseAnalyzerArgs(Res.getMutAnalyzerOpts(), Args, Diags);
   ParseDiagnosticArgs(Res.getMutDiagnosticOpts(), Args, &Diags,

@@ -306,8 +306,8 @@ public:
     return Invocation->getDiagnosticOpts();
   }
 
-  FileSystemOptions &getFileSystemOpts() {
-    return Invocation->getFileSystemOpts();
+  FileSystemOptions &getMutFileSystemOpts() {
+    return Invocation->getMutFileSystemOpts();
   }
   const FileSystemOptions &getFileSystemOpts() const {
     return Invocation->getFileSystemOpts();

@@ -255,7 +255,7 @@ public:
   MigratorOptions &getMutMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getMutAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getMutCodeGenOpts() { return *CodeGenOpts; }
-  FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
+  FileSystemOptions &getMutFileSystemOpts() { return *FSOpts; }
   FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
   DependencyOutputOptions &getDependencyOutputOpts() {
     return *DependencyOutputOpts;

@@ -54,7 +54,7 @@ public:
                                          /*isFramework*/ false,
                                          /*IgnoreSysRoot*/ false);
 
-    CI->getFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
+    CI->getMutFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
     CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
