@@ -95,7 +95,7 @@ TEST(CodeGenTest, DebugInfoCWDCodeGen) {
       FrontendInputFile("test.cpp", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = EmitLLVM;
   Invocation->getMutTargetOpts().Triple = "x86_64-unknown-linux-gnu";
-  Invocation->getCodeGenOpts().setDebugInfo(codegenoptions::FullDebugInfo);
+  Invocation->getMutCodeGenOpts().setDebugInfo(codegenoptions::FullDebugInfo);
   CompilerInstance Compiler;
 
   SmallString<256> IRBuffer;

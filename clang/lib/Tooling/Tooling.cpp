@@ -176,7 +176,7 @@ CompilerInvocation *newInvocation(DiagnosticsEngine *Diagnostics,
   CompilerInvocation::CreateFromArgs(*Invocation, CC1Args, *Diagnostics,
                                      BinaryName);
   Invocation->getFrontendOpts().DisableFree = false;
-  Invocation->getCodeGenOpts().DisableFree = false;
+  Invocation->getMutCodeGenOpts().DisableFree = false;
   return Invocation;
 }
 

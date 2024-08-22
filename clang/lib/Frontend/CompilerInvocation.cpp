@@ -572,7 +572,7 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
   LangOptions &LangOpts = Invocation.getMutLangOpts();
-  CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
+  CodeGenOptions &CodeGenOpts = Invocation.getMutCodeGenOpts();
   TargetOptions &TargetOpts = Invocation.getMutTargetOpts();
   FrontendOptions &FrontendOpts = Invocation.getFrontendOpts();
   CodeGenOpts.XRayInstrumentFunctions = LangOpts.XRayInstrument;
@@ -4853,7 +4853,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   for (auto Warning : Res.getDiagnosticOpts().Warnings) {
     if (Warning == "misexpect" &&
         !Diags.isIgnored(diag::warn_profile_data_misexpect, SourceLocation())) {
-      Res.getCodeGenOpts().MisExpect = true;
+      Res.getMutCodeGenOpts().MisExpect = true;
     }
   }
 
@@ -4868,13 +4868,13 @@ bool CompilerInvocation::CreateFromArgsImpl(
   if (LangOpts.OpenMPIsTargetDevice)
     Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
 
-  ParseCodeGenArgs(Res.getCodeGenOpts(), Args, DashX, Diags, T,
+  ParseCodeGenArgs(Res.getMutCodeGenOpts(), Args, DashX, Diags, T,
                    Res.getFrontendOpts().OutputFile, LangOpts);
 
   // FIXME: Override value name discarding when asan or msan is used because the
   // backend passes depend on the name of the alloca in order to print out
   // names.
-  Res.getCodeGenOpts().DiscardValueNames &=
+  Res.getMutCodeGenOpts().DiscardValueNames &=
       !LangOpts.Sanitize.has(SanitizerKind::Address) &&
       !LangOpts.Sanitize.has(SanitizerKind::KernelAddress) &&
       !LangOpts.Sanitize.has(SanitizerKind::Memory) &&
@@ -4896,14 +4896,14 @@ bool CompilerInvocation::CreateFromArgsImpl(
   // If sanitizer is enabled, disable OPT_ffine_grained_bitfield_accesses.
   if (Res.getCodeGenOpts().FineGrainedBitfieldAccesses &&
       !Res.getLangOpts().Sanitize.empty()) {
-    Res.getCodeGenOpts().FineGrainedBitfieldAccesses = false;
+    Res.getMutCodeGenOpts().FineGrainedBitfieldAccesses = false;
     Diags.Report(diag::warn_drv_fine_grained_bitfield_accesses_ignored);
   }
 
   // Store the command-line for using in the CodeView backend.
   if (Res.getCodeGenOpts().CodeViewCommandLine) {
-    Res.getCodeGenOpts().Argv0 = Argv0;
-    append_range(Res.getCodeGenOpts().CommandLineArgs, CommandLineArgs);
+    Res.getMutCodeGenOpts().Argv0 = Argv0;
+    append_range(Res.getMutCodeGenOpts().CommandLineArgs, CommandLineArgs);
   }
 
   // Set PGOOptions. Need to create a temporary VFS to read the profile
@@ -4912,7 +4912,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
     auto FS =
         createVFSFromOverlayFiles(Res.getHeaderSearchOpts().VFSOverlayFiles,
                                   Diags, llvm::vfs::getRealFileSystem());
-    setPGOUseInstrumentor(Res.getCodeGenOpts(),
+    setPGOUseInstrumentor(Res.getMutCodeGenOpts(),
                           Res.getCodeGenOpts().ProfileInstrumentUsePath, *FS,
                           Diags);
   }
@@ -5096,7 +5096,7 @@ std::vector<std::string> CompilerInvocationBase::getCC1CommandLine() const {
 void CompilerInvocation::resetNonModularOptions() {
   getMutLangOpts().resetNonModularOptions();
   getMutPreprocessorOpts().resetNonModularOptions();
-  getCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
+  getMutCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
 }
 
 void CompilerInvocation::clearImplicitModuleBuildOptions() {

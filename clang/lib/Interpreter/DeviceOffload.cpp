@@ -62,7 +62,8 @@ IncrementalCUDADeviceParser::Parse(llvm::StringRef Input) {
                    llvm::StringRef(FatbinContent.data(), FatbinContent.size()),
                    "", false));
 
-  HostParser.getCI()->getCodeGenOpts().CudaGpuBinaryFileName = FatbinFileName;
+  HostParser.getCI()->getMutCodeGenOpts().CudaGpuBinaryFileName =
+      FatbinFileName;
 
   FatbinContent.clear();
 

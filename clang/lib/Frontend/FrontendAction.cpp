@@ -232,7 +232,7 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
     // If we have plugins after the main consumer, which may be the codegen
     // action, they likely will need the ASTContext, so don't clear it in the
     // codegen action.
-    CI.getCodeGenOpts().ClearASTBeforeBackend = false;
+    CI.getMutCodeGenOpts().ClearASTBeforeBackend = false;
     for (auto &C : AfterConsumers)
       Consumers.push_back(std::move(C));
   }

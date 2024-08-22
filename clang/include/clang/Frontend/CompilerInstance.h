@@ -285,8 +285,8 @@ public:
     return Invocation->getMutAnalyzerOpts();
   }
 
-  CodeGenOptions &getCodeGenOpts() {
-    return Invocation->getCodeGenOpts();
+  CodeGenOptions &getMutCodeGenOpts() {
+    return Invocation->getMutCodeGenOpts();
   }
   const CodeGenOptions &getCodeGenOpts() const {
     return Invocation->getCodeGenOpts();

@@ -190,7 +190,7 @@ CreateFrontendAction(CompilerInstance &CI) {
       CI.getDiagnostics().Report(diag::warn_missing_symbol_graph_dir);
       CI.getFrontendOpts().SymbolGraphOutputDir = ".";
     }
-    CI.getCodeGenOpts().ClearASTBeforeBackend = false;
+    CI.getMutCodeGenOpts().ClearASTBeforeBackend = false;
     Act = std::make_unique<WrappingExtractAPIAction>(std::move(Act));
   }
 

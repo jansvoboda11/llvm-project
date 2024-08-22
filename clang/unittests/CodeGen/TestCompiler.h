@@ -34,7 +34,7 @@ struct TestCompiler {
   TestCompiler(clang::LangOptions LO,
                clang::CodeGenOptions CGO = clang::CodeGenOptions()) {
     compiler.getMutLangOpts() = std::move(LO);
-    compiler.getCodeGenOpts() = CGO;
+    compiler.getMutCodeGenOpts() = CGO;
     compiler.createDiagnostics();
 
     std::string TrStr = llvm::Triple::normalize(llvm::sys::getProcessTriple());

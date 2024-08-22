@@ -193,7 +193,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   CI.getFrontendOpts().LLVMArgs.clear();
 
   resetBenignCodeGenOptions(frontend::GenerateModule, CI.getLangOpts(),
-                            CI.getCodeGenOpts());
+                            CI.getMutCodeGenOpts());
 
   // Map output paths that affect behaviour to "-" so their existence is in the
   // context hash. The final path will be computed in addOutputPaths.
@@ -358,7 +358,7 @@ static bool needsModules(FrontendInputFile FIF) {
 void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
   CI.clearImplicitModuleBuildOptions();
   resetBenignCodeGenOptions(CI.getFrontendOpts().ProgramAction,
-                            CI.getLangOpts(), CI.getCodeGenOpts());
+                            CI.getLangOpts(), CI.getMutCodeGenOpts());
 
   if (llvm::any_of(CI.getFrontendOpts().Inputs, needsModules)) {
     Preprocessor &PP = ScanInstance.getPreprocessor();

@@ -254,7 +254,7 @@ public:
   AnalyzerOptions &getMutAnalyzerOpts() { return *AnalyzerOpts; }
   MigratorOptions &getMutMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getMutAPINotesOpts() { return *APINotesOpts; }
-  CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }
+  CodeGenOptions &getMutCodeGenOpts() { return *CodeGenOpts; }
   FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
   FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
   DependencyOutputOptions &getDependencyOutputOpts() {

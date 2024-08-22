@@ -129,10 +129,10 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
 
   // Don't clear the AST before backend codegen since we do codegen multiple
   // times, reusing the same AST.
-  Clang->getCodeGenOpts().ClearASTBeforeBackend = false;
+  Clang->getMutCodeGenOpts().ClearASTBeforeBackend = false;
 
   Clang->getFrontendOpts().DisableFree = false;
-  Clang->getCodeGenOpts().DisableFree = false;
+  Clang->getMutCodeGenOpts().DisableFree = false;
   return std::move(Clang);
 }
 
