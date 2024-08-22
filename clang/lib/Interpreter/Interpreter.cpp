@@ -116,7 +116,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
 
   // FIXME: Merge with CompilerInstance::ExecuteAction.
   llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer("").release();
-  Clang->getPreprocessorOpts().addRemappedFile("<<< inputs >>>", MB);
+  Clang->getMutPreprocessorOpts().addRemappedFile("<<< inputs >>>", MB);
 
   Clang->setTarget(TargetInfo::CreateTargetInfo(
       Clang->getDiagnostics(), &Clang->getInvocation().getMutTargetOpts()));

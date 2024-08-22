@@ -259,11 +259,9 @@ ASTUnit::~ASTUnit() {
   // perform this operation here because we explicitly request that the
   // compiler instance *not* free these buffers for each invocation of the
   // parser.
-  if (Invocation && OwnsRemappedFileBuffers) {
-    PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
-    for (const auto &RB : PPOpts.RemappedFileBuffers)
+  if (Invocation && OwnsRemappedFileBuffers)
+    for (const auto &RB : Invocation->getPreprocessorOpts().RemappedFileBuffers)
       delete RB.second;
-  }
 
   ClearCachedCompletionResults();
 
@@ -1591,7 +1589,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
     DiagCleanup(Diags.get());
 
   // We'll manage file buffers ourselves.
-  CI->getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  CI->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
   CI->getFrontendOpts().DisableFree = false;
   ProcessWarningOptions(AST->getDiagnostics(), CI->getDiagnosticOpts());
 
@@ -1698,7 +1696,7 @@ bool ASTUnit::LoadFromCompilerInvocation(
   assert(VFS && "VFS is null");
 
   // We'll manage file buffers ourselves.
-  Invocation->getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  Invocation->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
   Invocation->getFrontendOpts().DisableFree = false;
   getDiagnostics().Reset();
   ProcessWarningOptions(getDiagnostics(), Invocation->getDiagnosticOpts());
@@ -1800,10 +1798,10 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
 
   // Override any files that need remapping
   for (const auto &RemappedFile : RemappedFiles) {
-    CI->getPreprocessorOpts().addRemappedFile(RemappedFile.first,
-                                              RemappedFile.second);
+    CI->getMutPreprocessorOpts().addRemappedFile(RemappedFile.first,
+                                                 RemappedFile.second);
   }
-  PreprocessorOptions &PPOpts = CI->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = CI->getMutPreprocessorOpts();
   PPOpts.RemappedFilesKeepOriginalName = RemappedFilesKeepOriginalName;
   PPOpts.AllowPCHWithCompilerErrors = AllowPCHWithCompilerErrors;
   PPOpts.SingleFileParseMode = SingleFileParse;
@@ -1882,15 +1880,13 @@ bool ASTUnit::Reparse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
   ParsingTimer.setOutput("Reparsing " + getMainFileName());
 
   // Remap files.
-  PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = Invocation->getMutPreprocessorOpts();
   for (const auto &RB : PPOpts.RemappedFileBuffers)
     delete RB.second;
 
-  Invocation->getPreprocessorOpts().clearRemappedFiles();
-  for (const auto &RemappedFile : RemappedFiles) {
-    Invocation->getPreprocessorOpts().addRemappedFile(RemappedFile.first,
-                                                      RemappedFile.second);
-  }
+  PPOpts.clearRemappedFiles();
+  for (const auto &RemappedFile : RemappedFiles)
+    PPOpts.addRemappedFile(RemappedFile.first, RemappedFile.second);
 
   // If we have a preamble file lying around, or if we might try to
   // build a precompiled preamble, do so now.
@@ -2201,7 +2197,8 @@ void ASTUnit::CodeComplete(
 
   FrontendOptions &FrontendOpts = CCInvocation->getFrontendOpts();
   CodeCompleteOptions &CodeCompleteOpts = FrontendOpts.CodeCompleteOpts;
-  PreprocessorOptions &PreprocessorOpts = CCInvocation->getPreprocessorOpts();
+  PreprocessorOptions &PreprocessorOpts =
+      CCInvocation->getMutPreprocessorOpts();
 
   CodeCompleteOpts.IncludeMacros = IncludeMacros &&
                                    CachedCompletionResults.empty();

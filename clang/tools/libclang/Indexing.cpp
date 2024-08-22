@@ -346,7 +346,7 @@ public:
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override {
-    PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
+    const PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
 
     if (!PPOpts.ImplicitPCHInclude.empty()) {
       if (auto File =
@@ -536,7 +536,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   for (auto &UF : unsaved_files) {
     std::unique_ptr<llvm::MemoryBuffer> MB =
         llvm::MemoryBuffer::getMemBufferCopy(getContents(UF), UF.Filename);
-    CInvok->getPreprocessorOpts().addRemappedFile(UF.Filename, MB.get());
+    CInvok->getMutPreprocessorOpts().addRemappedFile(UF.Filename, MB.get());
     BufOwner->push_back(std::move(MB));
   }
 
@@ -589,7 +589,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   bool PrecompilePreamble = false;
   bool CreatePreambleOnFirstParse = false;
   bool CacheCodeCompletionResults = false;
-  PreprocessorOptions &PPOpts = CInvok->getPreprocessorOpts(); 
+  PreprocessorOptions &PPOpts = CInvok->getMutPreprocessorOpts();
   PPOpts.AllowPCHWithCompilerErrors = true;
 
   if (requestedToGetTU) {

@@ -422,7 +422,7 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   auto PreambleInvocation = std::make_shared<CompilerInvocation>(Invocation);
   FrontendOptions &FrontendOpts = PreambleInvocation->getFrontendOpts();
   PreprocessorOptions &PreprocessorOpts =
-      PreambleInvocation->getPreprocessorOpts();
+      PreambleInvocation->getMutPreprocessorOpts();
 
   std::shared_ptr<PCHBuffer> Buffer = std::make_shared<PCHBuffer>();
   std::unique_ptr<PCHStorage> Storage;
@@ -609,7 +609,7 @@ bool PrecompiledPreamble::CanReuse(const CompilerInvocation &Invocation,
       "Buffer is too large. Bounds were calculated from a different buffer?");
 
   auto PreambleInvocation = std::make_shared<CompilerInvocation>(Invocation);
-  PreprocessorOptions &PreprocessorOpts =
+  const PreprocessorOptions &PreprocessorOpts =
       PreambleInvocation->getPreprocessorOpts();
 
   // We've previously computed a preamble. Check whether we have the same
@@ -766,7 +766,7 @@ void PrecompiledPreamble::configurePreamble(
     llvm::MemoryBuffer *MainFileBuffer) const {
   assert(VFS);
 
-  auto &PreprocessorOpts = CI.getPreprocessorOpts();
+  auto &PreprocessorOpts = CI.getMutPreprocessorOpts();
 
   // Remap main file to point to MainFileBuffer.
   auto MainFilePath = CI.getFrontendOpts().Inputs[0].getFile();

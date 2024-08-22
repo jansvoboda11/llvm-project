@@ -4845,7 +4845,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
 
   ParsePointerAuthArgs(LangOpts, Args, Diags);
 
-  ParseLangArgs(LangOpts, Args, DashX, T, Res.getPreprocessorOpts().Includes,
+  ParseLangArgs(LangOpts, Args, DashX, T, Res.getMutPreprocessorOpts().Includes,
                 Diags);
   if (Res.getFrontendOpts().ProgramAction == frontend::RewriteObjC)
     LangOpts.ObjCExceptions = 1;
@@ -4880,7 +4880,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
       !LangOpts.Sanitize.has(SanitizerKind::Memory) &&
       !LangOpts.Sanitize.has(SanitizerKind::KernelMemory);
 
-  ParsePreprocessorArgs(Res.getPreprocessorOpts(), Args, Diags,
+  ParsePreprocessorArgs(Res.getMutPreprocessorOpts(), Args, Diags,
                         Res.getFrontendOpts().ProgramAction,
                         Res.getFrontendOpts());
   ParsePreprocessorOutputArgs(Res.getPreprocessorOutputOpts(), Args, Diags,
@@ -5095,7 +5095,7 @@ std::vector<std::string> CompilerInvocationBase::getCC1CommandLine() const {
 
 void CompilerInvocation::resetNonModularOptions() {
   getMutLangOpts().resetNonModularOptions();
-  getPreprocessorOpts().resetNonModularOptions();
+  getMutPreprocessorOpts().resetNonModularOptions();
   getCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
 }
 

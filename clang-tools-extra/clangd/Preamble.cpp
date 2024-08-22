@@ -376,8 +376,8 @@ scanPreamble(llvm::StringRef Contents, const tooling::CompileCommand &Cmd) {
   if (Clang->getFrontendOpts().Inputs.empty())
     return error("compiler instance had no inputs");
   // We are only interested in main file includes.
-  Clang->getPreprocessorOpts().SingleFileParseMode = true;
-  Clang->getPreprocessorOpts().UsePredefines = false;
+  Clang->getMutPreprocessorOpts().SingleFileParseMode = true;
+  Clang->getMutPreprocessorOpts().UsePredefines = false;
   PreprocessOnlyAction Action;
   if (!Action.BeginSourceFile(*Clang, Clang->getFrontendOpts().Inputs[0]))
     return error("failed BeginSourceFile");
@@ -643,7 +643,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
   CI.getFrontendOpts().SkipFunctionBodies = true;
   // We don't want to write comment locations into PCH. They are racy and slow
   // to read back. We rely on dynamic index for the comments instead.
-  CI.getPreprocessorOpts().WriteCommentListToPCH = false;
+  CI.getMutPreprocessorOpts().WriteCommentListToPCH = false;
 
   CppFilePreambleCallbacks CapturedInfo(
       FileName, Stats, Inputs.Opts.PreambleParseForwardingFunctions,
@@ -940,7 +940,7 @@ void PreamblePatch::apply(CompilerInvocation &CI) const {
   // No need to map an empty file.
   if (PatchContents.empty())
     return;
-  auto &PPOpts = CI.getPreprocessorOpts();
+  auto &PPOpts = CI.getMutPreprocessorOpts();
   auto PatchBuffer =
       // we copy here to ensure contents are still valid if CI outlives the
       // PreamblePatch.

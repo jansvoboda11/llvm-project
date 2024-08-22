@@ -577,7 +577,7 @@ runClangTidy(clang::tidy::ClangTidyContext &Context,
                        std::shared_ptr<PCHContainerOperations> PCHContainerOps,
                        DiagnosticConsumer *DiagConsumer) override {
       // Explicitly ask to define __clang_analyzer__ macro.
-      Invocation->getPreprocessorOpts().SetUpStaticAnalyzer = true;
+      Invocation->getMutPreprocessorOpts().SetUpStaticAnalyzer = true;
       return FrontendActionFactory::runInvocation(
           Invocation, Files, PCHContainerOps, DiagConsumer);
     }

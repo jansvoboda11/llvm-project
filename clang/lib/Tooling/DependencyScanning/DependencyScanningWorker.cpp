@@ -302,7 +302,7 @@ public:
     // Restore the value of DisableFree, which may be modified by Tooling.
     OriginalInvocation.getFrontendOpts().DisableFree = DisableFree;
     if (any(OptimizeArgs & ScanningOptimizations::Macros))
-      canonicalizeDefines(OriginalInvocation.getPreprocessorOpts());
+      canonicalizeDefines(OriginalInvocation.getMutPreprocessorOpts());
 
     if (Scanned) {
       // Scanning runs once for the first -cc1 invocation in a chain of driver
@@ -330,8 +330,8 @@ public:
     auto DiagConsumerFinisher =
         llvm::make_scope_exit([DiagConsumer]() { DiagConsumer->finish(); });
 
-    ScanInstance.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
-        true;
+    ScanInstance.getMutPreprocessorOpts()
+        .AllowPCHWithDifferentModulesCachePath = true;
 
     ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
     ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
@@ -354,7 +354,7 @@ public:
       if (!ModulesCachePath.empty())
         DepFS->setBypassedPathPrefix(ModulesCachePath);
 
-      ScanInstance.getPreprocessorOpts().DependencyDirectivesForFile =
+      ScanInstance.getMutPreprocessorOpts().DependencyDirectivesForFile =
           [LocalDepFS = DepFS](FileEntryRef File)
           -> std::optional<ArrayRef<dependency_directives_scan::Directive>> {
         if (llvm::ErrorOr<EntryRef> Entry =
@@ -426,7 +426,7 @@ public:
         true;
 
     // Avoid some checks and module map parsing when loading PCM files.
-    ScanInstance.getPreprocessorOpts().ModulesCheckRelocated = false;
+    ScanInstance.getMutPreprocessorOpts().ModulesCheckRelocated = false;
 
     std::unique_ptr<FrontendAction> Action;
 

@@ -23,7 +23,7 @@ namespace {
 
 TEST(FrontendOutputTests, TestOutputStream) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("").release());
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
@@ -47,7 +47,7 @@ TEST(FrontendOutputTests, TestOutputStream) {
 
 TEST(FrontendOutputTests, TestVerboseOutputStreamShared) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("invalid").release());
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
@@ -76,7 +76,7 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamOwned) {
   bool Success;
   {
     auto Invocation = std::make_shared<CompilerInvocation>();
-    Invocation->getPreprocessorOpts().addRemappedFile(
+    Invocation->getMutPreprocessorOpts().addRemappedFile(
         "test.cc", MemoryBuffer::getMemBuffer("invalid").release());
     Invocation->getFrontendOpts().Inputs.push_back(
         FrontendInputFile("test.cc", Language::CXX));

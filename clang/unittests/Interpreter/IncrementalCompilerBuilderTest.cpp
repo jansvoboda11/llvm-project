@@ -24,7 +24,7 @@ static void cleanupRemappedFileBuffers(CompilerInstance &CI) {
   for (const auto &RB : CI.getPreprocessorOpts().RemappedFileBuffers) {
     delete RB.second;
   }
-  CI.getPreprocessorOpts().clearRemappedFiles();
+  CI.getMutPreprocessorOpts().clearRemappedFiles();
 }
 
 TEST(IncrementalCompilerBuilder, SetCompilerArgs) {

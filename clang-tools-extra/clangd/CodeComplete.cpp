@@ -1406,7 +1406,7 @@ bool semaCodeComplete(std::unique_ptr<CodeCompleteConsumer> Consumer,
   auto Clang = prepareCompilerInstance(
       std::move(CI), !CompletingInPreamble ? &Input.Preamble.Preamble : nullptr,
       std::move(ContentsBuffer), std::move(VFS), IgnoreDiags);
-  Clang->getPreprocessorOpts().SingleFileParseMode = CompletingInPreamble;
+  Clang->getMutPreprocessorOpts().SingleFileParseMode = CompletingInPreamble;
   Clang->setCodeCompletionConsumer(Consumer.release());
 
   SyntaxOnlyAction Action;

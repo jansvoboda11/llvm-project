@@ -80,7 +80,7 @@ export int aa = 43;
     auto Buf = CIOpts.VFS->getBufferForFile("a.cppm");
     EXPECT_TRUE(Buf);
 
-    Invocation->getPreprocessorOpts().addRemappedFile("a.cppm", Buf->get());
+    Invocation->getMutPreprocessorOpts().addRemappedFile("a.cppm", Buf->get());
 
     Buf->release();
 

@@ -214,7 +214,7 @@ SymbolSlab indexStandardLibrary(llvm::StringRef HeaderSources,
   SymbolSlab Symbols;
   IgnoreDiagnostics IgnoreDiags;
   // CompilerInvocation is taken from elsewhere, and may map a dirty buffer.
-  CI->getPreprocessorOpts().clearRemappedFiles();
+  CI->getMutPreprocessorOpts().clearRemappedFiles();
   auto Clang = prepareCompilerInstance(
       std::move(CI), /*Preamble=*/nullptr,
       llvm::MemoryBuffer::getMemBuffer(HeaderSources, Input.getFile()),

@@ -150,7 +150,7 @@ bool FixItRecompile::BeginInvocation(CompilerInstance &CI) {
   CI.getDiagnosticClient().clear();
   CI.getDiagnostics().Reset();
 
-  PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = CI.getMutPreprocessorOpts();
   PPOpts.RemappedFiles.insert(PPOpts.RemappedFiles.end(),
                               RewrittenFiles.begin(), RewrittenFiles.end());
   PPOpts.RemappedFilesKeepOriginalName = false;

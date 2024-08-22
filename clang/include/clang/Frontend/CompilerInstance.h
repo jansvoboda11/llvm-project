@@ -330,8 +330,8 @@ public:
   LangOptions &getMutLangOpts() { return Invocation->getMutLangOpts(); }
   const LangOptions &getLangOpts() const { return Invocation->getLangOpts(); }
 
-  PreprocessorOptions &getPreprocessorOpts() {
-    return Invocation->getPreprocessorOpts();
+  PreprocessorOptions &getMutPreprocessorOpts() {
+    return Invocation->getMutPreprocessorOpts();
   }
   const PreprocessorOptions &getPreprocessorOpts() const {
     return Invocation->getPreprocessorOpts();

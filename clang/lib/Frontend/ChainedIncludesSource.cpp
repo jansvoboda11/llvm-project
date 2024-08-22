@@ -90,7 +90,8 @@ createASTReader(CompilerInstance &CI, StringRef pchFile,
 IntrusiveRefCntPtr<ExternalSemaSource> clang::createChainedIncludesSource(
     CompilerInstance &CI, IntrusiveRefCntPtr<ExternalSemaSource> &Reader) {
 
-  std::vector<std::string> &includes = CI.getPreprocessorOpts().ChainedIncludes;
+  std::vector<std::string> &includes =
+      CI.getMutPreprocessorOpts().ChainedIncludes;
   assert(!includes.empty() && "No '-chain-include' in options!");
 
   std::vector<std::unique_ptr<CompilerInstance>> CIs;
@@ -104,13 +105,13 @@ IntrusiveRefCntPtr<ExternalSemaSource> clang::createChainedIncludesSource(
     std::unique_ptr<CompilerInvocation> CInvok;
     CInvok.reset(new CompilerInvocation(CI.getInvocation()));
 
-    CInvok->getPreprocessorOpts().ChainedIncludes.clear();
-    CInvok->getPreprocessorOpts().ImplicitPCHInclude.clear();
-    CInvok->getPreprocessorOpts().DisablePCHOrModuleValidation =
+    CInvok->getMutPreprocessorOpts().ChainedIncludes.clear();
+    CInvok->getMutPreprocessorOpts().ImplicitPCHInclude.clear();
+    CInvok->getMutPreprocessorOpts().DisablePCHOrModuleValidation =
         DisableValidationForModuleKind::PCH;
-    CInvok->getPreprocessorOpts().Includes.clear();
-    CInvok->getPreprocessorOpts().MacroIncludes.clear();
-    CInvok->getPreprocessorOpts().Macros.clear();
+    CInvok->getMutPreprocessorOpts().Includes.clear();
+    CInvok->getMutPreprocessorOpts().MacroIncludes.clear();
+    CInvok->getMutPreprocessorOpts().Macros.clear();
 
     CInvok->getFrontendOpts().Inputs.clear();
     FrontendInputFile InputFile(includes[i], IK);

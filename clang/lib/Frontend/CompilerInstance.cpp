@@ -452,7 +452,7 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   HeaderSearch *HeaderInfo =
       new HeaderSearch(getHeaderSearchOpts(), getSourceManager(),
                        getDiagnostics(), getLangOpts(), &getTarget());
-  PP = std::make_shared<Preprocessor>(Invocation->getPreprocessorOpts(),
+  PP = std::make_shared<Preprocessor>(Invocation->getMutPreprocessorOpts(),
                                       getDiagnostics(), getLangOpts(),
                                       getSourceManager(), *HeaderInfo, *this,
                                       /*IdentifierInfoLookup=*/nullptr,
@@ -1183,7 +1183,7 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
   auto Invocation =
       std::make_shared<CompilerInvocation>(ImportingInstance.getInvocation());
 
-  PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = Invocation->getMutPreprocessorOpts();
 
   // For any options that aren't intended to affect how a module is built,
   // reset them to their default values.

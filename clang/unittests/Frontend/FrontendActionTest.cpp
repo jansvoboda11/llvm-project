@@ -81,7 +81,7 @@ private:
 
 TEST(ASTFrontendAction, Sanity) {
   auto invocation = std::make_shared<CompilerInvocation>();
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
   invocation->getFrontendOpts().Inputs.push_back(
@@ -101,7 +101,7 @@ TEST(ASTFrontendAction, Sanity) {
 
 TEST(ASTFrontendAction, IncrementalParsing) {
   auto invocation = std::make_shared<CompilerInvocation>();
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
   invocation->getFrontendOpts().Inputs.push_back(
@@ -123,7 +123,7 @@ TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
   auto invocation = std::make_shared<CompilerInvocation>();
   invocation->getMutLangOpts().CPlusPlus = true;
   invocation->getMutLangOpts().DelayedTemplateParsing = true;
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutPreprocessorOpts().addRemappedFile(
     "test.cc", MemoryBuffer::getMemBuffer(
       "template<typename T> struct A { A(T); T data; };\n"
       "template<typename T> struct B: public A<T> {\n"
@@ -174,7 +174,7 @@ public:
 
 TEST(PreprocessorFrontendAction, EndSourceFile) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
   Invocation->getFrontendOpts().Inputs.push_back(
@@ -234,7 +234,7 @@ struct TypoDiagnosticConsumer : public DiagnosticConsumer {
 TEST(ASTFrontendAction, ExternalSemaSource) {
   auto Invocation = std::make_shared<CompilerInvocation>();
   Invocation->getMutLangOpts().CPlusPlus = true;
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("void fooo();\n"
                                             "int main() { foo(); }")
                      .release());
@@ -267,7 +267,7 @@ TEST(GeneratePCHFrontendAction, CacheGeneratedPCH) {
   for (bool ShouldCache : {false, true}) {
     auto Invocation = std::make_shared<CompilerInvocation>();
     Invocation->getMutLangOpts().CacheGeneratedPCH = ShouldCache;
-    Invocation->getPreprocessorOpts().addRemappedFile(
+    Invocation->getMutPreprocessorOpts().addRemappedFile(
         "test.h",
         MemoryBuffer::getMemBuffer("int foo(void) { return 1; }\n").release());
     Invocation->getFrontendOpts().Inputs.push_back(

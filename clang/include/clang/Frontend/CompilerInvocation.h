@@ -250,7 +250,7 @@ public:
   TargetOptions &getMutTargetOpts() { return *TargetOpts; }
   DiagnosticOptions &getMutDiagnosticOpts() { return *DiagnosticOpts; }
   HeaderSearchOptions &getMutHeaderSearchOpts() { return *HSOpts; }
-  PreprocessorOptions &getPreprocessorOpts() { return *PPOpts; }
+  PreprocessorOptions &getMutPreprocessorOpts() { return *PPOpts; }
   AnalyzerOptions &getAnalyzerOpts() { return *AnalyzerOpts; }
   MigratorOptions &getMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }

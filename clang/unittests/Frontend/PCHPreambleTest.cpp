@@ -89,9 +89,9 @@ public:
 
     CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
-    CI->getPreprocessorOpts().RemappedFileBuffers = GetRemappedFiles();
+    CI->getMutPreprocessorOpts().RemappedFileBuffers = GetRemappedFiles();
 
-    PreprocessorOptions &PPOpts = CI->getPreprocessorOpts();
+    PreprocessorOptions &PPOpts = CI->getMutPreprocessorOpts();
     PPOpts.RemappedFilesKeepOriginalName = true;
 
     IntrusiveRefCntPtr<DiagnosticsEngine>

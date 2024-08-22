@@ -61,14 +61,14 @@ void disableUnsupportedOptions(CompilerInvocation &CI) {
   // Disable any pch generation/usage operations. Since serialized preamble
   // format is unstable, using an incompatible one might result in unexpected
   // behaviours, including crashes.
-  CI.getPreprocessorOpts().ImplicitPCHInclude.clear();
-  CI.getPreprocessorOpts().PrecompiledPreambleBytes = {0, false};
-  CI.getPreprocessorOpts().PCHThroughHeader.clear();
-  CI.getPreprocessorOpts().PCHWithHdrStop = false;
-  CI.getPreprocessorOpts().PCHWithHdrStopCreate = false;
+  CI.getMutPreprocessorOpts().ImplicitPCHInclude.clear();
+  CI.getMutPreprocessorOpts().PrecompiledPreambleBytes = {0, false};
+  CI.getMutPreprocessorOpts().PCHThroughHeader.clear();
+  CI.getMutPreprocessorOpts().PCHWithHdrStop = false;
+  CI.getMutPreprocessorOpts().PCHWithHdrStopCreate = false;
   // Don't crash on `#pragma clang __debug parser_crash`
   if (!AllowCrashPragmasForTest)
-    CI.getPreprocessorOpts().DisablePragmaDebugCrash = true;
+    CI.getMutPreprocessorOpts().DisablePragmaDebugCrash = true;
 
   // Always default to raw container format as clangd doesn't registry any other
   // and clang dies when faced with unknown formats.
@@ -141,7 +141,7 @@ prepareCompilerInstance(std::unique_ptr<clang::CompilerInvocation> CI,
   if (Preamble) {
     Preamble->OverridePreamble(*CI, VFS, Buffer.get());
   } else {
-    CI->getPreprocessorOpts().addRemappedFile(
+    CI->getMutPreprocessorOpts().addRemappedFile(
         CI->getFrontendOpts().Inputs[0].getFile(), Buffer.get());
   }
 

@@ -130,7 +130,7 @@ public:
     auto CI = createInvocation(Args, std::move(CIOpts));
     assert(CI);
     CI->getFrontendOpts().DisableFree = false;
-    CI->getPreprocessorOpts().addRemappedFile(
+    CI->getMutPreprocessorOpts().addRemappedFile(
         FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
     CompilerInstance Compiler;
     Compiler.setInvocation(std::move(CI));

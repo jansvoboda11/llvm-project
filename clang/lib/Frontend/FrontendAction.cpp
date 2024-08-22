@@ -634,7 +634,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // Options relating to how we treat the input (but not what we do with it)
     // are inherited from the AST unit.
     CI.getMutHeaderSearchOpts() = AST->getHeaderSearchOpts();
-    CI.getPreprocessorOpts() = AST->getPreprocessorOpts();
+    CI.getMutPreprocessorOpts() = AST->getPreprocessorOpts();
     CI.getMutLangOpts() = AST->getLangOpts();
 
     // Set the shared objects, these are reset when we finish processing the
@@ -783,8 +783,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // a single file, search for a suitable PCH file in that directory.
   if (!CI.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
     FileManager &FileMgr = CI.getFileManager();
-    PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
-    StringRef PCHInclude = PPOpts.ImplicitPCHInclude;
+    StringRef PCHInclude = CI.getPreprocessorOpts().ImplicitPCHInclude;
     std::string SpecificModuleCachePath = CI.getSpecificModuleCachePath();
     if (auto PCHDir = FileMgr.getOptionalDirectoryRef(PCHInclude)) {
       std::error_code EC;
@@ -801,7 +800,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
                 CI.getPCHContainerReader(), CI.getLangOpts(),
                 CI.getTargetOpts(), CI.getPreprocessorOpts(),
                 SpecificModuleCachePath, /*RequireStrictOptionMatches=*/true)) {
-          PPOpts.ImplicitPCHInclude = std::string(Dir->path());
+          CI.getMutPreprocessorOpts().ImplicitPCHInclude =
+              std::string(Dir->path());
           Found = true;
           break;
         }

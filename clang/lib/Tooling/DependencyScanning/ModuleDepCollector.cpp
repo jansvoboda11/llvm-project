@@ -212,7 +212,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // Remove any macro definitions that are explicitly ignored.
   if (!CI.getHeaderSearchOpts().ModulesIgnoreMacros.empty()) {
     llvm::erase_if(
-        CI.getPreprocessorOpts().Macros,
+        CI.getMutPreprocessorOpts().Macros,
         [&CI](const std::pair<std::string, bool> &Def) {
           StringRef MacroDef = Def.first;
           return CI.getHeaderSearchOpts().ModulesIgnoreMacros.contains(

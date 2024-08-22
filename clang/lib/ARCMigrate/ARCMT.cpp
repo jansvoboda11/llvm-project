@@ -173,7 +173,7 @@ createInvocationForMigration(CompilerInvocation &origCI,
                              const PCHContainerReader &PCHContainerRdr) {
   std::unique_ptr<CompilerInvocation> CInvok;
   CInvok.reset(new CompilerInvocation(origCI));
-  PreprocessorOptions &PPOpts = CInvok->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = CInvok->getMutPreprocessorOpts();
   if (!PPOpts.ImplicitPCHInclude.empty()) {
     // We can't use a PCH because it was likely built in non-ARC mode and we
     // want to parse in ARC. Include the original header.
@@ -190,7 +190,7 @@ createInvocationForMigration(CompilerInvocation &origCI,
   }
   std::string define = std::string(getARCMTMacroName());
   define += '=';
-  CInvok->getPreprocessorOpts().addMacroDef(define);
+  CInvok->getMutPreprocessorOpts().addMacroDef(define);
   CInvok->getMutLangOpts().ObjCAutoRefCount = true;
   CInvok->getMutLangOpts().setGC(LangOptions::NonGC);
   CInvok->getMutDiagnosticOpts().ErrorLimit = 0;
@@ -523,7 +523,7 @@ bool MigrationProcess::applyTransform(TransformFn trans,
       createInvocationForMigration(OrigCI, PCHContainerOps->getRawReader()));
   CInvok->getMutDiagnosticOpts().IgnoreWarnings = true;
 
-  Remapper.applyMappings(CInvok->getPreprocessorOpts());
+  Remapper.applyMappings(CInvok->getMutPreprocessorOpts());
 
   CapturedDiagList capturedDiags;
   std::vector<SourceLocation> ARCMTMacroLocs;

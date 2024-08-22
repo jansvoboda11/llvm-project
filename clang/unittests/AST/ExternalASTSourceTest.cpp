@@ -49,7 +49,7 @@ bool testExternalASTSource(ExternalASTSource *Source,
   Compiler.createDiagnostics();
 
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer(FileContents).release());
   const char *Args[] = { "test.cc" };
   CompilerInvocation::CreateFromArgs(*Invocation, Args,

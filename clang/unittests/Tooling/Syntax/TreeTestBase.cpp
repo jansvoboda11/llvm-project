@@ -146,7 +146,7 @@ SyntaxTreeTest::buildTree(StringRef Code, const TestClangConfig &ClangConfig) {
   Invocation = createInvocation(ArgsCStr, std::move(CIOpts));
   assert(Invocation);
   Invocation->getFrontendOpts().DisableFree = false;
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
   CompilerInstance Compiler;
   Compiler.setInvocation(Invocation);

@@ -88,7 +88,7 @@ ExpandModularHeadersPPCallbacks::ExpandModularHeadersPPCallbacks(
   HeaderInfo = std::make_unique<HeaderSearch>(HSOpts, Sources, Diags, LangOpts,
                                               &Compiler.getTarget());
 
-  PP = std::make_unique<clang::Preprocessor>(Compiler.getPreprocessorOpts(),
+  PP = std::make_unique<clang::Preprocessor>(Compiler.getMutPreprocessorOpts(),
                                              Diags, LangOpts, Sources,
                                              *HeaderInfo, ModuleLoader,
                                              /*IILookup=*/nullptr,

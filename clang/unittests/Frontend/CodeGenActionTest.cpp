@@ -43,7 +43,7 @@ public:
 
 TEST(CodeGenTest, TestNullCodeGen) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("").release());
   Invocation->getFrontendOpts().Inputs.push_back(
