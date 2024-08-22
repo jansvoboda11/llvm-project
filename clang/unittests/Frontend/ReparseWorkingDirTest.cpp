@@ -55,7 +55,7 @@ public:
                                       /*IgnoreSysRoot*/ false);
 
     CI->getFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
-    CI->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
         CompilerInstance::createDiagnostics(new DiagnosticOptions,

@@ -201,12 +201,12 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
   // Needed for testing dynamic_cast.
   Inv->getMutLangOpts().RTTI = true;
   Inv->getCodeGenOpts().setDebugInfo(llvm::codegenoptions::FullDebugInfo);
-  Inv->getTargetOpts().Triple = llvm::sys::getDefaultTargetTriple();
+  Inv->getMutTargetOpts().Triple = llvm::sys::getDefaultTargetTriple();
 
   Ins->setInvocation(std::move(Inv));
 
   TargetInfo *TI = TargetInfo::CreateTargetInfo(
-      Ins->getDiagnostics(), &Ins->getInvocation().getTargetOpts());
+      Ins->getDiagnostics(), &Ins->getInvocation().getMutTargetOpts());
   Ins->setTarget(TI);
   Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getMutLangOpts());
   Ins->createFileManager();

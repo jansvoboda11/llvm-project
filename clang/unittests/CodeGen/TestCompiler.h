@@ -42,7 +42,7 @@ struct TestCompiler {
     Tr.setOS(Triple::Linux);
     Tr.setVendor(Triple::VendorType::UnknownVendor);
     Tr.setEnvironment(Triple::EnvironmentType::UnknownEnvironment);
-    compiler.getTargetOpts().Triple = Tr.getTriple();
+    compiler.getMutTargetOpts().Triple = Tr.getTriple();
     compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
         compiler.getDiagnostics(),
         clang::TargetOptions(compiler.getTargetOpts())));

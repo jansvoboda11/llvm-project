@@ -344,8 +344,8 @@ public:
     return Invocation->getPreprocessorOutputOpts();
   }
 
-  TargetOptions &getTargetOpts() {
-    return Invocation->getTargetOpts();
+  TargetOptions &getMutTargetOpts() {
+    return Invocation->getMutTargetOpts();
   }
   const TargetOptions &getTargetOpts() const {
     return Invocation->getTargetOpts();

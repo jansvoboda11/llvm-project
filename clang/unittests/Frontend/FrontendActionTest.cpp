@@ -87,7 +87,7 @@ TEST(ASTFrontendAction, Sanity) {
   invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
   compiler.createDiagnostics();
@@ -107,7 +107,7 @@ TEST(ASTFrontendAction, IncrementalParsing) {
   invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
   compiler.createDiagnostics();
@@ -134,7 +134,7 @@ TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
   invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler;
   compiler.setInvocation(std::move(invocation));
   compiler.createDiagnostics();
@@ -180,7 +180,7 @@ TEST(PreprocessorFrontendAction, EndSourceFile) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
   Compiler.createDiagnostics();
@@ -241,7 +241,7 @@ TEST(ASTFrontendAction, ExternalSemaSource) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
   auto *TDC = new TypoDiagnosticConsumer;
@@ -274,7 +274,7 @@ TEST(GeneratePCHFrontendAction, CacheGeneratedPCH) {
         FrontendInputFile("test.h", Language::C));
     Invocation->getFrontendOpts().OutputFile = PCHFilename.str().str();
     Invocation->getFrontendOpts().ProgramAction = frontend::GeneratePCH;
-    Invocation->getTargetOpts().Triple = "x86_64-apple-darwin19.0.0";
+    Invocation->getMutTargetOpts().Triple = "x86_64-apple-darwin19.0.0";
     CompilerInstance Compiler;
     Compiler.setInvocation(std::move(Invocation));
     Compiler.createDiagnostics();

@@ -49,7 +49,7 @@ TEST(CodeGenTest, TestNullCodeGen) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = EmitLLVM;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
   Compiler.createDiagnostics();
@@ -67,7 +67,7 @@ TEST(CodeGenTest, CodeGenFromIRMemBuffer) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile(*MemBuffer, Language::LLVM_IR));
   Invocation->getFrontendOpts().ProgramAction = frontend::EmitLLVMOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
   Compiler.setInvocation(std::move(Invocation));
   Compiler.createDiagnostics();
@@ -94,7 +94,7 @@ TEST(CodeGenTest, DebugInfoCWDCodeGen) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cpp", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = EmitLLVM;
-  Invocation->getTargetOpts().Triple = "x86_64-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "x86_64-unknown-linux-gnu";
   Invocation->getCodeGenOpts().setDebugInfo(codegenoptions::FullDebugInfo);
   CompilerInstance Compiler;
 

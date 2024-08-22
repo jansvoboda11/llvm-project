@@ -107,7 +107,7 @@ void CompilerInstance::setAuxTarget(TargetInfo *Value) { AuxTarget = Value; }
 bool CompilerInstance::createTarget() {
   // Create the target instance.
   setTarget(TargetInfo::CreateTargetInfo(getDiagnostics(),
-                                         &getInvocation().getTargetOpts()));
+                                         &getInvocation().getMutTargetOpts()));
   if (!hasTarget())
     return false;
 

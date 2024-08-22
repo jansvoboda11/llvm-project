@@ -935,7 +935,7 @@ void PreamblePatch::apply(CompilerInvocation &CI) const {
   // ParsedASTTest.PreambleWithDifferentTarget.
   // Make sure this is a deep copy, as the same Baseline might be used
   // concurrently.
-  CI.getTargetOpts() = *Baseline->TargetOpts;
+  CI.getMutTargetOpts() = *Baseline->TargetOpts;
 
   // No need to map an empty file.
   if (PatchContents.empty())

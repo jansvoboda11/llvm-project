@@ -87,7 +87,7 @@ public:
       FrontendInputFile(EntryFile, FrontendOptions::getInputKindForExtension(
         llvm::sys::path::extension(EntryFile).substr(1))));
 
-    CI->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
     CI->getPreprocessorOpts().RemappedFileBuffers = GetRemappedFiles();
 

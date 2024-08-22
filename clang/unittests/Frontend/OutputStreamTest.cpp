@@ -28,7 +28,7 @@ TEST(FrontendOutputTests, TestOutputStream) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = EmitBC;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
 
   SmallVector<char, 256> IRBuffer;
@@ -52,7 +52,7 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamShared) {
   Invocation->getFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getFrontendOpts().ProgramAction = EmitBC;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler;
 
   std::string VerboseBuffer;
@@ -81,7 +81,7 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamOwned) {
     Invocation->getFrontendOpts().Inputs.push_back(
         FrontendInputFile("test.cc", Language::CXX));
     Invocation->getFrontendOpts().ProgramAction = EmitBC;
-    Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
     CompilerInstance Compiler;
 
     std::unique_ptr<raw_ostream> VerboseStream =

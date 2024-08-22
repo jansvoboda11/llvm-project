@@ -573,7 +573,7 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
 
   LangOptions &LangOpts = Invocation.getMutLangOpts();
   CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
-  TargetOptions &TargetOpts = Invocation.getTargetOpts();
+  TargetOptions &TargetOpts = Invocation.getMutTargetOpts();
   FrontendOptions &FrontendOpts = Invocation.getFrontendOpts();
   CodeGenOpts.XRayInstrumentFunctions = LangOpts.XRayInstrument;
   CodeGenOpts.XRayAlwaysEmitCustomEvents = LangOpts.XRayAlwaysEmitCustomEvents;
@@ -4837,7 +4837,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   ParseFrontendArgs(Res.getFrontendOpts(), Args, Diags, LangOpts.IsHeaderFile);
   // FIXME: We shouldn't have to pass the DashX option around here
   InputKind DashX = Res.getFrontendOpts().DashX;
-  ParseTargetArgs(Res.getTargetOpts(), Args, Diags);
+  ParseTargetArgs(Res.getMutTargetOpts(), Args, Diags);
   llvm::Triple T(Res.getTargetOpts().Triple);
   ParseHeaderSearchArgs(Res.getHeaderSearchOpts(), Args, Diags,
                         Res.getFileSystemOpts().WorkingDir);
@@ -4861,12 +4861,12 @@ bool CompilerInvocation::CreateFromArgsImpl(
     // During CUDA device-side compilation, the aux triple is the
     // triple used for host compilation.
     if (LangOpts.CUDAIsDevice)
-      Res.getTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
+      Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
   }
 
   // Set the triple of the host for OpenMP device compile.
   if (LangOpts.OpenMPIsTargetDevice)
-    Res.getTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
+    Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
 
   ParseCodeGenArgs(Res.getCodeGenOpts(), Args, DashX, Diags, T,
                    Res.getFrontendOpts().OutputFile, LangOpts);

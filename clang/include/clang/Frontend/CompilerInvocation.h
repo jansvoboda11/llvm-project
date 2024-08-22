@@ -247,7 +247,7 @@ public:
   /// Mutable getters.
   /// @{
   LangOptions &getMutLangOpts() { return *LangOpts; }
-  TargetOptions &getTargetOpts() { return *TargetOpts; }
+  TargetOptions &getMutTargetOpts() { return *TargetOpts; }
   DiagnosticOptions &getDiagnosticOpts() { return *DiagnosticOpts; }
   HeaderSearchOptions &getHeaderSearchOpts() { return *HSOpts; }
   PreprocessorOptions &getPreprocessorOpts() { return *PPOpts; }
