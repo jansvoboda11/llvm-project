@@ -136,8 +136,8 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnit) {
   HeaderSearchOptions HSOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(std::make_shared<PreprocessorOptions>(), Diags, LangOpts,
-                  SourceMgr, HeaderInfo, ModLoader,
+  PreprocessorOptions PPOpts;
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
                   /*IILookup =*/nullptr,
                   /*OwnsHeaderSearch =*/false);
   PP.Initialize(*Target);
@@ -186,8 +186,8 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnitWithTokenSplit) {
   HeaderSearchOptions HSOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(std::make_shared<PreprocessorOptions>(), Diags, LangOpts,
-                  SourceMgr, HeaderInfo, ModLoader,
+  PreprocessorOptions PPOpts;
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
                   /*IILookup =*/nullptr,
                   /*OwnsHeaderSearch =*/false);
   PP.Initialize(*Target);
@@ -480,8 +480,8 @@ TEST_F(SourceManagerTest, getMacroArgExpandedLocation) {
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
 
-  Preprocessor PP(std::make_shared<PreprocessorOptions>(), Diags, LangOpts,
-                  SourceMgr, HeaderInfo, ModLoader,
+  PreprocessorOptions PPOpts;
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
                   /*IILookup =*/nullptr,
                   /*OwnsHeaderSearch =*/false);
   // Ensure we can get expanded locations in presence of implicit includes.
@@ -598,8 +598,8 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnitWithMacroInInclude) {
   HeaderSearchOptions HSOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(std::make_shared<PreprocessorOptions>(), Diags, LangOpts,
-                  SourceMgr, HeaderInfo, ModLoader,
+  PreprocessorOptions PPOpts;
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
                   /*IILookup =*/nullptr,
                   /*OwnsHeaderSearch =*/false);
   PP.Initialize(*Target);

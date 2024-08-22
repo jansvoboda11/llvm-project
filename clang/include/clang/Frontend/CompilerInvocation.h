@@ -265,13 +265,6 @@ public:
   }
   /// @}
 
-  /// Base class internals.
-  /// @{
-  std::shared_ptr<PreprocessorOptions> getPreprocessorOptsPtr() {
-    return PPOpts;
-  }
-  /// @}
-
   /// Create a compiler invocation from a list of input options.
   /// \returns true on success.
   ///
