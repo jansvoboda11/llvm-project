@@ -4841,7 +4841,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   llvm::Triple T(Res.getTargetOpts().Triple);
   ParseHeaderSearchArgs(Res.getMutHeaderSearchOpts(), Args, Diags,
                         Res.getFileSystemOpts().WorkingDir);
-  ParseAPINotesArgs(Res.getAPINotesOpts(), Args, Diags);
+  ParseAPINotesArgs(Res.getMutAPINotesOpts(), Args, Diags);
 
   ParsePointerAuthArgs(LangOpts, Args, Diags);
 

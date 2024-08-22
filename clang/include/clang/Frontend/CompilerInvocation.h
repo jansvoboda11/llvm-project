@@ -253,7 +253,7 @@ public:
   PreprocessorOptions &getMutPreprocessorOpts() { return *PPOpts; }
   AnalyzerOptions &getMutAnalyzerOpts() { return *AnalyzerOpts; }
   MigratorOptions &getMutMigratorOpts() { return *MigratorOpts; }
-  APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }
+  APINotesOptions &getMutAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }
   FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
   FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
