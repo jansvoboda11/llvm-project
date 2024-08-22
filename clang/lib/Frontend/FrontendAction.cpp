@@ -695,7 +695,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromASTFile(
         std::string(InputFile), CI.getPCHContainerReader(),
         ASTUnit::LoadEverything, Diags, CI.getFileSystemOpts(),
-        CI.getHeaderSearchOptsPtr(), CI.getLangOptsPtr());
+        CI.getHeaderSearchOptsPtr(), &CI.getLangOpts());
 
     if (!AST)
       return false;

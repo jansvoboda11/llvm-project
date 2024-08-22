@@ -697,7 +697,7 @@ public:
                   IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
                   const FileSystemOptions &FileSystemOpts,
                   std::shared_ptr<HeaderSearchOptions> HSOpts,
-                  std::shared_ptr<LangOptions> LangOpts = nullptr,
+                  LangOptions *LangOpts = nullptr,
                   bool OnlyLocalDecls = false,
                   CaptureDiagsKind CaptureDiagnostics = CaptureDiagsKind::None,
                   bool AllowASTWithCompilerErrors = false,
