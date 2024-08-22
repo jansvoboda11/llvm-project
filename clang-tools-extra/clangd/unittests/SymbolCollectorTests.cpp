@@ -253,7 +253,7 @@ public:
 
       bool BeginInvocation(CompilerInstance &CI) override {
         // Make the compiler parse all comments.
-        CI.getLangOpts().CommentOpts.ParseAllComments = true;
+        CI.getMutLangOpts().CommentOpts.ParseAllComments = true;
         return true;
       }
 

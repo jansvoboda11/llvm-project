@@ -327,7 +327,7 @@ public:
     return Invocation->getAPINotesOpts();
   }
 
-  LangOptions &getLangOpts() { return Invocation->getLangOpts(); }
+  LangOptions &getMutLangOpts() { return Invocation->getMutLangOpts(); }
   const LangOptions &getLangOpts() const { return Invocation->getLangOpts(); }
 
   PreprocessorOptions &getPreprocessorOpts() {

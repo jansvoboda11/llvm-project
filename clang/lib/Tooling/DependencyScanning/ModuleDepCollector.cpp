@@ -207,7 +207,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   CI.getFrontendOpts().ARCMTAction = FrontendOptions::ARCMT_None;
   CI.getFrontendOpts().ObjCMTAction = FrontendOptions::ObjCMT_None;
   CI.getFrontendOpts().MTMigrateDir.clear();
-  CI.getLangOpts().ModuleName.clear();
+  CI.getMutLangOpts().ModuleName.clear();
 
   // Remove any macro definitions that are explicitly ignored.
   if (!CI.getHeaderSearchOpts().ModulesIgnoreMacros.empty()) {

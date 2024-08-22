@@ -180,7 +180,7 @@ bool GeneratePCHAction::shouldEraseOutputFiles() {
 }
 
 bool GeneratePCHAction::BeginSourceFileAction(CompilerInstance &CI) {
-  CI.getLangOpts().CompilingPCH = true;
+  CI.getMutLangOpts().CompilingPCH = true;
   return true;
 }
 
@@ -264,7 +264,7 @@ GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
 
 bool GenerateModuleInterfaceAction::BeginSourceFileAction(
     CompilerInstance &CI) {
-  CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+  CI.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
   CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
   CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
 
@@ -309,7 +309,7 @@ bool GenerateHeaderUnitAction::BeginSourceFileAction(CompilerInstance &CI) {
     CI.getDiagnostics().Report(diag::err_module_interface_requires_cpp_modules);
     return false;
   }
-  CI.getLangOpts().setCompilingModule(LangOptions::CMK_HeaderUnit);
+  CI.getMutLangOpts().setCompilingModule(LangOptions::CMK_HeaderUnit);
   return GenerateModuleAction::BeginSourceFileAction(CI);
 }
 

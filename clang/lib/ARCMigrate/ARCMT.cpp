@@ -191,8 +191,8 @@ createInvocationForMigration(CompilerInvocation &origCI,
   std::string define = std::string(getARCMTMacroName());
   define += '=';
   CInvok->getPreprocessorOpts().addMacroDef(define);
-  CInvok->getLangOpts().ObjCAutoRefCount = true;
-  CInvok->getLangOpts().setGC(LangOptions::NonGC);
+  CInvok->getMutLangOpts().ObjCAutoRefCount = true;
+  CInvok->getMutLangOpts().setGC(LangOptions::NonGC);
   CInvok->getDiagnosticOpts().ErrorLimit = 0;
   CInvok->getDiagnosticOpts().PedanticErrors = 0;
 
@@ -207,8 +207,8 @@ createInvocationForMigration(CompilerInvocation &origCI,
   WarnOpts.push_back("error=arc-unsafe-retained-assign");
   CInvok->getDiagnosticOpts().Warnings = std::move(WarnOpts);
 
-  CInvok->getLangOpts().ObjCWeakRuntime = HasARCRuntime(origCI);
-  CInvok->getLangOpts().ObjCWeak = CInvok->getLangOpts().ObjCWeakRuntime;
+  CInvok->getMutLangOpts().ObjCWeakRuntime = HasARCRuntime(origCI);
+  CInvok->getMutLangOpts().ObjCWeak = CInvok->getLangOpts().ObjCWeakRuntime;
 
   return CInvok.release();
 }
@@ -372,7 +372,7 @@ applyTransforms(CompilerInvocation &origCI, const FrontendInputFile &Input,
                             DiagClient, /*ShouldOwnClient=*/false));
 
   if (outputDir.empty()) {
-    origCI.getLangOpts().ObjCAutoRefCount = true;
+    origCI.getMutLangOpts().ObjCAutoRefCount = true;
     return migration.getRemapper().overwriteOriginal(*Diags);
   } else {
     return migration.getRemapper().flushToDisk(outputDir, *Diags);

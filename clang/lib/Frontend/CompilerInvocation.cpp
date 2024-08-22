@@ -571,7 +571,7 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
                             InputKind IK) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
-  LangOptions &LangOpts = Invocation.getLangOpts();
+  LangOptions &LangOpts = Invocation.getMutLangOpts();
   CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
   TargetOptions &TargetOpts = Invocation.getTargetOpts();
   FrontendOptions &FrontendOpts = Invocation.getFrontendOpts();
@@ -4811,7 +4811,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList Args = Opts.ParseArgs(CommandLineArgs, MissingArgIndex,
                                      MissingArgCount, VisibilityMask);
-  LangOptions &LangOpts = Res.getLangOpts();
+  LangOptions &LangOpts = Res.getMutLangOpts();
 
   // Check for missing argument error.
   if (MissingArgCount)
@@ -5094,13 +5094,13 @@ std::vector<std::string> CompilerInvocationBase::getCC1CommandLine() const {
 }
 
 void CompilerInvocation::resetNonModularOptions() {
-  getLangOpts().resetNonModularOptions();
+  getMutLangOpts().resetNonModularOptions();
   getPreprocessorOpts().resetNonModularOptions();
   getCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
 }
 
 void CompilerInvocation::clearImplicitModuleBuildOptions() {
-  getLangOpts().ImplicitModules = false;
+  getMutLangOpts().ImplicitModules = false;
   getHeaderSearchOpts().ImplicitModuleMaps = false;
   getHeaderSearchOpts().ModuleCachePath.clear();
   getHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;

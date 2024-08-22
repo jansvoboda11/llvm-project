@@ -178,28 +178,28 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
     ID Id = lookupTypeForTypeSpecifier(Input.c_str());
     assert(Id != TY_INVALID);
     if (isCXX(Id)) {
-      Inv->getLangOpts().CPlusPlus = true;
-      Inv->getLangOpts().CPlusPlus11 = true;
+      Inv->getMutLangOpts().CPlusPlus = true;
+      Inv->getMutLangOpts().CPlusPlus11 = true;
       Inv->getHeaderSearchOpts().UseLibcxx = true;
     }
     if (isObjC(Id)) {
-      Inv->getLangOpts().ObjC = 1;
+      Inv->getMutLangOpts().ObjC = 1;
     }
   }
-  Inv->getLangOpts().ObjCAutoRefCount = ObjCARC;
+  Inv->getMutLangOpts().ObjCAutoRefCount = ObjCARC;
 
-  Inv->getLangOpts().Bool = true;
-  Inv->getLangOpts().WChar = true;
-  Inv->getLangOpts().Blocks = true;
-  Inv->getLangOpts().DebuggerSupport = true;
-  Inv->getLangOpts().SpellChecking = false;
-  Inv->getLangOpts().ThreadsafeStatics = false;
-  Inv->getLangOpts().AccessControl = false;
-  Inv->getLangOpts().DollarIdents = true;
-  Inv->getLangOpts().Exceptions = true;
-  Inv->getLangOpts().CXXExceptions = true;
+  Inv->getMutLangOpts().Bool = true;
+  Inv->getMutLangOpts().WChar = true;
+  Inv->getMutLangOpts().Blocks = true;
+  Inv->getMutLangOpts().DebuggerSupport = true;
+  Inv->getMutLangOpts().SpellChecking = false;
+  Inv->getMutLangOpts().ThreadsafeStatics = false;
+  Inv->getMutLangOpts().AccessControl = false;
+  Inv->getMutLangOpts().DollarIdents = true;
+  Inv->getMutLangOpts().Exceptions = true;
+  Inv->getMutLangOpts().CXXExceptions = true;
   // Needed for testing dynamic_cast.
-  Inv->getLangOpts().RTTI = true;
+  Inv->getMutLangOpts().RTTI = true;
   Inv->getCodeGenOpts().setDebugInfo(llvm::codegenoptions::FullDebugInfo);
   Inv->getTargetOpts().Triple = llvm::sys::getDefaultTargetTriple();
 
@@ -208,7 +208,7 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
   TargetInfo *TI = TargetInfo::CreateTargetInfo(
       Ins->getDiagnostics(), &Ins->getInvocation().getTargetOpts());
   Ins->setTarget(TI);
-  Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getLangOpts());
+  Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getMutLangOpts());
   Ins->createFileManager();
   Ins->createSourceManager(Ins->getFileManager());
   Ins->createPreprocessor(TU_Complete);
@@ -220,7 +220,7 @@ std::unique_ptr<ASTContext>
 BuildASTContext(CompilerInstance &CI, SelectorTable &ST, Builtin::Context &BC) {
   auto &PP = CI.getPreprocessor();
   auto AST = std::make_unique<ASTContext>(
-      CI.getLangOpts(), CI.getSourceManager(),
+      CI.getMutLangOpts(), CI.getSourceManager(),
       PP.getIdentifierTable(), ST, BC, PP.TUKind);
   AST->InitBuiltinTypes(CI.getTarget());
   return AST;

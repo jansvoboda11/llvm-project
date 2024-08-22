@@ -217,7 +217,7 @@ llvm::Error buildModuleFile(llvm::StringRef ModuleName,
 
   // In clang's driver, we will suppress the check for ODR violation in GMF.
   // See the implementation of RenderModulesOptions in Clang.cpp.
-  CI->getLangOpts().SkipODRCheckInGMF = true;
+  CI->getMutLangOpts().SkipODRCheckInGMF = true;
 
   // Hash the contents of input files and store the hash value to the BMI files.
   // So that we can check if the files are still valid when we want to reuse the
@@ -311,7 +311,7 @@ bool StandalonePrerequisiteModules::canReuse(
   // See
   // https://clang.llvm.org/docs/StandardCPlusPlusModules.html#object-definition-consistency
   // for example.
-  Clang.getLangOpts().SkipODRCheckInGMF = true;
+  Clang.getMutLangOpts().SkipODRCheckInGMF = true;
 
   Clang.createASTReader();
   for (auto &RequiredModule : RequiredModules) {

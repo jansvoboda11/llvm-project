@@ -494,7 +494,7 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   auto PreambleDepCollector = std::make_shared<PreambleDependencyCollector>();
   Clang->addDependencyCollector(PreambleDepCollector);
 
-  Clang->getLangOpts().CompilingPCH = true;
+  Clang->getMutLangOpts().CompilingPCH = true;
 
   // Remap the main source file to the preamble buffer.
   StringRef MainFilePath = FrontendOpts.Inputs[0].getFile();

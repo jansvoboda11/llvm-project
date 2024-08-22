@@ -133,8 +133,8 @@ private:
     // We only perform include-cleaner analysis. So we disable diagnostics that
     // won't affect our analysis to make the tool more robust against
     // in-development code.
-    CI.getLangOpts().ModulesDeclUse = false;
-    CI.getLangOpts().ModulesStrictDeclUse = false;
+    CI.getMutLangOpts().ModulesDeclUse = false;
+    CI.getMutLangOpts().ModulesStrictDeclUse = false;
     return true;
   }
 

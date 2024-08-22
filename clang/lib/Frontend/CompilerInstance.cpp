@@ -130,12 +130,12 @@ bool CompilerInstance::createTarget() {
   if (!getTarget().hasStrictFP() && !getLangOpts().ExpStrictFP) {
     if (getLangOpts().RoundingMath) {
       getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_rounding);
-      getLangOpts().RoundingMath = false;
+      getMutLangOpts().RoundingMath = false;
     }
     auto FPExc = getLangOpts().getFPExceptionMode();
     if (FPExc != LangOptions::FPE_Default && FPExc != LangOptions::FPE_Ignore) {
       getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_exceptions);
-      getLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
+      getMutLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
     }
     // FIXME: can we disable FEnvAccess?
   }
@@ -149,7 +149,7 @@ bool CompilerInstance::createTarget() {
   // Inform the target of the language options.
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  getTarget().adjust(getDiagnostics(), getLangOpts());
+  getTarget().adjust(getDiagnostics(), getMutLangOpts());
 
   if (auto *Aux = getAuxTarget())
     getTarget().setAuxTarget(Aux);
@@ -457,7 +457,7 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
                                       getSourceManager(), *HeaderInfo, *this,
                                       /*IdentifierInfoLookup=*/nullptr,
                                       /*OwnsHeaderSearch=*/true, TUKind);
-  getTarget().adjust(getDiagnostics(), getLangOpts());
+  getTarget().adjust(getDiagnostics(), getMutLangOpts());
   PP->Initialize(getTarget(), getAuxTarget());
 
   if (PPOpts.DetailedRecord)
@@ -549,7 +549,7 @@ std::string CompilerInstance::getSpecificModuleCachePath(StringRef ModuleHash) {
 
 void CompilerInstance::createASTContext() {
   Preprocessor &PP = getPreprocessor();
-  auto *Context = new ASTContext(getLangOpts(), PP.getSourceManager(),
+  auto *Context = new ASTContext(getMutLangOpts(), PP.getSourceManager(),
                                  PP.getIdentifierTable(), PP.getSelectorTable(),
                                  PP.getBuiltinInfo(), PP.TUKind);
   Context->InitBuiltinTypes(getTarget(), getAuxTarget());
@@ -1200,11 +1200,11 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
                  });
 
   // If the original compiler invocation had -fmodule-name, pass it through.
-  Invocation->getLangOpts().ModuleName =
+  Invocation->getMutLangOpts().ModuleName =
       ImportingInstance.getInvocation().getLangOpts().ModuleName;
 
   // Note the name of the module we're building.
-  Invocation->getLangOpts().CurrentModule = std::string(ModuleName);
+  Invocation->getMutLangOpts().CurrentModule = std::string(ModuleName);
 
   // If there is a module map file, build the module using the module map.
   // Set up the inputs/outputs so that we build the module from its umbrella

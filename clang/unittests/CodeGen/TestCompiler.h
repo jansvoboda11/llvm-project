@@ -33,7 +33,7 @@ struct TestCompiler {
 
   TestCompiler(clang::LangOptions LO,
                clang::CodeGenOptions CGO = clang::CodeGenOptions()) {
-    compiler.getLangOpts() = LO;
+    compiler.getMutLangOpts() = std::move(LO);
     compiler.getCodeGenOpts() = CGO;
     compiler.createDiagnostics();
 

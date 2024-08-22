@@ -544,7 +544,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   // (often very broken) source code, where spell-checking can have a
   // significant negative impact on performance (particularly when 
   // precompiled headers are involved), we disable it.
-  CInvok->getLangOpts().SpellChecking = false;
+  CInvok->getMutLangOpts().SpellChecking = false;
 
   if (index_options & CXIndexOpt_SuppressWarnings)
     CInvok->getDiagnosticOpts().IgnoreWarnings = true;

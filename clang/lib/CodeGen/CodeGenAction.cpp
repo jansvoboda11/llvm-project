@@ -971,7 +971,7 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
 
 bool CodeGenAction::BeginSourceFileAction(CompilerInstance &CI) {
   if (CI.getFrontendOpts().GenReducedBMI)
-    CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+    CI.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
   return true;
 }
 
