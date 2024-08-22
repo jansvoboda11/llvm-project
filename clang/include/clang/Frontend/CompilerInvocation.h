@@ -249,7 +249,7 @@ public:
   LangOptions &getMutLangOpts() { return *LangOpts; }
   TargetOptions &getMutTargetOpts() { return *TargetOpts; }
   DiagnosticOptions &getMutDiagnosticOpts() { return *DiagnosticOpts; }
-  HeaderSearchOptions &getHeaderSearchOpts() { return *HSOpts; }
+  HeaderSearchOptions &getMutHeaderSearchOpts() { return *HSOpts; }
   PreprocessorOptions &getPreprocessorOpts() { return *PPOpts; }
   AnalyzerOptions &getAnalyzerOpts() { return *AnalyzerOpts; }
   MigratorOptions &getMigratorOpts() { return *MigratorOpts; }

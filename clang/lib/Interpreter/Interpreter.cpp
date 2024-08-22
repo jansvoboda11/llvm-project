@@ -98,7 +98,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
       Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getHeaderSearchOpts().ResourceDir =
+    Clang->getMutHeaderSearchOpts().ResourceDir =
         CompilerInvocation::GetResourcesPath(Argv[0], nullptr);
 
   // Create the actual diagnostics engine.

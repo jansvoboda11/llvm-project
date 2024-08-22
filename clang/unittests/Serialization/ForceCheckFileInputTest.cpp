@@ -95,7 +95,7 @@ export int aa = 43;
       CIOpts.VFS = VFSWithRemapping;
     Instance.createFileManager(CIOpts.VFS);
 
-    Instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+    Instance.getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
@@ -127,8 +127,8 @@ export int aa = 43;
 
     EXPECT_TRUE(Clang.createTarget());
     Clang.createPreprocessor(TU_Complete);
-    Clang.getHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
-    Clang.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+    Clang.getMutHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
+    Clang.getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
     Clang.createASTReader();
 
     addFile("a.cppm", R"cpp(

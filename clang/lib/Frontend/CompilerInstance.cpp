@@ -1191,7 +1191,7 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
 
   // Remove any macro definitions that are explicitly ignored by the module.
   // They aren't supposed to affect how the module is built anyway.
-  HeaderSearchOptions &HSOpts = Invocation->getHeaderSearchOpts();
+  HeaderSearchOptions &HSOpts = Invocation->getMutHeaderSearchOpts();
   llvm::erase_if(PPOpts.Macros,
                  [&HSOpts](const std::pair<std::string, bool> &def) {
                    StringRef MacroDef = def.first;
@@ -1720,7 +1720,7 @@ void CompilerInstance::createASTReader() {
     pruneModuleCache(getHeaderSearchOpts());
   }
 
-  HeaderSearchOptions &HSOpts = getHeaderSearchOpts();
+  const HeaderSearchOptions &HSOpts = getHeaderSearchOpts();
   std::string Sysroot = HSOpts.Sysroot;
   const PreprocessorOptions &PPOpts = getPreprocessorOpts();
   const FrontendOptions &FEOpts = getFrontendOpts();

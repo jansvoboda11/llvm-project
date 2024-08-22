@@ -265,8 +265,8 @@ GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
 bool GenerateModuleInterfaceAction::BeginSourceFileAction(
     CompilerInstance &CI) {
   CI.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
-  CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
-  CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+  CI.getMutHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+  CI.getMutHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
 
   return GenerateModuleAction::BeginSourceFileAction(CI);
 }
@@ -819,7 +819,7 @@ namespace {
 bool DumpModuleInfoAction::BeginInvocation(CompilerInstance &CI) {
   // The Object file reader also supports raw ast files and there is no point in
   // being strict about the module file format in -module-file-info mode.
-  CI.getHeaderSearchOpts().ModuleFormat = "obj";
+  CI.getMutHeaderSearchOpts().ModuleFormat = "obj";
   return true;
 }
 

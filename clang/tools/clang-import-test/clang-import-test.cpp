@@ -180,7 +180,7 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
     if (isCXX(Id)) {
       Inv->getMutLangOpts().CPlusPlus = true;
       Inv->getMutLangOpts().CPlusPlus11 = true;
-      Inv->getHeaderSearchOpts().UseLibcxx = true;
+      Inv->getMutHeaderSearchOpts().UseLibcxx = true;
     }
     if (isObjC(Id)) {
       Inv->getMutLangOpts().ObjC = 1;

@@ -4839,7 +4839,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   InputKind DashX = Res.getFrontendOpts().DashX;
   ParseTargetArgs(Res.getMutTargetOpts(), Args, Diags);
   llvm::Triple T(Res.getTargetOpts().Triple);
-  ParseHeaderSearchArgs(Res.getHeaderSearchOpts(), Args, Diags,
+  ParseHeaderSearchArgs(Res.getMutHeaderSearchOpts(), Args, Diags,
                         Res.getFileSystemOpts().WorkingDir);
   ParseAPINotesArgs(Res.getAPINotesOpts(), Args, Diags);
 
@@ -5101,14 +5101,14 @@ void CompilerInvocation::resetNonModularOptions() {
 
 void CompilerInvocation::clearImplicitModuleBuildOptions() {
   getMutLangOpts().ImplicitModules = false;
-  getHeaderSearchOpts().ImplicitModuleMaps = false;
-  getHeaderSearchOpts().ModuleCachePath.clear();
-  getHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;
-  getHeaderSearchOpts().BuildSessionTimestamp = 0;
+  getMutHeaderSearchOpts().ImplicitModuleMaps = false;
+  getMutHeaderSearchOpts().ModuleCachePath.clear();
+  getMutHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;
+  getMutHeaderSearchOpts().BuildSessionTimestamp = 0;
   // The specific values we canonicalize to for pruning don't affect behaviour,
   /// so use the default values so they may be dropped from the command-line.
-  getHeaderSearchOpts().ModuleCachePruneInterval = 7 * 24 * 60 * 60;
-  getHeaderSearchOpts().ModuleCachePruneAfter = 31 * 24 * 60 * 60;
+  getMutHeaderSearchOpts().ModuleCachePruneInterval = 7 * 24 * 60 * 60;
+  getMutHeaderSearchOpts().ModuleCachePruneAfter = 31 * 24 * 60 * 60;
 }
 
 IntrusiveRefCntPtr<llvm::vfs::FileSystem>

@@ -72,7 +72,7 @@ void disableUnsupportedOptions(CompilerInvocation &CI) {
 
   // Always default to raw container format as clangd doesn't registry any other
   // and clang dies when faced with unknown formats.
-  CI.getHeaderSearchOpts().ModuleFormat =
+  CI.getMutHeaderSearchOpts().ModuleFormat =
       PCHContainerOperations().getRawReader().getFormats().front().str();
 
   CI.getFrontendOpts().Plugins.clear();

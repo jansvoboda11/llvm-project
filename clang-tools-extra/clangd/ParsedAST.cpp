@@ -450,7 +450,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
   // in RequiredModules.
   if (Preamble && Preamble->RequiredModules)
     Preamble->RequiredModules->adjustHeaderSearchOptions(
-        CI->getHeaderSearchOpts());
+        CI->getMutHeaderSearchOpts());
 
   std::optional<PreamblePatch> Patch;
   // We might use an ignoring diagnostic consumer if they are going to be

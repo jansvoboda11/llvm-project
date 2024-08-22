@@ -84,7 +84,7 @@ void initializeModuleCache(CompilerInvocation &CI) {
     llvm::errs() << "Failed to create temp directory for module-cache";
     std::abort();
   }
-  CI.getHeaderSearchOpts().ModuleCachePath = ModuleCachePath.c_str();
+  CI.getMutHeaderSearchOpts().ModuleCachePath = ModuleCachePath.c_str();
 }
 
 void deleteModuleCache(const std::string ModuleCachePath) {

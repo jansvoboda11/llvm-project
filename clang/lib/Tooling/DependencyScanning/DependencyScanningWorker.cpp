@@ -336,8 +336,8 @@ public:
     ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
     ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
     ScanInstance.getFrontendOpts().ModulesShareFileManager = false;
-    ScanInstance.getHeaderSearchOpts().ModuleFormat = "raw";
-    ScanInstance.getHeaderSearchOpts().ModulesIncludeVFSUsage =
+    ScanInstance.getMutHeaderSearchOpts().ModuleFormat = "raw";
+    ScanInstance.getMutHeaderSearchOpts().ModulesIncludeVFSUsage =
         any(OptimizeArgs & ScanningOptimizations::VFS);
 
     // Support for virtual file system overlays.
@@ -377,7 +377,7 @@ public:
       if (visitPrebuiltModule(
               ScanInstance.getPreprocessorOpts().ImplicitPCHInclude,
               ScanInstance,
-              ScanInstance.getHeaderSearchOpts().PrebuiltModuleFiles,
+              ScanInstance.getMutHeaderSearchOpts().PrebuiltModuleFiles,
               PrebuiltModuleVFSMap, ScanInstance.getDiagnostics()))
         return false;
 
@@ -419,10 +419,10 @@ public:
     //
     // TODO: Implement diagnostic bucketing to reduce the impact of strict
     // context hashing.
-    ScanInstance.getHeaderSearchOpts().ModulesStrictContextHash = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
+    ScanInstance.getMutHeaderSearchOpts().ModulesStrictContextHash = true;
+    ScanInstance.getMutHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+    ScanInstance.getMutHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+    ScanInstance.getMutHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
         true;
 
     // Avoid some checks and module map parsing when loading PCM files.

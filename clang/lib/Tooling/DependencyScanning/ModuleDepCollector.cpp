@@ -182,7 +182,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // The scanner takes care to avoid passing non-affecting module maps to the
   // explicit compiles. No need to do extra work just to find out there are no
   // module map files to prune.
-  CI.getHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
+  CI.getMutHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
 
   // Remove options incompatible with explicit module build or are likely to
   // differ between identical modules discovered from different translation
@@ -219,7 +219,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
               llvm::CachedHashString(MacroDef.split('=').first));
         });
     // Remove the now unused option.
-    CI.getHeaderSearchOpts().ModulesIgnoreMacros.clear();
+    CI.getMutHeaderSearchOpts().ModulesIgnoreMacros.clear();
   }
 
   return CI;
@@ -326,7 +326,7 @@ void ModuleDepCollector::addModuleFiles(
     if (EagerLoadModules)
       CI.getFrontendOpts().ModuleFiles.push_back(std::move(PCMPath));
     else
-      CI.getHeaderSearchOpts().PrebuiltModuleFiles.insert(
+      CI.getMutHeaderSearchOpts().PrebuiltModuleFiles.insert(
           {MID.ModuleName, std::move(PCMPath)});
   }
 }

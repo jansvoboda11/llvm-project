@@ -1573,7 +1573,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
 
   if (!ResourceFilesPath.empty()) {
     // Override the resources path.
-    CI->getHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
+    CI->getMutHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
   }
   AST->OnlyLocalDecls = OnlyLocalDecls;
   AST->CaptureDiagnostics = CaptureDiagnostics;
@@ -1810,13 +1810,13 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
   PPOpts.RetainExcludedConditionalBlocks = RetainExcludedConditionalBlocks;
 
   // Override the resources path.
-  CI->getHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
+  CI->getMutHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
 
   CI->getFrontendOpts().SkipFunctionBodies =
       SkipFunctionBodies == SkipFunctionBodiesScope::PreambleAndMainFile;
 
   if (ModuleFormat)
-    CI->getHeaderSearchOpts().ModuleFormat = std::string(*ModuleFormat);
+    CI->getMutHeaderSearchOpts().ModuleFormat = std::string(*ModuleFormat);
 
   // Create the AST unit.
   std::unique_ptr<ASTUnit> AST;

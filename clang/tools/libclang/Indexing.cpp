@@ -550,7 +550,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
     CInvok->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   // Make sure to use the raw module format.
-  CInvok->getHeaderSearchOpts().ModuleFormat = std::string(
+  CInvok->getMutHeaderSearchOpts().ModuleFormat = std::string(
       CXXIdx->getPCHContainerOperations()->getRawReader().getFormats().front());
 
   auto Unit = ASTUnit::create(CInvok, Diags, CaptureDiagnostics,

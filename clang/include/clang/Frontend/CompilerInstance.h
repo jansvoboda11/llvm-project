@@ -315,8 +315,8 @@ public:
     return Invocation->getFrontendOpts();
   }
 
-  HeaderSearchOptions &getHeaderSearchOpts() {
-    return Invocation->getHeaderSearchOpts();
+  HeaderSearchOptions &getMutHeaderSearchOpts() {
+    return Invocation->getMutHeaderSearchOpts();
   }
   const HeaderSearchOptions &getHeaderSearchOpts() const {
     return Invocation->getHeaderSearchOpts();

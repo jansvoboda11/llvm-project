@@ -633,7 +633,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
     // Options relating to how we treat the input (but not what we do with it)
     // are inherited from the AST unit.
-    CI.getHeaderSearchOpts() = AST->getHeaderSearchOpts();
+    CI.getMutHeaderSearchOpts() = AST->getHeaderSearchOpts();
     CI.getPreprocessorOpts() = AST->getPreprocessorOpts();
     CI.getMutLangOpts() = AST->getLangOpts();
 

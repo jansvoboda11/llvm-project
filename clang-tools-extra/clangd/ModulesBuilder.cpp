@@ -222,9 +222,9 @@ llvm::Error buildModuleFile(llvm::StringRef ModuleName,
   // Hash the contents of input files and store the hash value to the BMI files.
   // So that we can check if the files are still valid when we want to reuse the
   // BMI files.
-  CI->getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+  CI->getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
-  BuiltModuleFiles.adjustHeaderSearchOptions(CI->getHeaderSearchOpts());
+  BuiltModuleFiles.adjustHeaderSearchOptions(CI->getMutHeaderSearchOpts());
 
   CI->getFrontendOpts().OutputFile = Inputs.CompileCommand.Output;
   auto Clang =
@@ -299,12 +299,12 @@ bool StandalonePrerequisiteModules::canReuse(
   if (!Clang.createTarget())
     return false;
 
-  adjustHeaderSearchOptions(Clang.getHeaderSearchOpts());
+  adjustHeaderSearchOptions(Clang.getMutHeaderSearchOpts());
   // Since we don't need to compile the source code actually, the TU kind here
   // doesn't matter.
   Clang.createPreprocessor(TU_Complete);
-  Clang.getHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
-  Clang.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+  Clang.getMutHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
+  Clang.getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
   // Following the practice of clang's driver to suppres the checking for ODR
   // violation in GMF.

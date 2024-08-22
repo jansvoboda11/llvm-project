@@ -49,10 +49,10 @@ public:
         EntryFile, FrontendOptions::getInputKindForExtension(
                        llvm::sys::path::extension(EntryFile).substr(1))));
 
-    CI->getHeaderSearchOpts().AddPath("headers",
-                                      frontend::IncludeDirGroup::Quoted,
-                                      /*isFramework*/ false,
-                                      /*IgnoreSysRoot*/ false);
+    CI->getMutHeaderSearchOpts().AddPath("headers",
+                                         frontend::IncludeDirGroup::Quoted,
+                                         /*isFramework*/ false,
+                                         /*IgnoreSysRoot*/ false);
 
     CI->getFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
     CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
