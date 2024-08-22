@@ -253,7 +253,7 @@ class HeaderSearch {
   friend SearchDirIterator;
 
   /// Header-search options used to initialize this header search.
-  std::shared_ptr<HeaderSearchOptions> HSOpts;
+  std::shared_ptr<const HeaderSearchOptions> HSOpts;
 
   /// Mapping from SearchDir to HeaderSearchOptions::UserEntries indices.
   llvm::DenseMap<unsigned, unsigned> SearchDirToHSEntry;
@@ -379,7 +379,7 @@ public:
 
   /// Retrieve the header-search options with which this header search
   /// was initialized.
-  HeaderSearchOptions &getHeaderSearchOpts() const { return *HSOpts; }
+  const HeaderSearchOptions &getHeaderSearchOpts() const { return *HSOpts; }
 
   FileManager &getFileMgr() const { return FileMgr; }
 
