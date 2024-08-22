@@ -4830,7 +4830,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   }
 
   ParseFileSystemArgs(Res.getFileSystemOpts(), Args, Diags);
-  ParseMigratorArgs(Res.getMigratorOpts(), Args, Diags);
+  ParseMigratorArgs(Res.getMutMigratorOpts(), Args, Diags);
   ParseAnalyzerArgs(Res.getMutAnalyzerOpts(), Args, Diags);
   ParseDiagnosticArgs(Res.getMutDiagnosticOpts(), Args, &Diags,
                       /*DefaultDiagColor=*/false);

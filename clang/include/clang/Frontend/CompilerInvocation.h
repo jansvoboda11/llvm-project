@@ -252,7 +252,7 @@ public:
   HeaderSearchOptions &getMutHeaderSearchOpts() { return *HSOpts; }
   PreprocessorOptions &getMutPreprocessorOpts() { return *PPOpts; }
   AnalyzerOptions &getMutAnalyzerOpts() { return *AnalyzerOpts; }
-  MigratorOptions &getMigratorOpts() { return *MigratorOpts; }
+  MigratorOptions &getMutMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }
   FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
