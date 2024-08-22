@@ -267,9 +267,6 @@ public:
 
   /// Base class internals.
   /// @{
-  std::shared_ptr<HeaderSearchOptions> getHeaderSearchOptsPtr() {
-    return HSOpts;
-  }
   std::shared_ptr<PreprocessorOptions> getPreprocessorOptsPtr() {
     return PPOpts;
   }

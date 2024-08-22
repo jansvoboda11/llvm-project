@@ -299,7 +299,6 @@ bool StandalonePrerequisiteModules::canReuse(
   if (!Clang.createTarget())
     return false;
 
-  assert(Clang.getHeaderSearchOptsPtr());
   adjustHeaderSearchOptions(Clang.getHeaderSearchOpts());
   // Since we don't need to compile the source code actually, the TU kind here
   // doesn't matter.

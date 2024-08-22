@@ -805,7 +805,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
     const std::string &Filename, const PCHContainerReader &PCHContainerRdr,
     WhatToLoad ToLoad, IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
     const FileSystemOptions &FileSystemOpts,
-    std::shared_ptr<HeaderSearchOptions> HSOpts,
+    const HeaderSearchOptions &HSOpts,
     LangOptions *LangOpts, bool OnlyLocalDecls,
     CaptureDiagsKind CaptureDiagnostics, bool AllowASTWithCompilerErrors,
     bool UserFilesAreVolatile, IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
@@ -830,8 +830,8 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
                                      AST->getFileManager(),
                                      UserFilesAreVolatile);
   AST->ModuleCache = new InMemoryModuleCache;
-  AST->HSOpts = HSOpts ? HSOpts : std::make_shared<HeaderSearchOptions>();
-  AST->HSOpts->ModuleFormat = std::string(PCHContainerRdr.getFormats().front());
+  AST->HSOpts = HSOpts;
+  AST->HSOpts.ModuleFormat = std::string(PCHContainerRdr.getFormats().front());
   AST->HeaderInfo.reset(new HeaderSearch(AST->getHeaderSearchOpts(),
                                          AST->getSourceManager(),
                                          AST->getDiagnostics(),
@@ -867,7 +867,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   unsigned Counter = 0;
   AST->Reader->setListener(std::make_unique<ASTInfoCollector>(
-      *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts, AST->LangOpts,
+      *AST->PP, AST->Ctx.get(), AST->HSOpts, *AST->PPOpts, AST->LangOpts,
       AST->TargetOpts, AST->Target, Counter));
 
   // Attach the AST reader to the AST context as an external AST

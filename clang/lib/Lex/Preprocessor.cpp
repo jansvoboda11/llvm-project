@@ -80,13 +80,13 @@ LLVM_INSTANTIATE_REGISTRY(PragmaHandlerRegistry)
 
 ExternalPreprocessorSource::~ExternalPreprocessorSource() = default;
 
-Preprocessor::Preprocessor(std::shared_ptr<PreprocessorOptions> PPOpts,
+Preprocessor::Preprocessor(PreprocessorOptions &PPOpts,
                            DiagnosticsEngine &diags, const LangOptions &opts,
                            SourceManager &SM, HeaderSearch &Headers,
                            ModuleLoader &TheModuleLoader,
                            IdentifierInfoLookup *IILookup, bool OwnsHeaders,
                            TranslationUnitKind TUKind)
-    : PPOpts(std::move(PPOpts)), Diags(&diags), LangOpts(opts),
+    : PPOpts(PPOpts), Diags(&diags), LangOpts(opts),
       FileMgr(Headers.getFileMgr()), SourceMgr(SM),
       ScratchBuf(new ScratchBuffer(SourceMgr)), HeaderInfo(Headers),
       TheModuleLoader(TheModuleLoader), ExternalSource(nullptr),
@@ -159,11 +159,11 @@ Preprocessor::Preprocessor(std::shared_ptr<PreprocessorOptions> PPOpts,
     SkippingUntilPragmaHdrStop = true;
 
   // If using a PCH with a through header, start skipping tokens.
-  if (!this->PPOpts->PCHThroughHeader.empty() &&
-      !this->PPOpts->ImplicitPCHInclude.empty())
+  if (!getPreprocessorOpts().PCHThroughHeader.empty() &&
+      !getPreprocessorOpts().ImplicitPCHInclude.empty())
     SkippingUntilPCHThroughHeader = true;
 
-  if (this->PPOpts->GeneratePreamble)
+  if (getPreprocessorOpts().GeneratePreamble)
     PreambleConditionalStack.startRecording();
 
   MaxTokens = LangOpts.MaxTokens;
@@ -580,18 +580,18 @@ void Preprocessor::EnterMainSourceFile() {
   // Start parsing the predefines.
   EnterSourceFile(FID, nullptr, SourceLocation());
 
-  if (!PPOpts->PCHThroughHeader.empty()) {
+  if (!getPreprocessorOpts().PCHThroughHeader.empty()) {
     // Lookup and save the FileID for the through header. If it isn't found
     // in the search path, it's a fatal error.
     OptionalFileEntryRef File = LookupFile(
-        SourceLocation(), PPOpts->PCHThroughHeader,
+        SourceLocation(), getPreprocessorOpts().PCHThroughHeader,
         /*isAngled=*/false, /*FromDir=*/nullptr, /*FromFile=*/nullptr,
         /*CurDir=*/nullptr, /*SearchPath=*/nullptr, /*RelativePath=*/nullptr,
         /*SuggestedModule=*/nullptr, /*IsMapped=*/nullptr,
         /*IsFrameworkFound=*/nullptr);
     if (!File) {
       Diag(SourceLocation(), diag::err_pp_through_header_not_found)
-          << PPOpts->PCHThroughHeader;
+          << getPreprocessorOpts().PCHThroughHeader;
       return;
     }
     setPCHThroughHeaderFileID(
@@ -617,21 +617,23 @@ bool Preprocessor::isPCHThroughHeader(const FileEntry *FE) {
 }
 
 bool Preprocessor::creatingPCHWithThroughHeader() {
-  return TUKind == TU_Prefix && !PPOpts->PCHThroughHeader.empty() &&
+  return TUKind == TU_Prefix &&
+         !getPreprocessorOpts().PCHThroughHeader.empty() &&
          PCHThroughHeaderFileID.isValid();
 }
 
 bool Preprocessor::usingPCHWithThroughHeader() {
-  return TUKind != TU_Prefix && !PPOpts->PCHThroughHeader.empty() &&
+  return TUKind != TU_Prefix &&
+         !getPreprocessorOpts().PCHThroughHeader.empty() &&
          PCHThroughHeaderFileID.isValid();
 }
 
 bool Preprocessor::creatingPCHWithPragmaHdrStop() {
-  return TUKind == TU_Prefix && PPOpts->PCHWithHdrStop;
+  return TUKind == TU_Prefix && getPreprocessorOpts().PCHWithHdrStop;
 }
 
 bool Preprocessor::usingPCHWithPragmaHdrStop() {
-  return TUKind != TU_Prefix && PPOpts->PCHWithHdrStop;
+  return TUKind != TU_Prefix && getPreprocessorOpts().PCHWithHdrStop;
 }
 
 /// Skip tokens until after the #include of the through header or
@@ -660,8 +662,8 @@ void Preprocessor::SkipTokensWhileUsingPCH() {
   if (ReachedMainFileEOF) {
     if (UsingPCHThroughHeader)
       Diag(SourceLocation(), diag::err_pp_through_header_not_seen)
-          << PPOpts->PCHThroughHeader << 1;
-    else if (!PPOpts->PCHWithHdrStopCreate)
+          << getPreprocessorOpts().PCHThroughHeader << 1;
+    else if (!getPreprocessorOpts().PCHWithHdrStopCreate)
       Diag(SourceLocation(), diag::err_pp_pragma_hdrstop_not_seen);
   }
 }
