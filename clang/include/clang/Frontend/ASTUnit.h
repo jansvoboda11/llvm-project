@@ -106,7 +106,7 @@ public:
   };
 
 private:
-  std::shared_ptr<LangOptions>            LangOpts;
+  LangOptions             LangOpts;
   IntrusiveRefCntPtr<DiagnosticsEngine>   Diagnostics;
   IntrusiveRefCntPtr<FileManager>         FileMgr;
   IntrusiveRefCntPtr<SourceManager>       SourceMgr;
@@ -463,8 +463,7 @@ public:
   }
 
   const LangOptions &getLangOpts() const {
-    assert(LangOpts && "ASTUnit does not have language options");
-    return *LangOpts;
+    return LangOpts;
   }
 
   const HeaderSearchOptions &getHeaderSearchOpts() const {

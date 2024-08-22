@@ -820,7 +820,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   ConfigureDiags(Diags, *AST, CaptureDiagnostics);
 
-  AST->LangOpts = LangOpts ? LangOpts : std::make_shared<LangOptions>();
+  AST->LangOpts = LangOpts ? *LangOpts : LangOptions();
   AST->OnlyLocalDecls = OnlyLocalDecls;
   AST->CaptureDiagnostics = CaptureDiagnostics;
   AST->Diagnostics = Diags;
@@ -844,14 +844,14 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
   HeaderSearch &HeaderInfo = *AST->HeaderInfo;
 
   AST->PP = std::make_shared<Preprocessor>(
-      AST->PPOpts, AST->getDiagnostics(), *AST->LangOpts,
+      AST->PPOpts, AST->getDiagnostics(), AST->LangOpts,
       AST->getSourceManager(), HeaderInfo, AST->ModuleLoader,
       /*IILookup=*/nullptr,
       /*OwnsHeaderSearch=*/false);
   Preprocessor &PP = *AST->PP;
 
   if (ToLoad >= LoadASTOnly)
-    AST->Ctx = new ASTContext(*AST->LangOpts, AST->getSourceManager(),
+    AST->Ctx = new ASTContext(AST->LangOpts, AST->getSourceManager(),
                               PP.getIdentifierTable(), PP.getSelectorTable(),
                               PP.getBuiltinInfo(),
                               AST->getTranslationUnitKind());
@@ -867,7 +867,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   unsigned Counter = 0;
   AST->Reader->setListener(std::make_unique<ASTInfoCollector>(
-      *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts, *AST->LangOpts,
+      *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts, AST->LangOpts,
       AST->TargetOpts, AST->Target, Counter));
 
   // Attach the AST reader to the AST context as an external AST
@@ -1213,7 +1213,7 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
          "IR inputs not support here!");
 
   // Configure the various subsystems.
-  LangOpts = Clang->getInvocation().LangOpts;
+  LangOpts = Clang->getInvocation().getLangOpts();
   FileSystemOpts = Clang->getFileSystemOpts();
 
   ResetForParse();
@@ -1488,7 +1488,7 @@ void ASTUnit::transferASTDataFromCompilerInstance(CompilerInstance &CI) {
   // Steal the created target, context, and preprocessor if they have been
   // created.
   assert(CI.hasInvocation() && "missing invocation");
-  LangOpts = CI.getInvocation().LangOpts;
+  LangOpts = CI.getInvocation().getLangOpts();
   TheSema = CI.takeSema();
   Consumer = CI.takeASTConsumer();
   if (CI.hasASTContext())
