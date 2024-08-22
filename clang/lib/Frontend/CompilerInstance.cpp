@@ -332,7 +332,7 @@ static void SetupSerializedDiagnostics(DiagnosticOptions *DiagOpts,
 
 void CompilerInstance::createDiagnostics(DiagnosticConsumer *Client,
                                          bool ShouldOwnClient) {
-  Diagnostics = createDiagnostics(&getDiagnosticOpts(), Client,
+  Diagnostics = createDiagnostics(&getMutDiagnosticOpts(), Client,
                                   ShouldOwnClient, &getCodeGenOpts());
 }
 
@@ -1222,7 +1222,7 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
   // Don't free the remapped file buffers; they are owned by our caller.
   PPOpts.RetainRemappedFileBuffers = true;
 
-  DiagnosticOptions &DiagOpts = Invocation->getDiagnosticOpts();
+  DiagnosticOptions &DiagOpts = Invocation->getMutDiagnosticOpts();
 
   DiagOpts.VerifyDiagnostics = 0;
   assert(ImportingInstance.getInvocation().getModuleHash() ==

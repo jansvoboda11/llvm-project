@@ -547,7 +547,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   CInvok->getMutLangOpts().SpellChecking = false;
 
   if (index_options & CXIndexOpt_SuppressWarnings)
-    CInvok->getDiagnosticOpts().IgnoreWarnings = true;
+    CInvok->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   // Make sure to use the raw module format.
   CInvok->getHeaderSearchOpts().ModuleFormat = std::string(

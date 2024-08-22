@@ -171,7 +171,7 @@ public:
     CI.getMutLangOpts().RetainCommentsFromSystemHeaders = true;
     // Index the whole file even if there are warnings and -Werror is set.
     // Avoids some analyses too. Set in two places as we're late to the party.
-    CI.getDiagnosticOpts().IgnoreWarnings = true;
+    CI.getMutDiagnosticOpts().IgnoreWarnings = true;
     CI.getDiagnostics().setIgnoreAllWarnings(true);
     // Instruct the parser to ask our ASTConsumer if it should skip function
     // bodies. The ASTConsumer will take care of skipping only functions inside

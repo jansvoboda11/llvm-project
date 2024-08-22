@@ -47,8 +47,8 @@ void disableUnsupportedOptions(CompilerInvocation &CI) {
   // Disable "clang -verify" diagnostics, they are rarely useful in clangd, and
   // our compiler invocation set-up doesn't seem to work with it (leading
   // assertions in VerifyDiagnosticConsumer).
-  CI.getDiagnosticOpts().VerifyDiagnostics = false;
-  CI.getDiagnosticOpts().ShowColors = false;
+  CI.getMutDiagnosticOpts().VerifyDiagnostics = false;
+  CI.getMutDiagnosticOpts().ShowColors = false;
 
   // Disable any dependency outputting, we don't want to generate files or write
   // to stdout/stderr.

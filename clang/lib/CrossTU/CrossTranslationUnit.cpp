@@ -602,7 +602,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
                  CommandLineArgs.begin(),
                  [](auto &&CmdPart) { return CmdPart.c_str(); });
 
-  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts{&CI.getDiagnosticOpts()};
+  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts{&CI.getMutDiagnosticOpts()};
   auto *DiagClient = new ForwardingDiagnosticConsumer{CI.getDiagnosticClient()};
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID{
       CI.getDiagnostics().getDiagnosticIDs()};

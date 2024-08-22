@@ -652,7 +652,7 @@ public:
                      DiagnosticConsumer *DiagConsumer) override {
     std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromCompilerInvocation(
         Invocation, std::move(PCHContainerOps),
-        CompilerInstance::createDiagnostics(&Invocation->getDiagnosticOpts(),
+        CompilerInstance::createDiagnostics(&Invocation->getMutDiagnosticOpts(),
                                             DiagConsumer,
                                             /*ShouldOwnClient=*/false),
         Files);

@@ -120,7 +120,7 @@ IntrusiveRefCntPtr<ExternalSemaSource> clang::createChainedIncludesSource(
       new TextDiagnosticPrinter(llvm::errs(), new DiagnosticOptions());
     IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-        new DiagnosticsEngine(DiagID, &CI.getDiagnosticOpts(), DiagClient));
+        new DiagnosticsEngine(DiagID, &CI.getMutDiagnosticOpts(), DiagClient));
 
     std::unique_ptr<CompilerInstance> Clang(
         new CompilerInstance(CI.getPCHContainerOperations()));

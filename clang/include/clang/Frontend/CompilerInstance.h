@@ -294,8 +294,8 @@ public:
     return Invocation->getDependencyOutputOpts();
   }
 
-  DiagnosticOptions &getDiagnosticOpts() {
-    return Invocation->getDiagnosticOpts();
+  DiagnosticOptions &getMutDiagnosticOpts() {
+    return Invocation->getMutDiagnosticOpts();
   }
   const DiagnosticOptions &getDiagnosticOpts() const {
     return Invocation->getDiagnosticOpts();

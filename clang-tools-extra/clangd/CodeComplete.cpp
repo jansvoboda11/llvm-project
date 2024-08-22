@@ -1383,7 +1383,7 @@ bool semaCodeComplete(std::unique_ptr<CodeCompleteConsumer> Consumer,
       llvm::MemoryBuffer::getMemBuffer(Input.ParseInput.Contents,
                                        Input.FileName);
   // The diagnostic options must be set before creating a CompilerInstance.
-  CI->getDiagnosticOpts().IgnoreWarnings = true;
+  CI->getMutDiagnosticOpts().IgnoreWarnings = true;
   // We reuse the preamble whether it's valid or not. This is a
   // correctness/performance tradeoff: building without a preamble is slow, and
   // completion is latency-sensitive.

@@ -57,7 +57,7 @@ private:
     auto CI = buildCompilerInvocation(PI, IgnoreDiags);
     EXPECT_TRUE(static_cast<bool>(CI));
     // The diagnostic options must be set before creating a CompilerInstance.
-    CI->getDiagnosticOpts().IgnoreWarnings = true;
+    CI->getMutDiagnosticOpts().IgnoreWarnings = true;
     auto VFS = PI.TFS->view(Cmd->Directory);
     auto Clang = prepareCompilerInstance(
         std::move(CI), /*Preamble=*/nullptr,

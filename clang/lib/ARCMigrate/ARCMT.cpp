@@ -180,7 +180,7 @@ createInvocationForMigration(CompilerInvocation &origCI,
     FileManager FileMgr(origCI.getFileSystemOpts());
     IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-        new DiagnosticsEngine(DiagID, &origCI.getDiagnosticOpts(),
+        new DiagnosticsEngine(DiagID, &origCI.getMutDiagnosticOpts(),
                               new IgnoringDiagConsumer()));
     std::string OriginalFile = ASTReader::getOriginalSourceFile(
         PPOpts.ImplicitPCHInclude, FileMgr, PCHContainerRdr, *Diags);
@@ -193,19 +193,16 @@ createInvocationForMigration(CompilerInvocation &origCI,
   CInvok->getPreprocessorOpts().addMacroDef(define);
   CInvok->getMutLangOpts().ObjCAutoRefCount = true;
   CInvok->getMutLangOpts().setGC(LangOptions::NonGC);
-  CInvok->getDiagnosticOpts().ErrorLimit = 0;
-  CInvok->getDiagnosticOpts().PedanticErrors = 0;
+  CInvok->getMutDiagnosticOpts().ErrorLimit = 0;
+  CInvok->getMutDiagnosticOpts().PedanticErrors = 0;
 
   // Ignore -Werror flags when migrating.
   std::vector<std::string> WarnOpts;
-  for (std::vector<std::string>::iterator
-         I = CInvok->getDiagnosticOpts().Warnings.begin(),
-         E = CInvok->getDiagnosticOpts().Warnings.end(); I != E; ++I) {
-    if (!StringRef(*I).starts_with("error"))
-      WarnOpts.push_back(*I);
-  }
+  for (StringRef Warning : CInvok->getDiagnosticOpts().Warnings)
+    if (!Warning.starts_with("error"))
+      WarnOpts.emplace_back(Warning);
   WarnOpts.push_back("error=arc-unsafe-retained-assign");
-  CInvok->getDiagnosticOpts().Warnings = std::move(WarnOpts);
+  CInvok->getMutDiagnosticOpts().Warnings = std::move(WarnOpts);
 
   CInvok->getMutLangOpts().ObjCWeakRuntime = HasARCRuntime(origCI);
   CInvok->getMutLangOpts().ObjCWeak = CInvok->getLangOpts().ObjCWeakRuntime;
@@ -259,7 +256,7 @@ bool arcmt::checkForManualIssues(
   assert(DiagClient);
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-      new DiagnosticsEngine(DiagID, &origCI.getDiagnosticOpts(),
+      new DiagnosticsEngine(DiagID, &origCI.getMutDiagnosticOpts(),
                             DiagClient, /*ShouldOwnClient=*/false));
 
   // Filter of all diagnostics.
@@ -288,7 +285,7 @@ bool arcmt::checkForManualIssues(
   }
 
   if (emitPremigrationARCErrors)
-    emitPremigrationErrors(capturedDiags, &origCI.getDiagnosticOpts(),
+    emitPremigrationErrors(capturedDiags, &origCI.getMutDiagnosticOpts(),
                            Unit->getPreprocessor());
   if (!plistOut.empty()) {
     SmallVector<StoredDiagnostic, 8> arcDiags;
@@ -368,7 +365,7 @@ applyTransforms(CompilerInvocation &origCI, const FrontendInputFile &Input,
 
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-      new DiagnosticsEngine(DiagID, &origCI.getDiagnosticOpts(),
+      new DiagnosticsEngine(DiagID, &origCI.getMutDiagnosticOpts(),
                             DiagClient, /*ShouldOwnClient=*/false));
 
   if (outputDir.empty()) {
@@ -513,7 +510,7 @@ MigrationProcess::MigrationProcess(
   if (!outputDir.empty()) {
     IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-      new DiagnosticsEngine(DiagID, &CI.getDiagnosticOpts(),
+      new DiagnosticsEngine(DiagID, &CI.getMutDiagnosticOpts(),
                             DiagClient, /*ShouldOwnClient=*/false));
     Remapper.initFromDisk(outputDir, *Diags, /*ignoreIfFilesChanged=*/true);
   }
@@ -524,7 +521,7 @@ bool MigrationProcess::applyTransform(TransformFn trans,
   std::unique_ptr<CompilerInvocation> CInvok;
   CInvok.reset(
       createInvocationForMigration(OrigCI, PCHContainerOps->getRawReader()));
-  CInvok->getDiagnosticOpts().IgnoreWarnings = true;
+  CInvok->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   Remapper.applyMappings(CInvok->getPreprocessorOpts());
 

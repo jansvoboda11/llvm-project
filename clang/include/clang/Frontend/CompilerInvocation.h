@@ -248,7 +248,7 @@ public:
   /// @{
   LangOptions &getMutLangOpts() { return *LangOpts; }
   TargetOptions &getMutTargetOpts() { return *TargetOpts; }
-  DiagnosticOptions &getDiagnosticOpts() { return *DiagnosticOpts; }
+  DiagnosticOptions &getMutDiagnosticOpts() { return *DiagnosticOpts; }
   HeaderSearchOptions &getHeaderSearchOpts() { return *HSOpts; }
   PreprocessorOptions &getPreprocessorOpts() { return *PPOpts; }
   AnalyzerOptions &getAnalyzerOpts() { return *AnalyzerOpts; }

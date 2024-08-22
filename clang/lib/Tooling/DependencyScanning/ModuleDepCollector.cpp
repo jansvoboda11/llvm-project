@@ -198,7 +198,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // Map output paths that affect behaviour to "-" so their existence is in the
   // context hash. The final path will be computed in addOutputPaths.
   if (!CI.getDiagnosticOpts().DiagnosticSerializationFile.empty())
-    CI.getDiagnosticOpts().DiagnosticSerializationFile = "-";
+    CI.getMutDiagnosticOpts().DiagnosticSerializationFile = "-";
   if (!CI.getDependencyOutputOpts().OutputFile.empty())
     CI.getDependencyOutputOpts().OutputFile = "-";
   CI.getDependencyOutputOpts().Targets.clear();

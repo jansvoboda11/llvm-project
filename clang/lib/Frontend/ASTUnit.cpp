@@ -2222,7 +2222,7 @@ void ASTUnit::CodeComplete(
 
   // Spell-checking and warnings are wasteful during code-completion.
   LangOpts.SpellChecking = false;
-  CCInvocation->getDiagnosticOpts().IgnoreWarnings = true;
+  CCInvocation->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   std::unique_ptr<CompilerInstance> Clang(
       new CompilerInstance(PCHContainerOps));

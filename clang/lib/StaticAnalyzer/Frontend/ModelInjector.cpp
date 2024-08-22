@@ -71,7 +71,7 @@ void ModelInjector::onBodySynthesis(const NamedDecl *D) {
   FrontendOpts.Inputs.emplace_back(fileName, IK);
   FrontendOpts.DisableFree = true;
 
-  Invocation->getDiagnosticOpts().VerifyDiagnostics = 0;
+  Invocation->getMutDiagnosticOpts().VerifyDiagnostics = 0;
 
   // Modules are parsed by a separate CompilerInstance, so this code mimics that
   // behavior for models

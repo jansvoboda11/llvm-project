@@ -74,7 +74,7 @@ createDiagnostics(unsigned int argc, char **argv) {
 
   // Build the diagnostics parser
   IntrusiveRefCntPtr<DiagnosticsEngine> FinalDiags =
-    CompilerInstance::createDiagnostics(&Invocation->getDiagnosticOpts());
+    CompilerInstance::createDiagnostics(&Invocation->getMutDiagnosticOpts());
   if (!FinalDiags)
     return nullptr;
 

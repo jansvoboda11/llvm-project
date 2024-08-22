@@ -321,7 +321,7 @@ public:
     ScanInstance.setInvocation(std::move(Invocation));
 
     // Create the compiler's actual diagnostics engine.
-    sanitizeDiagOpts(ScanInstance.getDiagnosticOpts());
+    sanitizeDiagOpts(ScanInstance.getMutDiagnosticOpts());
     ScanInstance.createDiagnostics(DiagConsumer, /*ShouldOwnClient=*/false);
     if (!ScanInstance.hasDiagnostics())
       return false;

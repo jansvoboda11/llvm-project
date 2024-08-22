@@ -360,7 +360,7 @@ scanPreamble(llvm::StringRef Contents, const tooling::CompileCommand &Cmd) {
   auto CI = buildCompilerInvocation(PI, IgnoreDiags);
   if (!CI)
     return error("failed to create compiler invocation");
-  CI->getDiagnosticOpts().IgnoreWarnings = true;
+  CI->getMutDiagnosticOpts().IgnoreWarnings = true;
   auto ContentsBuffer = llvm::MemoryBuffer::getMemBuffer(PI.Contents);
   // This means we're scanning (though not preprocessing) the preamble section
   // twice. However, it's important to precisely follow the preamble bounds used
@@ -614,7 +614,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
           L->sawDiagnostic(D, Diag);
       });
   llvm::IntrusiveRefCntPtr<DiagnosticsEngine> PreambleDiagsEngine =
-      CompilerInstance::createDiagnostics(&CI.getDiagnosticOpts(),
+      CompilerInstance::createDiagnostics(&CI.getMutDiagnosticOpts(),
                                           &PreambleDiagnostics,
                                           /*ShouldOwnClient=*/false);
   const Config &Cfg = Config::current();
