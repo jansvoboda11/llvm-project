@@ -257,7 +257,7 @@ public:
   CodeGenOptions &getMutCodeGenOpts() { return *CodeGenOpts; }
   FileSystemOptions &getMutFileSystemOpts() { return *FSOpts; }
   FrontendOptions &getMutFrontendOpts() { return *FrontendOpts; }
-  DependencyOutputOptions &getDependencyOutputOpts() {
+  DependencyOutputOptions &getMutDependencyOutputOpts() {
     return *DependencyOutputOpts;
   }
   PreprocessorOutputOptions &getPreprocessorOutputOpts() {

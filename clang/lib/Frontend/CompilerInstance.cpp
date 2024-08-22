@@ -1270,7 +1270,7 @@ compileModuleImpl(CompilerInstance &ImportingInstance, SourceLocation ImportLoc,
   // between all of the module CompilerInstances. Other than that, we don't
   // want to produce any dependency output from the module build.
   Instance.setModuleDepCollector(ImportingInstance.getModuleDepCollector());
-  Inv.getDependencyOutputOpts() = DependencyOutputOptions();
+  Inv.getMutDependencyOutputOpts() = DependencyOutputOptions();
 
   ImportingInstance.getDiagnostics().Report(ImportLoc,
                                             diag::remark_module_build)

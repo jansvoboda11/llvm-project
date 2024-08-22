@@ -200,8 +200,8 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   if (!CI.getDiagnosticOpts().DiagnosticSerializationFile.empty())
     CI.getMutDiagnosticOpts().DiagnosticSerializationFile = "-";
   if (!CI.getDependencyOutputOpts().OutputFile.empty())
-    CI.getDependencyOutputOpts().OutputFile = "-";
-  CI.getDependencyOutputOpts().Targets.clear();
+    CI.getMutDependencyOutputOpts().OutputFile = "-";
+  CI.getMutDependencyOutputOpts().Targets.clear();
 
   CI.getMutFrontendOpts().ProgramAction = frontend::GenerateModule;
   CI.getMutFrontendOpts().ARCMTAction = FrontendOptions::ARCMT_None;

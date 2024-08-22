@@ -52,11 +52,12 @@ void disableUnsupportedOptions(CompilerInvocation &CI) {
 
   // Disable any dependency outputting, we don't want to generate files or write
   // to stdout/stderr.
-  CI.getDependencyOutputOpts().ShowIncludesDest = ShowIncludesDestination::None;
-  CI.getDependencyOutputOpts().OutputFile.clear();
-  CI.getDependencyOutputOpts().HeaderIncludeOutputFile.clear();
-  CI.getDependencyOutputOpts().DOTOutputFile.clear();
-  CI.getDependencyOutputOpts().ModuleDependencyOutputDir.clear();
+  CI.getMutDependencyOutputOpts().ShowIncludesDest =
+      ShowIncludesDestination::None;
+  CI.getMutDependencyOutputOpts().OutputFile.clear();
+  CI.getMutDependencyOutputOpts().HeaderIncludeOutputFile.clear();
+  CI.getMutDependencyOutputOpts().DOTOutputFile.clear();
+  CI.getMutDependencyOutputOpts().ModuleDependencyOutputDir.clear();
 
   // Disable any pch generation/usage operations. Since serialized preamble
   // format is unstable, using an incompatible one might result in unexpected

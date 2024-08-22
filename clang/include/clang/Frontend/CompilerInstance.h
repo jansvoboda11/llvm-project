@@ -292,8 +292,8 @@ public:
     return Invocation->getCodeGenOpts();
   }
 
-  DependencyOutputOptions &getDependencyOutputOpts() {
-    return Invocation->getDependencyOutputOpts();
+  DependencyOutputOptions &getMutDependencyOutputOpts() {
+    return Invocation->getMutDependencyOutputOpts();
   }
   const DependencyOutputOptions &getDependencyOutputOpts() const {
     return Invocation->getDependencyOutputOpts();

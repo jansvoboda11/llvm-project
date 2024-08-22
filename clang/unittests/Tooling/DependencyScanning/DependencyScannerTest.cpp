@@ -35,7 +35,7 @@ namespace {
 /// Prints out all of the gathered dependencies into a string.
 class TestFileCollector : public DependencyFileGenerator {
 public:
-  TestFileCollector(DependencyOutputOptions &Opts,
+  TestFileCollector(const DependencyOutputOptions &Opts,
                     std::vector<std::string> &Deps)
       : DependencyFileGenerator(Opts), Deps(Deps) {}
 

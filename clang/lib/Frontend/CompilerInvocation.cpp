@@ -4887,7 +4887,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   ParsePreprocessorOutputArgs(Res.getPreprocessorOutputOpts(), Args, Diags,
                               Res.getFrontendOpts().ProgramAction);
 
-  ParseDependencyOutputArgs(Res.getDependencyOutputOpts(), Args, Diags,
+  ParseDependencyOutputArgs(Res.getMutDependencyOutputOpts(), Args, Diags,
                             Res.getFrontendOpts().ProgramAction,
                             Res.getPreprocessorOutputOpts().ShowLineMarkers);
   if (!Res.getDependencyOutputOpts().OutputFile.empty() &&
