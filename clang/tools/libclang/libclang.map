@@ -437,6 +437,38 @@ LLVM_19 {
 LLVM_20 {
   global:
     clang_isBeforeInTranslationUnit;
+    clang_DependencyScannerServiceOptions_create;
+    clang_DependencyScannerServiceOptions_dispose;
+    clang_DependencyScannerService_create;
+    clang_DependencyScannerService_dispose;
+    clang_DependencyScannerWorker_create;
+    clang_DependencyScannerWorker_dispose;
+    clang_DependencyScannerWorkerScanSettings_create;
+    clang_DependencyScannerWorkerScanSettings_dispose;
+    clang_DependencyScannerWorker_getDepGraph;
+    clang_DependencyGraph_dispose;
+    clang_DependencyGraph_getModuleCount;
+    clang_DependencyGraph_getModule;
+    clang_DependencyGraph_getJobCount;
+    clang_DependencyGraph_getJob;
+    clang_DependencyGraphModule_getName;
+    clang_DependencyGraphModule_getContextHash;
+    clang_DependencyGraphModule_getModuleMapPath;
+    clang_DependencyGraphModule_getFileDepCount;
+    clang_DependencyGraphModule_getFileDep;
+    clang_DependencyGraphModule_getModuleDepCount;
+    clang_DependencyGraphModule_getModuleDep;
+    clang_DependencyGraphModule_getBuildArgumentsCount;
+    clang_DependencyGraphModule_getBuildArgument;
+    clang_DependencyGraphCommand_getExecutable;
+    clang_DependencyGraphCommand_getBuildArgumentCount;
+    clang_DependencyGraphCommand_getBuildArgument;
+    clang_DependencyGraph_getTUContextHash;
+    clang_DependencyGraph_getTUFileDepCount;
+    clang_DependencyGraph_getTUFileDep;
+    clang_DependencyGraph_getTUModuleDepsCount;
+    clang_DependencyGraph_getTUModuleDep;
+    clang_DependencyGraph_getDiagnostics;
 };
 
 # Example of how to add a new symbol version entry.  If you do add a new symbol

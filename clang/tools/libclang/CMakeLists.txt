@@ -22,6 +22,7 @@ endif()
 set(SOURCES
   ARCMigrate.cpp
   BuildSystem.cpp
+  CDependencies.cpp
   CIndex.cpp
   CIndexCXX.cpp
   CIndexCodeCompletion.cpp
