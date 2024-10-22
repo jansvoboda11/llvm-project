@@ -2520,16 +2520,13 @@ InputFileInfo ASTReader::getInputFileInfo(ModuleFile &F, unsigned ID) {
   std::tie(R.FilenameAsRequested, R.Filename) = [&]() {
     uint16_t AsRequestedLength = Record[7];
 
-    std::string NameAsRequested = Blob.substr(0, AsRequestedLength).str();
-    std::string Name = Blob.substr(AsRequestedLength).str();
-
-    ResolveImportedPath(F, NameAsRequested);
-    ResolveImportedPath(F, Name);
+    StringRef NameAsRequested = Blob.substr(0, AsRequestedLength);
+    StringRef Name = Blob.substr(AsRequestedLength);
 
     if (Name.empty())
       Name = NameAsRequested;
 
-    return std::make_pair(std::move(NameAsRequested), std::move(Name));
+    return std::make_pair(NameAsRequested, Name);
   }();
 
   Expected<llvm::BitstreamEntry> MaybeEntry = Cursor.advance();
@@ -2582,7 +2579,8 @@ InputFile ASTReader::getInputFile(ModuleFile &F, unsigned ID, bool Complain) {
   time_t StoredTime = FI.StoredTime;
   bool Overridden = FI.Overridden;
   bool Transient = FI.Transient;
-  StringRef Filename = FI.FilenameAsRequested;
+  std::string Filename(FI.FilenameAsRequested);
+  ResolveImportedPath(F, Filename);
   uint64_t StoredContentHash = FI.ContentHash;
 
   // For standard C++ modules, we don't need to check the inputs.
@@ -2962,9 +2960,11 @@ ASTReader::ReadControlBlock(ModuleFile &F,
         for (unsigned I = 0; I < N; ++I) {
           bool IsSystem = I >= NumUserInputs;
           InputFileInfo FI = getInputFileInfo(F, I + 1);
-          Listener->visitInputFile(
-              FI.FilenameAsRequested, IsSystem, FI.Overridden,
-              F.Kind == MK_ExplicitModule || F.Kind == MK_PrebuiltModule);
+          std::string FilenameAsRequested(FI.FilenameAsRequested);
+          ResolveImportedPath(F, FilenameAsRequested);
+          Listener->visitInputFile(FilenameAsRequested, IsSystem, FI.Overridden,
+                                   F.Kind == MK_ExplicitModule ||
+                                       F.Kind == MK_PrebuiltModule);
         }
       }
 

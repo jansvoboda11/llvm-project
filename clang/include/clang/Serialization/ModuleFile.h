@@ -61,8 +61,8 @@ enum ModuleKind {
 
 /// The input file info that has been loaded from an AST file.
 struct InputFileInfo {
-  std::string FilenameAsRequested;
-  std::string Filename;
+  StringRef FilenameAsRequested;
+  StringRef Filename;
   uint64_t ContentHash;
   off_t StoredSize;
   time_t StoredTime;

@@ -465,7 +465,9 @@ public:
             JOS.attributeArray("command-line",
                                toJSONStrings(JOS, MD.getBuildArguments()));
             JOS.attribute("context-hash", StringRef(MD.ID.ContextHash));
-            JOS.attributeArray("file-deps", toJSONStrings(JOS, MD.FileDeps));
+            JOS.attributeArray("file-deps", [&] {
+              MD.forEachFileDep([&](StringRef FileDep) { JOS.value(FileDep); });
+            });
             JOS.attributeArray("link-libraries",
                                toJSONSorted(JOS, MD.LinkLibraries));
             JOS.attribute("name", StringRef(MD.ID.ModuleName));

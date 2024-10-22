@@ -21,6 +21,15 @@ using namespace clang;
 using namespace tooling;
 using namespace dependencies;
 
+void ModuleDeps::forEachFileDep(llvm::function_ref<void(StringRef)> Cb) const {
+  std::string FinalPath;
+  for (StringRef FileDep : FileDeps) {
+    FinalPath = FileDep;
+    ASTReader::ResolveImportedPath(FinalPath, FileDepsBaseDir);
+    Cb(FinalPath);
+  }
+}
+
 const std::vector<std::string> &ModuleDeps::getBuildArguments() {
   assert(!std::holds_alternative<std::monostate>(BuildInfo) &&
          "Using uninitialized ModuleDeps");
@@ -596,6 +605,7 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
   serialization::ModuleFile *MF =
       MDC.ScanInstance.getASTReader()->getModuleManager().lookup(
           *M->getASTFile());
+  MD.FileDepsBaseDir = MF->BaseDirectory;
   MDC.ScanInstance.getASTReader()->visitInputFileInfos(
       *MF, /*IncludeSystem=*/true,
       [&](const serialization::InputFileInfo &IFI, bool IsSystem) {
@@ -608,9 +618,6 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
           return;
         MDC.addFileDep(MD, IFI.Filename);
       });
-  // Not strictly needed to get deterministic results, consider removing this.
-  llvm::sort(MD.FileDeps);
-  MD.FileDeps.erase(llvm::unique(MD.FileDeps), MD.FileDeps.end());
 
   llvm::DenseSet<const Module *> SeenDeps;
   addAllSubmodulePrebuiltDeps(M, MD, SeenDeps);
@@ -625,7 +632,9 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
         if (StringRef(IFI.FilenameAsRequested)
                 .ends_with("__inferred_module.map"))
           return;
-        MD.ModuleMapFileDeps.emplace_back(IFI.FilenameAsRequested);
+        std::string Dep(IFI.FilenameAsRequested);
+        ASTReader::ResolveImportedPath(Dep, MF->BaseDirectory);
+        MD.ModuleMapFileDeps.emplace_back(std::move(Dep));
       });
 
   CowCompilerInvocation CI =
@@ -793,12 +802,5 @@ void ModuleDepCollector::addFileDep(StringRef Path) {
 }
 
 void ModuleDepCollector::addFileDep(ModuleDeps &MD, StringRef Path) {
-  if (IsStdModuleP1689Format) {
-    MD.FileDeps.emplace_back(Path);
-    return;
-  }
-
-  llvm::SmallString<256> Storage;
-  Path = makeAbsoluteAndPreferred(ScanInstance, Path, Storage);
   MD.FileDeps.emplace_back(Path);
 }
