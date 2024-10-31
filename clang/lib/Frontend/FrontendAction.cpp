@@ -510,7 +510,6 @@ static std::error_code collectModuleHeaderIncludes(
   // Add includes for each of these headers.
   for (auto HK : {Module::HK_Normal, Module::HK_Private}) {
     for (const Module::Header &H : Module->getHeaders(HK)) {
-      Module->addTopHeader(H.Entry);
       // Use the path as specified in the module map file. We'll look for this
       // file relative to the module build directory (the directory containing
       // the module map file) so this will find the same file that we found
@@ -523,7 +522,6 @@ static std::error_code collectModuleHeaderIncludes(
 
   if (std::optional<Module::Header> UmbrellaHeader =
           Module->getUmbrellaHeaderAsWritten()) {
-    Module->addTopHeader(UmbrellaHeader->Entry);
     if (Module->Parent)
       // Include the umbrella header for submodules.
       addHeaderInclude(UmbrellaHeader->PathRelativeToRootModuleDirectory,
@@ -580,7 +578,6 @@ static std::error_code collectModuleHeaderIncludes(
     llvm::sort(Headers, llvm::less_first());
     for (auto &H : Headers) {
       // Include this header as part of the umbrella directory.
-      Module->addTopHeader(H.second);
       addHeaderInclude(H.first, Includes, LangOpts, Module->IsExternC);
     }
   }

@@ -667,7 +667,6 @@ ModuleMap::findOrCreateModuleForHeaderInUmbrellaDir(FileEntryRef File) {
       Result = findOrCreateModuleFirst(Name, Result, /*IsFramework=*/false,
                                        Explicit);
       setInferredModuleAllowedBy(Result, UmbrellaModuleMap);
-      Result->addTopHeader(File);
 
       // If inferred submodules export everything they import, add a
       // wildcard to the set of exports.

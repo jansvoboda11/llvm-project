@@ -6224,12 +6224,6 @@ llvm::Error ASTReader::ReadSubmoduleBlock(ModuleFile &F,
       // them here.
       break;
 
-    case SUBMODULE_TOPHEADER: {
-      auto HeaderName = ResolveImportedPath(PathBuf, Blob, F);
-      CurrentModule->addTopHeaderFilename(*HeaderName);
-      break;
-    }
-
     case SUBMODULE_UMBRELLA_DIR: {
       // See comments in SUBMODULE_UMBRELLA_HEADER
       auto Dirname = ResolveImportedPath(PathBuf, Blob, F);

@@ -9335,33 +9335,11 @@ int clang_Module_isSystem(CXModule CXMod) {
 
 unsigned clang_Module_getNumTopLevelHeaders(CXTranslationUnit TU,
                                             CXModule CXMod) {
-  if (isNotUsableTU(TU)) {
-    LOG_BAD_TU(TU);
-    return 0;
-  }
-  if (!CXMod)
-    return 0;
-  Module *Mod = static_cast<Module *>(CXMod);
-  FileManager &FileMgr = cxtu::getASTUnit(TU)->getFileManager();
-  ArrayRef<FileEntryRef> TopHeaders = Mod->getTopHeaders(FileMgr);
-  return TopHeaders.size();
+  return 0;
 }
 
 CXFile clang_Module_getTopLevelHeader(CXTranslationUnit TU, CXModule CXMod,
                                       unsigned Index) {
-  if (isNotUsableTU(TU)) {
-    LOG_BAD_TU(TU);
-    return nullptr;
-  }
-  if (!CXMod)
-    return nullptr;
-  Module *Mod = static_cast<Module *>(CXMod);
-  FileManager &FileMgr = cxtu::getASTUnit(TU)->getFileManager();
-
-  ArrayRef<FileEntryRef> TopHeaders = Mod->getTopHeaders(FileMgr);
-  if (Index < TopHeaders.size())
-    return cxfile::makeCXFile(TopHeaders[Index]);
-
   return nullptr;
 }
 

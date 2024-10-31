@@ -1001,7 +1001,6 @@ void ASTWriter::WriteBlockInfoBlock() {
   RECORD(SUBMODULE_DEFINITION);
   RECORD(SUBMODULE_UMBRELLA_HEADER);
   RECORD(SUBMODULE_HEADER);
-  RECORD(SUBMODULE_TOPHEADER);
   RECORD(SUBMODULE_UMBRELLA_DIR);
   RECORD(SUBMODULE_IMPORTS);
   RECORD(SUBMODULE_AFFECTING_MODULES);
@@ -3021,11 +3020,6 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
   unsigned HeaderAbbrev = Stream.EmitAbbrev(std::move(Abbrev));
 
   Abbrev = std::make_shared<BitCodeAbbrev>();
-  Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_TOPHEADER));
-  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Name
-  unsigned TopHeaderAbbrev = Stream.EmitAbbrev(std::move(Abbrev));
-
-  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_UMBRELLA_DIR));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Name
   unsigned UmbrellaDirAbbrev = Stream.EmitAbbrev(std::move(Abbrev));
@@ -3164,16 +3158,6 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
       RecordData::value_type Record[] = {HL.RecordKind};
       for (const auto &H : Mod->getHeaders(HL.HeaderKind))
         Stream.EmitRecordWithBlob(HL.Abbrev, Record, H.NameAsWritten);
-    }
-
-    // Emit the top headers.
-    {
-      RecordData::value_type Record[] = {SUBMODULE_TOPHEADER};
-      for (FileEntryRef H : Mod->getTopHeaders(PP->getFileManager())) {
-        SmallString<128> HeaderName(H.getName());
-        PreparePathForOutput(HeaderName);
-        Stream.EmitRecordWithBlob(TopHeaderAbbrev, Record, HeaderName);
-      }
     }
 
     // Emit the imports.

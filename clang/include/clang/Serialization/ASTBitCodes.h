@@ -824,8 +824,7 @@ enum SubmoduleRecordTypes {
   /// Specifies a header that falls into this (sub)module.
   SUBMODULE_HEADER = 3,
 
-  /// Specifies a top-level header that falls into this (sub)module.
-  SUBMODULE_TOPHEADER = 4,
+  // ID 4 used to be used for top-level headers.
 
   /// Specifies an umbrella directory.
   SUBMODULE_UMBRELLA_DIR = 5,

@@ -257,12 +257,6 @@ private:
   /// corresponding serialized AST file, or null otherwise.
   OptionalFileEntryRef ASTFile;
 
-  /// The top-level headers associated with this module.
-  llvm::SmallSetVector<FileEntryRef, 2> TopHeaders;
-
-  /// top-level header filenames that aren't resolved to FileEntries yet.
-  std::vector<std::string> TopHeaderNames;
-
   /// Cache of modules visible to lookup in this module.
   mutable llvm::DenseSet<const Module*> VisibleModulesCache;
 
@@ -759,17 +753,6 @@ public:
   /// explicitly written in the module map file, or the parent of the umbrella
   /// header.
   OptionalDirectoryEntryRef getEffectiveUmbrellaDir() const;
-
-  /// Add a top-level header associated with this module.
-  void addTopHeader(FileEntryRef File);
-
-  /// Add a top-level header filename associated with this module.
-  void addTopHeaderFilename(StringRef Filename) {
-    TopHeaderNames.push_back(std::string(Filename));
-  }
-
-  /// The top-level headers associated with this module.
-  ArrayRef<FileEntryRef> getTopHeaders(FileManager &FileMgr);
 
   /// Determine whether this module has declared its intention to
   /// directly use another module.

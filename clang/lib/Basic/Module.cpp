@@ -269,22 +269,6 @@ OptionalDirectoryEntryRef Module::getEffectiveUmbrellaDir() const {
   return std::nullopt;
 }
 
-void Module::addTopHeader(FileEntryRef File) {
-  assert(File);
-  TopHeaders.insert(File);
-}
-
-ArrayRef<FileEntryRef> Module::getTopHeaders(FileManager &FileMgr) {
-  if (!TopHeaderNames.empty()) {
-    for (StringRef TopHeaderName : TopHeaderNames)
-      if (auto FE = FileMgr.getOptionalFileRef(TopHeaderName))
-        TopHeaders.insert(*FE);
-    TopHeaderNames.clear();
-  }
-
-  return llvm::ArrayRef(TopHeaders.begin(), TopHeaders.end());
-}
-
 bool Module::directlyUses(const Module *Requested) {
   auto *Top = getTopLevelModule();
 
