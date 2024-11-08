@@ -10,29 +10,6 @@
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "{{.*}}",
-// CHECK-NEXT:           "module-name": "B"
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "{{.*}}",
-// CHECK-NEXT:           "module-name": "C"
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/moduleA/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// Module A needs the VFS overlay because its dependency, module B, needs it.
-// CHECK:              "-ivfsoverlay"
-// CHECK-NEXT:         "[[PREFIX]]/build/vfs.yaml"
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "{{.*}}",
-// CHECK-NEXT:       "file-deps": [
-// CHECK:            ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "A"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [],
 // CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/moduleB/module.modulemap",
 // CHECK-NEXT:       "command-line": [
@@ -58,6 +35,29 @@
 // CHECK:            ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "C"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "context-hash": "{{.*}}",
+// CHECK-NEXT:           "module-name": "B"
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "context-hash": "{{.*}}",
+// CHECK-NEXT:           "module-name": "C"
+// CHECK-NEXT:         }
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/moduleA/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// Module A needs the VFS overlay because its dependency, module B, needs it.
+// CHECK:              "-ivfsoverlay"
+// CHECK-NEXT:         "[[PREFIX]]/build/vfs.yaml"
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "{{.*}}",
+// CHECK-NEXT:       "file-deps": [
+// CHECK:            ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "A"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

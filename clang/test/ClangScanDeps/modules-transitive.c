@@ -33,6 +33,10 @@ module third { header "third.h" }
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK:          },
+// CHECK-NEXT:     {
+// CHECK:          },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",

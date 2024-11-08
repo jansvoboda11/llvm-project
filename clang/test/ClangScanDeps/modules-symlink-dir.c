@@ -25,6 +25,16 @@
 // RUN: %clang @%t/F.rsp
 
 // CHECK:      "modules": [
+// CHECK-NEXT:   {
+// CHECK:          "clang-modulemap-file": "[[PREFIX]]/module/module.modulemap"
+// CHECK:          "command-line": [
+// CHECK-NOT: symlink-to-module
+// CHECK:            "[[PREFIX]]/module/module.modulemap"
+// CHECK-NOT: symlink-to-module
+// CHECK:          ]
+// CHECK:          "context-hash": "[[CONTEXT_HASH:[A-Z0-9]+]]"
+// CHECK:          "name": "Mod"
+// CHECK-NEXT:   },
 // CHECK:        {
 // CHECK:          "clang-module-deps": [],
 // CHECK:          "clang-modulemap-file": "[[PREFIX]]/module/F.framework/Modules/module.modulemap"
@@ -35,16 +45,6 @@
 // CHECK:          ]
 // CHECK:          "context-hash": "[[F_CONTEXT_HASH:[A-Z0-9]+]]"
 // CHECK:          "name": "F"
-// CHECK-NEXT:   }
-// CHECK-NEXT:   {
-// CHECK:          "clang-modulemap-file": "[[PREFIX]]/module/module.modulemap"
-// CHECK:          "command-line": [
-// CHECK-NOT: symlink-to-module
-// CHECK:            "[[PREFIX]]/module/module.modulemap"
-// CHECK-NOT: symlink-to-module
-// CHECK:          ]
-// CHECK:          "context-hash": "[[CONTEXT_HASH:[A-Z0-9]+]]"
-// CHECK:          "name": "Mod"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 // CHECK:      "translation-units": [
