@@ -397,22 +397,45 @@ public:
   void mergeDeps(ModuleDepsGraph Graph, size_t InputIndex) {
     std::vector<ModuleDeps *> NewMDs;
     {
-      std::unique_lock<std::mutex> ul(Lock);
+      /// We need the output of clang-scan-deps to be deterministic. However,
+      /// the dependency graph may contain two modules with the same name. How
+      /// do we decide which one to print first? If we made that decision based
+      /// on the context hash, the ordering would be deterministic, but
+      /// different across configurations. We solve that by tracking the index
+      /// of the first input TU that (transitively) imports the dependency,
+      /// which is always the same given identical input, resulting in
+      /// deterministic sorting that's also reproducible across machines.
+      std::unique_lock Lock(Mutex);
       for (const ModuleDeps &MD : Graph) {
-        auto I = Modules.find({MD.ID, 0});
-        if (I != Modules.end()) {
-          I->first.InputIndex = std::min(I->first.InputIndex, InputIndex);
+        auto [It, New] = ModuleToInputIndex.insert({MD.ID, 0});
+        if (New) {
+          // If this is the first time seeing the module dependency, we have to
+          // take ownership by establishing the mappings.
+          InputIndexToModules[InputIndex].insert(MD.ID);
+          It->second = InputIndex;
+          // And store the module dependency data itself.
+          auto MDPtr = std::make_unique<ModuleDeps>(std::move(MD));
+          NewMDs.push_back(MDPtr.get());
+          Modules[MD.ID] = std::move(MDPtr);
           continue;
         }
-        auto Res = Modules.insert(I, {{MD.ID, InputIndex}, std::move(MD)});
-        NewMDs.push_back(&Res->second);
+        if (It->second < InputIndex) {
+          // If we already saw the module dependency for a TU with a lower
+          // index, we just let it keep the ownership.
+          continue;
+        }
+        // But if we have the lowest index across all other TUs that import this
+        // module dependency, we take the ownership.
+        InputIndexToModules[It->second].remove(MD.ID);
+        InputIndexToModules[InputIndex].insert(MD.ID);
+        It->second = InputIndex;
       }
-      // First call to \c getBuildArguments is somewhat expensive. Let's call it
-      // on the current thread (instead of the main one), and outside the
-      // critical section.
-      for (ModuleDeps *MD : NewMDs)
-        (void)MD->getBuildArguments();
     }
+    // First call to \c getBuildArguments is somewhat expensive. Let's call it
+    // on the current thread (instead of the main one), and outside the critical
+    // section.
+    for (ModuleDeps *MD : NewMDs)
+      (void)MD->getBuildArguments();
   }
 
   bool roundTripCommand(ArrayRef<std::string> ArgStrs,
@@ -435,7 +458,7 @@ public:
                                             /*ShouldOwnClient=*/false);
 
     for (auto &&M : Modules)
-      if (roundTripCommand(M.second.getBuildArguments(), *Diags))
+      if (roundTripCommand(M.second->getBuildArguments(), *Diags))
         return true;
 
     for (auto &&I : Inputs)
@@ -452,32 +475,27 @@ public:
     if (&OS == &llvm::nulls())
       return;
 
-    // Sort the modules by name to get a deterministic order.
-    std::vector<IndexedModuleID> ModuleIDs;
-    for (auto &&M : Modules)
-      ModuleIDs.push_back(M.first);
-    llvm::sort(ModuleIDs);
-
     llvm::json::OStream JOS(OS, /*IndentSize=*/2);
 
     JOS.object([&] {
       JOS.attributeArray("modules", [&] {
-        for (auto &&ModID : ModuleIDs) {
-          auto &MD = Modules[ModID];
-          JOS.object([&] {
-            JOS.attributeArray("clang-module-deps",
-                               toJSONSorted(JOS, MD.ClangModuleDeps));
-            JOS.attribute("clang-modulemap-file",
-                          StringRef(MD.ClangModuleMapFile));
-            JOS.attributeArray("command-line",
-                               toJSONStrings(JOS, MD.getBuildArguments()));
-            JOS.attribute("context-hash", StringRef(MD.ID.ContextHash));
-            JOS.attributeArray("file-deps", toJSONSorted(JOS, MD.FileDeps));
-            JOS.attributeArray("link-libraries",
-                               toJSONSorted(JOS, MD.LinkLibraries));
-            JOS.attribute("name", StringRef(MD.ID.ModuleName));
-          });
-        }
+        for (unsigned InputIndex = 0; InputIndex < Inputs.size(); ++InputIndex)
+          for (ModuleID ModID : InputIndexToModules[InputIndex]) {
+            ModuleDeps &MD = *Modules[ModID];
+            JOS.object([&] {
+              JOS.attributeArray("clang-module-deps",
+                                 toJSONSorted(JOS, MD.ClangModuleDeps));
+              JOS.attribute("clang-modulemap-file",
+                            StringRef(MD.ClangModuleMapFile));
+              JOS.attributeArray("command-line",
+                                 toJSONStrings(JOS, MD.getBuildArguments()));
+              JOS.attribute("context-hash", StringRef(MD.ID.ContextHash));
+              JOS.attributeArray("file-deps", toJSONSorted(JOS, MD.FileDeps));
+              JOS.attributeArray("link-libraries",
+                                 toJSONSorted(JOS, MD.LinkLibraries));
+              JOS.attribute("name", StringRef(MD.ID.ModuleName));
+            });
+          }
       });
 
       JOS.attributeArray("translation-units", [&] {
@@ -520,39 +538,10 @@ public:
   }
 
 private:
-  struct IndexedModuleID {
-    ModuleID ID;
-
-    // FIXME: This is mutable so that it can still be updated after insertion
-    //  into an unordered associative container. This is "fine", since this
-    //  field doesn't contribute to the hash, but it's a brittle hack.
-    mutable size_t InputIndex;
-
-    bool operator==(const IndexedModuleID &Other) const {
-      return ID == Other.ID;
-    }
-
-    bool operator<(const IndexedModuleID &Other) const {
-      /// We need the output of clang-scan-deps to be deterministic. However,
-      /// the dependency graph may contain two modules with the same name. How
-      /// do we decide which one to print first? If we made that decision based
-      /// on the context hash, the ordering would be deterministic, but
-      /// different across machines. This can happen for example when the inputs
-      /// or the SDKs (which both contribute to the "context" hash) live in
-      /// different absolute locations. We solve that by tracking the index of
-      /// the first input TU that (transitively) imports the dependency, which
-      /// is always the same for the same input, resulting in deterministic
-      /// sorting that's also reproducible across machines.
-      return std::tie(ID.ModuleName, InputIndex) <
-             std::tie(Other.ID.ModuleName, Other.InputIndex);
-    }
-
-    struct Hasher {
-      std::size_t operator()(const IndexedModuleID &IMID) const {
-        return llvm::hash_value(IMID.ID);
-      }
-    };
-  };
+  std::mutex Mutex;
+  llvm::DenseMap<ModuleID, unsigned> ModuleToInputIndex;
+  llvm::DenseMap<unsigned, llvm::SetVector<ModuleID>> InputIndexToModules;
+  llvm::DenseMap<ModuleID, std::unique_ptr<ModuleDeps>> Modules;
 
   struct InputDeps {
     std::string FileName;
@@ -562,10 +551,6 @@ private:
     std::vector<std::string> DriverCommandLine;
     std::vector<Command> Commands;
   };
-
-  std::mutex Lock;
-  std::unordered_map<IndexedModuleID, ModuleDeps, IndexedModuleID::Hasher>
-      Modules;
   std::vector<InputDeps> Inputs;
 };
 

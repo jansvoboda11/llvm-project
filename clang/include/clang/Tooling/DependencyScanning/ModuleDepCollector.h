@@ -322,22 +322,16 @@ void resetBenignCodeGenOptions(frontend::ActionKind ProgramAction,
 } // end namespace tooling
 } // end namespace clang
 
-namespace llvm {
-inline hash_code hash_value(const clang::tooling::dependencies::ModuleID &ID) {
-  return hash_combine(ID.ModuleName, ID.ContextHash);
-}
-
-template <> struct DenseMapInfo<clang::tooling::dependencies::ModuleID> {
+template <> struct llvm::DenseMapInfo<clang::tooling::dependencies::ModuleID> {
   using ModuleID = clang::tooling::dependencies::ModuleID;
-  static inline ModuleID getEmptyKey() { return ModuleID{"", ""}; }
-  static inline ModuleID getTombstoneKey() {
-    return ModuleID{"~", "~"}; // ~ is not a valid module name or context hash
+  static ModuleID getEmptyKey() { return ModuleID{"", ""}; }
+  static ModuleID getTombstoneKey() { return ModuleID{"~", "~"}; }
+  static unsigned getHashValue(const ModuleID &ID) {
+    return hash_combine(ID.ModuleName, ID.ContextHash);
   }
-  static unsigned getHashValue(const ModuleID &ID) { return hash_value(ID); }
   static bool isEqual(const ModuleID &LHS, const ModuleID &RHS) {
     return LHS == RHS;
   }
 };
-} // namespace llvm
 
 #endif // LLVM_CLANG_TOOLING_DEPENDENCYSCANNING_MODULEDEPCOLLECTOR_H
