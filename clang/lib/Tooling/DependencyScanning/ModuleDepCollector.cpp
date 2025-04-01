@@ -774,6 +774,9 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
     MD.ClangModuleMapFile = std::string(Path);
   }
 
+  SmallString<0> PathBuf;
+  PathBuf.reserve(256);
+
   serialization::ModuleFile *MF =
       MDC.ScanInstance.getASTReader()->getModuleManager().lookup(
           *M->getASTFile());
@@ -781,14 +784,19 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
   MDC.ScanInstance.getASTReader()->visitInputFileInfos(
       *MF, /*IncludeSystem=*/true,
       [&](const serialization::InputFileInfo &IFI, bool IsSystem) {
+        auto ResolvedFilename = ASTReader::ResolveImportedPath(
+            PathBuf, IFI.UnresolvedImportedFilename, *MF);
+        if (MD.IsInStableDirectories)
+          MD.IsInStableDirectories =
+              isPathInStableDir(StableDirs, *ResolvedFilename);
         // The __inferred_module.map file is an insignificant implementation
         // detail of implicitly-built modules. The PCM will also report the
         // actual on-disk module map file that allowed inferring the module,
         // which is what we need for building the module explicitly
         // Let's ignore this file.
-        if (IFI.UnresolvedImportedFilename.ends_with("__inferred_module.map"))
+        if (ResolvedFilename->ends_with("__inferred_module.map"))
           return;
-        MDC.addFileDep(MD, IFI.UnresolvedImportedFilename);
+        MDC.addFileDep(MD, *ResolvedFilename);
       });
 
   llvm::DenseSet<const Module *> SeenDeps;
@@ -796,25 +804,16 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
   addAllSubmoduleDeps(M, MD, SeenDeps);
   addAllAffectingClangModules(M, MD, SeenDeps);
 
-  SmallString<0> PathBuf;
-  PathBuf.reserve(256);
   MDC.ScanInstance.getASTReader()->visitInputFileInfos(
       *MF, /*IncludeSystem=*/true,
       [&](const serialization::InputFileInfo &IFI, bool IsSystem) {
-        if (MD.IsInStableDirectories) {
-          auto FullFilePath = ASTReader::ResolveImportedPath(
-              PathBuf, IFI.UnresolvedImportedFilename, MF->BaseDirectory);
-          MD.IsInStableDirectories =
-              isPathInStableDir(StableDirs, *FullFilePath);
-        }
         if (!(IFI.TopLevel && IFI.ModuleMap))
           return;
         if (IFI.UnresolvedImportedFilenameAsRequested.ends_with(
                 "__inferred_module.map"))
           return;
         auto ResolvedFilenameAsRequested = ASTReader::ResolveImportedPath(
-            PathBuf, IFI.UnresolvedImportedFilenameAsRequested,
-            MF->BaseDirectory);
+            PathBuf, IFI.UnresolvedImportedFilenameAsRequested, *MF);
         MD.ModuleMapFileDeps.emplace_back(*ResolvedFilenameAsRequested);
       });
 
@@ -990,12 +989,9 @@ bool ModuleDepCollector::isPrebuiltModule(const Module *M) {
 
 static StringRef makeAbsoluteAndPreferred(CompilerInstance &CI, StringRef Path,
                                           SmallVectorImpl<char> &Storage) {
-  if (llvm::sys::path::is_absolute(Path) &&
-      !llvm::sys::path::is_style_windows(llvm::sys::path::Style::native))
-    return Path;
   Storage.assign(Path.begin(), Path.end());
   CI.getFileManager().makeAbsolutePath(Storage);
-  llvm::sys::path::make_preferred(Storage);
+  llvm::sys::path::remove_dots(Storage);
   return StringRef(Storage.data(), Storage.size());
 }
 
@@ -1007,11 +1003,11 @@ void ModuleDepCollector::addFileDep(StringRef Path) {
     return;
   }
 
-  llvm::SmallString<256> Storage;
-  Path = makeAbsoluteAndPreferred(ScanInstance, Path, Storage);
+  Path = makeAbsoluteAndPreferred(ScanInstance, Path, AbsolutePathBuf);
   FileDeps.emplace_back(Path);
 }
 
 void ModuleDepCollector::addFileDep(ModuleDeps &MD, StringRef Path) {
+  Path = makeAbsoluteAndPreferred(ScanInstance, Path, AbsolutePathBuf);
   MD.FileDeps.emplace_back(Path);
 }

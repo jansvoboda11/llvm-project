@@ -294,6 +294,7 @@ private:
   /// Checks whether the module is known as being prebuilt.
   bool isPrebuiltModule(const Module *M);
 
+  llvm::SmallString<0> AbsolutePathBuf;
   /// Adds \p Path to \c FileDeps, making it absolute if necessary.
   void addFileDep(StringRef Path);
   /// Adds \p Path to \c MD.FileDeps, making it absolute if necessary.
