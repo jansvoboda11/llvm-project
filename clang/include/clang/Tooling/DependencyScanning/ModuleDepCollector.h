@@ -296,9 +296,9 @@ private:
 
   llvm::SmallString<0> AbsolutePathBuf;
   /// Adds \p Path to \c FileDeps, making it absolute if necessary.
-  void addFileDep(StringRef Path);
+  void addFileDep(SmallString<128> &Path);
   /// Adds \p Path to \c MD.FileDeps, making it absolute if necessary.
-  void addFileDep(ModuleDeps &MD, StringRef Path);
+  void addFileDep(ModuleDeps &MD, SmallString<128> &Path);
 
   /// Get a Clang invocation adjusted to build the given modular dependency.
   /// This excludes paths that are yet-to-be-provided by the build system.

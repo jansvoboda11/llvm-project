@@ -987,15 +987,13 @@ bool ModuleDepCollector::isPrebuiltModule(const Module *M) {
   return true;
 }
 
-static StringRef makeAbsoluteAndPreferred(CompilerInstance &CI, StringRef Path,
-                                          SmallVectorImpl<char> &Storage) {
-  Storage.assign(Path.begin(), Path.end());
-  CI.getFileManager().makeAbsolutePath(Storage);
-  llvm::sys::path::remove_dots(Storage);
-  return StringRef(Storage.data(), Storage.size());
+static void makeAbsoluteAndPreferred(CompilerInstance &CI,
+                                     SmallString<128> &Path) {
+  CI.getFileManager().makeAbsolutePath(Path);
+  llvm::sys::path::remove_dots(Path);
 }
 
-void ModuleDepCollector::addFileDep(StringRef Path) {
+void ModuleDepCollector::addFileDep(SmallString<128> &Path) {
   if (Service.getFormat() == ScanningOutputFormat::P1689) {
     // Within P1689 format, we don't want all the paths to be absolute path
     // since it may violate the traditional make style dependencies info.
@@ -1003,11 +1001,11 @@ void ModuleDepCollector::addFileDep(StringRef Path) {
     return;
   }
 
-  Path = makeAbsoluteAndPreferred(ScanInstance, Path, AbsolutePathBuf);
+  makeAbsoluteAndPreferred(ScanInstance, Path);
   FileDeps.emplace_back(Path);
 }
 
-void ModuleDepCollector::addFileDep(ModuleDeps &MD, StringRef Path) {
-  Path = makeAbsoluteAndPreferred(ScanInstance, Path, AbsolutePathBuf);
+void ModuleDepCollector::addFileDep(ModuleDeps &MD, SmallString<128> &Path) {
+  makeAbsoluteAndPreferred(ScanInstance, Path);
   MD.FileDeps.emplace_back(Path);
 }
