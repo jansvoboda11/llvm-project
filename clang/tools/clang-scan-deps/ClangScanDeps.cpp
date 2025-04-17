@@ -406,7 +406,7 @@ static auto toJSONSorted(llvm::json::OStream &JOS, std::vector<std::string> V) {
 // Thread safe.
 class FullDeps {
 public:
-  FullDeps(size_t NumInputs) : Inputs(NumInputs) {}
+  FullDeps(size_t NumInputs) : Deps(NumInputs), Inputs(NumInputs) {}
 
   void mergeDeps(StringRef Input, TranslationUnitDeps TUDeps,
                  size_t InputIndex) {
@@ -429,24 +429,7 @@ public:
   }
 
   void mergeDeps(ModuleDepsGraph Graph, size_t InputIndex) {
-    std::vector<ModuleDeps *> NewMDs;
-    {
-      std::unique_lock<std::mutex> ul(Lock);
-      for (ModuleDeps &MD : Graph) {
-        auto I = Modules.find({MD.ID, 0});
-        if (I != Modules.end()) {
-          I->first.InputIndex = std::min(I->first.InputIndex, InputIndex);
-          continue;
-        }
-        auto Res = Modules.insert(I, {{MD.ID, InputIndex}, std::move(MD)});
-        NewMDs.push_back(&Res->second);
-      }
-    }
-    // First call to \c getBuildArguments is somewhat expensive. Let's call it
-    // on the current thread (instead of the main one), and outside the
-    // critical section.
-    for (ModuleDeps *MD : NewMDs)
-      (void)MD->getBuildArguments();
+    Deps[InputIndex] = std::move(Graph);
   }
 
   bool roundTripCommand(ArrayRef<std::string> ArgStrs,
@@ -469,9 +452,10 @@ public:
                                             DiagOpts, &DiagConsumer,
                                             /*ShouldOwnClient=*/false);
 
-    for (auto &&M : Modules)
-      if (roundTripCommand(M.second.getBuildArguments(), *Diags))
-        return true;
+    for (auto &InputDeps : Deps)
+      for (auto &M : InputDeps)
+        if (roundTripCommand(M.getBuildArguments(), *Diags))
+          return true;
 
     for (auto &&I : Inputs)
       for (const auto &Cmd : I.Commands)
@@ -487,18 +471,28 @@ public:
     if (&OS == &llvm::nulls())
       return;
 
-    // Sort the modules by name to get a deterministic order.
-    std::vector<IndexedModuleID> ModuleIDs;
-    for (auto &&M : Modules)
-      ModuleIDs.push_back(M.first);
-    llvm::sort(ModuleIDs);
+    // Associate modules with the first TU that (transitively) depends on them.
+    llvm::DenseMap<ModuleID, unsigned> ModuleIDs;
+    for (const auto &[InputIndex, Input] : llvm::enumerate(Inputs)) {
+      for (auto &&MD : Deps[InputIndex]) {
+        auto [It, New] = ModuleIDs.insert({MD.ID, InputIndex});
+        if (!New && It->second > InputIndex)
+          It->second = InputIndex;
+      }
+    }
 
     llvm::json::OStream JOS(OS, /*IndentSize=*/2);
 
     JOS.object([&] {
       JOS.attributeArray("modules", [&] {
-        for (auto &&ModID : ModuleIDs) {
-          auto &MD = Modules[ModID];
+        for (const auto &[InputIndex, Input] : llvm::enumerate(Inputs)) {
+          for (auto &&MD : Deps[InputIndex]) {
+          auto It = ModuleIDs.find(MD.ID);
+          assert(It != ModuleIDs.end());
+          // Report a dependency only with one chosen input.
+          if (It->second != InputIndex)
+            continue;
+
           JOS.object([&] {
             if (MD.IsInStableDirectories)
               JOS.attribute("is-in-stable-directories",
@@ -522,6 +516,7 @@ public:
                                toJSONSorted(JOS, MD.LinkLibraries));
             JOS.attribute("name", StringRef(MD.ID.ModuleName));
           });
+        }
         }
       });
 
@@ -585,40 +580,6 @@ public:
   }
 
 private:
-  struct IndexedModuleID {
-    ModuleID ID;
-
-    // FIXME: This is mutable so that it can still be updated after insertion
-    //  into an unordered associative container. This is "fine", since this
-    //  field doesn't contribute to the hash, but it's a brittle hack.
-    mutable size_t InputIndex;
-
-    bool operator==(const IndexedModuleID &Other) const {
-      return ID == Other.ID;
-    }
-
-    bool operator<(const IndexedModuleID &Other) const {
-      /// We need the output of clang-scan-deps to be deterministic. However,
-      /// the dependency graph may contain two modules with the same name. How
-      /// do we decide which one to print first? If we made that decision based
-      /// on the context hash, the ordering would be deterministic, but
-      /// different across machines. This can happen for example when the inputs
-      /// or the SDKs (which both contribute to the "context" hash) live in
-      /// different absolute locations. We solve that by tracking the index of
-      /// the first input TU that (transitively) imports the dependency, which
-      /// is always the same for the same input, resulting in deterministic
-      /// sorting that's also reproducible across machines.
-      return std::tie(ID.ModuleName, InputIndex) <
-             std::tie(Other.ID.ModuleName, Other.InputIndex);
-    }
-
-    struct Hasher {
-      std::size_t operator()(const IndexedModuleID &IMID) const {
-        return llvm::hash_value(IMID.ID);
-      }
-    };
-  };
-
   struct InputDeps {
     std::string FileName;
     std::string ContextHash;
@@ -631,9 +592,7 @@ private:
     std::vector<Command> Commands;
   };
 
-  std::mutex Lock;
-  std::unordered_map<IndexedModuleID, ModuleDeps, IndexedModuleID::Hasher>
-      Modules;
+  std::vector<std::vector<ModuleDeps>> Deps;
   std::vector<InputDeps> Inputs;
 };
 
