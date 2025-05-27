@@ -620,33 +620,11 @@ void ModuleDepCollector::associateWithContextHash(
   assert(Inserted && "duplicate module mapping");
 }
 
-void ModuleDepCollectorPP::LexedFileChanged(FileID FID,
-                                            LexedFileChangeReason Reason,
-                                            SrcMgr::CharacteristicKind FileType,
-                                            FileID PrevFID,
-                                            SourceLocation Loc) {
-  if (Reason != LexedFileChangeReason::EnterFile)
-    return;
-
-  SourceManager &SM = MDC.ScanInstance.getSourceManager();
-
-  // Dependency generation really does want to go all the way to the
-  // file entry for a source location to find out what is depended on.
-  // We do not want #line markers to affect dependency generation!
-  if (std::optional<StringRef> Filename = SM.getNonBuiltinFilenameForID(FID))
-    MDC.addFileDep(llvm::sys::path::remove_leading_dotslash(*Filename));
-}
-
 void ModuleDepCollectorPP::InclusionDirective(
     SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
     bool IsAngled, CharSourceRange FilenameRange, OptionalFileEntryRef File,
     StringRef SearchPath, StringRef RelativePath, const Module *SuggestedModule,
     bool ModuleImported, SrcMgr::CharacteristicKind FileType) {
-  if (!File && !ModuleImported) {
-    // This is a non-modular include that HeaderSearch failed to find. Add it
-    // here as `FileChanged` will never see it.
-    MDC.addFileDep(FileName);
-  }
   handleImport(SuggestedModule);
 }
 
@@ -696,6 +674,19 @@ void ModuleDepCollectorPP::EndOfMainFile() {
       MDC.RequiredStdCXXModules.push_back(ProvidedModule);
     else
       MDC.ProvidedStdCXXModule = ProvidedModule;
+  }
+
+  SourceManager &SM = MDC.ScanInstance.getSourceManager();
+  for (unsigned I = 0, E = SM.local_sloc_entry_size(); I != E; ++I) {
+    SrcMgr::SLocEntry &SLocEntry = SM.getLocalSLocEntry(I);
+    if (!SLocEntry.isFile())
+      continue;
+    if (!SLocEntry.getFile().getContentCache().OrigEntry)
+      continue;
+    if (isModuleMap(SLocEntry.getFile().getFileCharacteristic()))
+      continue;
+    MDC.addFileDep(llvm::sys::path::remove_leading_dotslash(
+        SLocEntry.getFile().getName()));
   }
 
   if (!MDC.ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
