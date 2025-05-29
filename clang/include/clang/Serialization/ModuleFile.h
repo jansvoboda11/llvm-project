@@ -207,7 +207,9 @@ public:
 
   /// The memory buffer that stores the data associated with
   /// this AST file, owned by the InMemoryModuleCache.
-  llvm::MemoryBuffer *Buffer = nullptr;
+  llvm::MemoryBuffer *FinalBuffer = nullptr;
+
+  std::unique_ptr<llvm::MemoryBuffer> TentativeBuffer = nullptr;
 
   /// The size of this file, in bits.
   uint64_t SizeInBits = 0;

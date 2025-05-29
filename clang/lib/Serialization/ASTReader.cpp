@@ -3359,12 +3359,8 @@ ASTReader::ReadControlBlock(ModuleFile &F,
       }
 
       // If we diagnosed a problem, produce a backtrace.
-      bool recompilingFinalized = Result == OutOfDate &&
-                                  (Capabilities & ARR_OutOfDate) &&
-                                  getModuleManager()
-                                      .getModuleCache()
-                                      .getInMemoryModuleCache()
-                                      .isPCMFinal(F.FileName);
+      bool recompilingFinalized =
+          Result == OutOfDate && (Capabilities & ARR_OutOfDate) && F.FinalBuffer;
       if (!IgnoreImportedByNote &&
           (isDiagnosedResult(Result, Capabilities) || recompilingFinalized))
         Diag(diag::note_module_file_imported_by)
@@ -5054,14 +5050,14 @@ ASTReader::ReadASTCore(StringRef FileName,
   auto FinalizeOrDropPCM = llvm::make_scope_exit([&]() {
     auto &MC = getModuleManager().getModuleCache().getInMemoryModuleCache();
     if (ShouldFinalizePCM)
-      MC.finalizePCM(FileName);
+      M->FinalBuffer = &MC.addPCM(FileName, std::move(M->TentativeBuffer));
     else
-      MC.tryToDropPCM(FileName);
+      M->TentativeBuffer = nullptr;
   });
   ModuleFile &F = *M;
   BitstreamCursor &Stream = F.Stream;
-  Stream = BitstreamCursor(PCHContainerRdr.ExtractPCH(*F.Buffer));
-  F.SizeInBits = F.Buffer->getBufferSize() * 8;
+  Stream = BitstreamCursor(PCHContainerRdr.ExtractPCH(*F.FinalBuffer));
+  F.SizeInBits = F.FinalBuffer->getBufferSize() * 8;
 
   // Sniff for the signature.
   if (llvm::Error Err = doesntStartWithASTFileMagic(Stream)) {
@@ -5189,8 +5185,7 @@ ASTReader::readUnhashedControlBlock(ModuleFile &F, bool WasImportedBy,
     // validation will fail during the as-system import since the PCM on disk
     // doesn't guarantee that -Werror was respected.  However, the -Werror
     // flags were checked during the initial as-user import.
-    if (getModuleManager().getModuleCache().getInMemoryModuleCache().isPCMFinal(
-            F.FileName)) {
+    if (F.FinalBuffer) {
       Diag(diag::warn_module_system_bit_conflict) << F.FileName;
       return Success;
     }
@@ -6563,10 +6558,7 @@ ASTReader::getModulePreprocessedEntities(ModuleFile &Mod) const {
 bool ASTReader::canRecoverFromOutOfDate(StringRef ModuleFileName,
                                         unsigned int ClientLoadCapabilities) {
   return ClientLoadCapabilities & ARR_OutOfDate &&
-         !getModuleManager()
-              .getModuleCache()
-              .getInMemoryModuleCache()
-              .isPCMFinal(ModuleFileName);
+         !getModuleManager().lookupByFileName(ModuleFileName)->FinalBuffer;
 }
 
 llvm::iterator_range<ASTReader::ModuleDeclIterator>
@@ -8824,7 +8816,7 @@ LLVM_DUMP_METHOD void ASTReader::dump() {
 /// by heap-backed versus mmap'ed memory.
 void ASTReader::getMemoryBufferSizes(MemoryBufferSizes &sizes) const {
   for (ModuleFile &I : ModuleMgr) {
-    if (llvm::MemoryBuffer *buf = I.Buffer) {
+    if (llvm::MemoryBuffer *buf = I.FinalBuffer) {
       size_t bytes = buf->getBufferSize();
       switch (buf->getBufferKind()) {
         case llvm::MemoryBuffer::MemoryBuffer_Malloc:

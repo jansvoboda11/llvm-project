@@ -5399,7 +5399,7 @@ ASTWriter::WriteAST(llvm::PointerUnion<Sema *, Preprocessor *> Subject,
 
   if (ShouldCacheASTInMemory) {
     // Construct MemoryBuffer and update buffer manager.
-    ModCache.getInMemoryModuleCache().addBuiltPCM(
+    ModCache.getInMemoryModuleCache().addPCM(
         OutputFile, llvm::MemoryBuffer::getMemBufferCopy(
                         StringRef(Buffer.begin(), Buffer.size())));
   }

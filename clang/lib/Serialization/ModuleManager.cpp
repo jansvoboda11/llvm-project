@@ -183,7 +183,7 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
   // Load the contents of the module
   if (std::unique_ptr<llvm::MemoryBuffer> Buffer = lookupBuffer(FileName)) {
     // The buffer was already provided for us.
-    NewModule->Buffer = &getModuleCache().getInMemoryModuleCache().addBuiltPCM(
+    NewModule->FinalBuffer = &getModuleCache().getInMemoryModuleCache().addPCM(
         FileName, std::move(Buffer));
     // Since the cached buffer is reused, it is safe to close the file
     // descriptor that was opened while stat()ing the PCM in
@@ -192,15 +192,9 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
   } else if (llvm::MemoryBuffer *Buffer =
                  getModuleCache().getInMemoryModuleCache().lookupPCM(
                      FileName)) {
-    NewModule->Buffer = Buffer;
+    NewModule->FinalBuffer = Buffer;
     // As above, the file descriptor is no longer needed.
     Entry->closeFile();
-  } else if (getModuleCache().getInMemoryModuleCache().shouldBuildPCM(
-                 FileName)) {
-    // Report that the module is out of date, since we tried (and failed) to
-    // import it earlier.
-    Entry->closeFile();
-    return OutOfDate;
   } else {
     // Get a buffer of the file and close the file descriptor when done.
     // The file is volatile because in a parallel build we expect multiple
@@ -217,12 +211,11 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
       return Missing;
     }
 
-    NewModule->Buffer = &getModuleCache().getInMemoryModuleCache().addPCM(
-        FileName, std::move(*Buf));
+    NewModule->TentativeBuffer = std::move(*Buf);
   }
 
   // Initialize the stream.
-  NewModule->Data = PCHContainerRdr.ExtractPCH(*NewModule->Buffer);
+  NewModule->Data = PCHContainerRdr.ExtractPCH(*NewModule->FinalBuffer);
 
   // Read the signature eagerly now so that we can check it.  Avoid calling
   // ReadSignature unless there's something to check though.
