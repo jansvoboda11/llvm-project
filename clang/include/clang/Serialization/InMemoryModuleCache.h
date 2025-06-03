@@ -28,7 +28,7 @@ namespace clang {
 /// each \a ModuleManager sees the same files.
 class InMemoryModuleCache : public llvm::RefCountedBase<InMemoryModuleCache> {
   /// Cache of buffers.
-  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> PCMs;
+  llvm::StringMap<std::vector<std::unique_ptr<llvm::MemoryBuffer>>> PCMs;
 
 public:
   /// Get a pointer to the PCM if it exists; else nullptr.

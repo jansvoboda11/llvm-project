@@ -215,7 +215,7 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
   }
 
   // Initialize the stream.
-  NewModule->Data = PCHContainerRdr.ExtractPCH(*NewModule->FinalBuffer);
+  NewModule->Data = PCHContainerRdr.ExtractPCH(*NewModule->TentativeBuffer);
 
   // Read the signature eagerly now so that we can check it.  Avoid calling
   // ReadSignature unless there's something to check though.

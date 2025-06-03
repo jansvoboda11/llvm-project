@@ -16,14 +16,13 @@ InMemoryModuleCache::lookupPCM(llvm::StringRef Filename) const {
   auto I = PCMs.find(Filename);
   if (I == PCMs.end())
     return nullptr;
-  return I->second.get();
+  return I->second.back().get();
 }
 
 llvm::MemoryBuffer &
 InMemoryModuleCache::addPCM(llvm::StringRef Filename,
                             std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   auto &PCM = PCMs[Filename];
-  if (!PCM)
-    PCM = std::move(Buffer);
-  return *PCM;
+  PCM.push_back(std::move(Buffer));
+  return *PCM.back();
 }

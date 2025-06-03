@@ -5056,8 +5056,8 @@ ASTReader::ReadASTCore(StringRef FileName,
   });
   ModuleFile &F = *M;
   BitstreamCursor &Stream = F.Stream;
-  Stream = BitstreamCursor(PCHContainerRdr.ExtractPCH(*F.FinalBuffer));
-  F.SizeInBits = F.FinalBuffer->getBufferSize() * 8;
+  Stream = BitstreamCursor(PCHContainerRdr.ExtractPCH(*F.TentativeBuffer));
+  F.SizeInBits = F.TentativeBuffer->getBufferSize() * 8;
 
   // Sniff for the signature.
   if (llvm::Error Err = doesntStartWithASTFileMagic(Stream)) {
