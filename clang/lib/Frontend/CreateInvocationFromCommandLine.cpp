@@ -32,14 +32,15 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
                         CreateInvocationOptions Opts) {
   assert(!ArgList.empty());
   std::optional<DiagnosticOptions> LocalDiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
-  if (Opts.Diags) {
-    Diags = std::move(Opts.Diags);
-  } else {
+  std::unique_ptr<DiagnosticsEngine> LocalDiags;
+  DiagnosticsEngine &Diags = [&]() -> DiagnosticsEngine & {
+    if (Opts.Diags)
+      return *Opts.Diags;
     LocalDiagOpts.emplace();
-    Diags = CompilerInstance::createDiagnostics(
+    LocalDiags = CompilerInstance::createDiagnostics(
         Opts.VFS ? *Opts.VFS : *llvm::vfs::getRealFileSystem(), *LocalDiagOpts);
-  }
+    return *LocalDiags;
+  }();
 
   SmallVector<const char *, 16> Args(ArgList);
 
@@ -50,7 +51,7 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
       "-fsyntax-only");
 
   // FIXME: We shouldn't have to pass in the path info.
-  driver::Driver TheDriver(Args[0], llvm::sys::getDefaultTargetTriple(), *Diags,
+  driver::Driver TheDriver(Args[0], llvm::sys::getDefaultTargetTriple(), Diags,
                            "clang LLVM compiler", Opts.VFS);
 
   // Don't check that inputs exist, they may have been remapped.
@@ -94,14 +95,14 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
     SmallString<256> Msg;
     llvm::raw_svector_ostream OS(Msg);
     Jobs.Print(OS, "; ", true);
-    Diags->Report(diag::err_fe_expected_compiler_job) << OS.str();
+    Diags.Report(diag::err_fe_expected_compiler_job) << OS.str();
     return nullptr;
   }
   auto Cmd = llvm::find_if(Jobs, [](const driver::Command &Cmd) {
     return StringRef(Cmd.getCreator().getName()) == "clang";
   });
   if (Cmd == Jobs.end()) {
-    Diags->Report(diag::err_fe_expected_clang_command);
+    Diags.Report(diag::err_fe_expected_clang_command);
     return nullptr;
   }
 
@@ -109,7 +110,7 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
   if (Opts.CC1Args)
     *Opts.CC1Args = {CCArgs.begin(), CCArgs.end()};
   auto CI = std::make_unique<CompilerInvocation>();
-  if (!CompilerInvocation::CreateFromArgs(*CI, CCArgs, *Diags, Args[0]) &&
+  if (!CompilerInvocation::CreateFromArgs(*CI, CCArgs, Diags, Args[0]) &&
       !Opts.RecoverOnError)
     return nullptr;
   return CI;

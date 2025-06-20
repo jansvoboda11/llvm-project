@@ -67,9 +67,9 @@ export int aa = 43;
     CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
 
     DiagnosticOptions DiagOpts;
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    std::shared_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts);
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
 
     const char *Args[] = {"clang++",       "-std=c++20",
                           "--precompile",  "-working-directory",
@@ -87,7 +87,7 @@ export int aa = 43;
     Buf->release();
 
     CompilerInstance Instance(std::move(Invocation));
-    Instance.setDiagnostics(Diags.get());
+    Instance.setDiagnostics(Diags);
 
     Instance.getFrontendOpts().OutputFile = BMIPath;
 
@@ -107,9 +107,9 @@ export int aa = 43;
     CreateInvocationOptions CIOpts;
     CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
     DiagnosticOptions DiagOpts;
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    std::shared_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts);
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
 
     std::string BMIPath = llvm::Twine(TestDir + "/a.pcm").str();
     const char *Args[] = {
@@ -122,7 +122,7 @@ export int aa = 43;
 
     CompilerInstance Clang(std::move(Invocation));
 
-    Clang.setDiagnostics(Diags.get());
+    Clang.setDiagnostics(std::move(Diags));
     FileManager *FM = Clang.createFileManager(CIOpts.VFS);
     Clang.createSourceManager(*FM);
 

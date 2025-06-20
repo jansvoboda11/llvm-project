@@ -741,7 +741,7 @@ bool DependencyScanningWorker::scanDependencies(
                   [](const std::string &Str) { return Str.c_str(); });
   auto DiagOpts = CreateAndPopulateDiagOpts(CCommandLine);
   sanitizeDiagOpts(*DiagOpts);
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::unique_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(FileMgr->getVirtualFileSystem(),
                                           *DiagOpts, &DC,
                                           /*ShouldOwnClient=*/false);

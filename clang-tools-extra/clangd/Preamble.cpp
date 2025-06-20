@@ -614,7 +614,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
           L->sawDiagnostic(D, Diag);
       });
   auto VFS = Inputs.TFS->view(Inputs.CompileCommand.Directory);
-  llvm::IntrusiveRefCntPtr<DiagnosticsEngine> PreambleDiagsEngine =
+  std::shared_ptr<DiagnosticsEngine> PreambleDiagsEngine =
       CompilerInstance::createDiagnostics(*VFS, CI.getDiagnosticOpts(),
                                           &PreambleDiagnostics,
                                           /*ShouldOwnClient=*/false);
@@ -659,7 +659,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
   WallTimer PreambleTimer;
   PreambleTimer.startTimer();
   auto BuiltPreamble = PrecompiledPreamble::Build(
-      CI, ContentsBuffer.get(), Bounds, *PreambleDiagsEngine,
+      CI, ContentsBuffer.get(), Bounds, PreambleDiagsEngine,
       Stats ? TimedFS : StatCacheFS, std::make_shared<PCHContainerOperations>(),
       StoreInMemory, /*StoragePath=*/"", CapturedInfo);
 

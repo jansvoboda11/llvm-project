@@ -479,14 +479,13 @@ static CXErrorCode clang_indexSourceFile_Impl(
 
   // Configure the diagnostics.
   auto DiagOpts = std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
+  std::shared_ptr<DiagnosticsEngine> Diags(
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           *DiagOpts, CaptureDiag,
                                           /*ShouldOwnClient=*/true));
 
   // Recover resources if we crash before exiting this function.
-  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine,
-    llvm::CrashRecoveryContextReleaseRefCleanup<DiagnosticsEngine> >
+  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine>
     DiagCleanup(Diags.get());
 
   std::unique_ptr<std::vector<const char *>> Args(
@@ -508,7 +507,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
     Args->push_back(source_filename);
 
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   CIOpts.ProbePrecompiled = true; // FIXME: historical default. Needed?
   std::shared_ptr<CompilerInvocation> CInvok =
       createInvocation(*Args, std::move(CIOpts));

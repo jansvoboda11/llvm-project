@@ -32,7 +32,7 @@ protected:
   std::unique_ptr<ToolOutputFile> input_file;
   std::shared_ptr<DiagnosticOptions> DiagOpts =
       std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
+  std::shared_ptr<DiagnosticsEngine> Diags;
   std::shared_ptr<CompilerInvocation> CInvok;
   std::shared_ptr<PCHContainerOperations> PCHContainerOps;
 
@@ -48,7 +48,7 @@ protected:
     Diags = CompilerInstance::createDiagnostics(*VFS, *DiagOpts);
 
     CreateInvocationOptions CIOpts;
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
     CIOpts.VFS = VFS;
     CInvok = createInvocation(Args, std::move(CIOpts));
 
@@ -140,7 +140,7 @@ TEST_F(ASTUnitTest, ModuleTextualHeader) {
                         "-fmodule-name=M"};
   Diags = CompilerInstance::createDiagnostics(*InMemoryFs, *DiagOpts);
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   CInvok = createInvocation(Args, std::move(CIOpts));
   ASSERT_TRUE(CInvok);
 
@@ -166,8 +166,9 @@ TEST_F(ASTUnitTest, LoadFromCommandLineEarlyError) {
 
   const char *Args[] = {"clang", "-target", "foobar", InputFileName.c_str()};
 
-  auto Diags = CompilerInstance::createDiagnostics(
-      *llvm::vfs::getRealFileSystem(), *DiagOpts);
+  std::shared_ptr<DiagnosticsEngine> Diags =
+      CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
+                                          *DiagOpts);
   auto PCHContainerOps = std::make_shared<PCHContainerOperations>();
   std::unique_ptr<clang::ASTUnit> ErrUnit;
 
@@ -194,8 +195,9 @@ TEST_F(ASTUnitTest, LoadFromCommandLineWorkingDirectory) {
   const char *Args[] = {"clang", "-working-directory", WorkingDir.c_str(),
                         InputFileName.c_str()};
 
-  auto Diags = CompilerInstance::createDiagnostics(
-      *llvm::vfs::getRealFileSystem(), *DiagOpts);
+  std::shared_ptr<DiagnosticsEngine> Diags =
+      CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
+                                          *DiagOpts);
   auto PCHContainerOps = std::make_shared<PCHContainerOperations>();
   std::unique_ptr<clang::ASTUnit> ErrUnit;
 

@@ -77,7 +77,7 @@ static bool run(ArrayRef<const char *> Args, const char *ProgName) {
       ArrayRef(Args).slice(1), MissingArgIndex, MissingArgCount);
   ParseDiagnosticArgs(DiagOpts, ParsedArgs);
 
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diag = new clang::DiagnosticsEngine(
+  auto Diag = std::make_unique<clang::DiagnosticsEngine>(
       new clang::DiagnosticIDs(), DiagOpts,
       new clang::TextDiagnosticPrinter(llvm::errs(), DiagOpts));
 

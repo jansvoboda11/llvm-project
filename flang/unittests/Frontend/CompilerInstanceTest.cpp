@@ -82,7 +82,7 @@ TEST(CompilerInstance, AllowDiagnosticLogWithUnownedDiagnosticConsumer) {
   diagOpts.DiagnosticLogFile = "-";
 
   // 4. Create a DiagnosticEngine with an unowned consumer
-  IntrusiveRefCntPtr<clang::DiagnosticsEngine> diags =
+  std::unique_ptr<clang::DiagnosticsEngine> diags =
       compInst.createDiagnostics(diagOpts, diagPrinter.get(),
           /*ShouldOwnClient=*/false);
 

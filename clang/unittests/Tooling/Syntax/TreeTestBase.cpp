@@ -144,7 +144,7 @@ SyntaxTreeTest::buildTree(StringRef Code, const TestClangConfig &ClangConfig) {
   }
 
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   CIOpts.VFS = FS;
   Invocation = createInvocation(ArgsCStr, std::move(CIOpts));
   assert(Invocation);
@@ -152,7 +152,7 @@ SyntaxTreeTest::buildTree(StringRef Code, const TestClangConfig &ClangConfig) {
   Invocation->getPreprocessorOpts().addRemappedFile(
       FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
   CompilerInstance Compiler(Invocation);
-  Compiler.setDiagnostics(Diags.get());
+  Compiler.setDiagnostics(Diags);
   Compiler.setFileManager(FileMgr.get());
   Compiler.setSourceManager(SourceMgr.get());
 

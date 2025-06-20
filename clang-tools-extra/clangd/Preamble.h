@@ -80,7 +80,7 @@ public:
 
 private:
   std::shared_ptr<CompilerInvocation> Invocation;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diagnostics;
+  std::shared_ptr<DiagnosticsEngine> Diagnostics;
   IntrusiveRefCntPtr<TargetInfo> Target;
   IntrusiveRefCntPtr<TargetInfo> AuxTarget;
   IntrusiveRefCntPtr<FileManager> FileMgr;

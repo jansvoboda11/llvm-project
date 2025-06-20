@@ -41,8 +41,8 @@ protected:
 
   // Data fields.
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
-      new DiagnosticsEngine(new DiagnosticIDs, DiagOpts);
+  std::shared_ptr<DiagnosticsEngine> Diags =
+      std::make_shared<DiagnosticsEngine>(new DiagnosticIDs, DiagOpts);
   IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> FS =
       new llvm::vfs::InMemoryFileSystem;
   IntrusiveRefCntPtr<FileManager> FileMgr =

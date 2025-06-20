@@ -83,7 +83,7 @@ class CompilerInstance : public ModuleLoader {
   std::shared_ptr<CompilerInvocation> Invocation;
 
   /// The diagnostics engine instance.
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diagnostics;
+  std::shared_ptr<DiagnosticsEngine> Diagnostics;
 
   /// The target being compiled for.
   IntrusiveRefCntPtr<TargetInfo> Target;
@@ -355,13 +355,13 @@ public:
     return *Diagnostics;
   }
 
-  IntrusiveRefCntPtr<DiagnosticsEngine> getDiagnosticsPtr() const {
+  std::shared_ptr<DiagnosticsEngine> getDiagnosticsPtr() const {
     assert(Diagnostics && "Compiler instance has no diagnostics!");
     return Diagnostics;
   }
 
   /// setDiagnostics - Replace the current diagnostics engine.
-  void setDiagnostics(DiagnosticsEngine *Value);
+  void setDiagnostics(std::shared_ptr<DiagnosticsEngine> Value);
 
   DiagnosticConsumer &getDiagnosticClient() const {
     assert(Diagnostics && Diagnostics->getClient() &&
@@ -673,7 +673,7 @@ public:
   /// used by some diagnostics printers (for logging purposes only).
   ///
   /// \return The new object on success, or null on failure.
-  static IntrusiveRefCntPtr<DiagnosticsEngine>
+  static std::unique_ptr<DiagnosticsEngine>
   createDiagnostics(llvm::vfs::FileSystem &VFS, DiagnosticOptions &Opts,
                     DiagnosticConsumer *Client = nullptr,
                     bool ShouldOwnClient = true,

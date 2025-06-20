@@ -111,8 +111,9 @@ buildCompilerInvocation(const ParseInputs &Inputs, clang::DiagnosticConsumer &D,
   CIOpts.CC1Args = CC1Args;
   CIOpts.RecoverOnError = true;
   DiagnosticOptions DiagOpts;
-  CIOpts.Diags =
+  std::unique_ptr<DiagnosticsEngine> InvocationDiags =
       CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts, &D, false);
+  CIOpts.Diags = InvocationDiags.get();
   CIOpts.ProbePrecompiled = false;
   std::unique_ptr<CompilerInvocation> CI = createInvocation(ArgStrs, CIOpts);
   if (!CI)

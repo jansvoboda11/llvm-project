@@ -412,7 +412,7 @@ PrecompiledPreamble::operator=(PrecompiledPreamble &&) = default;
 llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
     const CompilerInvocation &Invocation,
     const llvm::MemoryBuffer *MainFileBuffer, PreambleBounds Bounds,
-    DiagnosticsEngine &Diagnostics,
+    std::shared_ptr<DiagnosticsEngine> DiagnosticsPtr,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps, bool StoreInMemory,
     StringRef StoragePath, PreambleCallbacks &Callbacks) {
@@ -461,7 +461,8 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   llvm::CrashRecoveryContextCleanupRegistrar<CompilerInstance> CICleanup(
       Clang.get());
 
-  Clang->setDiagnostics(&Diagnostics);
+  Clang->setDiagnostics(DiagnosticsPtr);
+  DiagnosticsEngine &Diagnostics = Clang->getDiagnostics();
 
   // Create the target instance.
   if (!Clang->createTarget())

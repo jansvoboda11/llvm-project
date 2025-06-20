@@ -85,8 +85,6 @@ class ClangModulesDeclVendorImpl : public ClangModulesDeclVendor {
 public:
   ClangModulesDeclVendorImpl(
       std::unique_ptr<clang::DiagnosticOptions> diagnostic_options,
-      llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> diagnostics_engine,
-      std::shared_ptr<clang::CompilerInvocation> compiler_invocation,
       std::unique_ptr<clang::CompilerInstance> compiler_instance,
       std::unique_ptr<clang::Parser> parser);
 
@@ -117,9 +115,9 @@ private:
 
   bool m_enabled = false;
 
+  // FIXME: Remove this by making the DiagnosticsEngine in CompilerInstance
+  // refer to DiagnosticOptions in CompilerInvocation in CompilerInstance.
   std::unique_ptr<clang::DiagnosticOptions> m_diagnostic_options;
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> m_diagnostics_engine;
-  std::shared_ptr<clang::CompilerInvocation> m_compiler_invocation;
   std::unique_ptr<clang::CompilerInstance> m_compiler_instance;
   std::unique_ptr<clang::Parser> m_parser;
   size_t m_source_location_index =
@@ -232,13 +230,9 @@ ClangModulesDeclVendor::~ClangModulesDeclVendor() = default;
 
 ClangModulesDeclVendorImpl::ClangModulesDeclVendorImpl(
     std::unique_ptr<clang::DiagnosticOptions> diagnostic_options,
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> diagnostics_engine,
-    std::shared_ptr<clang::CompilerInvocation> compiler_invocation,
     std::unique_ptr<clang::CompilerInstance> compiler_instance,
     std::unique_ptr<clang::Parser> parser)
     : m_diagnostic_options(std::move(diagnostic_options)),
-      m_diagnostics_engine(std::move(diagnostics_engine)),
-      m_compiler_invocation(std::move(compiler_invocation)),
       m_compiler_instance(std::move(compiler_instance)),
       m_parser(std::move(parser)) {
 
@@ -716,7 +710,7 @@ ClangModulesDeclVendor::Create(Target &target) {
 
   auto diag_options_up =
       clang::CreateAndPopulateDiagOpts(compiler_invocation_argument_cstrs);
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> diagnostics_engine =
+  std::shared_ptr<clang::DiagnosticsEngine> diagnostics_engine =
       clang::CompilerInstance::createDiagnostics(
           *FileSystem::Instance().GetVirtualFileSystem(), *diag_options_up,
           new StoringDiagnosticConsumer);
@@ -727,7 +721,7 @@ ClangModulesDeclVendor::Create(Target &target) {
                             compiler_invocation_arguments.end()));
 
   clang::CreateInvocationOptions CIOpts;
-  CIOpts.Diags = diagnostics_engine;
+  CIOpts.Diags = diagnostics_engine.get();
   std::shared_ptr<clang::CompilerInvocation> invocation =
       clang::createInvocation(compiler_invocation_argument_cstrs,
                               std::move(CIOpts));
@@ -747,7 +741,7 @@ ClangModulesDeclVendor::Create(Target &target) {
 
   // Make sure clang uses the same VFS as LLDB.
   instance->createFileManager(FileSystem::Instance().GetVirtualFileSystem());
-  instance->setDiagnostics(diagnostics_engine.get());
+  instance->setDiagnostics(diagnostics_engine);
 
   std::unique_ptr<clang::FrontendAction> action(new clang::SyntaxOnlyAction);
 
@@ -779,7 +773,6 @@ ClangModulesDeclVendor::Create(Target &target) {
   while (!parser->ParseTopLevelDecl(parsed, ImportState))
     ;
 
-  return new ClangModulesDeclVendorImpl(
-      std::move(diag_options_up), std::move(diagnostics_engine),
-      std::move(invocation), std::move(instance), std::move(parser));
+  return new ClangModulesDeclVendorImpl(std::move(diag_options_up),
+                                        std::move(instance), std::move(parser));
 }

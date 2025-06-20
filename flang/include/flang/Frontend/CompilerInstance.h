@@ -67,7 +67,7 @@ class CompilerInstance {
   std::unique_ptr<llvm::raw_ostream> ownedSemaOutputStream;
 
   /// The diagnostics engine instance.
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> diagnostics;
+  std::shared_ptr<clang::DiagnosticsEngine> diagnostics;
 
   /// Holds information about the output file.
   struct OutputFile {
@@ -346,7 +346,7 @@ public:
   /// DiagnosticsEngine object.
   ///
   /// \return The new object on success, or null on failure.
-  static clang::IntrusiveRefCntPtr<clang::DiagnosticsEngine>
+  static std::unique_ptr<clang::DiagnosticsEngine>
   createDiagnostics(clang::DiagnosticOptions &opts,
                     clang::DiagnosticConsumer *client = nullptr,
                     bool shouldOwnClient = true);

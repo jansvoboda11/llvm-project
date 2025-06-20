@@ -109,10 +109,10 @@ private:
   std::unique_ptr<LangOptions> LangOpts;
   // FIXME: The documentation on \c LoadFrom* member functions states that the
   // DiagnosticsEngine (and therefore DiagnosticOptions) must outlive the
-  // returned ASTUnit. This is not the case. Enfore it by storing non-owning
+  // returned ASTUnit. This is not the case. Enforce it by storing non-owning
   // pointers here.
   std::shared_ptr<DiagnosticOptions> DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine>   Diagnostics;
+  std::shared_ptr<DiagnosticsEngine> Diagnostics;
   IntrusiveRefCntPtr<FileManager>         FileMgr;
   IntrusiveRefCntPtr<SourceManager>       SourceMgr;
   IntrusiveRefCntPtr<ModuleCache> ModCache;
@@ -266,8 +266,9 @@ private:
   /// (likely to change while trying to use them).
   bool UserFilesAreVolatile : 1;
 
-  static void ConfigureDiags(IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-                             ASTUnit &AST, CaptureDiagsKind CaptureDiagnostics);
+  /// Configure the diagnostics object for use with ASTUnit.
+  static void ConfigureDiags(DiagnosticsEngine &Diags, ASTUnit &AST,
+                             CaptureDiagsKind CaptureDiagnostics);
 
   void TranslateStoredDiagnostics(FileManager &FileMgr,
                                   SourceManager &SrcMan,
@@ -680,7 +681,7 @@ public:
   static std::unique_ptr<ASTUnit>
   create(std::shared_ptr<CompilerInvocation> CI,
          std::shared_ptr<DiagnosticOptions> DiagOpts,
-         IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+         std::shared_ptr<DiagnosticsEngine> Diags,
          CaptureDiagsKind CaptureDiagnostics, bool UserFilesAreVolatile);
 
   enum WhatToLoad {
@@ -707,7 +708,7 @@ public:
   static std::unique_ptr<ASTUnit> LoadFromASTFile(
       StringRef Filename, const PCHContainerReader &PCHContainerRdr,
       WhatToLoad ToLoad, std::shared_ptr<DiagnosticOptions> DiagOpts,
-      IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+      std::shared_ptr<DiagnosticsEngine> Diags,
       const FileSystemOptions &FileSystemOpts,
       const HeaderSearchOptions &HSOpts, const LangOptions *LangOpts = nullptr,
       bool OnlyLocalDecls = false,
@@ -770,7 +771,7 @@ public:
       std::shared_ptr<CompilerInvocation> CI,
       std::shared_ptr<PCHContainerOperations> PCHContainerOps,
       std::shared_ptr<DiagnosticOptions> DiagOpts,
-      IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+      std::shared_ptr<DiagnosticsEngine> Diags,
       FrontendAction *Action = nullptr, ASTUnit *Unit = nullptr,
       bool Persistent = true, StringRef ResourceFilesPath = StringRef(),
       bool OnlyLocalDecls = false,
@@ -798,7 +799,7 @@ public:
       std::shared_ptr<CompilerInvocation> CI,
       std::shared_ptr<PCHContainerOperations> PCHContainerOps,
       std::shared_ptr<DiagnosticOptions> DiagOpts,
-      IntrusiveRefCntPtr<DiagnosticsEngine> Diags, FileManager *FileMgr,
+      std::shared_ptr<DiagnosticsEngine> Diags, FileManager *FileMgr,
       bool OnlyLocalDecls = false,
       CaptureDiagsKind CaptureDiagnostics = CaptureDiagsKind::None,
       unsigned PrecompilePreambleAfterNParses = 0,
@@ -847,7 +848,7 @@ public:
       const char **ArgBegin, const char **ArgEnd,
       std::shared_ptr<PCHContainerOperations> PCHContainerOps,
       std::shared_ptr<DiagnosticOptions> DiagOpts,
-      IntrusiveRefCntPtr<DiagnosticsEngine> Diags, StringRef ResourceFilesPath,
+      std::shared_ptr<DiagnosticsEngine> Diags, StringRef ResourceFilesPath,
       bool StorePreamblesInMemory = false,
       StringRef PreambleStoragePath = StringRef(), bool OnlyLocalDecls = false,
       CaptureDiagsKind CaptureDiagnostics = CaptureDiagsKind::None,
@@ -916,8 +917,9 @@ public:
                     bool IncludeCodePatterns, bool IncludeBriefComments,
                     CodeCompleteConsumer &Consumer,
                     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                    DiagnosticsEngine &Diag, LangOptions &LangOpts,
-                    SourceManager &SourceMgr, FileManager &FileMgr,
+                    std::shared_ptr<DiagnosticsEngine> Diag,
+                    LangOptions &LangOpts, SourceManager &SourceMgr,
+                    FileManager &FileMgr,
                     SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
                     SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers,
                     std::unique_ptr<SyntaxOnlyAction> Act);

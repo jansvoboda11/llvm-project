@@ -786,21 +786,19 @@ ASTUnit::getBufferForFile(StringRef Filename, std::string *ErrorStr) {
   return nullptr;
 }
 
-/// Configure the diagnostics object for use with ASTUnit.
-void ASTUnit::ConfigureDiags(IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-                             ASTUnit &AST,
+void ASTUnit::ConfigureDiags(DiagnosticsEngine &Diags, ASTUnit &AST,
                              CaptureDiagsKind CaptureDiagnostics) {
-  assert(Diags.get() && "no DiagnosticsEngine was provided");
   if (CaptureDiagnostics != CaptureDiagsKind::None)
-    Diags->setClient(new FilterAndStoreDiagnosticConsumer(
+    Diags.setClient(new FilterAndStoreDiagnosticConsumer(
         &AST.StoredDiagnostics, nullptr,
-        CaptureDiagnostics != CaptureDiagsKind::AllWithoutNonErrorsFromIncludes));
+        CaptureDiagnostics !=
+            CaptureDiagsKind::AllWithoutNonErrorsFromIncludes));
 }
 
 std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
     StringRef Filename, const PCHContainerReader &PCHContainerRdr,
     WhatToLoad ToLoad, std::shared_ptr<DiagnosticOptions> DiagOpts,
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+    std::shared_ptr<DiagnosticsEngine> Diags,
     const FileSystemOptions &FileSystemOpts, const HeaderSearchOptions &HSOpts,
     const LangOptions *LangOpts, bool OnlyLocalDecls,
     CaptureDiagsKind CaptureDiagnostics, bool AllowASTWithCompilerErrors,
@@ -810,11 +808,10 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
   // Recover resources if we crash before exiting this method.
   llvm::CrashRecoveryContextCleanupRegistrar<ASTUnit>
     ASTUnitCleanup(AST.get());
-  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine,
-    llvm::CrashRecoveryContextReleaseRefCleanup<DiagnosticsEngine>>
+  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine>
     DiagCleanup(Diags.get());
 
-  ConfigureDiags(Diags, *AST, CaptureDiagnostics);
+  ConfigureDiags(*Diags, *AST, CaptureDiagnostics);
 
   AST->LangOpts = LangOpts ? std::make_unique<LangOptions>(*LangOpts)
                            : std::make_unique<LangOptions>();
@@ -1193,7 +1190,7 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
 
   // Set up diagnostics, capturing any diagnostics that would
   // otherwise be dropped.
-  Clang->setDiagnostics(&getDiagnostics());
+  Clang->setDiagnostics(Diagnostics);
 
   // Create the target instance.
   if (!Clang->createTarget())
@@ -1413,7 +1410,7 @@ ASTUnit::getMainBufferWithPrecompiledPreamble(
       PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies = true;
 
     llvm::ErrorOr<PrecompiledPreamble> NewPreamble = PrecompiledPreamble::Build(
-        PreambleInvocationIn, MainFileBuffer.get(), Bounds, *Diagnostics, VFS,
+        PreambleInvocationIn, MainFileBuffer.get(), Bounds, Diagnostics, VFS,
         PCHContainerOps, StorePreamblesInMemory, PreambleStoragePath,
         Callbacks);
 
@@ -1533,11 +1530,11 @@ StringRef ASTUnit::getASTFileName() const {
 std::unique_ptr<ASTUnit>
 ASTUnit::create(std::shared_ptr<CompilerInvocation> CI,
                 std::shared_ptr<DiagnosticOptions> DiagOpts,
-                IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+                std::shared_ptr<DiagnosticsEngine> Diags,
                 CaptureDiagsKind CaptureDiagnostics,
                 bool UserFilesAreVolatile) {
   std::unique_ptr<ASTUnit> AST(new ASTUnit(false));
-  ConfigureDiags(Diags, *AST, CaptureDiagnostics);
+  ConfigureDiags(*Diags, *AST, CaptureDiagnostics);
   IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
       createVFSFromCompilerInvocation(*CI, *Diags);
   AST->DiagOpts = DiagOpts;
@@ -1557,7 +1554,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
     std::shared_ptr<CompilerInvocation> CI,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     std::shared_ptr<DiagnosticOptions> DiagOpts,
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags, FrontendAction *Action,
+    std::shared_ptr<DiagnosticsEngine> Diags, FrontendAction *Action,
     ASTUnit *Unit, bool Persistent, StringRef ResourceFilesPath,
     bool OnlyLocalDecls, CaptureDiagsKind CaptureDiagnostics,
     unsigned PrecompilePreambleAfterNParses, bool CacheCodeCompletionResults,
@@ -1590,8 +1587,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
   // Recover resources if we crash before exiting this method.
   llvm::CrashRecoveryContextCleanupRegistrar<ASTUnit>
     ASTUnitCleanup(OwnAST.get());
-  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine,
-    llvm::CrashRecoveryContextReleaseRefCleanup<DiagnosticsEngine>>
+  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine>
     DiagCleanup(Diags.get());
 
   // We'll manage file buffers ourselves.
@@ -1613,7 +1609,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
 
   // Set up diagnostics, capturing any diagnostics that would
   // otherwise be dropped.
-  Clang->setDiagnostics(&AST->getDiagnostics());
+  Clang->setDiagnostics(AST->Diagnostics);
 
   // Create the target instance.
   if (!Clang->createTarget())
@@ -1732,14 +1728,14 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
     std::shared_ptr<CompilerInvocation> CI,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     std::shared_ptr<DiagnosticOptions> DiagOpts,
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags, FileManager *FileMgr,
+    std::shared_ptr<DiagnosticsEngine> Diags, FileManager *FileMgr,
     bool OnlyLocalDecls, CaptureDiagsKind CaptureDiagnostics,
     unsigned PrecompilePreambleAfterNParses, TranslationUnitKind TUKind,
     bool CacheCodeCompletionResults, bool IncludeBriefCommentsInCodeCompletion,
     bool UserFilesAreVolatile) {
   // Create the AST unit.
   std::unique_ptr<ASTUnit> AST(new ASTUnit(false));
-  ConfigureDiags(Diags, *AST, CaptureDiagnostics);
+  ConfigureDiags(*Diags, *AST, CaptureDiagnostics);
   AST->DiagOpts = DiagOpts;
   AST->Diagnostics = Diags;
   AST->OnlyLocalDecls = OnlyLocalDecls;
@@ -1756,8 +1752,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
   // Recover resources if we crash before exiting this method.
   llvm::CrashRecoveryContextCleanupRegistrar<ASTUnit>
     ASTUnitCleanup(AST.get());
-  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine,
-    llvm::CrashRecoveryContextReleaseRefCleanup<DiagnosticsEngine>>
+  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine>
     DiagCleanup(Diags.get());
 
   if (AST->LoadFromCompilerInvocation(std::move(PCHContainerOps),
@@ -1771,7 +1766,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
     const char **ArgBegin, const char **ArgEnd,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     std::shared_ptr<DiagnosticOptions> DiagOpts,
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags, StringRef ResourceFilesPath,
+    std::shared_ptr<DiagnosticsEngine> Diags, StringRef ResourceFilesPath,
     bool StorePreamblesInMemory, StringRef PreambleStoragePath,
     bool OnlyLocalDecls, CaptureDiagsKind CaptureDiagnostics,
     ArrayRef<RemappedFile> RemappedFiles, bool RemappedFilesKeepOriginalName,
@@ -1800,7 +1795,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
 
     CreateInvocationOptions CIOpts;
     CIOpts.VFS = VFS;
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
     CIOpts.ProbePrecompiled = true; // FIXME: historical default. Needed?
     CI = createInvocation(llvm::ArrayRef(ArgBegin, ArgEnd), std::move(CIOpts));
     if (!CI)
@@ -1832,7 +1827,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
   AST.reset(new ASTUnit(false));
   AST->NumStoredDiagnosticsFromDriver = StoredDiagnostics.size();
   AST->StoredDiagnostics.swap(StoredDiagnostics);
-  ConfigureDiags(Diags, *AST, CaptureDiagnostics);
+  ConfigureDiags(*Diags, *AST, CaptureDiagnostics);
   AST->DiagOpts = DiagOpts;
   AST->Diagnostics = Diags;
   AST->FileSystemOpts = CI->getFileSystemOpts();
@@ -2197,8 +2192,9 @@ void ASTUnit::CodeComplete(
     bool IncludeCodePatterns, bool IncludeBriefComments,
     CodeCompleteConsumer &Consumer,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-    DiagnosticsEngine &Diag, LangOptions &LangOpts, SourceManager &SourceMgr,
-    FileManager &FileMgr, SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
+    std::shared_ptr<DiagnosticsEngine> Diag, LangOptions &LangOpts,
+    SourceManager &SourceMgr, FileManager &FileMgr,
+    SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
     SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers,
     std::unique_ptr<SyntaxOnlyAction> Act) {
   if (!Invocation)
@@ -2247,11 +2243,11 @@ void ASTUnit::CodeComplete(
       std::string(Clang->getFrontendOpts().Inputs[0].getFile());
 
   // Set up diagnostics, capturing any diagnostics produced.
-  Clang->setDiagnostics(&Diag);
+  Clang->setDiagnostics(Diag);
   CaptureDroppedDiagnostics Capture(CaptureDiagsKind::All,
                                     Clang->getDiagnostics(),
                                     &StoredDiagnostics, nullptr);
-  ProcessWarningOptions(Diag, Inv.getDiagnosticOpts(),
+  ProcessWarningOptions(*Diag, Inv.getDiagnosticOpts(),
                         FileMgr.getVirtualFileSystem());
 
   // Create the target instance.

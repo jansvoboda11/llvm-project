@@ -25,13 +25,15 @@ TEST(BuildCompilerInvocationTest, RecoverMultipleJobs) {
   // This generates multiple jobs and we recover by using the first.
   std::vector<const char *> Args = {"clang", "--target=macho", "-arch",  "i386",
                                     "-arch", "x86_64",         "foo.cpp"};
+  auto VFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   clang::IgnoringDiagConsumer D;
   clang::DiagnosticOptions DiagOpts;
+  auto Diags =
+      clang::CompilerInstance::createDiagnostics(*VFS, DiagOpts, &D, false);
   CreateInvocationOptions Opts;
   Opts.RecoverOnError = true;
-  Opts.VFS = new llvm::vfs::InMemoryFileSystem();
-  Opts.Diags = clang::CompilerInstance::createDiagnostics(*Opts.VFS, DiagOpts,
-                                                          &D, false);
+  Opts.VFS = VFS.get();
+  Opts.Diags = Diags.get();
   std::unique_ptr<CompilerInvocation> CI = createInvocation(Args, Opts);
   ASSERT_TRUE(CI);
   EXPECT_THAT(CI->getTargetOpts().Triple, testing::StartsWith("i386-"));
@@ -47,11 +49,11 @@ TEST(BuildCompilerInvocationTest, ProbePrecompiled) {
 
   clang::IgnoringDiagConsumer D;
   clang::DiagnosticOptions DiagOpts;
-  llvm::IntrusiveRefCntPtr<DiagnosticsEngine> CommandLineDiagsEngine =
+  std::unique_ptr<DiagnosticsEngine> CommandLineDiagsEngine =
       clang::CompilerInstance::createDiagnostics(*FS, DiagOpts, &D, false);
   // Default: ProbePrecompiled=false
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = CommandLineDiagsEngine;
+  CIOpts.Diags = CommandLineDiagsEngine.get();
   CIOpts.VFS = FS;
   std::unique_ptr<CompilerInvocation> CI = createInvocation(Args, CIOpts);
   ASSERT_TRUE(CI);

@@ -440,7 +440,7 @@ public:
   bool roundTripCommands(raw_ostream &ErrOS) {
     DiagnosticOptions DiagOpts;
     TextDiagnosticPrinter DiagConsumer(ErrOS, DiagOpts);
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    std::unique_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                             DiagOpts, &DiagConsumer,
                                             /*ShouldOwnClient=*/false);
@@ -782,7 +782,7 @@ getCompilationDatabase(int argc, char **argv, std::string &ErrorMessage) {
         tooling::JSONCommandLineSyntax::AutoDetect);
 
   DiagnosticOptions DiagOpts;
-  llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::unique_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           DiagOpts);
   driver::Driver TheDriver(CommandLine[0], llvm::sys::getDefaultTargetTriple(),

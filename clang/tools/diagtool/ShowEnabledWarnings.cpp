@@ -53,7 +53,7 @@ static char getCharForLevel(DiagnosticsEngine::Level Level) {
   llvm_unreachable("Unknown diagnostic level");
 }
 
-static IntrusiveRefCntPtr<DiagnosticsEngine>
+static std::unique_ptr<DiagnosticsEngine>
 createDiagnostics(unsigned int argc, char **argv) {
   IntrusiveRefCntPtr<DiagnosticIDs> DiagIDs(new DiagnosticIDs());
   DiagnosticOptions DiagOpts;
@@ -66,15 +66,17 @@ createDiagnostics(unsigned int argc, char **argv) {
   SmallVector<const char *, 4> Args;
   Args.push_back("diagtool");
   Args.append(argv, argv + argc);
+  auto InvocationDiagnostics =
+      std::make_unique<DiagnosticsEngine>(DiagIDs, DiagOpts, DiagsBuffer);
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = new DiagnosticsEngine(DiagIDs, DiagOpts, DiagsBuffer);
+  CIOpts.Diags = InvocationDiagnostics.get();
   std::unique_ptr<CompilerInvocation> Invocation =
       createInvocation(Args, CIOpts);
   if (!Invocation)
     return nullptr;
 
   // Build the diagnostics parser
-  IntrusiveRefCntPtr<DiagnosticsEngine> FinalDiags =
+  std::unique_ptr<DiagnosticsEngine> FinalDiags =
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           Invocation->getDiagnosticOpts());
   if (!FinalDiags)
@@ -104,7 +106,7 @@ int ShowEnabledWarnings::run(unsigned int argc, char **argv, raw_ostream &Out) {
   }
 
   // Create the diagnostic engine.
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags = createDiagnostics(argc, argv);
+  std::unique_ptr<DiagnosticsEngine> Diags = createDiagnostics(argc, argv);
   if (!Diags) {
     printUsage();
     return EXIT_FAILURE;

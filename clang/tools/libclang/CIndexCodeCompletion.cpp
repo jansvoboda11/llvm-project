@@ -259,7 +259,7 @@ struct AllocatedCXCodeCompleteResults : public CXCodeCompleteResults {
   DiagnosticOptions DiagOpts;
 
   /// Diag object
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diag;
+  std::shared_ptr<DiagnosticsEngine> Diag;
   
   /// Language options used to adjust source locations.
   LangOptions LangOpts;
@@ -763,7 +763,7 @@ clang_codeCompleteAt_Impl(CXTranslationUnit TU, const char *complete_filename,
                     RemappedFiles, (options & CXCodeComplete_IncludeMacros),
                     (options & CXCodeComplete_IncludeCodePatterns),
                     IncludeBriefComments, Capture,
-                    CXXIdx->getPCHContainerOperations(), *Results->Diag,
+                    CXXIdx->getPCHContainerOperations(), Results->Diag,
                     Results->LangOpts, *Results->SourceMgr, *Results->FileMgr,
                     Results->Diagnostics, Results->TemporaryBuffers,
                     /*SyntaxOnlyAction=*/nullptr);

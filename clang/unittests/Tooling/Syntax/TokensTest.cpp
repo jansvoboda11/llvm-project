@@ -125,7 +125,7 @@ public:
     std::vector<const char *> Args = {"tok-test", "-std=c++03", "-fsyntax-only",
                                       FileName};
     CreateInvocationOptions CIOpts;
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
     CIOpts.VFS = FS;
     auto CI = createInvocation(Args, std::move(CIOpts));
     assert(CI);
@@ -133,7 +133,7 @@ public:
     CI->getPreprocessorOpts().addRemappedFile(
         FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
     CompilerInstance Compiler(std::move(CI));
-    Compiler.setDiagnostics(Diags.get());
+    Compiler.setDiagnostics(Diags);
     Compiler.setFileManager(FileMgr.get());
     Compiler.setSourceManager(SourceMgr.get());
 
@@ -249,8 +249,8 @@ public:
 
   // Data fields.
   DiagnosticOptions DiagOpts;
-  llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
-      new DiagnosticsEngine(new DiagnosticIDs, DiagOpts);
+  std::shared_ptr<DiagnosticsEngine> Diags =
+      std::make_shared<DiagnosticsEngine>(new DiagnosticIDs, DiagOpts);
   IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> FS =
       new llvm::vfs::InMemoryFileSystem;
   llvm::IntrusiveRefCntPtr<FileManager> FileMgr =

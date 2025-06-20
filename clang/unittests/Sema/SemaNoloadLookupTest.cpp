@@ -60,9 +60,9 @@ public:
     CreateInvocationOptions CIOpts;
     CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
     DiagnosticOptions DiagOpts;
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    std::shared_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts);
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
 
     std::string CacheBMIPath =
         llvm::Twine(TestDir + "/" + ModuleName + ".pcm").str();
@@ -82,7 +82,7 @@ public:
     EXPECT_TRUE(Invocation);
 
     CompilerInstance Instance(std::move(Invocation));
-    Instance.setDiagnostics(Diags.get());
+    Instance.setDiagnostics(Diags);
     Instance.getFrontendOpts().OutputFile = CacheBMIPath;
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));

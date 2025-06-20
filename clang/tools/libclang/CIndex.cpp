@@ -4233,7 +4233,7 @@ enum CXErrorCode clang_createTranslationUnit2(CXIndex CIdx,
   HeaderSearchOptions HSOpts;
 
   auto DiagOpts = std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           *DiagOpts);
   std::unique_ptr<ASTUnit> AU = ASTUnit::LoadFromASTFile(
@@ -4307,7 +4307,7 @@ clang_parseTranslationUnit_Impl(CXIndex CIdx, const char *source_filename,
   // Configure the diagnostics.
   std::shared_ptr<DiagnosticOptions> DiagOpts = CreateAndPopulateDiagOpts(
       llvm::ArrayRef(command_line_args, num_command_line_args));
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
+  std::shared_ptr<DiagnosticsEngine> Diags(
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           *DiagOpts));
 
@@ -4319,9 +4319,7 @@ clang_parseTranslationUnit_Impl(CXIndex CIdx, const char *source_filename,
     CaptureDiagnostics = CaptureDiagsKind::AllWithoutNonErrorsFromIncludes;
 
   // Recover resources if we crash before exiting this function.
-  llvm::CrashRecoveryContextCleanupRegistrar<
-      DiagnosticsEngine,
-      llvm::CrashRecoveryContextReleaseRefCleanup<DiagnosticsEngine>>
+  llvm::CrashRecoveryContextCleanupRegistrar<DiagnosticsEngine>
       DiagCleanup(Diags.get());
 
   std::unique_ptr<std::vector<ASTUnit::RemappedFile>> RemappedFiles(

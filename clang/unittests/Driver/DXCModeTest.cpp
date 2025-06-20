@@ -219,11 +219,11 @@ TEST(DxcModeTest, DefaultEntry) {
   const char *Args[] = {"clang", "--driver-mode=dxc", "-Tcs_6_7", "foo.hlsl"};
 
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::unique_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*InMemoryFileSystem, DiagOpts);
 
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   std::unique_ptr<CompilerInvocation> CInvok =
       createInvocation(Args, std::move(CIOpts));
   EXPECT_TRUE(CInvok);

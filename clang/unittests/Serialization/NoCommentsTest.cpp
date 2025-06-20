@@ -86,9 +86,9 @@ void foo() {}
   CreateInvocationOptions CIOpts;
   CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts);
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
 
   std::string CacheBMIPath = llvm::Twine(TestDir + "/Comments.pcm").str();
   const char *Args[] = {"clang++",       "-std=c++20",
@@ -99,11 +99,11 @@ void foo() {}
   ASSERT_TRUE(Invocation);
 
   CompilerInstance Instance(std::move(Invocation));
-  Instance.setDiagnostics(Diags.get());
+  Instance.setDiagnostics(std::move(Diags));
   Instance.getFrontendOpts().OutputFile = CacheBMIPath;
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
-  ASSERT_FALSE(Diags->hasErrorOccurred());
+  ASSERT_FALSE(Instance.getDiagnostics().hasErrorOccurred());
 
   std::string DepArg =
       llvm::Twine("-fmodule-file=Comments=" + CacheBMIPath).str();

@@ -188,7 +188,7 @@ bool IsModuleFileUpToDate(PathRef ModuleFilePath,
 
   clang::clangd::IgnoreDiagnostics IgnoreDiags;
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::unique_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*VFS, DiagOpts, &IgnoreDiags,
                                           /*ShouldOwnClient=*/false);
 

@@ -227,7 +227,7 @@ public:
 /// as errors" and passes them off to the DiagnosticConsumer for reporting to
 /// the user. DiagnosticsEngine is tied to one translation unit and one
 /// SourceManager.
-class DiagnosticsEngine : public RefCountedBase<DiagnosticsEngine> {
+class DiagnosticsEngine {
 public:
   /// The level of the diagnostic, after it has been through mapping.
   // FIXME: Make this an alias for DiagnosticIDs::Level as soon as

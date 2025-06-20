@@ -30,7 +30,7 @@ namespace {
 class CommandLineTest : public ::testing::Test {
 public:
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
+  std::unique_ptr<DiagnosticsEngine> Diags;
   SmallVector<const char *, 32> GeneratedArgs;
   BumpPtrAllocator Alloc;
   StringSaver StringPool;

@@ -229,14 +229,13 @@ void CompilerInstance::createDiagnostics(clang::DiagnosticConsumer *client,
   diagnostics = createDiagnostics(getDiagnosticOpts(), client, shouldOwnClient);
 }
 
-clang::IntrusiveRefCntPtr<clang::DiagnosticsEngine>
+std::unique_ptr<clang::DiagnosticsEngine>
 CompilerInstance::createDiagnostics(clang::DiagnosticOptions &opts,
                                     clang::DiagnosticConsumer *client,
                                     bool shouldOwnClient) {
   clang::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagID(
       new clang::DiagnosticIDs());
-  clang::IntrusiveRefCntPtr<clang::DiagnosticsEngine> diags(
-      new clang::DiagnosticsEngine(diagID, opts));
+  auto diags = std::make_unique<clang::DiagnosticsEngine>(diagID, opts);
 
   // Create the diagnostic client for reporting errors or for
   // implementing -verify.

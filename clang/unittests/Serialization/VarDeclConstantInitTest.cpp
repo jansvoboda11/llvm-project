@@ -93,9 +93,9 @@ export namespace Fibonacci
   CreateInvocationOptions CIOpts;
   CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*CIOpts.VFS, DiagOpts);
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
 
   const char *Args[] = {"clang++",       "-std=c++20",
                         "--precompile",  "-working-directory",
@@ -106,7 +106,7 @@ export namespace Fibonacci
   Invocation->getFrontendOpts().DisableFree = false;
 
   CompilerInstance Instance(std::move(Invocation));
-  Instance.setDiagnostics(Diags.get());
+  Instance.setDiagnostics(Diags);
 
   std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
   Instance.getFrontendOpts().OutputFile = CacheBMIPath;

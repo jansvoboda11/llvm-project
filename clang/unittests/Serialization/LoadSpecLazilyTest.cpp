@@ -54,10 +54,10 @@ public:
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
         llvm::vfs::createPhysicalFileSystem();
     DiagnosticOptions DiagOpts;
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    std::shared_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*VFS, DiagOpts);
     CreateInvocationOptions CIOpts;
-    CIOpts.Diags = Diags;
+    CIOpts.Diags = Diags.get();
     CIOpts.VFS = VFS;
 
     std::string CacheBMIPath =
@@ -80,7 +80,7 @@ public:
     EXPECT_TRUE(Invocation);
 
     CompilerInstance Instance(std::move(Invocation));
-    Instance.setDiagnostics(Diags.get());
+    Instance.setDiagnostics(Diags);
     Instance.getFrontendOpts().OutputFile = CacheBMIPath;
     // Avoid memory leaks.
     Instance.getFrontendOpts().DisableFree = false;

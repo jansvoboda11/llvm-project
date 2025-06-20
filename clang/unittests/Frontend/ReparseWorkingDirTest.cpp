@@ -58,9 +58,9 @@ public:
     CI->getTargetOpts().Triple = "i386-unknown-linux-gnu";
 
     auto DiagOpts = std::make_shared<DiagnosticOptions>();
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
+    std::shared_ptr<DiagnosticsEngine> Diags =
         CompilerInstance::createDiagnostics(*VFS, *DiagOpts,
-                                            new DiagnosticConsumer));
+                                            new DiagnosticConsumer);
 
     FileManager *FileMgr = new FileManager(CI->getFileSystemOpts(), VFS);
 

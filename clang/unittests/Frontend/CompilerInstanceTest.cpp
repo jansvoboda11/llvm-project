@@ -57,12 +57,12 @@ TEST(CompilerInstance, DefaultVFSOverlayFromInvocation) {
   const char *Args[] = {"clang", VFSArg.c_str(), "-xc++", "-"};
 
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           DiagOpts);
 
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   std::shared_ptr<CompilerInvocation> CInvok =
       createInvocation(Args, std::move(CIOpts));
 
@@ -71,7 +71,7 @@ TEST(CompilerInstance, DefaultVFSOverlayFromInvocation) {
   // Create a minimal CompilerInstance which should use the VFS we specified
   // in the CompilerInvocation (as we don't explicitly set our own).
   CompilerInstance Instance(std::move(CInvok));
-  Instance.setDiagnostics(Diags.get());
+  Instance.setDiagnostics(Diags);
   Instance.createFileManager();
 
   // Check if the virtual file exists which means that our VFS is used by the
@@ -91,10 +91,10 @@ TEST(CompilerInstance, AllowDiagnosticLogWithUnownedDiagnosticConsumer) {
   llvm::raw_string_ostream DiagnosticsOS(DiagnosticOutput);
   auto DiagPrinter =
       std::make_unique<TextDiagnosticPrinter>(DiagnosticsOS, DiagOpts);
-  CompilerInstance Instance;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
-      Instance.createDiagnostics(*llvm::vfs::getRealFileSystem(), DiagOpts,
-                                 DiagPrinter.get(), /*ShouldOwnClient=*/false);
+  std::shared_ptr<DiagnosticsEngine> Diags =
+      CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
+                                          DiagOpts, DiagPrinter.get(),
+                                          /*ShouldOwnClient=*/false);
 
   Diags->Report(diag::err_expected) << "no crash";
   ASSERT_EQ(DiagnosticOutput, "error: expected no crash\n");
@@ -123,11 +123,11 @@ TEST(CompilerInstance, MultipleInputsCleansFileIDs) {
       )cpp"));
 
   DiagnosticOptions DiagOpts;
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*VFS, DiagOpts);
 
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
 
   const char *Args[] = {"clang", "-xc++", "a.cc"};
   std::shared_ptr<CompilerInvocation> CInvok =
@@ -135,7 +135,7 @@ TEST(CompilerInstance, MultipleInputsCleansFileIDs) {
   ASSERT_TRUE(CInvok) << "could not create compiler invocation";
 
   CompilerInstance Instance(std::move(CInvok));
-  Instance.setDiagnostics(Diags.get());
+  Instance.setDiagnostics(Diags);
   Instance.createFileManager(VFS);
 
   // Run once for `a.cc` and then for `a.h`. This makes sure we get the same

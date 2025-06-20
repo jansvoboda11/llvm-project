@@ -221,11 +221,10 @@ static bool printSourceSymbols(const char *Executable,
   ArgsWithProgName.push_back(Executable);
   ArgsWithProgName.append(Args.begin(), Args.end());
   auto DiagOpts = std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
-      CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
-                                          *DiagOpts));
+  std::shared_ptr<DiagnosticsEngine> Diags(CompilerInstance::createDiagnostics(
+      *llvm::vfs::getRealFileSystem(), *DiagOpts));
   CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
+  CIOpts.Diags = Diags.get();
   CIOpts.ProbePrecompiled = true; // FIXME: historical default. Needed?
   auto CInvok = createInvocation(ArgsWithProgName, std::move(CIOpts));
   if (!CInvok)
@@ -276,7 +275,7 @@ static bool printSourceSymbolsFromModule(StringRef modulePath,
   HeaderSearchOptions HSOpts;
 
   auto DiagOpts = std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+  std::shared_ptr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(*llvm::vfs::getRealFileSystem(),
                                           *DiagOpts);
   std::unique_ptr<ASTUnit> AU = ASTUnit::LoadFromASTFile(

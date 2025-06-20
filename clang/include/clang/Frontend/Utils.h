@@ -195,7 +195,7 @@ createChainedIncludesSource(CompilerInstance &CI,
 struct CreateInvocationOptions {
   /// Receives diagnostics encountered while parsing command-line flags.
   /// If not provided, these are printed to stderr.
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags = nullptr;
+  DiagnosticsEngine *Diags = nullptr;
   /// Used e.g. to probe for system headers locations.
   /// If not provided, the real filesystem is used.
   /// FIXME: the driver does perform some non-virtualized IO.

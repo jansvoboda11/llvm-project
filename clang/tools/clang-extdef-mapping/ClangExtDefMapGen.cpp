@@ -121,9 +121,9 @@ protected:
 
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 
-static IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
+static std::shared_ptr<DiagnosticsEngine> Diags;
 
-IntrusiveRefCntPtr<DiagnosticsEngine>
+std::shared_ptr<DiagnosticsEngine>
 GetDiagnosticsEngine(DiagnosticOptions &DiagOpts) {
   if (Diags) {
     // Call reset to make sure we don't mix errors
@@ -136,12 +136,10 @@ GetDiagnosticsEngine(DiagnosticOptions &DiagOpts) {
   DiagClient->setPrefix("clang-extdef-mappping");
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
 
-  IntrusiveRefCntPtr<DiagnosticsEngine> DiagEngine(
-      new DiagnosticsEngine(DiagID, DiagOpts, DiagClient));
+  auto DiagEngine =
+      std::make_shared<DiagnosticsEngine>(DiagID, DiagOpts, DiagClient);
   Diags.swap(DiagEngine);
 
-  // Retain this one time so it's not destroyed by ASTUnit::LoadFromASTFile
-  Diags->Retain();
   return Diags;
 }
 
@@ -153,7 +151,7 @@ static bool HandleAST(StringRef AstPath) {
     CI = new CompilerInstance();
 
   auto DiagOpts = std::make_shared<DiagnosticOptions>();
-  IntrusiveRefCntPtr<DiagnosticsEngine> DiagEngine =
+  std::shared_ptr<DiagnosticsEngine> DiagEngine =
       GetDiagnosticsEngine(*DiagOpts);
 
   std::unique_ptr<ASTUnit> Unit = ASTUnit::LoadFromASTFile(

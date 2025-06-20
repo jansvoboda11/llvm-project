@@ -202,7 +202,7 @@ public:
   /// Diagnostic consumer.
   clang::TextDiagnosticPrinter DC;
   /// Diagnostic engine.
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> Diagnostics;
+  std::unique_ptr<clang::DiagnosticsEngine> Diagnostics;
   /// Options controlling the target.
   std::shared_ptr<clang::TargetOptions> TargetOpts;
   /// Target information.

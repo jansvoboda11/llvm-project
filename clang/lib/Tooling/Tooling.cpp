@@ -72,11 +72,11 @@ FrontendActionFactory::~FrontendActionFactory() = default;
 
 /// Builds a clang driver initialized for running clang tools.
 static driver::Driver *
-newDriver(DiagnosticsEngine *Diagnostics, const char *BinaryName,
+newDriver(DiagnosticsEngine &Diagnostics, const char *BinaryName,
           IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
   driver::Driver *CompilerDriver =
       new driver::Driver(BinaryName, llvm::sys::getDefaultTargetTriple(),
-                         *Diagnostics, "clang LLVM compiler", std::move(VFS));
+                         Diagnostics, "clang LLVM compiler", std::move(VFS));
   CompilerDriver->setTitle("clang_based_tool");
   return CompilerDriver;
 }
@@ -382,7 +382,7 @@ bool ToolInvocation::run() {
   }
 
   TextDiagnosticPrinter DiagnosticPrinter(llvm::errs(), *DiagOpts);
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diagnostics =
+  std::unique_ptr<DiagnosticsEngine> Diagnostics =
       CompilerInstance::createDiagnostics(
           Files->getVirtualFileSystem(), *DiagOpts,
           DiagConsumer ? DiagConsumer : &DiagnosticPrinter, false);
@@ -403,7 +403,7 @@ bool ToolInvocation::run() {
   }
 
   const std::unique_ptr<driver::Driver> Driver(
-      newDriver(&*Diagnostics, BinaryName, &Files->getVirtualFileSystem()));
+      newDriver(*Diagnostics, BinaryName, &Files->getVirtualFileSystem()));
   // The "input file not found" diagnostics from the driver are useful.
   // The driver is only aware of the VFS working directory, but some clients
   // change this at the FileManager level instead.
