@@ -446,9 +446,6 @@ static bool checkCodegenOptions(const CodeGenOptions &CGOpts,
       }                                                                        \
     }                                                                          \
   }
-#define DEBUGOPT(Name, Bits, Default, Compatibility)
-#define VALUE_DEBUGOPT(Name, Bits, Default, Compatibility)
-#define ENUM_DEBUGOPT(Name, Type, Bits, Default, Compatibility)
 #include "clang/Basic/CodeGenOptions.def"
 
   return false;
@@ -6506,9 +6503,6 @@ bool ASTReader::ParseCodeGenOptions(const RecordData &Record,
 #define ENUM_CODEGENOPT(Name, Type, Bits, Default, Compatibility)              \
   if constexpr (CK::Compatibility != CK::Benign)                               \
     CGOpts.set##Name(static_cast<clang::CodeGenOptions::Type>(Record[Idx++]));
-#define DEBUGOPT(Name, Bits, Default, Compatibility)
-#define VALUE_DEBUGOPT(Name, Bits, Default, Compatibility)
-#define ENUM_DEBUGOPT(Name, Type, Bits, Default, Compatibility)
 #include "clang/Basic/CodeGenOptions.def"
 
   return Listener.ReadCodeGenOptions(CGOpts, ModuleFilename, Complain,

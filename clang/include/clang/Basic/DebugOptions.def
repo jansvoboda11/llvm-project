@@ -7,25 +7,24 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines debug-specific codegen options. Users of this file
-// must define the CODEGENOPT macro to make use of this information.
-// Optionally, the user may also define DEBUGOPT (for flags), ENUM_DEBUGOPT (for
-// options that have enumeration type), and VALUE_DEBUGOPT (is a debug option
-// that describes a value rather than a flag).
+// must define the DEBUGOPT macro to make use of this information.
+// Optionally, the user may also define ENUM_DEBUGOPT (for options that have
+// enumeration type), and VALUE_DEBUGOPT (is a debug option that describes a
+// value rather than a flag).
 //
 //===----------------------------------------------------------------------===//
 #ifndef DEBUGOPT
-#define DEBUGOPT(Name, Bits, Default, Compatibility) \
-CODEGENOPT(Name, Bits, Default, Compatibility)
+#  error Define the DEBUGOPT macro to handle debug options
 #endif
 
 #ifndef VALUE_DEBUGOPT
 #  define VALUE_DEBUGOPT(Name, Bits, Default, Compatibility) \
-VALUE_CODEGENOPT(Name, Bits, Default, Compatibility)
+DEBUGOPT(Name, Bits, Default, Compatibility)
 #endif
 
 #ifndef ENUM_DEBUGOPT
 #  define ENUM_DEBUGOPT(Name, Type, Bits, Default, Compatibility) \
-ENUM_CODEGENOPT(Name, Type, Bits, Default, Compatibility)
+DEBUGOPT(Name, Type, Bits, Default, Compatibility)
 #endif
 
 ENUM_DEBUGOPT(CompressDebugSections, DebugCompressionType, 2,

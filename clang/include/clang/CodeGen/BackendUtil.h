@@ -28,6 +28,7 @@ namespace clang {
 class CompilerInstance;
 class DiagnosticsEngine;
 class CodeGenOptions;
+class DebugOptions;
 class BackendConsumer;
 
 enum BackendAction {
@@ -39,7 +40,7 @@ enum BackendAction {
   Backend_EmitObj       ///< Emit native object files
 };
 
-void emitBackendOutput(CompilerInstance &CI, CodeGenOptions &CGOpts,
+void emitBackendOutput(CompilerInstance &CI, CodeGenOptions &CGOpts, DebugOptions &DebugOpts,
                        StringRef TDesc, llvm::Module *M, BackendAction Action,
                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                        std::unique_ptr<raw_pwrite_stream> OS,

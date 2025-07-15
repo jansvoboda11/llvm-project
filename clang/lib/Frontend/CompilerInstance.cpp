@@ -280,7 +280,7 @@ static void collectVFSEntries(CompilerInstance &CI,
 
 // Diagnostics
 static void SetUpDiagnosticLog(DiagnosticOptions &DiagOpts,
-                               const CodeGenOptions *CodeGenOpts,
+                               const DebugOptions *DebugOpts,
                                DiagnosticsEngine &Diags) {
   std::error_code EC;
   std::unique_ptr<raw_ostream> StreamOwner;
@@ -303,8 +303,8 @@ static void SetUpDiagnosticLog(DiagnosticOptions &DiagOpts,
   // Chain in the diagnostic client which will log the diagnostics.
   auto Logger = std::make_unique<LogDiagnosticPrinter>(*OS, DiagOpts,
                                                         std::move(StreamOwner));
-  if (CodeGenOpts)
-    Logger->setDwarfDebugFlags(CodeGenOpts->DwarfDebugFlags);
+  if (DebugOpts)
+    Logger->setDwarfDebugFlags(DebugOpts->DwarfDebugFlags);
   if (Diags.ownsClient()) {
     Diags.setClient(
         new ChainedDiagnosticConsumer(Diags.takeClient(), std::move(Logger)));
@@ -333,13 +333,13 @@ void CompilerInstance::createDiagnostics(llvm::vfs::FileSystem &VFS,
                                          DiagnosticConsumer *Client,
                                          bool ShouldOwnClient) {
   Diagnostics = createDiagnostics(VFS, getDiagnosticOpts(), Client,
-                                  ShouldOwnClient, &getCodeGenOpts());
+                                  ShouldOwnClient, &getDebugOpts());
 }
 
 IntrusiveRefCntPtr<DiagnosticsEngine> CompilerInstance::createDiagnostics(
     llvm::vfs::FileSystem &VFS, DiagnosticOptions &Opts,
     DiagnosticConsumer *Client, bool ShouldOwnClient,
-    const CodeGenOptions *CodeGenOpts) {
+    const DebugOptions *DebugOpts) {
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
       new DiagnosticsEngine(DiagID, Opts));
@@ -359,7 +359,7 @@ IntrusiveRefCntPtr<DiagnosticsEngine> CompilerInstance::createDiagnostics(
 
   // Chain in -diagnostic-log-file dumper, if requested.
   if (!Opts.DiagnosticLogFile.empty())
-    SetUpDiagnosticLog(Opts, CodeGenOpts, *Diags);
+    SetUpDiagnosticLog(Opts, DebugOpts, *Diags);
 
   if (!Opts.DiagnosticSerializationFile.empty())
     SetupSerializedDiagnostics(Opts, *Diags, Opts.DiagnosticSerializationFile);

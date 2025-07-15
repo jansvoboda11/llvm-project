@@ -47,6 +47,7 @@ class PCHContainerGenerator : public ASTConsumer {
   const HeaderSearchOptions &HeaderSearchOpts;
   const PreprocessorOptions &PreprocessorOpts;
   CodeGenOptions CodeGenOpts;
+  DebugOptions DebugOpts;
   const TargetOptions TargetOpts;
   LangOptions LangOpts;
   std::unique_ptr<llvm::LLVMContext> VMContext;
@@ -155,18 +156,18 @@ public:
     // ThreadModel, but the backend expects them to be nonempty.
     CodeGenOpts.CodeModel = "default";
     LangOpts.setThreadModel(LangOptions::ThreadModelKind::Single);
-    CodeGenOpts.DebugTypeExtRefs = true;
+    DebugOpts.DebugTypeExtRefs = true;
     // When building a module MainFileName is the name of the modulemap file.
     CodeGenOpts.MainFileName =
         LangOpts.CurrentModule.empty() ? MainFileName : LangOpts.CurrentModule;
-    CodeGenOpts.setDebugInfo(llvm::codegenoptions::FullDebugInfo);
-    CodeGenOpts.setDebuggerTuning(CI.getCodeGenOpts().getDebuggerTuning());
-    CodeGenOpts.DwarfVersion = CI.getCodeGenOpts().DwarfVersion;
-    CodeGenOpts.DebugCompilationDir =
-        CI.getInvocation().getCodeGenOpts().DebugCompilationDir;
-    CodeGenOpts.DebugPrefixMap =
-        CI.getInvocation().getCodeGenOpts().DebugPrefixMap;
-    CodeGenOpts.DebugStrictDwarf = CI.getCodeGenOpts().DebugStrictDwarf;
+    DebugOpts.setDebugInfo(llvm::codegenoptions::FullDebugInfo);
+    DebugOpts.setDebuggerTuning(CI.getDebugOpts().getDebuggerTuning());
+    DebugOpts.DwarfVersion = CI.getDebugOpts().DwarfVersion;
+    DebugOpts.DebugCompilationDir =
+        CI.getInvocation().getDebugOpts().DebugCompilationDir;
+    DebugOpts.DebugPrefixMap =
+        CI.getInvocation().getDebugOpts().DebugPrefixMap;
+    DebugOpts.DebugStrictDwarf = CI.getDebugOpts().DebugStrictDwarf;
   }
 
   ~PCHContainerGenerator() override = default;
@@ -179,7 +180,7 @@ public:
     M.reset(new llvm::Module(MainFileName, *VMContext));
     M->setDataLayout(Ctx->getTargetInfo().getDataLayoutString());
     Builder.reset(new CodeGen::CodeGenModule(
-        *Ctx, FS, HeaderSearchOpts, PreprocessorOpts, CodeGenOpts, *M, Diags));
+        *Ctx, FS, HeaderSearchOpts, PreprocessorOpts, CodeGenOpts, DebugOpts, *M, Diags));
 
     // Prepare CGDebugInfo to emit debug info for a clang module.
     auto *DI = Builder->getModuleDebugInfo();
@@ -322,14 +323,14 @@ public:
       // Print the IR for the PCH container to the debug output.
       llvm::SmallString<0> Buffer;
       clang::emitBackendOutput(
-          CI, CodeGenOpts, Ctx.getTargetInfo().getDataLayoutString(), M.get(),
+          CI, CodeGenOpts, DebugOpts, Ctx.getTargetInfo().getDataLayoutString(), M.get(),
           BackendAction::Backend_EmitLL, FS,
           std::make_unique<llvm::raw_svector_ostream>(Buffer));
       llvm::dbgs() << Buffer;
     });
 
     // Use the LLVM backend to emit the pch container.
-    clang::emitBackendOutput(CI, CodeGenOpts,
+    clang::emitBackendOutput(CI, CodeGenOpts, DebugOpts,
                              Ctx.getTargetInfo().getDataLayoutString(), M.get(),
                              BackendAction::Backend_EmitObj, FS, std::move(OS));
 

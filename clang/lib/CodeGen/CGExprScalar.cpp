@@ -29,6 +29,7 @@
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/CodeGenOptions.h"
+#include "clang/Basic/DebugOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/APFixedPoint.h"
 #include "llvm/IR/Argument.h"
@@ -2036,7 +2037,7 @@ Value *ScalarExprEmitter::VisitMemberExpr(MemberExpr *E) {
   // If -fdebug-info-for-profiling is specified, emit a pseudo variable and its
   // debug info for the pointer, even if there is no variable associated with
   // the pointer's expression.
-  if (CGF.CGM.getCodeGenOpts().DebugInfoForProfiling && CGF.getDebugInfo()) {
+  if (CGF.CGM.getDebugOpts().DebugInfoForProfiling && CGF.getDebugInfo()) {
     if (llvm::LoadInst *Load = dyn_cast<llvm::LoadInst>(Result)) {
       if (llvm::GetElementPtrInst *GEP =
               dyn_cast<llvm::GetElementPtrInst>(Load->getPointerOperand())) {

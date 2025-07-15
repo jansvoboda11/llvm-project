@@ -1658,9 +1658,6 @@ void ASTWriter::WriteControlBlock(Preprocessor &PP, StringRef isysroot) {
 #define ENUM_CODEGENOPT(Name, Type, Bits, Default, Compatibility)              \
   if constexpr (CK::Compatibility != CK::Benign)                               \
     Record.push_back(static_cast<unsigned>(CGOpts.get##Name()));
-#define DEBUGOPT(Name, Bits, Default, Compatibility)
-#define VALUE_DEBUGOPT(Name, Bits, Default, Compatibility)
-#define ENUM_DEBUGOPT(Name, Type, Bits, Default, Compatibility)
 #include "clang/Basic/CodeGenOptions.def"
   Stream.EmitRecord(CODEGEN_OPTIONS, Record);
 

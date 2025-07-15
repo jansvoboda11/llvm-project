@@ -33,6 +33,7 @@ inline constexpr llvm::StringRef ClangTrapPrefix = "__clang_trap_msg";
 
 namespace clang {
   class CodeGenOptions;
+  class DebugOptions;
   class CoverageSourceInfo;
   class Decl;
   class DiagnosticsEngine;
@@ -110,7 +111,7 @@ CodeGenerator *CreateLLVMCodeGen(DiagnosticsEngine &Diags,
                                  IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
                                  const HeaderSearchOptions &HeaderSearchOpts,
                                  const PreprocessorOptions &PreprocessorOpts,
-                                 const CodeGenOptions &CGO,
+                                 const CodeGenOptions &CGO, const DebugOptions &DO,
                                  llvm::LLVMContext &C,
                                  CoverageSourceInfo *CoverageInfo = nullptr);
 

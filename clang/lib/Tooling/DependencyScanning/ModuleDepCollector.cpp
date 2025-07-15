@@ -144,28 +144,28 @@ static void optimizeDiagnosticOpts(DiagnosticOptions &Opts,
 
 static void optimizeCWD(CowCompilerInvocation &BuildInvocation, StringRef CWD) {
   BuildInvocation.getMutFileSystemOpts().WorkingDir.clear();
-  if (BuildInvocation.getCodeGenOpts().DwarfVersion) {
+  if (BuildInvocation.getDebugOpts().DwarfVersion) {
     // It is necessary to explicitly set the DebugCompilationDir
     // to a common directory (e.g. root) if IgnoreCWD is true.
     // When IgnoreCWD is true, the module's content should not
     // depend on the current working directory. However, if dwarf
-    // information is needed (when CGOpts.DwarfVersion is
-    // non-zero), then CGOpts.DebugCompilationDir must be
+    // information is needed (when DebugOpts.DwarfVersion is
+    // non-zero), then DebugOpts.DebugCompilationDir must be
     // populated, because otherwise the current working directory
     // will be automatically embedded in the dwarf information in
     // the pcm, contradicting the assumption that it is safe to
     // ignore the CWD. Thus in such cases,
-    // CGOpts.DebugCompilationDir is explicitly set to a common
+    // DebugOpts.DebugCompilationDir is explicitly set to a common
     // directory.
     // FIXME: It is still excessive to create a copy of
-    // CodeGenOpts for each module. Since we do not modify the
-    // CodeGenOpts otherwise per module, the following code
-    // ends up generating identical CodeGenOpts for each module
+    // DebugOpts for each module. Since we do not modify the
+    // DebugOpts otherwise per module, the following code
+    // ends up generating identical DebugOpts for each module
     // with DebugCompilationDir pointing to the root directory.
     // We can optimize this away by creating a _single_ copy of
-    // CodeGenOpts whose DebugCompilationDir points to the root
+    // DebugOpts whose DebugCompilationDir points to the root
     // directory and reuse it across modules.
-    BuildInvocation.getMutCodeGenOpts().DebugCompilationDir =
+    BuildInvocation.getMutDebugOpts().DebugCompilationDir =
         llvm::sys::path::root_path(CWD);
   }
 }
@@ -205,17 +205,17 @@ void ModuleDepCollector::addOutputPaths(CowCompilerInvocation &CI,
   }
 }
 
-void dependencies::resetBenignCodeGenOptions(frontend::ActionKind ProgramAction,
-                                             const LangOptions &LangOpts,
-                                             CodeGenOptions &CGOpts) {
+void dependencies::resetBenignCodeGenAndDebugOptions(
+    frontend::ActionKind ProgramAction, const LangOptions &LangOpts,
+    CodeGenOptions &CGOpts, DebugOptions &DOpts) {
   // TODO: Figure out better way to set options to their default value.
   if (ProgramAction == frontend::GenerateModule) {
     CGOpts.MainFileName.clear();
-    CGOpts.DwarfDebugFlags.clear();
+    DOpts.DwarfDebugFlags.clear();
   }
   if (ProgramAction == frontend::GeneratePCH ||
       (ProgramAction == frontend::GenerateModule && !LangOpts.ModulesCodegen)) {
-    CGOpts.DebugCompilationDir.clear();
+    DOpts.DebugCompilationDir.clear();
     CGOpts.CoverageCompilationDir.clear();
     CGOpts.CoverageDataFile.clear();
     CGOpts.CoverageNotesFile.clear();
@@ -288,8 +288,8 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // LLVM options are not going to affect the AST
   CI.getFrontendOpts().LLVMArgs.clear();
 
-  resetBenignCodeGenOptions(frontend::GenerateModule, CI.getLangOpts(),
-                            CI.getCodeGenOpts());
+  resetBenignCodeGenAndDebugOptions(frontend::GenerateModule, CI.getLangOpts(),
+                                    CI.getCodeGenOpts(), CI.getDebugOpts());
 
   // Map output paths that affect behaviour to "-" so their existence is in the
   // context hash. The final path will be computed in addOutputPaths.
@@ -457,8 +457,9 @@ static bool needsModules(FrontendInputFile FIF) {
 
 void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
   CI.clearImplicitModuleBuildOptions();
-  resetBenignCodeGenOptions(CI.getFrontendOpts().ProgramAction,
-                            CI.getLangOpts(), CI.getCodeGenOpts());
+  resetBenignCodeGenAndDebugOptions(CI.getFrontendOpts().ProgramAction,
+                                    CI.getLangOpts(), CI.getCodeGenOpts(),
+                                    CI.getDebugOpts());
 
   if (llvm::any_of(CI.getFrontendOpts().Inputs, needsModules)) {
     Preprocessor &PP = ScanInstance.getPreprocessor();
@@ -549,8 +550,11 @@ static bool isSafeToIgnoreCWD(const CowCompilerInvocation &CI) {
 
   // Codegen options.
   const auto &CodeGenOpts = CI.getCodeGenOpts();
-  IF_RELATIVE_RETURN_FALSE(CodeGenOpts.DebugCompilationDir);
   IF_RELATIVE_RETURN_FALSE(CodeGenOpts.CoverageCompilationDir);
+
+  // Debug options.
+  const auto &DebugOpts = CI.getDebugOpts();
+  IF_RELATIVE_RETURN_FALSE(DebugOpts.DebugCompilationDir);
 
   // Sanitizer options.
   IF_ANY_RELATIVE_RETURN_FALSE(CI.getLangOpts().NoSanitizeFiles);

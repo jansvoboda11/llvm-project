@@ -11,6 +11,7 @@
 
 #include "clang/APINotes/APINotesOptions.h"
 #include "clang/Basic/CodeGenOptions.h"
+#include "clang/Basic/DebugOptions.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileSystemOptions.h"
 #include "clang/Basic/LLVM.h"
@@ -99,6 +100,9 @@ protected:
   /// Options controlling IRgen and the backend.
   std::shared_ptr<CodeGenOptions> CodeGenOpts;
 
+  /// Options controlling debug info.
+  std::shared_ptr<DebugOptions> DebugOpts;
+
   /// Options controlling file system operations.
   std::shared_ptr<FileSystemOptions> FSOpts;
 
@@ -137,6 +141,7 @@ public:
   const MigratorOptions &getMigratorOpts() const { return *MigratorOpts; }
   const APINotesOptions &getAPINotesOpts() const { return *APINotesOpts; }
   const CodeGenOptions &getCodeGenOpts() const { return *CodeGenOpts; }
+  const DebugOptions &getDebugOpts() const { return *DebugOpts; }
   const FileSystemOptions &getFileSystemOpts() const { return *FSOpts; }
   const FrontendOptions &getFrontendOpts() const { return *FrontendOpts; }
   const DependencyOutputOptions &getDependencyOutputOpts() const {
@@ -198,6 +203,10 @@ private:
                                   const llvm::Triple &T,
                                   const std::string &OutputFile,
                                   const LangOptions *LangOpts);
+
+  /// Generate command line otpions from DebugOptions.
+  static void GenerateDebugArgs(const DebugOptions &Opts,
+                                ArgumentConsumer Consumer);
   /// @}
 };
 
@@ -238,6 +247,7 @@ public:
   using CompilerInvocationBase::getMigratorOpts;
   using CompilerInvocationBase::getAPINotesOpts;
   using CompilerInvocationBase::getCodeGenOpts;
+  using CompilerInvocationBase::getDebugOpts;
   using CompilerInvocationBase::getFileSystemOpts;
   using CompilerInvocationBase::getFrontendOpts;
   using CompilerInvocationBase::getDependencyOutputOpts;
@@ -255,6 +265,7 @@ public:
   MigratorOptions &getMigratorOpts() { return *MigratorOpts; }
   APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }
   CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }
+  DebugOptions &getDebugOpts() { return *DebugOpts; }
   FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
   FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
   DependencyOutputOptions &getDependencyOutputOpts() {
@@ -335,11 +346,16 @@ private:
                             DiagnosticsEngine &Diags);
 
   /// Parse command line options that map to CodeGenOptions.
-  static bool ParseCodeGenArgs(CodeGenOptions &Opts, llvm::opt::ArgList &Args,
-                               InputKind IK, DiagnosticsEngine &Diags,
-                               const llvm::Triple &T,
+  static bool ParseCodeGenArgs(CodeGenOptions &Opts, bool &NeedLocTracking,
+                               llvm::opt::ArgList &Args, InputKind IK,
+                               DiagnosticsEngine &Diags, const llvm::Triple &T,
                                const std::string &OutputFile,
                                const LangOptions &LangOptsRef);
+
+  static bool ParseDebugArgs(DebugOptions &Opts, llvm::opt::ArgList &Args,
+                                        DiagnosticsEngine &Diags,
+                                        const bool &NeedLocTracking,
+                                        const CodeGenOptions &CodeGenOpts);
 };
 
 /// Same as \c CompilerInvocation, but with copy-on-write optimization.
@@ -378,6 +394,7 @@ public:
   MigratorOptions &getMutMigratorOpts();
   APINotesOptions &getMutAPINotesOpts();
   CodeGenOptions &getMutCodeGenOpts();
+  DebugOptions &getMutDebugOpts();
   FileSystemOptions &getMutFileSystemOpts();
   FrontendOptions &getMutFrontendOpts();
   DependencyOutputOptions &getMutDependencyOutputOpts();

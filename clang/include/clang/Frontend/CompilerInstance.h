@@ -279,6 +279,11 @@ public:
     return Invocation->getCodeGenOpts();
   }
 
+  DebugOptions &getDebugOpts() { return Invocation->getDebugOpts(); }
+  const DebugOptions &getDebugOpts() const {
+    return Invocation->getDebugOpts();
+  }
+
   DependencyOutputOptions &getDependencyOutputOpts() {
     return Invocation->getDependencyOutputOpts();
   }
@@ -669,7 +674,7 @@ public:
   /// attached to (and, then, owned by) the returned DiagnosticsEngine
   /// object.
   ///
-  /// \param CodeGenOpts If non-NULL, the code gen options in use, which may be
+  /// \param DebugOpts If non-NULL, the debug options in use, which may be
   /// used by some diagnostics printers (for logging purposes only).
   ///
   /// \return The new object on success, or null on failure.
@@ -677,7 +682,7 @@ public:
   createDiagnostics(llvm::vfs::FileSystem &VFS, DiagnosticOptions &Opts,
                     DiagnosticConsumer *Client = nullptr,
                     bool ShouldOwnClient = true,
-                    const CodeGenOptions *CodeGenOpts = nullptr);
+                    const DebugOptions *DebugOpts = nullptr);
 
   /// Create the file manager and replace any existing one with it.
   ///

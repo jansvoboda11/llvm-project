@@ -119,7 +119,7 @@ BackendConsumer::BackendConsumer(CompilerInstance &CI, BackendAction Action,
       AsmOutStream(std::move(OS)), FS(VFS), Action(Action),
       Gen(CreateLLVMCodeGen(Diags, InFile, std::move(VFS),
                             CI.getHeaderSearchOpts(), CI.getPreprocessorOpts(),
-                            CI.getCodeGenOpts(), C, CoverageInfo)),
+                            CI.getCodeGenOpts(), CI.getDebugOpts(), C, CoverageInfo)),
       LinkModules(std::move(LinkModules)), CurLinkModule(CurLinkModule) {
   TimerIsEnabled = CodeGenOpts.TimePasses;
   llvm::TimePassesIsEnabled = CodeGenOpts.TimePasses;
@@ -313,7 +313,7 @@ void BackendConsumer::HandleTranslationUnit(ASTContext &C) {
 
   EmbedBitcode(getModule(), CodeGenOpts, llvm::MemoryBufferRef());
 
-  emitBackendOutput(CI, CI.getCodeGenOpts(),
+  emitBackendOutput(CI, CI.getCodeGenOpts(), CI.getDebugOpts(),
                     C.getTargetInfo().getDataLayoutString(), getModule(),
                     Action, FS, std::move(AsmOutStream), this);
 
@@ -982,8 +982,8 @@ CodeGenAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
 
   // Enable generating macro debug info only when debug info is not disabled and
   // also macro debug info is enabled.
-  if (CI.getCodeGenOpts().getDebugInfo() != codegenoptions::NoDebugInfo &&
-      CI.getCodeGenOpts().MacroDebugInfo) {
+  if (CI.getDebugOpts().getDebugInfo() != codegenoptions::NoDebugInfo &&
+      CI.getDebugOpts().MacroDebugInfo) {
     std::unique_ptr<PPCallbacks> Callbacks =
         std::make_unique<MacroPPCallbacks>(BEConsumer->getCodeGenerator(),
                                             CI.getPreprocessor());
@@ -1184,7 +1184,7 @@ void CodeGenAction::ExecuteAction() {
   std::unique_ptr<llvm::ToolOutputFile> OptRecordFile =
       std::move(*OptRecordFileOrErr);
 
-  emitBackendOutput(CI, CI.getCodeGenOpts(),
+  emitBackendOutput(CI, CI.getCodeGenOpts(), CI.getDebugOpts(),
                     CI.getTarget().getDataLayoutString(), TheModule.get(), BA,
                     CI.getFileManager().getVirtualFileSystemPtr(),
                     std::move(OS));

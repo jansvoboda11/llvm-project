@@ -18,6 +18,7 @@
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/Basic/CodeGenOptions.h"
+#include "clang/Basic/DebugOptions.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -1114,7 +1115,7 @@ CodeGenModule::getVTableLinkage(const CXXRecordDecl *RD) {
     case TSK_ExplicitSpecialization:
       assert(
           (IsInNamedModule || def || CodeGenOpts.OptimizationLevel > 0 ||
-           CodeGenOpts.getDebugInfo() != llvm::codegenoptions::NoDebugInfo) &&
+           DebugOpts.getDebugInfo() != llvm::codegenoptions::NoDebugInfo) &&
           "Shouldn't query vtable linkage without the class in module units, "
           "key function, optimizations, or debug info");
       if (IsExternalDefinition && CodeGenOpts.OptimizationLevel > 0)

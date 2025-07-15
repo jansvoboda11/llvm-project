@@ -379,9 +379,9 @@ private:
 };
 
 /// Resets codegen options that don't affect modules/PCH.
-void resetBenignCodeGenOptions(frontend::ActionKind ProgramAction,
+void resetBenignCodeGenAndDebugOptions(frontend::ActionKind ProgramAction,
                                const LangOptions &LangOpts,
-                               CodeGenOptions &CGOpts);
+                               CodeGenOptions &CGOpts, DebugOptions &DOpts);
 
 /// Determine if \c Input can be resolved within a stable directory.
 ///

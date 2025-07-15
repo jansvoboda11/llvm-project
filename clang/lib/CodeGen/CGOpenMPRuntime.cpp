@@ -24,6 +24,7 @@
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/Basic/DebugOptions.h"
 #include "clang/Basic/OpenMPKinds.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
@@ -1369,7 +1370,7 @@ llvm::Value *CGOpenMPRuntime::emitUpdateLocation(CodeGenFunction &CGF,
                                                  unsigned Flags, bool EmitLoc) {
   uint32_t SrcLocStrSize;
   llvm::Constant *SrcLocStr;
-  if ((!EmitLoc && CGM.getCodeGenOpts().getDebugInfo() ==
+  if ((!EmitLoc && CGM.getDebugOpts().getDebugInfo() ==
                        llvm::codegenoptions::NoDebugInfo) ||
       Loc.isInvalid()) {
     SrcLocStr = OMPBuilder.getOrCreateDefaultSrcLocStr(SrcLocStrSize);
@@ -9390,7 +9391,7 @@ void CGOpenMPRuntime::emitUserDefinedMapper(const OMPDeclareMapperDecl *D,
     auto FillInfoMap = [&](MappableExprsHandler::MappingExprInfo &MapExpr) {
       return emitMappingInformation(MapperCGF, OMPBuilder, MapExpr);
     };
-    if (CGM.getCodeGenOpts().getDebugInfo() !=
+    if (CGM.getDebugOpts().getDebugInfo() !=
         llvm::codegenoptions::NoDebugInfo) {
       CombinedInfo.Names.resize(CombinedInfo.Exprs.size());
       llvm::transform(CombinedInfo.Exprs, CombinedInfo.Names.begin(),
@@ -9586,7 +9587,7 @@ genMapInfo(MappableExprsHandler &MEHandler, CodeGenFunction &CGF,
   auto FillInfoMap = [&](MappableExprsHandler::MappingExprInfo &MapExpr) {
     return emitMappingInformation(CGF, OMPBuilder, MapExpr);
   };
-  if (CGM.getCodeGenOpts().getDebugInfo() !=
+  if (CGM.getDebugOpts().getDebugInfo() !=
       llvm::codegenoptions::NoDebugInfo) {
     CombinedInfo.Names.resize(CombinedInfo.Exprs.size());
     llvm::transform(CombinedInfo.Exprs, CombinedInfo.Names.begin(),
@@ -10345,7 +10346,7 @@ void CGOpenMPRuntime::emitTargetDataCalls(
     auto FillInfoMap = [&](MappableExprsHandler::MappingExprInfo &MapExpr) {
       return emitMappingInformation(CGF, OMPBuilder, MapExpr);
     };
-    if (CGM.getCodeGenOpts().getDebugInfo() !=
+    if (CGM.getDebugOpts().getDebugInfo() !=
         llvm::codegenoptions::NoDebugInfo) {
       CombinedInfo.Names.resize(CombinedInfo.Exprs.size());
       llvm::transform(CombinedInfo.Exprs, CombinedInfo.Names.begin(),
