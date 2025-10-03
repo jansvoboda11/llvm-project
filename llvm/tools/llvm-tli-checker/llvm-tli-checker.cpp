@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
   BumpPtrAllocator A;
   StringSaver Saver(A);
   TLICheckerOptTable Tbl;
-  opt::InputArgList Args = Tbl.parseArgs(argc, argv, OPT_UNKNOWN, Saver,
+  opt::InputArgList Args = Tbl.parseArgs({argc, argv}, OPT_UNKNOWN, Saver,
                                          [&](StringRef Msg) { fail(Msg); });
 
   if (Args.hasArg(OPT_help)) {

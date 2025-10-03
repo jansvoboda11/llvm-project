@@ -27,7 +27,7 @@ class Arg;
 class ArgList;
 
 /// ArgStringList - Type used for constructing argv lists for subprocesses.
-using ArgStringList = SmallVector<const char *, 16>;
+using ArgStringList = SmallVector<StringRef, 16>;
 
 /// Base flags for all options. Custom flags may be added after.
 enum DriverFlag {

@@ -162,7 +162,7 @@ int llvm_cxxfilt_main(int argc, char **argv, const llvm::ToolContext &) {
   StringSaver Saver(A);
   CxxfiltOptTable Tbl;
   ToolName = argv[0];
-  opt::InputArgList Args = Tbl.parseArgs(argc, argv, OPT_UNKNOWN, Saver,
+  opt::InputArgList Args = Tbl.parseArgs({argc, argv}, OPT_UNKNOWN, Saver,
                                          [&](StringRef Msg) { error(Msg); });
   if (Args.hasArg(OPT_help)) {
     Tbl.printHelp(outs(),

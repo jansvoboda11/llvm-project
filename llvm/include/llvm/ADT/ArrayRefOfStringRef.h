@@ -36,6 +36,14 @@ class ArrayRefOfStringRef {
 public:
   ArrayRefOfStringRef() = default;
 
+  template <size_t Argc>
+  ArrayRefOfStringRef(const char *(&Argv)[Argc])
+      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
+
+  template <size_t Argc>
+  ArrayRefOfStringRef(const char *const (&Argv)[Argc])
+      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
+
   ArrayRefOfStringRef(int Argc, char *Argv[])
       : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
 
@@ -53,6 +61,9 @@ public:
 
   ArrayRefOfStringRef(ArrayRef<std::string> Args)
       : DataAndKind(Args.data(), Kind::StdString), Length(Args.size()) {}
+
+  ArrayRefOfStringRef(const std::vector<const char *> &Args)
+      : DataAndKind(Args.data(), Kind::CharPtr), Length(Args.size()) {}
 
   ArrayRefOfStringRef(const std::vector<std::string> &Args)
       : DataAndKind(Args.data(), Kind::StdString), Length(Args.size()) {}

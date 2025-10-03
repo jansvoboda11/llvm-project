@@ -10,6 +10,7 @@
 #define LLVM_OPTION_OPTTABLE_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringTable.h"
@@ -420,7 +421,7 @@ public:
   /// visibility flags set.
   /// \return An InputArgList; on error this will contain all the options
   /// which could be parsed.
-  InputArgList ParseArgs(ArrayRef<const char *> Args, unsigned &MissingArgIndex,
+  InputArgList ParseArgs(ArrayRefOfStringRef Args, unsigned &MissingArgIndex,
                          unsigned &MissingArgCount,
                          Visibility VisibilityMask = Visibility()) const;
 
@@ -430,7 +431,7 @@ public:
 
 private:
   InputArgList
-  internalParseArgs(ArrayRef<const char *> Args, unsigned &MissingArgIndex,
+  internalParseArgs(ArrayRefOfStringRef Args, unsigned &MissingArgIndex,
                     unsigned &MissingArgCount,
                     std::function<bool(const Option &)> ExcludeOption) const;
 
@@ -443,6 +444,9 @@ public:
   /// or unknown options.
   /// \return An InputArgList; on error this will contain all the options which
   /// could be parsed.
+  InputArgList parseArgs(ArrayRefOfStringRef Argv, OptSpecifier Unknown,
+                         StringSaver &Saver,
+                         std::function<void(StringRef)> ErrorFn) const;
   InputArgList parseArgs(int Argc, char *const *Argv, OptSpecifier Unknown,
                          StringSaver &Saver,
                          std::function<void(StringRef)> ErrorFn) const;

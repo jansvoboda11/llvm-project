@@ -22,7 +22,7 @@ TEST(DebugTest, Basic) {
   static const char *DT[] = {"A", "B"};  
   
   llvm::DebugFlag = true;
-  setCurrentDebugTypes(DT, 2);
+  setCurrentDebugTypes(DT);
   DEBUG_WITH_TYPE("A", os1 << "A");
   DEBUG_WITH_TYPE("B", os1 << "B");
   EXPECT_EQ("AB", os1.str());
@@ -40,7 +40,7 @@ TEST(DebugTest, CommaInDebugBlock) {
   static const char Letters[] = {'X', 'Y', 'Z'};
 
   llvm::DebugFlag = true;
-  setCurrentDebugTypes(DT, 2);
+  setCurrentDebugTypes(DT);
   DEBUG_WITH_TYPE("A", {
     SmallMapVector<int, char, 4> map;
     for (int i = 0; i < 3; i++)
@@ -63,28 +63,28 @@ TEST(DebugTest, DebugWithType) {
 
   {
     static const char *DT[] = {"A", "B"};
-    setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+    setCurrentDebugTypes(DT);
     EXPECT_TRUE(CheckDebugWithType("A"));
     EXPECT_TRUE(CheckDebugWithType("B"));
     EXPECT_FALSE(CheckDebugWithType("C"));
   }
   {
     static const char *DT[] = {"A:"};
-    setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+    setCurrentDebugTypes(DT);
     EXPECT_FALSE(CheckDebugWithType("A"));
     EXPECT_TRUE(CheckDebugWithType("B"));
     EXPECT_TRUE(CheckDebugWithType("C"));
   }
   {
     static const char *DT[] = {"A:", "B"};
-    setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+    setCurrentDebugTypes(DT);
     EXPECT_FALSE(CheckDebugWithType("A"));
     EXPECT_TRUE(CheckDebugWithType("B"));
     EXPECT_FALSE(CheckDebugWithType("C"));
   }
   {
     static const char *DT[] = {"A:3", "B:", "C"};
-    setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+    setCurrentDebugTypes(DT);
     EXPECT_TRUE(CheckDebugWithType("A"));
     EXPECT_FALSE(isCurrentDebugType("A", 4));
     EXPECT_FALSE(CheckDebugWithType("B"));

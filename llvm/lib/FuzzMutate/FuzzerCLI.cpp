@@ -26,7 +26,7 @@ void llvm::parseFuzzerCLOpts(int ArgC, char *ArgV[]) {
   while (I < ArgC)
     CLArgs.push_back(ArgV[I++]);
 
-  cl::ParseCommandLineOptions(CLArgs.size(), CLArgs.data());
+  cl::ParseCommandLineOptions(CLArgs);
 }
 
 void llvm::handleExecNameEncodedBEOpts(StringRef ExecName) {
@@ -57,12 +57,7 @@ void llvm::handleExecNameEncodedBEOpts(StringRef ExecName) {
     errs() << " " << Args[I];
   errs() << "\n";
 
-  std::vector<const char *> CLArgs;
-  CLArgs.reserve(Args.size());
-  for (std::string &S : Args)
-    CLArgs.push_back(S.c_str());
-
-  cl::ParseCommandLineOptions(CLArgs.size(), CLArgs.data());
+  cl::ParseCommandLineOptions(Args);
 }
 
 void llvm::handleExecNameEncodedOptimizerOpts(StringRef ExecName) {
@@ -131,12 +126,7 @@ void llvm::handleExecNameEncodedOptimizerOpts(StringRef ExecName) {
     errs() << " " << Args[I];
   errs() << "\n";
 
-  std::vector<const char *> CLArgs;
-  CLArgs.reserve(Args.size());
-  for (std::string &S : Args)
-    CLArgs.push_back(S.c_str());
-
-  cl::ParseCommandLineOptions(CLArgs.size(), CLArgs.data());
+  cl::ParseCommandLineOptions(Args);
 }
 
 int llvm::runFuzzerOnInputs(int ArgC, char *ArgV[], FuzzerTestFun TestOne,
