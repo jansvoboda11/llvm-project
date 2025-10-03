@@ -268,9 +268,8 @@ TEST(CommandLineTest, TokenizeWindowsCommandLineExeName) {
   const char Input2[] = "\"a\\\"b c\\\"d\n\"e\\\"f g\\\"h\n";
   const char *const Output2[] = {"a\\b", "c\"d", nullptr,
                                  "e\\f", "g\"h", nullptr};
-  SmallVector<size_t> EOLIndices;
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLineFull, Input2, Output2,
-                           &EOLIndices);
+                           /*MarkEOLs=*/true);
 
   const char Input3[] = R"(\\server\share\subdir\clang.exe)";
   const char *const Output3[] = {"\\\\server\\share\\subdir\\clang.exe"};

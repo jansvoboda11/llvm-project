@@ -1273,7 +1273,7 @@ Error ExpansionContext::expandResponseFiles(SmallVectorImpl<StringRef> &Argv) {
 
     StringRef Arg = Argv[I];
 
-    if (Arg[0] != '@') {
+    if (!Arg.starts_with('@')) {
       ++I;
       continue;
     }
@@ -1626,7 +1626,7 @@ bool CommandLineParser::ParseCommandLineOptions(ArrayRefOfStringRef Argv,
     // considered to be positional if it doesn't start with '-', if it is "-"
     // itself, or if we have seen "--" already.
     //
-    if (NewArgv[i][0] != '-' || NewArgv[i][1] == 0 || DashDashFound) {
+    if (!NewArgv[i].starts_with('-') || NewArgv[i] == "-" || DashDashFound) {
       // Positional argument!
       if (ActivePositionalArg) {
         ProvidePositionalOption(ActivePositionalArg, StringRef(NewArgv[i]), i);

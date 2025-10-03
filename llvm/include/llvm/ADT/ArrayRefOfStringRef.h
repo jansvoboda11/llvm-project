@@ -20,8 +20,7 @@ class ArrayRefOfStringRef {
 
   size_t Length = 0;
 
-  template <class FnTy>
-  auto visit(FnTy &&Fn) const {
+  template <class FnTy> auto visit(FnTy &&Fn) const {
     const void *Ptr = DataAndKind.getPointer();
     switch (DataAndKind.getInt()) {
     case Kind::CharPtr:
@@ -95,10 +94,11 @@ public:
   /// slice(n, m) - Chop off the first N elements of the array, and keep M
   /// elements in the array.
   ArrayRefOfStringRef slice(size_t N, size_t M) const {
-    assert(N+M <= size() && "Invalid specifier");
-    ArrayRefOfStringRef Slice = *this;
-    const void *PointerPlusN = visit([N](auto Arr) -> const void * { return Arr.data() + N; });
-    Slice.DataAndKind.setPointer(PointerPlusN);
+    assert(N + M <= size() && "Invalid specifier");
+    const void *NewPtr =
+        visit([N](auto Arr) -> const void * { return Arr.data() + N; });
+    ArrayRefOfStringRef Slice;
+    Slice.DataAndKind = {NewPtr, DataAndKind.getInt()};
     Slice.Length = M;
     return Slice;
   }
@@ -122,42 +122,78 @@ public:
       : public iterator_facade_base<iterator, std::random_access_iterator_tag,
                                     StringRef, std::ptrdiff_t, StringRef,
                                     StringRef> {
-    const ArrayRefOfStringRef *Array;
-    size_t Index;
+    PointerIntPair<const void *, 2, Kind> DataAndKind = {nullptr,
+                                                         Kind::CharPtr};
 
-    friend ArrayRefOfStringRef;
-    iterator(const ArrayRefOfStringRef *Array, size_t Index)
-        : Array(Array), Index(Index) {}
-
-  public:
-    iterator(const iterator &RHS) : Array(RHS.Array), Index(RHS.Index) {}
-
-    iterator &operator=(const iterator &RHS) = default;
-
-    bool operator==(const iterator &RHS) const {
-      assert(Array == RHS.Array);
-      return Index == RHS.Index;
+    template <class FnTy>
+    static auto visit(FnTy &&Fn, const iterator &LHS, const iterator &RHS) {
+      assert(LHS.DataAndKind.getInt() == RHS.DataAndKind.getInt());
+      const void *LHSPtr = LHS.DataAndKind.getPointer();
+      const void *RHSPtr = RHS.DataAndKind.getPointer();
+      switch (LHS.DataAndKind.getInt()) {
+      case Kind::CharPtr:
+        return Fn(static_cast<const char *const *>(LHSPtr),
+                  static_cast<const char *const *>(RHSPtr));
+      case Kind::StringRef:
+        return Fn(static_cast<const StringRef *>(LHSPtr),
+                  static_cast<const StringRef *>(RHSPtr));
+      case Kind::StdString:
+        return Fn(static_cast<const std::string *>(LHSPtr),
+                  static_cast<const std::string *>(RHSPtr));
+      }
     }
 
-    StringRef operator*() const { return (*Array)[Index]; }
+    template <class FnTy> auto visit(FnTy &&Fn) const {
+      return visit([&Fn](const auto *Ptr, const auto *) { return Fn(Ptr); },
+                   *this, *this);
+    }
+
+    friend ArrayRefOfStringRef;
+    iterator(const ArrayRefOfStringRef *Array, size_t N)
+        : DataAndKind(Array->DataAndKind) {
+      const void *NewPtr =
+          visit([N](const auto *Ptr) -> const void * { return Ptr + N; });
+      DataAndKind.setPointer(NewPtr);
+    }
+
+  public:
+    iterator() = default;
+
+    iterator(const iterator &) = default;
+
+    iterator &operator=(const iterator &) = default;
+
+    bool operator==(const iterator &RHS) const {
+      assert(DataAndKind.getInt() == RHS.DataAndKind.getInt());
+      return DataAndKind.getPointer() == RHS.DataAndKind.getPointer();
+    }
 
     bool operator<(const iterator &RHS) const {
-      assert(Array == RHS.Array);
-      return Index < RHS.Index;
+      assert(DataAndKind.getInt() == RHS.DataAndKind.getInt());
+      return DataAndKind.getPointer() < RHS.DataAndKind.getPointer();
+    }
+
+    StringRef operator*() const {
+      return visit([](const auto *Ptr) { return StringRef(*Ptr); });
     }
 
     std::ptrdiff_t operator-(const iterator &RHS) const {
-      assert(Array == RHS.Array);
-      return Index - RHS.Index;
+      return visit(
+          [](const auto *Ptr, const auto *RHSPtr) { return Ptr - RHSPtr; },
+          *this, RHS);
     }
 
     iterator &operator+=(std::ptrdiff_t N) {
-      Index += N;
+      const void *NewPtr =
+          visit([N](const auto *Ptr) -> const void * { return Ptr + N; });
+      DataAndKind.setPointer(NewPtr);
       return *this;
     }
 
     iterator &operator-=(std::ptrdiff_t N) {
-      Index -= N;
+      const void *NewPtr =
+          visit([N](const auto *Ptr) -> const void * { return Ptr - N; });
+      DataAndKind.setPointer(NewPtr);
       return *this;
     }
   };

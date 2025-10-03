@@ -1363,7 +1363,7 @@ static int ar_main(int argc, char **argv) {
       break;
     }
 
-    if ((*ArgIt)[0] != '-') {
+    if (!(*ArgIt).starts_with('-')) {
       if (Options.empty())
         Options += *ArgIt;
       else
@@ -1405,7 +1405,7 @@ static int ar_main(int argc, char **argv) {
         matchFlagWithArg("rsp-quoting", ArgIt, Argv))
       continue;
 
-    if (*ArgIt == "-X") {
+    if ((*ArgIt).starts_with("-X")) {
       if (object::Archive::getDefaultKind() == object::Archive::K_AIXBIG) {
         Match = !(*ArgIt).drop_front(2).empty() ? (*ArgIt).drop_front(2)
                                                 : *(++ArgIt);
