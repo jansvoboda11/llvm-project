@@ -666,7 +666,7 @@ static bool CommaSeparateAndAddOccurrence(Option *Handler, unsigned pos,
 /// don't allow a value (-foo) the former is rejected (-foo=).
 static inline bool ProvideOption(Option *Handler, StringRef ArgName,
                                  StringRef Value, int argc,
-                                 const char *const *argv, int &i) {
+                                 const StringRef *argv, int &i) {
   // Is this a multi-argument option?
   unsigned NumAdditionalVals = Handler->getNumAdditionalVals();
 
@@ -679,8 +679,7 @@ static inline bool ProvideOption(Option *Handler, StringRef ArgName,
       if (i + 1 >= argc || Handler->getFormattingFlag() == cl::AlwaysPrefix)
         return Handler->error("requires a value!");
       // Steal the next argument, like for '-o filename'
-      assert(argv && "null check");
-      Value = StringRef(argv[++i]);
+      Value = argv[++i];
     }
     break;
   case ValueDisallowed:
@@ -839,16 +838,16 @@ static bool isWhitespaceOrNull(char C) {
 static bool isQuote(char C) { return C == '\"' || C == '\''; }
 
 void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
-                                SmallVectorImpl<const char *> &NewArgv,
-                                bool MarkEOLs) {
+                                SmallVectorImpl<StringRef> &NewArgv,
+                                SmallVectorImpl<size_t> *EOLIndices) {
   SmallString<128> Token;
   for (size_t I = 0, E = Src.size(); I != E; ++I) {
     // Consume runs of whitespace.
     if (Token.empty()) {
       while (I != E && isWhitespace(Src[I])) {
         // Mark the end of lines in response files.
-        if (MarkEOLs && Src[I] == '\n')
-          NewArgv.push_back(nullptr);
+        if (EOLIndices && Src[I] == '\n')
+          EOLIndices->push_back(NewArgv.size());
         ++I;
       }
       if (I == E)
@@ -882,10 +881,10 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
     // End the token if this is whitespace.
     if (isWhitespace(C)) {
       if (!Token.empty())
-        NewArgv.push_back(Saver.save(Token.str()).data());
+        NewArgv.push_back(Saver.save(Token.str()));
       // Mark the end of lines in response files.
-      if (MarkEOLs && C == '\n')
-        NewArgv.push_back(nullptr);
+      if (EOLIndices && C == '\n')
+        EOLIndices->push_back(NewArgv.size());
       Token.clear();
       continue;
     }
@@ -896,7 +895,7 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
 
   // Append the last token after hitting EOF with no whitespace.
   if (!Token.empty())
-    NewArgv.push_back(Saver.save(Token.str()).data());
+    NewArgv.push_back(Saver.save(Token.str()));
 }
 
 /// Backslashes are interpreted in a rather complicated way in the Windows-style
@@ -1059,12 +1058,12 @@ static inline void tokenizeWindowsCommandLineImpl(
 }
 
 void cl::TokenizeWindowsCommandLine(StringRef Src, StringSaver &Saver,
-                                    SmallVectorImpl<const char *> &NewArgv,
-                                    bool MarkEOLs) {
+                                    SmallVectorImpl<StringRef> &NewArgv,
+                                    SmallVectorImpl<size_t> *EOLIndices) {
   auto AddToken = [&](StringRef Tok) { NewArgv.push_back(Tok.data()); };
-  auto OnEOL = [&]() {
-    if (MarkEOLs)
-      NewArgv.push_back(nullptr);
+  auto OnEOL = [&] {
+    if (EOLIndices)
+      EOLIndices->push_back(NewArgv.size());
   };
   tokenizeWindowsCommandLineImpl(Src, Saver, AddToken,
                                  /*AlwaysCopy=*/true, OnEOL, false);
@@ -1079,20 +1078,20 @@ void cl::TokenizeWindowsCommandLineNoCopy(StringRef Src, StringSaver &Saver,
 }
 
 void cl::TokenizeWindowsCommandLineFull(StringRef Src, StringSaver &Saver,
-                                        SmallVectorImpl<const char *> &NewArgv,
-                                        bool MarkEOLs) {
+                                        SmallVectorImpl<StringRef> &NewArgv,
+                                        SmallVectorImpl<size_t> *EOLIndices) {
   auto AddToken = [&](StringRef Tok) { NewArgv.push_back(Tok.data()); };
-  auto OnEOL = [&]() {
-    if (MarkEOLs)
-      NewArgv.push_back(nullptr);
+  auto OnEOL = [&] {
+    if (EOLIndices)
+      EOLIndices->push_back(NewArgv.size());
   };
   tokenizeWindowsCommandLineImpl(Src, Saver, AddToken,
                                  /*AlwaysCopy=*/true, OnEOL, true);
 }
 
 void cl::tokenizeConfigFile(StringRef Source, StringSaver &Saver,
-                            SmallVectorImpl<const char *> &NewArgv,
-                            bool MarkEOLs) {
+                            SmallVectorImpl<StringRef> &NewArgv,
+                            SmallVectorImpl<size_t> *EOLIndices) {
   for (const char *Cur = Source.begin(); Cur != Source.end();) {
     SmallString<128> Line;
     // Check for comment line.
@@ -1125,7 +1124,7 @@ void cl::tokenizeConfigFile(StringRef Source, StringSaver &Saver,
     }
     // Tokenize line.
     Line.append(Start, Cur);
-    cl::TokenizeGNUCommandLine(Line, Saver, NewArgv, MarkEOLs);
+    cl::TokenizeGNUCommandLine(Line, Saver, NewArgv, EOLIndices);
   }
 }
 
@@ -1137,7 +1136,7 @@ static bool hasUTF8ByteOrderMark(ArrayRef<char> S) {
 
 // Substitute <CFGDIR> with the file's base path.
 static void ExpandBasePaths(StringRef BasePath, StringSaver &Saver,
-                            const char *&Arg) {
+                            StringRef &Arg) {
   assert(sys::path::is_absolute(BasePath));
   constexpr StringLiteral Token("<CFGDIR>");
   const StringRef ArgString(Arg);
@@ -1169,7 +1168,8 @@ static void ExpandBasePaths(StringRef BasePath, StringSaver &Saver,
 
 // FName must be an absolute path.
 Error ExpansionContext::expandResponseFile(
-    StringRef FName, SmallVectorImpl<const char *> &NewArgv) {
+    StringRef FName, SmallVectorImpl<StringRef> &NewArgv,
+    SmallVectorImpl<size_t> *EOLIndices) {
   assert(sys::path::is_absolute(FName));
   llvm::ErrorOr<std::unique_ptr<MemoryBuffer>> MemBufOrErr =
       FS->getBufferForFile(FName);
@@ -1197,7 +1197,7 @@ Error ExpansionContext::expandResponseFile(
     Str = StringRef(BufRef.data() + 3, BufRef.size() - 3);
 
   // Tokenize the contents into NewArgv.
-  Tokenizer(Str, Saver, NewArgv, MarkEOLs);
+  Tokenizer(Str, Saver, NewArgv, EOLIndices);
 
   // Expanded file content may require additional transformations, like using
   // absolute paths instead of relative in '@file' constructs or expanding
@@ -1206,10 +1206,7 @@ Error ExpansionContext::expandResponseFile(
     return Error::success();
 
   StringRef BasePath = llvm::sys::path::parent_path(FName);
-  for (const char *&Arg : NewArgv) {
-    if (!Arg)
-      continue;
-
+  for (StringRef &Arg : NewArgv) {
     // Substitute <CFGDIR> with the file's base path.
     if (InConfigFile)
       ExpandBasePaths(BasePath, Saver, Arg);
@@ -1251,8 +1248,7 @@ Error ExpansionContext::expandResponseFile(
 
 /// Expand response files on a command line recursively using the given
 /// StringSaver and tokenization strategy.
-Error ExpansionContext::expandResponseFiles(
-    SmallVectorImpl<const char *> &Argv) {
+Error ExpansionContext::expandResponseFiles(SmallVectorImpl<StringRef> &Argv) {
   struct ResponseFileRecord {
     std::string File;
     size_t End;
@@ -1275,19 +1271,14 @@ Error ExpansionContext::expandResponseFiles(
       FileStack.pop_back();
     }
 
-    const char *Arg = Argv[I];
-    // Check if it is an EOL marker
-    if (Arg == nullptr) {
-      ++I;
-      continue;
-    }
+    StringRef Arg = Argv[I];
 
     if (Arg[0] != '@') {
       ++I;
       continue;
     }
 
-    const char *FName = Arg + 1;
+    StringRef FName = Arg.drop_front();
     // Note that CurrentDir is only used for top-level rsp files, the rest will
     // always have an absolute path deduced from the containing file.
     SmallString<128> CurrDir;
@@ -1346,7 +1337,7 @@ Error ExpansionContext::expandResponseFiles(
 
     // Replace this response file argument with the tokenization of its
     // contents.  Nested response files are expanded in subsequent iterations.
-    SmallVector<const char *, 0> ExpandedArgv;
+    SmallVector<StringRef, 0> ExpandedArgv;
     if (Error Err = expandResponseFile(FName, ExpandedArgv))
       return Err;
 
@@ -1356,7 +1347,7 @@ Error ExpansionContext::expandResponseFiles(
       Record.End += ExpandedArgv.size() - 1;
     }
 
-    FileStack.push_back({FName, I + ExpandedArgv.size()});
+    FileStack.push_back({FName.str(), I + ExpandedArgv.size()});
     Argv.erase(Argv.begin() + I);
     Argv.insert(Argv.begin() + I, ExpandedArgv.begin(), ExpandedArgv.end());
   }
@@ -1372,7 +1363,7 @@ Error ExpansionContext::expandResponseFiles(
 
 bool cl::expandResponseFiles(int Argc, const char *const *Argv,
                              const char *EnvVar, StringSaver &Saver,
-                             SmallVectorImpl<const char *> &NewArgv) {
+                             SmallVectorImpl<StringRef> &NewArgv) {
 #ifdef _WIN32
   auto Tokenize = cl::TokenizeWindowsCommandLine;
 #else
@@ -1381,7 +1372,7 @@ bool cl::expandResponseFiles(int Argc, const char *const *Argv,
   // The environment variable specifies initial options.
   if (EnvVar)
     if (std::optional<std::string> EnvValue = sys::Process::GetEnv(EnvVar))
-      Tokenize(*EnvValue, Saver, NewArgv, /*MarkEOLs=*/false);
+      Tokenize(*EnvValue, Saver, NewArgv, /*EOLIndices=*/nullptr);
 
   // Command line options can override the environment variable.
   NewArgv.append(Argv + 1, Argv + Argc);
@@ -1394,7 +1385,7 @@ bool cl::expandResponseFiles(int Argc, const char *const *Argv,
 }
 
 bool cl::ExpandResponseFiles(StringSaver &Saver, TokenizerCallback Tokenizer,
-                             SmallVectorImpl<const char *> &Argv) {
+                             SmallVectorImpl<StringRef> &Argv) {
   ExpansionContext ECtx(Saver.getAllocator(), Tokenizer);
   if (Error Err = ECtx.expandResponseFiles(Argv)) {
     errs() << toString(std::move(Err)) << '\n';
@@ -1445,7 +1436,7 @@ bool ExpansionContext::findConfigFile(StringRef FileName,
 }
 
 Error ExpansionContext::readConfigFile(StringRef CfgFile,
-                                       SmallVectorImpl<const char *> &Argv) {
+                                       SmallVectorImpl<StringRef> &Argv) {
   SmallString<128> AbsPath;
   if (sys::path::is_relative(CfgFile)) {
     AbsPath.assign(CfgFile);
@@ -1467,7 +1458,7 @@ bool cl::ParseCommandLineOptions(int argc, const char *const *argv,
                                  vfs::FileSystem *VFS, const char *EnvVar,
                                  bool LongOptionsUseDoubleDash) {
   initCommonOptions();
-  SmallVector<const char *, 20> NewArgv;
+  SmallVector<StringRef, 20> NewArgv;
   BumpPtrAllocator A;
   StringSaver Saver(A);
   NewArgv.push_back(argv[0]);
@@ -1520,7 +1511,7 @@ bool CommandLineParser::ParseCommandLineOptions(
   bool ErrorParsing = false;
 
   // Expand response files.
-  SmallVector<const char *, 20> newArgv(argv, argv + argc);
+  SmallVector<StringRef, 20> NewArgv(argv, argv + argc);
   BumpPtrAllocator A;
 #ifdef _WIN32
   auto Tokenize = cl::TokenizeWindowsCommandLine;
@@ -1528,15 +1519,14 @@ bool CommandLineParser::ParseCommandLineOptions(
   auto Tokenize = cl::TokenizeGNUCommandLine;
 #endif
   ExpansionContext ECtx(A, Tokenize, VFS);
-  if (Error Err = ECtx.expandResponseFiles(newArgv)) {
+  if (Error Err = ECtx.expandResponseFiles(NewArgv)) {
     *Errs << toString(std::move(Err)) << '\n';
     return false;
   }
-  argv = &newArgv[0];
-  argc = static_cast<int>(newArgv.size());
+  auto NewArgc = static_cast<int>(NewArgv.size());
 
   // Copy the program name into ProgName, making sure not to overflow it.
-  ProgramName = std::string(sys::path::filename(StringRef(argv[0])));
+  ProgramName = std::string(sys::path::filename(NewArgv[0]));
 
   // Check out the positional arguments to collect information about them.
   unsigned NumPositionalRequired = 0;
@@ -1548,12 +1538,12 @@ bool CommandLineParser::ParseCommandLineOptions(
   SubCommand *ChosenSubCommand = &SubCommand::getTopLevel();
   std::string NearestSubCommandString;
   bool MaybeNamedSubCommand =
-      argc >= 2 && argv[FirstArg][0] != '-' && hasNamedSubCommands();
+      NewArgc >= 2 && NewArgv[FirstArg][0] != '-' && hasNamedSubCommands();
   if (MaybeNamedSubCommand) {
     // If the first argument specifies a valid subcommand, start processing
     // options from the second argument.
     ChosenSubCommand =
-        LookupSubCommand(StringRef(argv[FirstArg]), NearestSubCommandString);
+        LookupSubCommand(NewArgv[FirstArg], NearestSubCommandString);
     if (ChosenSubCommand != &SubCommand::getTopLevel())
       FirstArg = 2;
   }
@@ -1623,7 +1613,7 @@ bool CommandLineParser::ParseCommandLineOptions(
 
   // Loop over all of the arguments... processing them.
   bool DashDashFound = false; // Have we read '--'?
-  for (int i = FirstArg; i < argc; ++i) {
+  for (int i = FirstArg; i < NewArgc; ++i) {
     Option *Handler = nullptr;
     std::string NearestHandlerString;
     StringRef Value;
@@ -1634,7 +1624,7 @@ bool CommandLineParser::ParseCommandLineOptions(
     // considered to be positional if it doesn't start with '-', if it is "-"
     // itself, or if we have seen "--" already.
     //
-    if (argv[i][0] != '-' || argv[i][1] == 0 || DashDashFound) {
+    if (NewArgv[i][0] != '-' || NewArgv[i][1] == 0 || DashDashFound) {
       // Positional argument!
       if (ActivePositionalArg) {
         ProvidePositionalOption(ActivePositionalArg, StringRef(argv[i]), i);
@@ -1642,22 +1632,22 @@ bool CommandLineParser::ParseCommandLineOptions(
       }
 
       if (!PositionalOpts.empty()) {
-        PositionalVals.push_back(std::make_pair(StringRef(argv[i]), i));
+        PositionalVals.push_back(std::make_pair(NewArgv[i], i));
 
         // All of the positional arguments have been fulfulled, give the rest to
         // the consume after option... if it's specified...
         //
         if (PositionalVals.size() >= NumPositionalRequired && ConsumeAfterOpt) {
-          for (++i; i < argc; ++i)
-            PositionalVals.push_back(std::make_pair(StringRef(argv[i]), i));
+          for (++i; i < NewArgc; ++i)
+            PositionalVals.push_back(std::make_pair(NewArgv[i], i));
           break; // Handle outside of the argument processing loop...
         }
 
         // Delay processing positional arguments until the end...
         continue;
       }
-    } else if (argv[i][0] == '-' && argv[i][1] == '-' && argv[i][2] == 0 &&
-               !DashDashFound) {
+    } else if (NewArgv[i][0] == '-' && NewArgv[i][1] == '-' &&
+               NewArgv[i][2] == 0 && !DashDashFound) {
       DashDashFound = true; // This is the mythical "--"?
       continue;             // Don't try to process it as an argument itself.
     } else if (ActivePositionalArg &&
@@ -1665,7 +1655,7 @@ bool CommandLineParser::ParseCommandLineOptions(
       // If there is a positional argument eating options, check to see if this
       // option is another positional argument.  If so, treat it as an argument,
       // otherwise feed it to the eating positional.
-      ArgName = StringRef(argv[i] + 1);
+      ArgName = NewArgv[i].drop_front();
       // Eat second dash.
       if (ArgName.consume_front("-"))
         HaveDoubleDash = true;
@@ -1673,11 +1663,11 @@ bool CommandLineParser::ParseCommandLineOptions(
       Handler = LookupLongOption(*ChosenSubCommand, ArgName, Value,
                                  LongOptionsUseDoubleDash, HaveDoubleDash);
       if (!Handler || Handler->getFormattingFlag() != cl::Positional) {
-        ProvidePositionalOption(ActivePositionalArg, StringRef(argv[i]), i);
+        ProvidePositionalOption(ActivePositionalArg, NewArgv[i], i);
         continue; // We are done!
       }
     } else { // We start with a '-', must be an argument.
-      ArgName = StringRef(argv[i] + 1);
+      ArgName = NewArgv[i].drop_front();
       // Eat second dash.
       if (ArgName.consume_front("-"))
         HaveDoubleDash = true;
@@ -1706,7 +1696,7 @@ bool CommandLineParser::ParseCommandLineOptions(
     if (!Handler) {
       if (!SinkOpts.empty()) {
         for (Option *SinkOpt : SinkOpts)
-          SinkOpt->addOccurrence(i, "", StringRef(argv[i]));
+          SinkOpt->addOccurrence(i, "", NewArgv[i]);
         continue;
       }
 
@@ -1714,7 +1704,7 @@ bool CommandLineParser::ParseCommandLineOptions(
                                        StringRef NearestArgumentName) {
         *Errs << ProgramName << ": Unknown "
               << (IsArg ? "command line argument" : "subcommand") << " '"
-              << argv[i] << "'.  Try: '" << argv[0] << " --help'\n";
+              << NewArgv[i] << "'.  Try: '" << NewArgv[0] << " --help'\n";
 
         if (NearestArgumentName.empty())
           return;
@@ -1748,7 +1738,8 @@ bool CommandLineParser::ParseCommandLineOptions(
       ActivePositionalArg = Handler;
     }
     else
-      ErrorParsing |= ProvideOption(Handler, ArgName, Value, argc, argv, i);
+      ErrorParsing |=
+          ProvideOption(Handler, ArgName, Value, NewArgc, &NewArgv[0], i);
   }
 
   // Check and handle positional arguments now...
