@@ -201,16 +201,20 @@ typedef void ParserFunction(StringRef Source, StringSaver &Saver,
 
 void testCommandLineTokenizer(ParserFunction *parse, StringRef Input,
                               ArrayRefOfStringRef Output,
-                              bool MarkEOLs = false) {
+                              ArrayRef<size_t> EOLIndices = {}) {
   SmallVector<StringRef, 0> Actual;
   BumpPtrAllocator A;
   StringSaver Saver(A);
-  SmallVector<size_t> EOLIndices;
-  parse(Input, Saver, Actual, MarkEOLs ? &EOLIndices : nullptr);
+  SmallVector<size_t> ActualEOLIndices;
+  parse(Input, Saver, Actual, &ActualEOLIndices);
   EXPECT_EQ(Output.size(), Actual.size());
   for (unsigned I = 0, E = Actual.size(); I != E; ++I)
     if (I < Output.size())
       EXPECT_EQ(Output[I], Actual[I]);
+  EXPECT_EQ(EOLIndices.size(), ActualEOLIndices.size());
+  for (unsigned I = 0, E = EOLIndices.size(); I != E; ++I)
+    if (I < EOLIndices.size())
+      EXPECT_EQ(EOLIndices[I], ActualEOLIndices[I]);
 }
 
 TEST(CommandLineTest, TokenizeGNUCommandLine) {
@@ -266,10 +270,10 @@ TEST(CommandLineTest, TokenizeWindowsCommandLineExeName) {
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLineFull, Input1, Output1);
 
   const char Input2[] = "\"a\\\"b c\\\"d\n\"e\\\"f g\\\"h\n";
-  const char *const Output2[] = {"a\\b", "c\"d", nullptr,
-                                 "e\\f", "g\"h", nullptr};
+  const char *const Output2[] = {"a\\b", "c\"d", "e\\f", "g\"h"};
+  const size_t EOLIndices2[] = {2, 4};
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLineFull, Input2, Output2,
-                           /*MarkEOLs=*/true);
+                           EOLIndices2);
 
   const char Input3[] = R"(\\server\share\subdir\clang.exe)";
   const char *const Output3[] = {"\\\\server\\share\\subdir\\clang.exe"};
@@ -288,13 +292,13 @@ TEST(CommandLineTest, TokenizeAndMarkEOLs) {
   // else as compiler flags. The tokenizer inserts nullptr sentinels into the
   // output so that clang-cl can find the end of the current line.
   const char Input[] = "clang -Xclang foo\n\nfoo\"bar\"baz\n x.cpp\n";
-  const char *const Output[] = {"clang", "-Xclang", "foo",
-                                nullptr, nullptr,   "foobarbaz",
-                                nullptr, "x.cpp",   nullptr};
+  const char *const Output[] = {"clang", "-Xclang", "foo", "foobarbaz",
+                                "x.cpp"};
+  size_t EOLIndices[] = {3, 3, 4, 5};
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLine, Input, Output,
-                           /*MarkEOLs=*/true);
+                           EOLIndices);
   testCommandLineTokenizer(cl::TokenizeGNUCommandLine, Input, Output,
-                           /*MarkEOLs=*/true);
+                           EOLIndices);
 }
 
 TEST(CommandLineTest, TokenizeConfigFile1) {
