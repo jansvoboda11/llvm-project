@@ -42,6 +42,9 @@ public:
   ArrayRefOfStringRef(int Argc, const char *Argv[])
       : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
 
+  ArrayRefOfStringRef(int Argc, const char *const *Argv)
+      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
+
   ArrayRefOfStringRef(ArrayRef<const char *> Args)
       : DataAndKind(Args.data(), Kind::CharPtr), Length(Args.size()) {}
 
@@ -56,6 +59,9 @@ public:
 
   ArrayRefOfStringRef(const SmallVectorImpl<const char *> &Args)
       : DataAndKind(Args.data(), Kind::CharPtr), Length(Args.size()) {}
+
+  ArrayRefOfStringRef(const SmallVectorImpl<StringRef> &Args)
+      : DataAndKind(Args.data(), Kind::StringRef), Length(Args.size()) {}
 
   size_t size() const { return Length; }
 

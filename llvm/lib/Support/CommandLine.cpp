@@ -187,8 +187,8 @@ public:
 
   void ResetAllOptionOccurrences();
 
-  bool ParseCommandLineOptions(int argc, const char *const *argv,
-                               StringRef Overview, raw_ostream *Errs = nullptr,
+  bool ParseCommandLineOptions(ArrayRefOfStringRef Args, StringRef Overview,
+                               raw_ostream *Errs = nullptr,
                                vfs::FileSystem *VFS = nullptr,
                                bool LongOptionsUseDoubleDash = false);
 
@@ -1361,8 +1361,8 @@ Error ExpansionContext::expandResponseFiles(SmallVectorImpl<StringRef> &Argv) {
   return Error::success();
 }
 
-bool cl::expandResponseFiles(int Argc, const char *const *Argv,
-                             const char *EnvVar, StringSaver &Saver,
+bool cl::expandResponseFiles(ArrayRefOfStringRef Argv, const char *EnvVar,
+                             StringSaver &Saver,
                              SmallVectorImpl<StringRef> &NewArgv) {
 #ifdef _WIN32
   auto Tokenize = cl::TokenizeWindowsCommandLine;
@@ -1375,7 +1375,8 @@ bool cl::expandResponseFiles(int Argc, const char *const *Argv,
       Tokenize(*EnvValue, Saver, NewArgv, /*EOLIndices=*/nullptr);
 
   // Command line options can override the environment variable.
-  NewArgv.append(Argv + 1, Argv + Argc);
+  Argv = Argv.drop_front();
+  NewArgv.append(Argv.begin(), Argv.end());
   ExpansionContext ECtx(Saver.getAllocator(), Tokenize);
   if (Error Err = ECtx.expandResponseFiles(NewArgv)) {
     errs() << toString(std::move(Err)) << '\n';
@@ -1453,15 +1454,16 @@ Error ExpansionContext::readConfigFile(StringRef CfgFile,
 }
 
 static void initCommonOptions();
-bool cl::ParseCommandLineOptions(int argc, const char *const *argv,
-                                 StringRef Overview, raw_ostream *Errs,
-                                 vfs::FileSystem *VFS, const char *EnvVar,
+bool cl::ParseCommandLineOptions(ArrayRefOfStringRef Argv, StringRef Overview,
+                                 raw_ostream *Errs, vfs::FileSystem *VFS,
+                                 const char *EnvVar,
                                  bool LongOptionsUseDoubleDash) {
   initCommonOptions();
   SmallVector<StringRef, 20> NewArgv;
   BumpPtrAllocator A;
   StringSaver Saver(A);
-  NewArgv.push_back(argv[0]);
+  NewArgv.push_back(Argv.front());
+  Argv = Argv.drop_front();
 
   // Parse options from environment variable.
   if (EnvVar) {
@@ -1471,13 +1473,11 @@ bool cl::ParseCommandLineOptions(int argc, const char *const *argv,
   }
 
   // Append options from command line.
-  for (int I = 1; I < argc; ++I)
-    NewArgv.push_back(argv[I]);
-  int NewArgc = static_cast<int>(NewArgv.size());
+  NewArgv.append(Argv.begin(), Argv.end());
 
   // Parse all options.
-  return GlobalParser->ParseCommandLineOptions(
-      NewArgc, &NewArgv[0], Overview, Errs, VFS, LongOptionsUseDoubleDash);
+  return GlobalParser->ParseCommandLineOptions(NewArgv, Overview, Errs, VFS,
+                                               LongOptionsUseDoubleDash);
 }
 
 /// Reset all options at least once, so that we can parse different options.
@@ -1497,9 +1497,11 @@ void CommandLineParser::ResetAllOptionOccurrences() {
   }
 }
 
-bool CommandLineParser::ParseCommandLineOptions(
-    int argc, const char *const *argv, StringRef Overview, raw_ostream *Errs,
-    vfs::FileSystem *VFS, bool LongOptionsUseDoubleDash) {
+bool CommandLineParser::ParseCommandLineOptions(ArrayRefOfStringRef Argv,
+                                                StringRef Overview,
+                                                raw_ostream *Errs,
+                                                vfs::FileSystem *VFS,
+                                                bool LongOptionsUseDoubleDash) {
   assert(hasOptions() && "No options specified!");
 
   ProgramOverview = Overview;
@@ -1511,7 +1513,7 @@ bool CommandLineParser::ParseCommandLineOptions(
   bool ErrorParsing = false;
 
   // Expand response files.
-  SmallVector<StringRef, 20> NewArgv(argv, argv + argc);
+  SmallVector<StringRef, 20> NewArgv(Argv.begin(), Argv.end());
   BumpPtrAllocator A;
 #ifdef _WIN32
   auto Tokenize = cl::TokenizeWindowsCommandLine;
@@ -1627,7 +1629,7 @@ bool CommandLineParser::ParseCommandLineOptions(
     if (NewArgv[i][0] != '-' || NewArgv[i][1] == 0 || DashDashFound) {
       // Positional argument!
       if (ActivePositionalArg) {
-        ProvidePositionalOption(ActivePositionalArg, StringRef(argv[i]), i);
+        ProvidePositionalOption(ActivePositionalArg, StringRef(NewArgv[i]), i);
         continue; // We are done!
       }
 
@@ -1744,18 +1746,18 @@ bool CommandLineParser::ParseCommandLineOptions(
 
   // Check and handle positional arguments now...
   if (NumPositionalRequired > PositionalVals.size()) {
-      *Errs << ProgramName
-             << ": Not enough positional command line arguments specified!\n"
-             << "Must specify at least " << NumPositionalRequired
-             << " positional argument" << (NumPositionalRequired > 1 ? "s" : "")
-             << ": See: " << argv[0] << " --help\n";
+    *Errs << ProgramName
+          << ": Not enough positional command line arguments specified!\n"
+          << "Must specify at least " << NumPositionalRequired
+          << " positional argument" << (NumPositionalRequired > 1 ? "s" : "")
+          << ": See: " << NewArgv[0] << " --help\n";
 
     ErrorParsing = true;
   } else if (!HasUnlimitedPositionals &&
              PositionalVals.size() > PositionalOpts.size()) {
     *Errs << ProgramName << ": Too many positional arguments specified!\n"
           << "Can specify at most " << PositionalOpts.size()
-          << " positional arguments: See: " << argv[0] << " --help\n";
+          << " positional arguments: See: " << NewArgv[0] << " --help\n";
     ErrorParsing = true;
 
   } else if (!ConsumeAfterOpt) {
@@ -1840,7 +1842,7 @@ bool CommandLineParser::ParseCommandLineOptions(
   // Note that if ReadResponseFiles == true, this must be done before the
   // memory allocated for the expanded command line is free()d below.
   LLVM_DEBUG(dbgs() << "Args: ";
-             for (int i = 0; i < argc; ++i) dbgs() << argv[i] << ' ';
+             for (int i = 0; i < NewArgc; ++i) dbgs() << NewArgv[i] << ' ';
              dbgs() << '\n';);
 
   // Free all of the memory allocated to the map.  Command line options may only
@@ -2861,6 +2863,6 @@ void cl::ResetAllOptionOccurrences() {
 
 void LLVMParseCommandLineOptions(int argc, const char *const *argv,
                                  const char *Overview) {
-  llvm::cl::ParseCommandLineOptions(argc, argv, StringRef(Overview),
-                                    &llvm::nulls());
+  llvm::cl::ParseCommandLineOptions(ArrayRefOfStringRef(argc, argv),
+                                    StringRef(Overview), &llvm::nulls());
 }

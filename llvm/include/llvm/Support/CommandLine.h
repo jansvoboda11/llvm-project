@@ -20,6 +20,7 @@
 #define LLVM_SUPPORT_COMMANDLINE_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -66,7 +67,7 @@ namespace cl {
 // that give precedence to later occurrences.  If your program supports options
 // that give precedence to earlier occurrences, you will need to extend this
 // function to support it correctly.
-LLVM_ABI bool ParseCommandLineOptions(int argc, const char *const *argv,
+LLVM_ABI bool ParseCommandLineOptions(ArrayRefOfStringRef Argv,
                                       StringRef Overview = "",
                                       raw_ostream *Errs = nullptr,
                                       vfs::FileSystem *VFS = nullptr,
@@ -2273,8 +2274,7 @@ public:
 /// environment variable EnvVar and command line options, then expands
 /// response files recursively.
 /// \return true if all @files were expanded successfully or there were none.
-LLVM_ABI bool expandResponseFiles(int Argc, const char *const *Argv,
-                                  const char *EnvVar,
+LLVM_ABI bool expandResponseFiles(ArrayRefOfStringRef Argv, const char *EnvVar,
                                   SmallVectorImpl<const char *> &NewArgv);
 
 /// A convenience helper which supports the typical use case of expansion
@@ -2287,8 +2287,8 @@ LLVM_ABI bool ExpandResponseFiles(StringSaver &Saver,
 /// environment variable EnvVar and command line options, then expands response
 /// files recursively. The tokenizer is a predefined GNU or Windows one.
 /// \return true if all @files were expanded successfully or there were none.
-LLVM_ABI bool expandResponseFiles(int Argc, const char *const *Argv,
-                                  const char *EnvVar, StringSaver &Saver,
+LLVM_ABI bool expandResponseFiles(ArrayRefOfStringRef Argv, const char *EnvVar,
+                                  StringSaver &Saver,
                                   SmallVectorImpl<StringRef> &NewArgv);
 
 /// Mark all options not part of this category as cl::ReallyHidden.
