@@ -407,8 +407,8 @@ std::unique_ptr<Arg> OptTable::parseOneArgGrouped(InputArgList &Args,
   // In the case of an incorrect short option extract the character and move to
   // the next one.
   if (Str[1] != '-') {
-    Str = Args.MakeArgString(Str.substr(0, 2));
     Args.replaceArgString(Index, Twine('-') + Str.substr(2));
+    Str = Args.MakeArgString(Str.substr(0, 2));
     return std::make_unique<Arg>(getOption(UnknownOptionID), Str, Index, Str);
   }
 

@@ -132,7 +132,8 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
     // Parse out the comma separated values.
     while (!Value.empty()) {
       auto [Head, Tail] = Value.split(',');
-      A->getValues().push_back(Head);
+      if (!Head.empty())
+        A->getValues().push_back(Head);
       Value = Tail;
     }
 
