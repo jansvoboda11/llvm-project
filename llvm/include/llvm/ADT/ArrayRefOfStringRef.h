@@ -9,6 +9,17 @@
 #include <string>
 
 namespace llvm {
+namespace detail {
+template <class T, class U> struct Like : std::false_type {};
+template <> struct Like<StringRef, const char *> : std::true_type {};
+template <> struct Like<StringRef, std::string> : std::true_type {};
+template <> struct Like<StringRef, std::string_view> : std::true_type {};
+
+template <class T, class U> struct Like<ArrayRef<T>, U> {
+  static constexpr bool value = Like<T, decltype(std::declval<const U &>().data());
+};
+} // namespace detail
+
 class ArrayRefOfStringRef {
   enum class Kind {
     CharPtr,
@@ -32,24 +43,23 @@ class ArrayRefOfStringRef {
     }
   }
 
+  template <class T>
+  static constexpr bool StringRefLike =
+      std::is_same_v<T, const char *> || std::is_same_v<T, std::string> ||
+      std::is_same_v<T, std::string_view>;
+
+  template <class C, class T>
+  static constexpr bool ArrayRefLike =
+    std::is_invocable_v<decltype(std::declval<const C &>().data())>
+
 public:
   ArrayRefOfStringRef() = default;
-
-  template <size_t Argc>
-  ArrayRefOfStringRef(const char *(&Argv)[Argc])
-      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
 
   template <size_t Argc>
   ArrayRefOfStringRef(const char *const (&Argv)[Argc])
       : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
 
-  ArrayRefOfStringRef(int Argc, char *Argv[])
-      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
-
-  ArrayRefOfStringRef(int Argc, const char *Argv[])
-      : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
-
-  ArrayRefOfStringRef(int Argc, const char *const *Argv)
+  ArrayRefOfStringRef(int Argc, const char *const Argv[])
       : DataAndKind(Argv, Kind::CharPtr), Length(Argc) {}
 
   ArrayRefOfStringRef(ArrayRef<const char *> Args)
