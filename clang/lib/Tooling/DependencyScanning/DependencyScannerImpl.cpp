@@ -502,10 +502,6 @@ bool initializeScanCompilerInstance(
   ScanInstance.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
       true;
 
-  if (ScanInstance.getHeaderSearchOpts().ModulesValidateOncePerBuildSession)
-    ScanInstance.getHeaderSearchOpts().BuildSessionTimestamp =
-        Service.getBuildSessionTimestamp();
-
   ScanInstance.getFrontendOpts().DisableFree = false;
   ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
   ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;

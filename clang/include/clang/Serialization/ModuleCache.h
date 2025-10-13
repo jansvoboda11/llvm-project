@@ -33,17 +33,14 @@ public:
   virtual std::unique_ptr<llvm::AdvisoryLock>
   getLock(StringRef ModuleFilename) = 0;
 
-  // TODO: Abstract away timestamps with isUpToDate() and markUpToDate().
   // TODO: Consider exposing a "validation lock" API to prevent multiple clients
   // concurrently noticing an out-of-date module file and validating its inputs.
 
-  /// Returns the timestamp denoting the last time inputs of the module file
-  /// were validated.
-  virtual std::time_t getModuleTimestamp(StringRef ModuleFilename) = 0;
+  /// Checks whether the inputs of the module file were marked as validated.
+  virtual bool isMarkedUpToDate(StringRef ModuleFilename) = 0;
 
-  /// Updates the timestamp denoting the last time inputs of the module file
-  /// were validated.
-  virtual void updateModuleTimestamp(StringRef ModuleFilename) = 0;
+  /// Marks the inputs of the module file as validated.
+  virtual void markUpToDate(StringRef ModuleFilename) = 0;
 
   /// Prune module files that haven't been accessed in a long time.
   virtual void maybePrune(StringRef Path, time_t PruneInterval,
@@ -62,7 +59,8 @@ public:
 /// operated on by multiple processes. This instance must be used across all
 /// \c CompilerInstance instances participating in building modules for single
 /// translation unit in order to share the same \c InMemoryModuleCache.
-IntrusiveRefCntPtr<ModuleCache> createCrossProcessModuleCache();
+IntrusiveRefCntPtr<ModuleCache>
+createCrossProcessModuleCache(std::time_t BuildSessionTimestamp);
 
 /// Shared implementation of `ModuleCache::maybePrune()`.
 void maybePruneImpl(StringRef Path, time_t PruneInterval, time_t PruneAfter);

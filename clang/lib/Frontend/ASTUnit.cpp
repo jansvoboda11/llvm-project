@@ -836,9 +836,10 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
   AST->SourceMgr = llvm::makeIntrusiveRefCnt<SourceManager>(
       AST->getDiagnostics(), AST->getFileManager(), UserFilesAreVolatile);
-  AST->ModCache = createCrossProcessModuleCache();
   AST->HSOpts = std::make_unique<HeaderSearchOptions>(HSOpts);
   AST->HSOpts->ModuleFormat = std::string(PCHContainerRdr.getFormats().front());
+  AST->ModCache =
+      createCrossProcessModuleCache(AST->HSOpts->BuildSessionTimestamp);
   AST->HeaderInfo.reset(new HeaderSearch(AST->getHeaderSearchOpts(),
                                          AST->getSourceManager(),
                                          AST->getDiagnostics(),
@@ -1562,9 +1563,10 @@ ASTUnit::create(std::shared_ptr<CompilerInvocation> CI,
   AST->FileMgr =
       llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, VFS);
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
-  AST->SourceMgr = llvm::makeIntrusiveRefCnt<SourceManager>(
-      AST->getDiagnostics(), *AST->FileMgr, UserFilesAreVolatile);
-  AST->ModCache = createCrossProcessModuleCache();
+  AST->SourceMgr = new SourceManager(AST->getDiagnostics(), *AST->FileMgr,
+                                     UserFilesAreVolatile);
+  AST->ModCache = createCrossProcessModuleCache(
+      AST->Invocation->getHeaderSearchOpts().BuildSessionTimestamp);
 
   return AST;
 }
@@ -1766,6 +1768,8 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
   AST->IncludeBriefCommentsInCodeCompletion
     = IncludeBriefCommentsInCodeCompletion;
   AST->Invocation = std::move(CI);
+  AST->ModCache = createCrossProcessModuleCache(
+      AST->Invocation->getHeaderSearchOpts().BuildSessionTimestamp);
   AST->FileSystemOpts = FileMgr->getFileSystemOpts();
   AST->FileMgr = FileMgr;
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
@@ -1859,7 +1863,6 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
       llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, VFS);
   AST->StorePreamblesInMemory = StorePreamblesInMemory;
   AST->PreambleStoragePath = PreambleStoragePath;
-  AST->ModCache = createCrossProcessModuleCache();
   AST->OnlyLocalDecls = OnlyLocalDecls;
   AST->CaptureDiagnostics = CaptureDiagnostics;
   AST->TUKind = TUKind;
@@ -1868,6 +1871,8 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
     = IncludeBriefCommentsInCodeCompletion;
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
   AST->Invocation = CI;
+  AST->ModCache = createCrossProcessModuleCache(
+      AST->Invocation->getHeaderSearchOpts().BuildSessionTimestamp);
   AST->SkipFunctionBodies = SkipFunctionBodies;
   if (ForSerialization)
     AST->WriterData.reset(new ASTWriterData(*AST->ModCache, *AST->CodeGenOpts));
@@ -2406,7 +2411,7 @@ bool ASTUnit::serialize(raw_ostream &OS) {
 
   SmallString<128> Buffer;
   llvm::BitstreamWriter Stream(Buffer);
-  IntrusiveRefCntPtr<ModuleCache> ModCache = createCrossProcessModuleCache();
+  IntrusiveRefCntPtr<ModuleCache> ModCache = createCrossProcessModuleCache(PP->getHeaderSearchInfo().getHeaderSearchOpts().BuildSessionTimestamp);
   ASTWriter Writer(Stream, Buffer, *ModCache, *CodeGenOpts, {});
   return serializeUnit(Writer, Buffer, getSema(), OS);
 }

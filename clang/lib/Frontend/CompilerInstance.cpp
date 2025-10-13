@@ -73,7 +73,9 @@ CompilerInstance::CompilerInstance(
     ModuleCache *ModCache)
     : ModuleLoader(/*BuildingModule=*/ModCache),
       Invocation(std::move(Invocation)),
-      ModCache(ModCache ? ModCache : createCrossProcessModuleCache()),
+      ModCache(ModCache ? ModCache
+                        : createCrossProcessModuleCache(
+                              getHeaderSearchOpts().BuildSessionTimestamp)),
       ThePCHContainerOperations(std::move(PCHContainerOps)) {
   assert(this->Invocation && "Invocation must not be null");
 }
@@ -1434,9 +1436,8 @@ static bool compileModuleAndReadASTImpl(CompilerInstance &ImportingInstance,
   if (ImportingInstance.getPreprocessor()
           .getHeaderSearchInfo()
           .getHeaderSearchOpts()
-          .ModulesValidateOncePerBuildSession) {
-    ImportingInstance.getModuleCache().updateModuleTimestamp(ModuleFileName);
-  }
+          .ModulesValidateOncePerBuildSession)
+    ImportingInstance.getModuleCache().markUpToDate(ModuleFileName);
 
   return readASTAfterCompileModule(ImportingInstance, ImportLoc, ModuleNameLoc,
                                    Module, ModuleFileName,
