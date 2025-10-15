@@ -124,7 +124,8 @@ private:
   friend FileCollectorFileSystem;
 
   void addFileToMapping(StringRef VirtualPath, StringRef RealPath) {
-    if (sys::fs::is_directory(VirtualPath))
+    auto StatusOrErr = Canonicalizer.getFileSystem().status(VirtualPath);
+    if (StatusOrErr && StatusOrErr->isDirectory())
       VFSWriter.addDirectoryMapping(VirtualPath, RealPath);
     else
       VFSWriter.addFileMapping(VirtualPath, RealPath);
