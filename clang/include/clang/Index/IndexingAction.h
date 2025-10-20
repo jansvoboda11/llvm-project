@@ -36,11 +36,13 @@ class IndexDataConsumer;
 std::unique_ptr<ASTConsumer>
 createIndexingASTConsumer(std::shared_ptr<IndexDataConsumer> DataConsumer,
                           const IndexingOptions &Opts,
+                          std::shared_ptr<HeaderSearch> HS,
                           std::shared_ptr<Preprocessor> PP);
 
 std::unique_ptr<ASTConsumer> createIndexingASTConsumer(
     std::shared_ptr<IndexDataConsumer> DataConsumer,
-    const IndexingOptions &Opts, std::shared_ptr<Preprocessor> PP,
+    const IndexingOptions &Opts, std::shared_ptr<HeaderSearch> HS,
+    std::shared_ptr<Preprocessor> PP,
     // Prefer to set Opts.ShouldTraverseDecl and use the above overload.
     // This version is only needed if used to *track* function body parsing.
     std::function<bool(const Decl *)> ShouldSkipFunctionBody);

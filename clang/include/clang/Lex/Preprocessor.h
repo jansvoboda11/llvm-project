@@ -241,9 +241,6 @@ class Preprocessor {
   // State that changes while the preprocessor runs:
   bool InMacroArgs : 1;            // True if parsing fn macro invocation args.
 
-  /// Whether the preprocessor owns the header search object.
-  bool OwnsHeaderSearch : 1;
-
   /// True if macro expansion is disabled.
   bool DisableMacroExpansion : 1;
 
@@ -1192,7 +1189,6 @@ public:
                const LangOptions &LangOpts, SourceManager &SM,
                HeaderSearch &Headers, ModuleLoader &TheModuleLoader,
                IdentifierInfoLookup *IILookup = nullptr,
-               bool OwnsHeaderSearch = false,
                TranslationUnitKind TUKind = TU_Complete);
 
   ~Preprocessor();

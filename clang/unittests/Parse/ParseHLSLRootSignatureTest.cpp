@@ -89,8 +89,7 @@ protected:
     HeaderSearch HeaderInfo(SearchOpts, SourceMgr, Diags, LangOpts,
                             Target.get());
     auto PP = std::make_unique<Preprocessor>(
-        PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-        /*IILookup =*/nullptr, /*OwnsHeaderSearch =*/false);
+        PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     PP->Initialize(*Target);
     PP->EnterMainSourceFile();
     return PP;

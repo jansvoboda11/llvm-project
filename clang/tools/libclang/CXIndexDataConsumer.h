@@ -341,6 +341,7 @@ public:
 
   void setASTContext(llvm::IntrusiveRefCntPtr<ASTContext> ctx);
   void setPreprocessor(std::shared_ptr<Preprocessor> PP) override;
+  void setHeaderSearch(std::shared_ptr<HeaderSearch> HS) override;
 
   bool shouldSuppressRefs() const {
     return IndexOptions & CXIndexOpt_SuppressRedundantRefs;

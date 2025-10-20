@@ -431,6 +431,10 @@ void CXIndexDataConsumer::setPreprocessor(std::shared_ptr<Preprocessor> PP) {
   cxtu::getASTUnit(CXTU)->setPreprocessor(std::move(PP));
 }
 
+void CXIndexDataConsumer::setHeaderSearch(std::shared_ptr<HeaderSearch> HS) {
+  cxtu::getASTUnit(CXTU)->setHeaderSearch(std::move(HS));
+}
+
 bool CXIndexDataConsumer::isFunctionLocalDecl(const Decl *D) {
   assert(D);
 

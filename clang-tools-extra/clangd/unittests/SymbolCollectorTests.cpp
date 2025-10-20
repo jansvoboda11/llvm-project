@@ -292,6 +292,7 @@ public:
       CreateASTConsumer(CompilerInstance &CI, llvm::StringRef InFile) override {
         PI->record(CI);
         return createIndexingASTConsumer(DataConsumer, Opts,
+                                         CI.getHeaderSearchPtr(),
                                          CI.getPreprocessorPtr());
       }
 

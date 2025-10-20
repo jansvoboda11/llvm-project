@@ -272,6 +272,10 @@ void ASTUnit::setPreprocessor(std::shared_ptr<Preprocessor> PP) {
   this->PP = std::move(PP);
 }
 
+void ASTUnit::setHeaderSearch(std::shared_ptr<HeaderSearch> HS) {
+  this->HeaderInfo = std::move(HS);
+}
+
 void ASTUnit::enableSourceFileDiagnostics() {
   assert(getDiagnostics().getClient() && Ctx &&
       "Bad context for source file");
@@ -852,9 +856,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   AST->PP = std::make_shared<Preprocessor>(
       *AST->PPOpts, AST->getDiagnostics(), *AST->LangOpts,
-      AST->getSourceManager(), HeaderInfo, AST->ModuleLoader,
-      /*IILookup=*/nullptr,
-      /*OwnsHeaderSearch=*/false);
+      AST->getSourceManager(), HeaderInfo, AST->ModuleLoader);
   Preprocessor &PP = *AST->PP;
 
   if (ToLoad >= LoadASTOnly)
@@ -1506,6 +1508,8 @@ void ASTUnit::transferASTDataFromCompilerInstance(CompilerInstance &CI) {
     Ctx = CI.getASTContextPtr();
   if (CI.hasPreprocessor())
     PP = CI.getPreprocessorPtr();
+  if (CI.hasHeaderSearch())
+    HeaderInfo = CI.getHeaderSearchPtr();
   CI.setSourceManager(nullptr);
   CI.setFileManager(nullptr);
   if (CI.hasTarget())
@@ -1648,6 +1652,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
   AST->TheSema.reset();
   AST->Ctx = nullptr;
   AST->PP = nullptr;
+  AST->HeaderInfo = nullptr;
   AST->Reader = nullptr;
 
   // Create a file manager object to provide access to and cache the filesystem.
@@ -1960,6 +1965,7 @@ void ASTUnit::ResetForParse() {
   TheSema.reset();
   Ctx.reset();
   PP.reset();
+  HeaderInfo.reset();
   Reader.reset();
 
   TopLevelDecls.clear();

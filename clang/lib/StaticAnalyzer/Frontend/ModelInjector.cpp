@@ -95,6 +95,7 @@ void ModelInjector::onBodySynthesis(const NamedDecl *D) {
   // is set to true to avoid double free issues
   Instance.setFileManager(CI.getFileManagerPtr());
   Instance.setSourceManager(SM);
+  Instance.setHeaderSearch(CI.getHeaderSearchPtr());
   Instance.setPreprocessor(CI.getPreprocessorPtr());
   Instance.setASTContext(CI.getASTContextPtr());
 

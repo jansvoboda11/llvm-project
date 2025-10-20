@@ -161,8 +161,8 @@ public:
       CI.getPreprocessor().addPPCallbacks(
           std::make_unique<IncludeGraphCollector>(CI.getSourceManager(), IG));
 
-    return index::createIndexingASTConsumer(Collector, Opts,
-                                            CI.getPreprocessorPtr());
+    return index::createIndexingASTConsumer(
+        Collector, Opts, CI.getHeaderSearchPtr(), CI.getPreprocessorPtr());
   }
 
   bool BeginInvocation(CompilerInstance &CI) override {

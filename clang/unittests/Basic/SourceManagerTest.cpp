@@ -137,8 +137,7 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnit) {
   PreprocessorOptions PPOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                  /*IILookup =*/nullptr, /*OwnsHeaderSearch =*/false);
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
   PP.Initialize(*Target);
   PP.EnterMainSourceFile();
 
@@ -186,8 +185,7 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnitWithTokenSplit) {
   PreprocessorOptions PPOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                  /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
   PP.Initialize(*Target);
   PP.EnterMainSourceFile();
   llvm::SmallString<8> Scratch;
@@ -460,8 +458,7 @@ TEST_F(SourceManagerTest, ResetsIncludeLocMap) {
     HeaderSearchOptions HSOpts;
     PreprocessorOptions PPOpts;
     HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                    /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     PP.Initialize(*Target);
     PP.EnterMainSourceFile();
     PP.LexTokensUntilEOF();
@@ -537,8 +534,7 @@ TEST_F(SourceManagerTest, getMacroArgExpandedLocation) {
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
 
-  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                  /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
   // Ensure we can get expanded locations in presence of implicit includes.
   // These are different than normal includes since predefines buffer doesn't
   // have a valid insertion location.
@@ -654,8 +650,7 @@ TEST_F(SourceManagerTest, isBeforeInTranslationUnitWithMacroInInclude) {
   PreprocessorOptions PPOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, &*Target);
-  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                  /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
   PP.Initialize(*Target);
 
   std::vector<MacroAction> Macros;

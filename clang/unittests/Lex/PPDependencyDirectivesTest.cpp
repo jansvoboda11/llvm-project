@@ -133,9 +133,7 @@ TEST_F(PPDependencyDirectivesTest, MacroGuard) {
   HeaderSearchOptions HSOpts;
   TrivialModuleLoader ModLoader;
   HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, Target.get());
-  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                  /*IILookup =*/nullptr,
-                  /*OwnsHeaderSearch =*/false);
+  Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
   PP.Initialize(*Target);
 
   PP.setDependencyDirectivesGetter(GetDependencyDirectives);

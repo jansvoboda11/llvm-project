@@ -99,19 +99,22 @@ public:
 class IndexASTConsumer final : public ASTConsumer {
   std::shared_ptr<IndexDataConsumer> DataConsumer;
   std::shared_ptr<IndexingContext> IndexCtx;
+  std::shared_ptr<HeaderSearch> HS;
   std::shared_ptr<Preprocessor> PP;
   std::function<bool(const Decl *)> ShouldSkipFunctionBody;
 
 public:
   IndexASTConsumer(std::shared_ptr<IndexDataConsumer> DataConsumer,
                    const IndexingOptions &Opts,
+                   std::shared_ptr<HeaderSearch> HS,
                    std::shared_ptr<Preprocessor> PP,
                    std::function<bool(const Decl *)> ShouldSkipFunctionBody)
       : DataConsumer(std::move(DataConsumer)),
         IndexCtx(new IndexingContext(Opts, *this->DataConsumer)),
-        PP(std::move(PP)),
+        HS(std::move(HS)), PP(std::move(PP)),
         ShouldSkipFunctionBody(std::move(ShouldSkipFunctionBody)) {
     assert(this->DataConsumer != nullptr);
+    assert(this->HS != nullptr);
     assert(this->PP != nullptr);
   }
 
@@ -120,6 +123,7 @@ protected:
     IndexCtx->setASTContext(Context);
     IndexCtx->getDataConsumer().initialize(Context);
     IndexCtx->getDataConsumer().setPreprocessor(PP);
+    IndexCtx->getDataConsumer().setHeaderSearch(HS);
     PP->addPPCallbacks(std::make_unique<IndexPPCallbacks>(IndexCtx));
   }
 
@@ -159,7 +163,7 @@ protected:
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override {
     return std::make_unique<IndexASTConsumer>(
-        DataConsumer, Opts, CI.getPreprocessorPtr(),
+        DataConsumer, Opts, CI.getHeaderSearchPtr(), CI.getPreprocessorPtr(),
         /*ShouldSkipFunctionBody=*/[](const Decl *) { return false; });
   }
 };
@@ -168,15 +172,17 @@ protected:
 
 std::unique_ptr<ASTConsumer> index::createIndexingASTConsumer(
     std::shared_ptr<IndexDataConsumer> DataConsumer,
-    const IndexingOptions &Opts, std::shared_ptr<Preprocessor> PP,
+    const IndexingOptions &Opts, std::shared_ptr<HeaderSearch> HS,
+    std::shared_ptr<Preprocessor> PP,
     std::function<bool(const Decl *)> ShouldSkipFunctionBody) {
-  return std::make_unique<IndexASTConsumer>(DataConsumer, Opts, PP,
-                                            ShouldSkipFunctionBody);
+  return std::make_unique<IndexASTConsumer>(
+      DataConsumer, Opts, std::move(HS), std::move(PP), ShouldSkipFunctionBody);
 }
 
 std::unique_ptr<ASTConsumer> clang::index::createIndexingASTConsumer(
     std::shared_ptr<IndexDataConsumer> DataConsumer,
-    const IndexingOptions &Opts, std::shared_ptr<Preprocessor> PP) {
+    const IndexingOptions &Opts, std::shared_ptr<HeaderSearch> HS,
+    std::shared_ptr<Preprocessor> PP) {
   std::function<bool(const Decl *)> ShouldSkipFunctionBody = [](const Decl *) {
     return false;
   };
@@ -185,7 +191,8 @@ std::unique_ptr<ASTConsumer> clang::index::createIndexingASTConsumer(
         [ShouldTraverseDecl(Opts.ShouldTraverseDecl)](const Decl *D) {
           return !ShouldTraverseDecl(D);
         };
-  return createIndexingASTConsumer(std::move(DataConsumer), Opts, std::move(PP),
+  return createIndexingASTConsumer(std::move(DataConsumer), Opts, std::move(HS),
+                                   std::move(PP),
                                    std::move(ShouldSkipFunctionBody));
 }
 
@@ -261,6 +268,7 @@ void index::indexASTUnit(ASTUnit &Unit, IndexDataConsumer &DataConsumer,
   IndexCtx.setASTContext(Unit.getASTContext());
   DataConsumer.initialize(Unit.getASTContext());
   DataConsumer.setPreprocessor(Unit.getPreprocessorPtr());
+  DataConsumer.setHeaderSearch(Unit.getHeaderSearchPtr());
 
   if (Opts.IndexMacrosInPreprocessor)
     indexPreprocessorMacros(Unit.getPreprocessor(), DataConsumer);

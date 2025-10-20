@@ -201,8 +201,7 @@ protected:
     AddFakeHeader(HeaderInfo, HeaderPath, SystemHeader);
 
     PreprocessorOptions PPOpts;
-    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                    /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     return InclusionDirectiveCallback(PP)->FilenameRange;
   }
 
@@ -219,8 +218,7 @@ protected:
     AddFakeHeader(HeaderInfo, HeaderPath, SystemHeader);
 
     PreprocessorOptions PPOpts;
-    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                    /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     return InclusionDirectiveCallback(PP)->FileType;
   }
 
@@ -245,8 +243,7 @@ protected:
         llvm::MemoryBuffer::getMemBuffer(SourceText);
     SourceMgr.setMainFileID(SourceMgr.createFileID(std::move(Buf)));
     HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, Target.get());
-    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                    /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     PP.Initialize(*Target);
     auto *Callbacks = new CondDirectiveCallbacks;
     PP.addPPCallbacks(std::unique_ptr<PPCallbacks>(Callbacks));
@@ -270,8 +267,7 @@ protected:
 
     HeaderSearch HeaderInfo(HSOpts, SourceMgr, Diags, LangOpts, Target.get());
 
-    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader,
-                    /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+    Preprocessor PP(PPOpts, Diags, LangOpts, SourceMgr, HeaderInfo, ModLoader);
     PP.Initialize(*Target);
 
     auto *Callbacks = new PragmaMarkCallbacks;
@@ -301,8 +297,7 @@ protected:
                             Target.get());
 
     Preprocessor PP(PPOpts, Diags, OpenCLLangOpts, SourceMgr, HeaderInfo,
-                    ModLoader, /*IILookup=*/nullptr,
-                    /*OwnsHeaderSearch=*/false);
+                    ModLoader);
     PP.Initialize(*Target);
 
     // parser actually sets correct pragma handlers for preprocessor
@@ -440,7 +435,7 @@ TEST_F(PPCallbacksTest, FileNotFoundSkipped) {
   DiagnosticConsumer *DiagConsumer = new DiagnosticConsumer;
   DiagnosticsEngine FileNotFoundDiags(DiagID, DiagOpts, DiagConsumer);
   Preprocessor PP(PPOpts, FileNotFoundDiags, LangOpts, SourceMgr, HeaderInfo,
-                  ModLoader, /*IILookup=*/nullptr, /*OwnsHeaderSearch=*/false);
+                  ModLoader);
   PP.Initialize(*Target);
 
   class FileNotFoundCallbacks : public PPCallbacks {

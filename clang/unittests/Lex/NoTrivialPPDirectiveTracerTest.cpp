@@ -66,9 +66,7 @@ protected:
     HeaderInfo->AddSearchPath(DL, /*isAngled=*/false);
 
     return std::make_unique<Preprocessor>(PPOpts, Diags, LangOpts, SourceMgr,
-                                          *HeaderInfo, ModLoader,
-                                          /*IILookup=*/nullptr,
-                                          /*OwnsHeaderSearch=*/false);
+                                          *HeaderInfo, ModLoader);
   }
 
   IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> VFS;

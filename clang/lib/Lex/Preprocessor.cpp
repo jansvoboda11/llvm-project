@@ -82,7 +82,7 @@ Preprocessor::Preprocessor(const PreprocessorOptions &PPOpts,
                            DiagnosticsEngine &diags, const LangOptions &opts,
                            SourceManager &SM, HeaderSearch &Headers,
                            ModuleLoader &TheModuleLoader,
-                           IdentifierInfoLookup *IILookup, bool OwnsHeaders,
+                           IdentifierInfoLookup *IILookup,
                            TranslationUnitKind TUKind)
     : PPOpts(PPOpts), Diags(&diags), LangOpts(opts),
       FileMgr(Headers.getFileMgr()), SourceMgr(SM),
@@ -94,8 +94,6 @@ Preprocessor::Preprocessor(const PreprocessorOptions &PPOpts,
       Identifiers(IILookup), PragmaHandlers(new PragmaNamespace(StringRef())),
       TUKind(TUKind), SkipMainFilePreamble(0, true),
       CurSubmoduleState(&NullSubmoduleState) {
-  OwnsHeaderSearch = OwnsHeaders;
-
   // Default to discarding comments.
   KeepComments = false;
   KeepMacroComments = false;
@@ -181,10 +179,6 @@ Preprocessor::~Preprocessor() {
   // Free any cached MacroArgs.
   for (MacroArgs *ArgList = MacroArgCache; ArgList;)
     ArgList = ArgList->deallocate();
-
-  // Delete the header search info, if we own it.
-  if (OwnsHeaderSearch)
-    delete &HeaderInfo;
 }
 
 void Preprocessor::Initialize(const TargetInfo &Target,

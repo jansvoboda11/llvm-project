@@ -360,6 +360,7 @@ public:
     Preprocessor &PP = CI.getPreprocessor();
     PP.addPPCallbacks(std::make_unique<IndexPPCallbacks>(PP, *DataConsumer));
     DataConsumer->setPreprocessor(CI.getPreprocessorPtr());
+    DataConsumer->setHeaderSearch(CI.getHeaderSearchPtr());
 
     if (SKData) {
       auto *PPRec = new PPConditionalDirectiveRecord(PP.getSourceManager());
@@ -372,7 +373,7 @@ public:
     Consumers.push_back(std::make_unique<IndexingConsumer>(
         *DataConsumer, ParsedLocsTracker.get()));
     Consumers.push_back(createIndexingASTConsumer(
-        DataConsumer, Opts, CI.getPreprocessorPtr(),
+        DataConsumer, Opts, CI.getHeaderSearchPtr(), CI.getPreprocessorPtr(),
         [this](const Decl *D) { return this->shouldSkipFunctionBody(D); }));
     return std::make_unique<MultiplexConsumer>(std::move(Consumers));
   }

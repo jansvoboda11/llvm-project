@@ -118,7 +118,7 @@ private:
   IntrusiveRefCntPtr<FileManager>         FileMgr;
   IntrusiveRefCntPtr<SourceManager>       SourceMgr;
   IntrusiveRefCntPtr<ModuleCache> ModCache;
-  std::unique_ptr<HeaderSearch>           HeaderInfo;
+  std::shared_ptr<HeaderSearch>           HeaderInfo;
   IntrusiveRefCntPtr<TargetInfo>          Target;
   std::shared_ptr<Preprocessor>           PP;
   IntrusiveRefCntPtr<ASTContext>          Ctx;
@@ -455,9 +455,17 @@ public:
     return SourceMgr;
   }
 
+  const HeaderSearch &getHeaderSearch() const { return *HeaderInfo; }
+  HeaderSearch &getHeaderSearch() { return *HeaderInfo; }
+  std::shared_ptr<HeaderSearch> getHeaderSearchPtr() const {
+    return HeaderInfo;
+  }
+  void setHeaderSearch(std::shared_ptr<HeaderSearch> HS);
+
   const Preprocessor &getPreprocessor() const { return *PP; }
   Preprocessor &getPreprocessor() { return *PP; }
   std::shared_ptr<Preprocessor> getPreprocessorPtr() const { return PP; }
+  void setPreprocessor(std::shared_ptr<Preprocessor> pp);
 
   const ASTContext &getASTContext() const { return *Ctx; }
   ASTContext &getASTContext() { return *Ctx; }
@@ -466,7 +474,6 @@ public:
   void setASTContext(llvm::IntrusiveRefCntPtr<ASTContext> ctx) {
     Ctx = std::move(ctx);
   }
-  void setPreprocessor(std::shared_ptr<Preprocessor> pp);
 
   /// Enable source-range based diagnostic messages.
   ///

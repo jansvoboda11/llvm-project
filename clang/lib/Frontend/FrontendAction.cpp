@@ -947,6 +947,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // file, otherwise the CompilerInstance will happily destroy them.
     CI.setFileManager(AST->getFileManagerPtr());
     CI.setSourceManager(AST->getSourceManagerPtr());
+    CI.setHeaderSearch(AST->getHeaderSearchPtr());
     CI.setPreprocessor(AST->getPreprocessorPtr());
     Preprocessor &PP = CI.getPreprocessor();
     PP.getBuiltinInfo().initializeBuiltins(PP.getIdentifierTable(),
@@ -1382,11 +1383,13 @@ void FrontendAction::EndSourceFile() {
   if (isCurrentFileAST()) {
     if (DisableFree) {
       CI.resetAndLeakPreprocessor();
+      CI.resetAndLeakHeaderSearch();
       CI.resetAndLeakSourceManager();
       CI.resetAndLeakFileManager();
       llvm::BuryPointer(std::move(CurrentASTUnit));
     } else {
       CI.setPreprocessor(nullptr);
+      CI.setHeaderSearch(nullptr);
       CI.setSourceManager(nullptr);
       CI.setFileManager(nullptr);
     }

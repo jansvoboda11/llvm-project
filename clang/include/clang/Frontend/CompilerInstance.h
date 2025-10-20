@@ -43,16 +43,12 @@ class TimerGroup;
 namespace clang {
 class ASTContext;
 class ASTReader;
-
-namespace serialization {
-class ModuleFile;
-}
-
 class CodeCompleteConsumer;
 class DiagnosticsEngine;
 class DiagnosticConsumer;
 class FileManager;
 class FrontendAction;
+class HeaderSearch;
 class Module;
 class ModuleCache;
 class Preprocessor;
@@ -60,6 +56,9 @@ class Sema;
 class SourceManager;
 class TargetInfo;
 enum class DisableValidationForModuleKind;
+namespace serialization {
+class ModuleFile;
+}
 
 /// CompilerInstance - Helper class for managing a single instance of the Clang
 /// compiler.
@@ -112,6 +111,9 @@ class CompilerInstance : public ModuleLoader {
 
   /// Functor for getting the dependency preprocessor directives of a file.
   std::unique_ptr<DependencyDirectivesGetter> GetDependencyDirectives;
+
+  /// The header search.
+  std::shared_ptr<HeaderSearch> HS;
 
   /// The preprocessor.
   std::shared_ptr<Preprocessor> PP;
@@ -503,6 +505,25 @@ public:
 
   /// setSourceManager - Replace the current source manager.
   void setSourceManager(llvm::IntrusiveRefCntPtr<SourceManager> Value);
+
+  /// @}
+  /// @name HeaderSearch
+  /// @{
+
+  bool hasHeaderSearch() const { return HS != nullptr; }
+
+  HeaderSearch &getHeaderSearch() const {
+    assert(HS && "Compiler instance has no header search!");
+    return *HS;
+  }
+
+  std::shared_ptr<HeaderSearch> getHeaderSearchPtr() { return HS; }
+
+  void resetAndLeakHeaderSearch() {
+    llvm::BuryPointer(new std::shared_ptr<HeaderSearch>(HS));
+  }
+
+  void setHeaderSearch(std::shared_ptr<HeaderSearch> Value);
 
   /// @}
   /// @name Preprocessor

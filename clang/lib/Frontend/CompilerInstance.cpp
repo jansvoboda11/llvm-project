@@ -172,6 +172,10 @@ void CompilerInstance::setSourceManager(
   SourceMgr = std::move(Value);
 }
 
+void CompilerInstance::setHeaderSearch(std::shared_ptr<HeaderSearch> Value) {
+  HS = std::move(Value);
+}
+
 void CompilerInstance::setPreprocessor(std::shared_ptr<Preprocessor> Value) {
   PP = std::move(Value);
 }
@@ -449,15 +453,15 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   // The AST reader holds a reference to the old preprocessor (if any).
   TheASTReader.reset();
 
+  // Create the header search.
+  HS = std::make_shared<HeaderSearch>(getHeaderSearchOpts(), getSourceManager(),
+                                      getDiagnostics(), getLangOpts(),
+                                      &getTarget());
   // Create the Preprocessor.
-  HeaderSearch *HeaderInfo =
-      new HeaderSearch(getHeaderSearchOpts(), getSourceManager(),
-                       getDiagnostics(), getLangOpts(), &getTarget());
   PP = std::make_shared<Preprocessor>(Invocation->getPreprocessorOpts(),
                                       getDiagnostics(), getLangOpts(),
-                                      getSourceManager(), *HeaderInfo, *this,
-                                      /*IdentifierInfoLookup=*/nullptr,
-                                      /*OwnsHeaderSearch=*/true, TUKind);
+                                      getSourceManager(), *HS, *this,
+                                      /*IdentifierInfoLookup=*/nullptr, TUKind);
   getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
   PP->Initialize(getTarget(), getAuxTarget());
 

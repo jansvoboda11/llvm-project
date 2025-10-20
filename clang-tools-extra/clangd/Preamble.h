@@ -62,8 +62,8 @@ public:
       : Invocation(Clang.getInvocationPtr()),
         Diagnostics(Clang.getDiagnosticsPtr()), Target(Clang.getTargetPtr()),
         AuxTarget(Clang.getAuxTarget()), FileMgr(Clang.getFileManagerPtr()),
-        SourceMgr(Clang.getSourceManagerPtr()), PP(Clang.getPreprocessorPtr()),
-        Context(Clang.getASTContextPtr()) {}
+        SourceMgr(Clang.getSourceManagerPtr()), HS(Clang.getHeaderSearchPtr()),
+        PP(Clang.getPreprocessorPtr()), Context(Clang.getASTContextPtr()) {}
 
   CapturedASTCtx(const CapturedASTCtx &) = delete;
   CapturedASTCtx &operator=(const CapturedASTCtx &) = delete;
@@ -72,6 +72,7 @@ public:
 
   ASTContext &getASTContext() { return *Context; }
   Preprocessor &getPreprocessor() { return *PP; }
+  HeaderSearch &getHeaderSearch() { return *HS; }
   CompilerInvocation &getCompilerInvocation() { return *Invocation; }
   FileManager &getFileManager() { return *FileMgr; }
   void setStatCache(std::shared_ptr<PreambleFileStatusCache> StatCache) {
@@ -85,6 +86,7 @@ private:
   IntrusiveRefCntPtr<TargetInfo> AuxTarget;
   IntrusiveRefCntPtr<FileManager> FileMgr;
   IntrusiveRefCntPtr<SourceManager> SourceMgr;
+  std::shared_ptr<HeaderSearch> HS;
   std::shared_ptr<Preprocessor> PP;
   IntrusiveRefCntPtr<ASTContext> Context;
   std::shared_ptr<PreambleFileStatusCache> StatCache;

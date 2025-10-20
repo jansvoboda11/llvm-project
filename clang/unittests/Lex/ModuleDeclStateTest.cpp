@@ -79,9 +79,7 @@ protected:
     HeaderInfo.emplace(HSOpts, SourceMgr, Diags, LangOpts, Target.get());
 
     return std::make_unique<Preprocessor>(PPOpts, Diags, LangOpts, SourceMgr,
-                                          *HeaderInfo, ModLoader,
-                                          /*IILookup=*/nullptr,
-                                          /*OwnsHeaderSearch=*/false);
+                                          *HeaderInfo, ModLoader);
   }
 
   void preprocess(Preprocessor &PP, std::unique_ptr<PPCallbacks> C) {

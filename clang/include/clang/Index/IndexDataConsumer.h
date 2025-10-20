@@ -38,6 +38,8 @@ public:
 
   virtual void setPreprocessor(std::shared_ptr<Preprocessor> PP) {}
 
+  virtual void setHeaderSearch(std::shared_ptr<HeaderSearch> HS) {}
+
   /// \returns true to continue indexing, or false to abort.
   virtual bool handleDeclOccurrence(const Decl *D, SymbolRoleSet Roles,
                                     ArrayRef<SymbolRelation> Relations,
