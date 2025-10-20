@@ -88,15 +88,22 @@ TestAST::TestAST(const TestInputs &In) {
     Filename = getFilenameForTesting(In.Language).str();
 
   // Set up a VFS with only the virtual file visible.
-  auto VFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-  if (auto Err = VFS->setCurrentWorkingDirectory(In.WorkingDir))
+  auto InMemoryVFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  if (auto Err = InMemoryVFS->setCurrentWorkingDirectory(In.WorkingDir))
     ADD_FAILURE() << "Failed to setWD: " << Err.message();
-  VFS->addFile(Filename, /*ModificationTime=*/0,
+  InMemoryVFS->addFile(Filename, /*ModificationTime=*/0,
                llvm::MemoryBuffer::getMemBufferCopy(In.Code, Filename));
   for (const auto &Extra : In.ExtraFiles)
-    VFS->addFile(
+    InMemoryVFS->addFile(
         Extra.getKey(), /*ModificationTime=*/0,
         llvm::MemoryBuffer::getMemBufferCopy(Extra.getValue(), Extra.getKey()));
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS = std::move(InMemoryVFS);
+  if (In.ExtraFS) {
+    auto OverlayVFS =
+        llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(std::move(VFS));
+    OverlayVFS->pushOverlay(std::move(In.ExtraFS));
+    VFS = std::move(OverlayVFS);
+  }
 
   // Extra error conditions are reported through diagnostics, set that up first.
   bool ErrorOK = In.ErrorOK || llvm::StringRef(In.Code).contains("error-ok");

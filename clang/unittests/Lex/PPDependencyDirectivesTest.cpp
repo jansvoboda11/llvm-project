@@ -31,18 +31,15 @@ namespace {
 class PPDependencyDirectivesTest : public ::testing::Test {
 protected:
   PPDependencyDirectivesTest()
-      : FileMgr(FileMgrOpts),
-        Diags(DiagnosticIDs::create(), DiagOpts, new IgnoringDiagConsumer()),
-        SourceMgr(Diags, FileMgr), TargetOpts(new TargetOptions) {
+      : Diags(DiagnosticIDs::create(), DiagOpts, new IgnoringDiagConsumer()),
+        TargetOpts(new TargetOptions) {
     TargetOpts->Triple = "x86_64-apple-macos12";
     Target = TargetInfo::CreateTargetInfo(Diags, *TargetOpts);
   }
 
   FileSystemOptions FileMgrOpts;
-  FileManager FileMgr;
   DiagnosticOptions DiagOpts;
   DiagnosticsEngine Diags;
-  SourceManager SourceMgr;
   LangOptions LangOpts;
   std::shared_ptr<TargetOptions> TargetOpts;
   IntrusiveRefCntPtr<TargetInfo> Target;
@@ -91,11 +88,13 @@ TEST_F(PPDependencyDirectivesTest, MacroGuard) {
                    "#include \"head1.h\"\n#include \"head1.h\"\n"
                    "#include \"head2.h\"\n#include \"head2.h\"\n"
                    "#include \"head3.h\"\n#include \"head3.h\"\n"));
-  FileMgr.setVirtualFileSystem(VFS);
+  FileManager FileMgr(FileMgrOpts, VFS);
 
   OptionalFileEntryRef FE;
   ASSERT_THAT_ERROR(FileMgr.getFileRef("main.c").moveInto(FE),
                     llvm::Succeeded());
+
+  SourceManager SourceMgr(Diags, FileMgr);
   SourceMgr.setMainFileID(
       SourceMgr.createFileID(*FE, SourceLocation(), SrcMgr::C_User));
 

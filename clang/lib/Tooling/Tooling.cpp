@@ -470,23 +470,19 @@ bool FrontendActionFactory::runInvocation(
 ClangTool::ClangTool(const CompilationDatabase &Compilations,
                      ArrayRef<std::string> SourcePaths,
                      std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                     IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
-                     IntrusiveRefCntPtr<FileManager> Files)
+                     IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS)
     : Compilations(Compilations), SourcePaths(SourcePaths),
       PCHContainerOps(std::move(PCHContainerOps)),
       OverlayFileSystem(llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
           std::move(BaseFS))),
       InMemoryFileSystem(
           llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>()),
-      Files(Files ? Files
-                  : llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions(),
-                                                           OverlayFileSystem)) {
+      Files(llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions(),
+                                                   OverlayFileSystem)) {
   OverlayFileSystem->pushOverlay(InMemoryFileSystem);
   appendArgumentsAdjuster(getClangStripOutputAdjuster());
   appendArgumentsAdjuster(getClangSyntaxOnlyAdjuster());
   appendArgumentsAdjuster(getClangStripDependencyFileAdjuster());
-  if (Files)
-    Files->setVirtualFileSystem(OverlayFileSystem);
 }
 
 ClangTool::~ClangTool() = default;

@@ -209,37 +209,21 @@ protected:
   TestInputs Inputs;
   PragmaIncludes PI;
   RecordedPP PP;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> ExtraFS = nullptr;
 
   AnalyzeTest() {
     Inputs.MakeAction = [this] {
-      struct Hook : public SyntaxOnlyAction {
-      public:
-        Hook(RecordedPP &PP, PragmaIncludes &PI,
-             llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> ExtraFS)
-            : PP(PP), PI(PI), ExtraFS(std::move(ExtraFS)) {}
+      struct Hook : SyntaxOnlyAction {
+        Hook(RecordedPP &PP, PragmaIncludes &PI) : PP(PP), PI(PI) {}
         bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
           CI.getPreprocessor().addPPCallbacks(PP.record(CI.getPreprocessor()));
           PI.record(CI);
           return true;
         }
 
-        bool BeginInvocation(CompilerInstance &CI) override {
-          if (!ExtraFS)
-            return true;
-          auto OverlayFS =
-              llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
-                  CI.getFileManager().getVirtualFileSystemPtr());
-          OverlayFS->pushOverlay(ExtraFS);
-          CI.getFileManager().setVirtualFileSystem(std::move(OverlayFS));
-          return true;
-        }
-
         RecordedPP &PP;
         PragmaIncludes &PI;
-        llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> ExtraFS;
       };
-      return std::make_unique<Hook>(PP, PI, ExtraFS);
+      return std::make_unique<Hook>(PP, PI);
     };
   }
 };
@@ -353,7 +337,7 @@ TEST_F(AnalyzeTest, SpellingIncludesWithSymlinks) {
   }
   )cpp");
   Inputs.Code = Code.code();
-  ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   ExtraFS->addFile("content_for/0", /*ModificationTime=*/{},
                    llvm::MemoryBuffer::getMemBufferCopy(guard(R"cpp(
   #include "inner.h"
@@ -366,6 +350,7 @@ TEST_F(AnalyzeTest, SpellingIncludesWithSymlinks) {
   )cpp")));
   ExtraFS->addSymbolicLink("inner.h", "content_for/1",
                            /*ModificationTime=*/{});
+  Inputs.ExtraFS = std::move(ExtraFS);
 
   TestAST AST(Inputs);
   std::vector<Decl *> DeclsInTU;
@@ -400,7 +385,7 @@ TEST_F(AnalyzeTest, SpellingIncludesWithSymlinks) {
 // Make sure that the references to implicit operator new/delete are reported as
 // ambigious.
 TEST_F(AnalyzeTest, ImplicitOperatorNewDeleteNotMissing) {
-  ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   ExtraFS->addFile("header.h",
                    /*ModificationTime=*/{},
                    llvm::MemoryBuffer::getMemBufferCopy(guard(R"cpp(
@@ -411,6 +396,7 @@ TEST_F(AnalyzeTest, ImplicitOperatorNewDeleteNotMissing) {
                    llvm::MemoryBuffer::getMemBufferCopy(guard(R"cpp(
   #include "header.h"
   )cpp")));
+  Inputs.ExtraFS = std::move(ExtraFS);
 
   Inputs.Code = R"cpp(
       #include "wrapper.h"
@@ -426,12 +412,13 @@ TEST_F(AnalyzeTest, ImplicitOperatorNewDeleteNotMissing) {
 }
 
 TEST_F(AnalyzeTest, ImplicitOperatorNewDeleteNotUnused) {
-  ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto ExtraFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   ExtraFS->addFile("header.h",
                    /*ModificationTime=*/{},
                    llvm::MemoryBuffer::getMemBufferCopy(guard(R"cpp(
   void* operator new(decltype(sizeof(int)));
   )cpp")));
+  Inputs.ExtraFS = std::move(ExtraFS);
 
   Inputs.Code = R"cpp(
       #include "header.h"

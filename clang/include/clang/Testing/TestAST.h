@@ -49,6 +49,8 @@ struct TestInputs {
   /// Keys are plain filenames ("foo.h"), values are file content.
   llvm::StringMap<std::string> ExtraFiles = {};
 
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> ExtraFS;
+
   /// Root of execution, all relative paths in Args/Files are resolved against
   /// this.
   std::string WorkingDir;

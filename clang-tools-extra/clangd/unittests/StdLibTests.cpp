@@ -88,16 +88,18 @@ TEST(StdLibTests, StdLibSet) {
   FS.Files["libc/_"] = "";
 
   HeaderSearchOptions HSOpts;
+  FileSystemOptions FSOpts;
   auto Add = [&](const LangOptions &LO,
                  std::vector<llvm::StringRef> SearchPath) {
-    SourceManagerForFile SM("scratch", "");
-    SM.get().getFileManager().setVirtualFileSystem(FS.view(std::nullopt));
-    HeaderSearch HS(HSOpts, SM.get(), SM.get().getDiagnostics(), LO,
-                    /*Target=*/nullptr);
+    FileManager FileMgr(FSOpts, FS.view(std::nullopt));
+    DiagnosticOptions DiagOpts;
+    DiagnosticsEngine Diags(DiagnosticIDs::create(), DiagOpts);
+    SourceManager SourceMgr(Diags, FileMgr);
+    HeaderSearch HS(HSOpts, SourceMgr, Diags, LO, /*Target=*/nullptr);
     for (auto P : SearchPath)
       HS.AddSearchPath(
           DirectoryLookup(
-              cantFail(SM.get().getFileManager().getDirectoryRef(testPath(P))),
+              cantFail(SourceMgr.getFileManager().getDirectoryRef(testPath(P))),
               SrcMgr::C_System, /*isFramework=*/false),
           true);
     return Set.add(LO, HS);

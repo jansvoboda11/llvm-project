@@ -450,26 +450,27 @@ protected:
 
 /// By default, this delegates all calls to the underlying file system. This
 /// is useful when derived file systems want to override some calls and still
-/// proxy other calls.
-class LLVM_ABI ProxyFileSystem
-    : public RTTIExtends<ProxyFileSystem, FileSystem> {
+/// proxy other calls. Allows swapping out the underlying FS after construction.
+class LLVM_ABI MutableProxyFileSystem
+    : public RTTIExtends<MutableProxyFileSystem, FileSystem> {
 public:
   static const char ID;
-  explicit ProxyFileSystem(IntrusiveRefCntPtr<FileSystem> FS)
+
+  explicit MutableProxyFileSystem(IntrusiveRefCntPtr<FileSystem> FS)
       : FS(std::move(FS)) {}
 
-  llvm::ErrorOr<Status> status(const Twine &Path) override {
+  ErrorOr<Status> status(const Twine &Path) override {
     return FS->status(Path);
   }
   bool exists(const Twine &Path) override { return FS->exists(Path); }
-  llvm::ErrorOr<std::unique_ptr<File>>
+  ErrorOr<std::unique_ptr<File>>
   openFileForRead(const Twine &Path) override {
     return FS->openFileForRead(Path);
   }
   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override {
     return FS->dir_begin(Dir, EC);
   }
-  llvm::ErrorOr<std::string> getCurrentWorkingDirectory() const override {
+  ErrorOr<std::string> getCurrentWorkingDirectory() const override {
     return FS->getCurrentWorkingDirectory();
   }
   std::error_code setCurrentWorkingDirectory(const Twine &Path) override {
@@ -483,8 +484,13 @@ public:
     return FS->isLocal(Path, Result);
   }
 
-protected:
   FileSystem &getUnderlyingFS() const { return *FS; }
+
+  void setUnderlyingFS(IntrusiveRefCntPtr<FileSystem> NewFS) {
+    FS = std::move(NewFS);
+  }
+
+protected:
   void visitChildFileSystems(VisitCallbackTy Callback) override {
     if (FS) {
       Callback(*FS);
@@ -494,6 +500,24 @@ protected:
 
 private:
   IntrusiveRefCntPtr<FileSystem> FS;
+
+  void anchor() override;
+};
+
+/// By default, this delegates all calls to the underlying file system. This
+/// is useful when derived file systems want to override some calls and still
+/// proxy other calls.
+class LLVM_ABI ProxyFileSystem
+    : public RTTIExtends<ProxyFileSystem, MutableProxyFileSystem> {
+public:
+  static const char ID;
+
+  // Inherit the MutableProxyFileSystem constructor.
+  using RTTIExtends::RTTIExtends;
+
+private:
+  // Disallow swapping out the underlying VFS.
+  using RTTIExtends::setUnderlyingFS;
 
   void anchor() override;
 };

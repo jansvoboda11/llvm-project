@@ -622,6 +622,7 @@ directory_iterator OverlayFileSystem::dir_begin(const Twine &Dir,
   return Combined;
 }
 
+void MutableProxyFileSystem::anchor() {}
 void ProxyFileSystem::anchor() {}
 
 namespace llvm {
@@ -2981,6 +2982,7 @@ void TracingFileSystem::printImpl(raw_ostream &OS, PrintType Type,
 
 const char FileSystem::ID = 0;
 const char OverlayFileSystem::ID = 0;
+const char MutableProxyFileSystem::ID = 0;
 const char ProxyFileSystem::ID = 0;
 const char InMemoryFileSystem::ID = 0;
 const char RedirectingFileSystem::ID = 0;

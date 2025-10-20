@@ -653,15 +653,18 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
   llvm::SmallString<32> AbsFileName(FileName);
   VFS->makeAbsolute(AbsFileName);
   auto StatCache = std::make_shared<PreambleFileStatusCache>(AbsFileName);
-  auto StatCacheFS = StatCache->getProducingFS(VFS);
-  llvm::IntrusiveRefCntPtr<TimerFS> TimedFS(new TimerFS(StatCacheFS));
+  auto StatCacheFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::MutableProxyFileSystem>(
+          StatCache->getProducingFS(VFS));
+  auto TimedFS = llvm::makeIntrusiveRefCnt<TimerFS>(StatCacheFS);
 
   WallTimer PreambleTimer;
   PreambleTimer.startTimer();
   auto BuiltPreamble = PrecompiledPreamble::Build(
       CI, ContentsBuffer.get(), Bounds, PreambleDiagsEngine,
-      Stats ? TimedFS : StatCacheFS, std::make_shared<PCHContainerOperations>(),
-      StoreInMemory, /*StoragePath=*/"", CapturedInfo);
+      Stats ? IntrusiveRefCntPtr<llvm::vfs::FileSystem>(TimedFS) : StatCacheFS,
+      std::make_shared<PCHContainerOperations>(), StoreInMemory,
+      /*StoragePath=*/"", CapturedInfo);
 
   PreambleTimer.stopTimer();
 
@@ -720,8 +723,7 @@ buildPreamble(PathRef FileName, CompilerInvocation CI,
       auto Ctx = CapturedInfo.takeLife();
       // Stat cache is thread safe only when there are no producers. Hence
       // change the VFS underneath to a consuming fs.
-      Ctx->getFileManager().setVirtualFileSystem(
-          Result->StatCache->getConsumingFS(VFS));
+      StatCacheFS->setUnderlyingFS(Result->StatCache->getConsumingFS(VFS));
       // While extending the life of FileMgr and VFS, StatCache should also be
       // extended.
       Ctx->setStatCache(Result->StatCache);
