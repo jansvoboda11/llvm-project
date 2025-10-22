@@ -370,7 +370,7 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 FrontendAction::~FrontendAction() {}
 
 void FrontendAction::setCurrentInput(const FrontendInputFile &CurrentInput,
-                                     std::unique_ptr<ASTUnit> AST) {
+                                     std::unique_ptr<CompilerInstance> AST) {
   this->CurrentInput = CurrentInput;
   CurrentASTUnit = std::move(AST);
 }
@@ -931,8 +931,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // FIXME: What if the input is a memory buffer?
     StringRef InputFile = Input.getFile();
 
-    std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromASTFile(
-        InputFile, CI.getPCHContainerReader(), ASTUnit::LoadEverything,
+    std::unique_ptr<CompilerInstance> AST = ASTUnit::LoadFromASTFile(
+        InputFile, CI.getPCHContainerOperations(), ASTUnit::LoadEverything,
         CI.getVirtualFileSystemPtr(), nullptr, Diags, CI.getFileSystemOpts(),
         CI.getHeaderSearchOpts(), &CI.getLangOpts());
 

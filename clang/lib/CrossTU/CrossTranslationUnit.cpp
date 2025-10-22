@@ -297,11 +297,11 @@ llvm::Expected<const T *> CrossTranslationUnitContext::getCrossTUDefinitionImpl(
   if (!LookupName)
     return llvm::make_error<IndexError>(
         index_error_code::failed_to_generate_usr);
-  llvm::Expected<ASTUnit *> ASTUnitOrError =
+  llvm::Expected<CompilerInstance *> ASTUnitOrError =
       loadExternalAST(*LookupName, CrossTUDir, IndexName, DisplayCTUProgress);
   if (!ASTUnitOrError)
     return ASTUnitOrError.takeError();
-  ASTUnit *Unit = *ASTUnitOrError;
+  CompilerInstance *Unit = *ASTUnitOrError;
   assert(&Unit->getFileManager() ==
          &Unit->getASTContext().getSourceManager().getFileManager());
 
@@ -317,7 +317,7 @@ llvm::Expected<const T *> CrossTranslationUnitContext::getCrossTUDefinitionImpl(
     // diagnostics.
     ++NumTripleMismatch;
     return llvm::make_error<IndexError>(index_error_code::triple_mismatch,
-                                        std::string(Unit->getMainFileName()),
+                                        std::string(),
                                         TripleTo.str(), TripleFrom.str());
   }
 
@@ -408,7 +408,7 @@ CrossTranslationUnitContext::ASTUnitStorage::ASTUnitStorage(
                     ? CI.getAnalyzerOpts().CTUImportCppThreshold
                     : CI.getAnalyzerOpts().CTUImportThreshold) {}
 
-llvm::Expected<ASTUnit *>
+llvm::Expected<CompilerInstance *>
 CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFile(
     StringRef FileName, bool DisplayCTUProgress) {
   // Try the cache first.
@@ -427,10 +427,10 @@ CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFile(
     if (!LoadAttempt)
       return LoadAttempt.takeError();
 
-    std::unique_ptr<ASTUnit> LoadedUnit = std::move(LoadAttempt.get());
+    std::unique_ptr<CompilerInstance> LoadedUnit = std::move(LoadAttempt.get());
 
     // Need the raw pointer and the unique_ptr as well.
-    ASTUnit *Unit = LoadedUnit.get();
+    CompilerInstance *Unit = LoadedUnit.get();
 
     // Update the cache.
     FileASTUnitMap[FileName] = std::move(LoadedUnit);
@@ -448,7 +448,7 @@ CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFile(
   }
 }
 
-llvm::Expected<ASTUnit *>
+llvm::Expected<CompilerInstance *>
 CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFunction(
     StringRef FunctionName, StringRef CrossTUDir, StringRef IndexName,
     bool DisplayCTUProgress) {
@@ -471,7 +471,7 @@ CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFunction(
 
     // Search in the index for the filename where the definition of FunctionName
     // resides.
-    if (llvm::Expected<ASTUnit *> FoundForFile =
+    if (llvm::Expected<CompilerInstance *> FoundForFile =
             getASTUnitForFile(It->second, DisplayCTUProgress)) {
 
       // Update the cache.
@@ -518,7 +518,7 @@ llvm::Error CrossTranslationUnitContext::ASTUnitStorage::ensureCTUIndexLoaded(
   };
 }
 
-llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
+llvm::Expected<CompilerInstance *> CrossTranslationUnitContext::loadExternalAST(
     StringRef LookupName, StringRef CrossTUDir, StringRef IndexName,
     bool DisplayCTUProgress) {
   // FIXME: The current implementation only supports loading decls with
@@ -527,7 +527,7 @@ llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
   //        error will be returned.
 
   // Try to get the value from the heavily cached storage.
-  llvm::Expected<ASTUnit *> Unit = ASTStorage.getASTUnitForFunction(
+  llvm::Expected<CompilerInstance *> Unit = ASTStorage.getASTUnitForFunction(
       LookupName, CrossTUDir, IndexName, DisplayCTUProgress);
 
   if (!Unit)
@@ -576,7 +576,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromDump(StringRef ASTDumpPath) {
   auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
       DiagnosticIDs::create(), *DiagOpts, DiagClient);
   return ASTUnit::LoadFromASTFile(
-      ASTDumpPath, CI.getPCHContainerOperations()->getRawReader(),
+      ASTDumpPath, CI.getPCHContainerOperations(),
       ASTUnit::LoadEverything, CI.getVirtualFileSystemPtr(), DiagOpts, Diags,
       CI.getFileSystemOpts(), CI.getHeaderSearchOpts());
 }
@@ -619,10 +619,11 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
   auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(DiagID, *DiagOpts,
                                                             DiagClient);
 
-  return ASTUnit::LoadFromCommandLine(
-      CommandLineArgs.begin(), (CommandLineArgs.end()),
-      CI.getPCHContainerOperations(), DiagOpts, Diags,
-      CI.getHeaderSearchOpts().ResourceDir);
+  return nullptr;
+  // return ASTUnit::LoadFromCommandLine(
+  //     CommandLineArgs.begin(), (CommandLineArgs.end()),
+  //     CI.getPCHContainerOperations(), DiagOpts, Diags,
+  //     CI.getHeaderSearchOpts().ResourceDir);
 }
 
 llvm::Expected<InvocationListTy>
@@ -736,7 +737,7 @@ llvm::Error CrossTranslationUnitContext::ASTLoader::lazyInitInvocationList() {
 
 template <typename T>
 llvm::Expected<const T *>
-CrossTranslationUnitContext::importDefinitionImpl(const T *D, ASTUnit *Unit) {
+CrossTranslationUnitContext::importDefinitionImpl(const T *D, CompilerInstance *Unit) {
   assert(hasBodyOrInit(D) && "Decls to be imported should have body or init.");
 
   assert(&D->getASTContext() == &Unit->getASTContext() &&
@@ -772,13 +773,13 @@ CrossTranslationUnitContext::importDefinitionImpl(const T *D, ASTUnit *Unit) {
 
 llvm::Expected<const FunctionDecl *>
 CrossTranslationUnitContext::importDefinition(const FunctionDecl *FD,
-                                              ASTUnit *Unit) {
+                                              CompilerInstance *Unit) {
   return importDefinitionImpl(FD, Unit);
 }
 
 llvm::Expected<const VarDecl *>
 CrossTranslationUnitContext::importDefinition(const VarDecl *VD,
-                                              ASTUnit *Unit) {
+                                              CompilerInstance *Unit) {
   return importDefinitionImpl(VD, Unit);
 }
 

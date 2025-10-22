@@ -36,7 +36,7 @@ class CompilerInstance;
 /// Abstract base class for actions which can be performed by the frontend.
 class FrontendAction {
   FrontendInputFile CurrentInput;
-  std::unique_ptr<ASTUnit> CurrentASTUnit;
+  std::unique_ptr<CompilerInstance> CurrentASTUnit;
   CompilerInstance *Instance;
   friend class ASTMergeAction;
   friend class WrapperFrontendAction;
@@ -160,19 +160,19 @@ public:
     return CurrentInput.getKind();
   }
 
-  ASTUnit &getCurrentASTUnit() const {
+  CompilerInstance &getCurrentASTUnit() const {
     assert(CurrentASTUnit && "No current AST unit!");
     return *CurrentASTUnit;
   }
 
   Module *getCurrentModule() const;
 
-  std::unique_ptr<ASTUnit> takeCurrentASTUnit() {
+  std::unique_ptr<CompilerInstance> takeCurrentASTUnit() {
     return std::move(CurrentASTUnit);
   }
 
   void setCurrentInput(const FrontendInputFile &CurrentInput,
-                       std::unique_ptr<ASTUnit> AST = nullptr);
+                       std::unique_ptr<CompilerInstance> AST = nullptr);
 
   /// @}
   /// @name Supported Modes

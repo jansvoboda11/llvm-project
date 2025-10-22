@@ -867,6 +867,7 @@ public:
   /// True if non-system source files should be treated as volatile
   /// (likely to change while trying to use them).
   bool userFilesAreVolatile() const { return UserFilesAreVolatile; }
+  void setUserFilesAreVolatile(bool Value) { UserFilesAreVolatile = Value; }
 
   /// Retrieve the module build stack.
   ModuleBuildStack getModuleBuildStack() const {

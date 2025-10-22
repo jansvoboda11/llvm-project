@@ -165,7 +165,7 @@ public:
   /// The returned pointer is never a nullptr.
   ///
   /// Note that the AST files should also be in the \p CrossTUDir.
-  llvm::Expected<ASTUnit *> loadExternalAST(StringRef LookupName,
+  llvm::Expected<CompilerInstance *> loadExternalAST(StringRef LookupName,
                                             StringRef CrossTUDir,
                                             StringRef IndexName,
                                             bool DisplayCTUProgress = false);
@@ -227,7 +227,7 @@ private:
   ASTContext &Context;
   std::shared_ptr<ASTImporterSharedState> ImporterSharedSt;
 
-  using LoadResultTy = llvm::Expected<std::unique_ptr<ASTUnit>>;
+  using LoadResultTy = llvm::Expected<std::unique_ptr<CompilerInstance>>;
 
   /// Loads ASTUnits from AST-dumps or source-files.
   class ASTLoader {
@@ -302,7 +302,7 @@ private:
     ///
     /// \return An Expected instance which contains the ASTUnit pointer or the
     /// error occurred during the load.
-    llvm::Expected<ASTUnit *> getASTUnitForFunction(StringRef FunctionName,
+    llvm::Expected<CompilerInstance *> getASTUnitForFunction(StringRef FunctionName,
                                                     StringRef CrossTUDir,
                                                     StringRef IndexName,
                                                     bool DisplayCTUProgress);
@@ -322,12 +322,12 @@ private:
 
   private:
     llvm::Error ensureCTUIndexLoaded(StringRef CrossTUDir, StringRef IndexName);
-    llvm::Expected<ASTUnit *> getASTUnitForFile(StringRef FileName,
+    llvm::Expected<CompilerInstance *> getASTUnitForFile(StringRef FileName,
                                                 bool DisplayCTUProgress);
 
     template <typename... T> using BaseMapTy = llvm::StringMap<T...>;
-    using OwningMapTy = BaseMapTy<std::unique_ptr<clang::ASTUnit>>;
-    using NonOwningMapTy = BaseMapTy<clang::ASTUnit *>;
+    using OwningMapTy = BaseMapTy<std::unique_ptr<clang::CompilerInstance>>;
+    using NonOwningMapTy = BaseMapTy<clang::CompilerInstance *>;
 
     OwningMapTy FileASTUnitMap;
     NonOwningMapTy NameASTUnitMap;

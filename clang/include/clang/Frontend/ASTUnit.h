@@ -722,7 +722,7 @@ public:
     LoadEverything
   };
 
-  /// Create a ASTUnit from an AST file.
+  /// Create a CompilerInstance from an AST file.
   ///
   /// \param Filename - The AST file to load.
   ///
@@ -732,8 +732,8 @@ public:
   /// lifetime is expected to extend past that of the returned ASTUnit.
   ///
   /// \returns - The initialized ASTUnit or null if the AST failed to load.
-  static std::unique_ptr<ASTUnit> LoadFromASTFile(
-      StringRef Filename, const PCHContainerReader &PCHContainerRdr,
+  static std::unique_ptr<CompilerInstance> LoadFromASTFile(
+      StringRef Filename, std::shared_ptr<PCHContainerOperations> PCHContainerRdr,
       WhatToLoad ToLoad, IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
       std::shared_ptr<DiagnosticOptions> DiagOpts,
       IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
