@@ -115,6 +115,7 @@ private:
   // pointers here.
   std::shared_ptr<DiagnosticOptions> DiagOpts;
   IntrusiveRefCntPtr<DiagnosticsEngine>   Diagnostics;
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
   IntrusiveRefCntPtr<FileManager>         FileMgr;
   IntrusiveRefCntPtr<SourceManager>       SourceMgr;
   IntrusiveRefCntPtr<ModuleCache> ModCache;
@@ -500,8 +501,7 @@ public:
   }
 
   IntrusiveRefCntPtr<llvm::vfs::FileSystem> getVirtualFileSystemPtr() {
-    // FIXME: Don't defer VFS ownership to the FileManager.
-    return FileMgr->getVirtualFileSystemPtr();
+    return VFS;
   }
 
   const FileManager &getFileManager() const { return *FileMgr; }
@@ -826,7 +826,9 @@ public:
       std::shared_ptr<PCHContainerOperations> PCHContainerOps,
       std::shared_ptr<DiagnosticOptions> DiagOpts,
       IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-      IntrusiveRefCntPtr<FileManager> FileMgr, bool OnlyLocalDecls = false,
+      IntrusiveRefCntPtr<FileManager> FileMgr,
+      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+      bool OnlyLocalDecls = false,
       CaptureDiagsKind CaptureDiagnostics = CaptureDiagsKind::None,
       unsigned PrecompilePreambleAfterNParses = 0,
       TranslationUnitKind TUKind = TU_Complete,
@@ -897,17 +899,10 @@ public:
   /// Reparse the source files using the same command-line options that
   /// were originally used to produce this translation unit.
   ///
-  /// \param VFS - A llvm::vfs::FileSystem to be used for all file accesses.
-  /// Note that preamble is saved to a temporary directory on a RealFileSystem,
-  /// so in order for it to be loaded correctly, VFS should give an access to
-  /// this(i.e. be an overlay over RealFileSystem).
-  /// FileMgr->getVirtualFileSystem() will be used if \p VFS is nullptr.
-  ///
   /// \returns True if a failure occurred that causes the ASTUnit not to
   /// contain any translation-unit information, false otherwise.
   bool Reparse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-               ArrayRef<RemappedFile> RemappedFiles = {},
-               IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS = nullptr);
+               ArrayRef<RemappedFile> RemappedFiles = {});
 
   /// Free data that will be re-generated on the next parse.
   ///
@@ -947,6 +942,7 @@ public:
                     LangOptions &LangOpts,
                     llvm::IntrusiveRefCntPtr<SourceManager> SourceMgr,
                     llvm::IntrusiveRefCntPtr<FileManager> FileMgr,
+                    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                     SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
                     SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers,
                     std::unique_ptr<SyntaxOnlyAction> Act);

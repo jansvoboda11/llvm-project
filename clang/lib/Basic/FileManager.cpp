@@ -41,15 +41,10 @@ using namespace clang;
 // Common logic.
 //===----------------------------------------------------------------------===//
 
-FileManager::FileManager(const FileSystemOptions &FSO,
-                         IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
-    : FS(std::move(FS)), FileSystemOpts(FSO), SeenDirEntries(64),
-      SeenFileEntries(64), NextFileUID(0) {
-  // If the caller doesn't provide a virtual file system, just grab the real
-  // file system.
-  if (!this->FS)
-    this->FS = llvm::vfs::getRealFileSystem();
-}
+FileManager::FileManager(const FileSystemOptions &FSOpts,
+                         llvm::vfs::FileSystem &FS)
+    : FS(FS), FileSystemOpts(FSOpts), SeenDirEntries(64), SeenFileEntries(64),
+      NextFileUID(0) {}
 
 FileManager::~FileManager() = default;
 
@@ -362,7 +357,7 @@ llvm::Expected<FileEntryRef> FileManager::getSTDIN() {
 }
 
 void FileManager::trackVFSUsage(bool Active) {
-  FS->visit([Active](llvm::vfs::FileSystem &FileSys) {
+  FS.visit([Active](llvm::vfs::FileSystem &FileSys) {
     if (auto *RFS = dyn_cast<llvm::vfs::RedirectingFileSystem>(&FileSys))
       RFS->setUsageTrackingActive(Active);
   });
@@ -491,7 +486,7 @@ bool FileManager::makeAbsolutePath(SmallVectorImpl<char> &Path) const {
   bool Changed = FixupRelativePath(Path);
 
   if (!llvm::sys::path::is_absolute(StringRef(Path.data(), Path.size()))) {
-    FS->makeAbsolute(Path);
+    FS.makeAbsolute(Path);
     Changed = true;
   }
 
@@ -547,12 +542,12 @@ FileManager::getBufferForFileImpl(StringRef Filename, int64_t FileSize,
                                   bool isVolatile, bool RequiresNullTerminator,
                                   bool IsText) const {
   if (FileSystemOpts.WorkingDir.empty())
-    return FS->getBufferForFile(Filename, FileSize, RequiresNullTerminator,
+    return FS.getBufferForFile(Filename, FileSize, RequiresNullTerminator,
                                 isVolatile, IsText);
 
   SmallString<128> FilePath(Filename);
   FixupRelativePath(FilePath);
-  return FS->getBufferForFile(FilePath, FileSize, RequiresNullTerminator,
+  return FS.getBufferForFile(FilePath, FileSize, RequiresNullTerminator,
                               isVolatile, IsText);
 }
 
@@ -570,13 +565,13 @@ std::error_code FileManager::getStatValue(StringRef Path,
   // absolute!
   if (FileSystemOpts.WorkingDir.empty())
     return FileSystemStatCache::get(Path, Status, isFile, F, StatCache.get(),
-                                    *FS, IsText);
+                                    FS, IsText);
 
   SmallString<128> FilePath(Path);
   FixupRelativePath(FilePath);
 
   return FileSystemStatCache::get(FilePath.c_str(), Status, isFile, F,
-                                  StatCache.get(), *FS, IsText);
+                                  StatCache.get(), FS, IsText);
 }
 
 std::error_code
@@ -585,7 +580,7 @@ FileManager::getNoncachedStatValue(StringRef Path,
   SmallString<128> FilePath(Path);
   FixupRelativePath(FilePath);
 
-  llvm::ErrorOr<llvm::vfs::Status> S = FS->status(FilePath.c_str());
+  llvm::ErrorOr<llvm::vfs::Status> S = FS.status(FilePath.c_str());
   if (!S)
     return S.getError();
   Result = *S;
@@ -630,12 +625,12 @@ StringRef FileManager::getCanonicalName(const void *Entry, StringRef Name) {
 
   SmallString<256> AbsPathBuf;
   SmallString<256> RealPathBuf;
-  if (!FS->getRealPath(Name, RealPathBuf)) {
+  if (!FS.getRealPath(Name, RealPathBuf)) {
     if (is_style_windows(llvm::sys::path::Style::native)) {
       // For Windows paths, only use the real path if it doesn't resolve
       // a substitute drive, as those are used to avoid MAX_PATH issues.
       AbsPathBuf = Name;
-      if (!FS->makeAbsolute(AbsPathBuf)) {
+      if (!FS.makeAbsolute(AbsPathBuf)) {
         if (llvm::sys::path::root_name(RealPathBuf) ==
             llvm::sys::path::root_name(AbsPathBuf)) {
           CanonicalName = RealPathBuf.str().copy(CanonicalNameStorage);

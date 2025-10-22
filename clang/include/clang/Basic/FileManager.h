@@ -51,7 +51,7 @@ class FileSystemStatCache;
 /// as a single file.
 ///
 class FileManager : public RefCountedBase<FileManager> {
-  IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
+  llvm::vfs::FileSystem &FS;
   FileSystemOptions FileSystemOpts;
   llvm::SpecificBumpPtrAllocator<FileEntry> FilesAlloc;
   llvm::SpecificBumpPtrAllocator<DirectoryEntry> DirsAlloc;
@@ -135,12 +135,7 @@ class FileManager : public RefCountedBase<FileManager> {
   void fillRealPathName(FileEntry *UFE, llvm::StringRef FileName);
 
 public:
-  /// Construct a file manager, optionally with a custom VFS.
-  ///
-  /// \param FS if non-null, the VFS to use.  Otherwise uses
-  /// llvm::vfs::getRealFileSystem().
-  FileManager(const FileSystemOptions &FileSystemOpts,
-              IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
+  FileManager(const FileSystemOptions &FSOpts, llvm::vfs::FileSystem &FS);
   ~FileManager();
 
   /// Installs the provided FileSystemStatCache object within
@@ -216,18 +211,15 @@ public:
   FileSystemOptions &getFileSystemOpts() { return FileSystemOpts; }
   const FileSystemOptions &getFileSystemOpts() const { return FileSystemOpts; }
 
-  llvm::vfs::FileSystem &getVirtualFileSystem() const { return *FS; }
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getVirtualFileSystemPtr() const {
-    return FS;
-  }
+  llvm::vfs::FileSystem &getVirtualFileSystem() const { return FS; }
 
   /// Enable or disable tracking of VFS usage. Used to not track full header
   /// search and implicit modulemap lookup.
   void trackVFSUsage(bool Active);
 
-  void setVirtualFileSystem(IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
-    this->FS = std::move(FS);
+  void setVirtualFileSystem(llvm::vfs::FileSystem &FS) {
+    // FIXME
+    //this->FS = FS;
   }
 
   /// Retrieve a file entry for a "virtual" file that acts as

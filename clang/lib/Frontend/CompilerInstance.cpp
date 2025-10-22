@@ -161,7 +161,7 @@ bool CompilerInstance::createTarget() {
 
 void CompilerInstance::setFileManager(IntrusiveRefCntPtr<FileManager> Value) {
   assert(Value == nullptr ||
-         getVirtualFileSystemPtr() == Value->getVirtualFileSystemPtr());
+         &getVirtualFileSystem() == &Value->getVirtualFileSystem());
   FileMgr = std::move(Value);
 }
 
@@ -382,7 +382,7 @@ IntrusiveRefCntPtr<DiagnosticsEngine> CompilerInstance::createDiagnostics(
 
 void CompilerInstance::createFileManager() {
   assert(VFS && "CompilerInstance needs a VFS for creating FileManager");
-  FileMgr = llvm::makeIntrusiveRefCnt<FileManager>(getFileSystemOpts(), VFS);
+  FileMgr = llvm::makeIntrusiveRefCnt<FileManager>(getFileSystemOpts(), *VFS);
 }
 
 // Source Manager

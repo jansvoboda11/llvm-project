@@ -583,7 +583,7 @@ llvm::Expected<std::string> applyAllReplacements(StringRef Code,
 
   auto InMemoryFileSystem =
       llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-  FileManager Files(FileSystemOptions(), InMemoryFileSystem);
+  FileManager Files(FileSystemOptions(), *InMemoryFileSystem);
   DiagnosticOptions DiagOpts;
   DiagnosticsEngine Diagnostics(DiagnosticIDs::create(), DiagOpts);
   SourceManager SourceMgr(Diagnostics, Files);

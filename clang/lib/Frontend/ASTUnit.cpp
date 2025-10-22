@@ -512,6 +512,7 @@ namespace {
 /// Gathers information from ASTReader that will be used to initialize
 /// a Preprocessor.
 class ASTInfoCollector : public ASTReaderListener {
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> &VFS;
   Preprocessor &PP;
   ASTContext *Context;
   HeaderSearchOptions &HSOpts;
@@ -525,12 +526,13 @@ class ASTInfoCollector : public ASTReaderListener {
   bool InitializedHeaderSearchPaths = false;
 
 public:
-  ASTInfoCollector(Preprocessor &PP, ASTContext *Context,
+  ASTInfoCollector(IntrusiveRefCntPtr<llvm::vfs::FileSystem> &VFS,
+  Preprocessor &PP, ASTContext *Context,
                    HeaderSearchOptions &HSOpts, PreprocessorOptions &PPOpts,
                    LangOptions &LangOpt, CodeGenOptions &CodeGenOpts,
                    std::shared_ptr<TargetOptions> &TargetOpts,
                    IntrusiveRefCntPtr<TargetInfo> &Target, unsigned &Counter)
-      : PP(PP), Context(Context), HSOpts(HSOpts), PPOpts(PPOpts),
+      : VFS(VFS), PP(PP), Context(Context), HSOpts(HSOpts), PPOpts(PPOpts),
         LangOpt(LangOpt), CodeGenOpts(CodeGenOpts), TargetOpts(TargetOpts),
         Target(Target), Counter(Counter) {}
 
@@ -594,9 +596,9 @@ public:
     // Initialize the FileManager. We can't do this in update(), since that
     // performs the initialization too late (once both target and language
     // options are read).
-    PP.getFileManager().setVirtualFileSystem(createVFSFromOverlayFiles(
-        HSOpts.VFSOverlayFiles, PP.getDiagnostics(),
-        PP.getFileManager().getVirtualFileSystemPtr()));
+    VFS = createVFSFromOverlayFiles(HSOpts.VFSOverlayFiles, PP.getDiagnostics(),
+                                    VFS);
+    PP.getFileManager().setVirtualFileSystem(*VFS);
 
     InitializedHeaderSearchPaths = true;
 
@@ -832,7 +834,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
   AST->CaptureDiagnostics = CaptureDiagnostics;
   AST->DiagOpts = DiagOpts;
   AST->Diagnostics = Diags;
-  AST->FileMgr = llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOpts, VFS);
+  AST->VFS = VFS;
+  AST->FileMgr =
+      llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOpts, *AST->VFS);
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
   AST->SourceMgr = llvm::makeIntrusiveRefCnt<SourceManager>(
       AST->getDiagnostics(), AST->getFileManager(), UserFilesAreVolatile);
@@ -875,8 +879,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   unsigned Counter = 0;
   AST->Reader->setListener(std::make_unique<ASTInfoCollector>(
-      *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts, *AST->LangOpts,
-      *AST->CodeGenOpts, AST->TargetOpts, AST->Target, Counter));
+      AST->VFS, *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts,
+      *AST->LangOpts, *AST->CodeGenOpts, AST->TargetOpts, AST->Target,
+      Counter));
 
   // Attach the AST reader to the AST context as an external AST
   // source, so that declarations will be deserialized from the
@@ -1553,14 +1558,13 @@ ASTUnit::create(std::shared_ptr<CompilerInvocation> CI,
                 bool UserFilesAreVolatile) {
   std::unique_ptr<ASTUnit> AST(new ASTUnit(false));
   ConfigureDiags(Diags, *AST, CaptureDiagnostics);
-  IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-      createVFSFromCompilerInvocation(*CI, *Diags);
   AST->DiagOpts = DiagOpts;
   AST->Diagnostics = Diags;
   AST->FileSystemOpts = CI->getFileSystemOpts();
   AST->Invocation = std::move(CI);
+  AST->VFS = createVFSFromCompilerInvocation(*AST->Invocation, *Diags);
   AST->FileMgr =
-      llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, VFS);
+      llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, *AST->VFS);
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
   AST->SourceMgr = llvm::makeIntrusiveRefCnt<SourceManager>(
       AST->getDiagnostics(), *AST->FileMgr, UserFilesAreVolatile);
@@ -1750,7 +1754,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     std::shared_ptr<DiagnosticOptions> DiagOpts,
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-    IntrusiveRefCntPtr<FileManager> FileMgr, bool OnlyLocalDecls,
+    IntrusiveRefCntPtr<FileManager> FileMgr,
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    bool OnlyLocalDecls,
     CaptureDiagsKind CaptureDiagnostics,
     unsigned PrecompilePreambleAfterNParses, TranslationUnitKind TUKind,
     bool CacheCodeCompletionResults, bool IncludeBriefCommentsInCodeCompletion,
@@ -1768,6 +1774,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
     = IncludeBriefCommentsInCodeCompletion;
   AST->Invocation = std::move(CI);
   AST->FileSystemOpts = FileMgr->getFileSystemOpts();
+  AST->VFS = std::move(VFS);
   AST->FileMgr = FileMgr;
   AST->UserFilesAreVolatile = UserFilesAreVolatile;
 
@@ -1779,8 +1786,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCompilerInvocation(
     DiagCleanup(Diags.get());
 
   if (AST->LoadFromCompilerInvocation(std::move(PCHContainerOps),
-                                      PrecompilePreambleAfterNParses,
-                                      AST->FileMgr->getVirtualFileSystemPtr()))
+                                      PrecompilePreambleAfterNParses, AST->VFS))
     return nullptr;
   return AST;
 }
@@ -1855,9 +1861,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
   AST->Diagnostics = Diags;
   AST->FileSystemOpts = CI->getFileSystemOpts();
   AST->CodeGenOpts = std::make_unique<CodeGenOptions>(CI->getCodeGenOpts());
-  VFS = createVFSFromCompilerInvocation(*CI, *Diags, VFS);
+  AST->VFS = createVFSFromCompilerInvocation(*CI, *Diags, VFS);
   AST->FileMgr =
-      llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, VFS);
+      llvm::makeIntrusiveRefCnt<FileManager>(AST->FileSystemOpts, *AST->VFS);
   AST->StorePreamblesInMemory = StorePreamblesInMemory;
   AST->PreambleStoragePath = PreambleStoragePath;
   AST->ModCache = createCrossProcessModuleCache();
@@ -1896,15 +1902,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromCommandLine(
 }
 
 bool ASTUnit::Reparse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                      ArrayRef<RemappedFile> RemappedFiles,
-                      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
+                      ArrayRef<RemappedFile> RemappedFiles) {
   if (!Invocation)
     return true;
-
-  if (!VFS) {
-    assert(FileMgr && "FileMgr is null on Reparse call");
-    VFS = FileMgr->getVirtualFileSystemPtr();
-  }
 
   clearFileLevelDecls();
 
@@ -2220,6 +2220,7 @@ void ASTUnit::CodeComplete(
     llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diag, LangOptions &LangOpts,
     llvm::IntrusiveRefCntPtr<SourceManager> SourceMgr,
     llvm::IntrusiveRefCntPtr<FileManager> FileMgr,
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
     SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers,
     std::unique_ptr<SyntaxOnlyAction> Act) {
@@ -2291,7 +2292,7 @@ void ASTUnit::CodeComplete(
          "IR inputs not support here!");
 
   // Use the source and file managers that we were given.
-  Clang->setVirtualFileSystem(FileMgr->getVirtualFileSystemPtr());
+  Clang->setVirtualFileSystem(VFS);
   Clang->setFileManager(FileMgr);
   Clang->setSourceManager(SourceMgr);
 
@@ -2332,7 +2333,7 @@ void ASTUnit::CodeComplete(
   std::unique_ptr<llvm::MemoryBuffer> OverrideMainBuffer;
   if (Preamble && Line > 1 && hasSameUniqueID(File, OriginalSourceFile)) {
     OverrideMainBuffer = getMainBufferWithPrecompiledPreamble(
-        PCHContainerOps, Inv, FileMgr->getVirtualFileSystemPtr(), false,
+        PCHContainerOps, Inv, VFS, false,
         Line - 1);
   }
 
@@ -2342,8 +2343,6 @@ void ASTUnit::CodeComplete(
     assert(Preamble &&
            "No preamble was built, but OverrideMainBuffer is not null");
 
-    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-        FileMgr->getVirtualFileSystemPtr();
     Preamble->AddImplicitPreamble(Clang->getInvocation(), VFS,
                                   OverrideMainBuffer.get());
     // FIXME: there is no way to update VFS if it was changed by
