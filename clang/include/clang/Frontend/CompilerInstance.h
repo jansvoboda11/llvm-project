@@ -589,14 +589,27 @@ public:
   /// @name Module Management
   /// @{
 
-  IntrusiveRefCntPtr<ASTReader> getASTReader() const;
+  bool hasASTReader() const { return TheASTReader != nullptr; }
+  ASTReader &getASTReader() const;
+  IntrusiveRefCntPtr<ASTReader> getASTReaderPtr() const;
   void setASTReader(IntrusiveRefCntPtr<ASTReader> Reader);
 
-  std::shared_ptr<ModuleDependencyCollector> getModuleDepCollector() const;
-  void setModuleDepCollector(
-      std::shared_ptr<ModuleDependencyCollector> Collector);
+  ModuleDependencyCollector &getModuleDepCollector() const {
+    assert(ModuleDepCollector && "No ModuleDepCollector in CompilerInstance");
+    return *ModuleDepCollector;
+  }
+  std::shared_ptr<ModuleDependencyCollector> getModuleDepCollectorPtr() const {
+    assert(ModuleDepCollector && "No ModuleDepCollector in CompilerInstance");
+    return ModuleDepCollector;
+  }
+  void setModuleDepCollector(std::shared_ptr<ModuleDependencyCollector> MDC) {
+    ModuleDepCollector = std::move(MDC);
+  }
 
-  std::shared_ptr<PCHContainerOperations> getPCHContainerOperations() const {
+  PCHContainerOperations &getPCHContainerOperations() const {
+    return *ThePCHContainerOperations;
+  }
+  std::shared_ptr<PCHContainerOperations> getPCHContainerOperationsPtr() const {
     return ThePCHContainerOperations;
   }
 

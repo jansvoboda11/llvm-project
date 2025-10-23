@@ -118,7 +118,7 @@ void ExpandModularHeadersPPCallbacks::handleModuleFile(
 
   // Visit all the input files of this module and mark them to record their
   // contents later.
-  Compiler.getASTReader()->visitInputFiles(
+  Compiler.getASTReader().visitInputFiles(
       *MF, true, false,
       [this](const serialization::InputFile &IF, bool /*IsSystem*/) {
         Recorder->addNecessaryFile(*IF.getFile());
@@ -166,7 +166,7 @@ void ExpandModularHeadersPPCallbacks::InclusionDirective(
     SrcMgr::CharacteristicKind FileType) {
   if (ModuleImported) {
     serialization::ModuleFile *MF =
-        Compiler.getASTReader()->getModuleManager().lookup(
+        Compiler.getASTReader().getModuleManager().lookup(
             *SuggestedModule->getASTFile());
     handleModuleFile(MF);
   }

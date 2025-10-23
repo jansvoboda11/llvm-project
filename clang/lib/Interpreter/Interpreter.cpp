@@ -89,9 +89,9 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
 
   // Register the support for object-file-wrapped Clang modules.
   // FIXME: Clang should register these container operations automatically.
-  auto PCHOps = Clang->getPCHContainerOperations();
-  PCHOps->registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
-  PCHOps->registerReader(std::make_unique<ObjectFilePCHContainerReader>());
+  auto &PCHOps = Clang->getPCHContainerOperations();
+  PCHOps.registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
+  PCHOps.registerReader(std::make_unique<ObjectFilePCHContainerReader>());
 
   // Buffer diagnostics from argument parsing so that we can output them using
   // a well formed diagnostic object.

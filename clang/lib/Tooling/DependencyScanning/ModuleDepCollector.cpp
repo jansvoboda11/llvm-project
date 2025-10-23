@@ -764,10 +764,10 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
   }
 
   serialization::ModuleFile *MF =
-      MDC.ScanInstance.getASTReader()->getModuleManager().lookup(
+      MDC.ScanInstance.getASTReader().getModuleManager().lookup(
           *M->getASTFile());
   MD.FileDepsBaseDir = MF->BaseDirectory;
-  MDC.ScanInstance.getASTReader()->visitInputFileInfos(
+  MDC.ScanInstance.getASTReader().visitInputFileInfos(
       *MF, /*IncludeSystem=*/true,
       [&](const serialization::InputFileInfo &IFI, bool IsSystem) {
         // The __inferred_module.map file is an insignificant implementation
@@ -787,7 +787,7 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
 
   SmallString<0> PathBuf;
   PathBuf.reserve(256);
-  MDC.ScanInstance.getASTReader()->visitInputFileInfos(
+  MDC.ScanInstance.getASTReader().visitInputFileInfos(
       *MF, /*IncludeSystem=*/true,
       [&](const serialization::InputFileInfo &IFI, bool IsSystem) {
         if (MD.IsInStableDirectories) {
@@ -815,7 +815,7 @@ ModuleDepCollectorPP::handleTopLevelModule(const Module *M) {
                     (ScanningOptimizations::HeaderSearch |
                      ScanningOptimizations::VFS)))
               optimizeHeaderSearchOpts(BuildInvocation.getMutHeaderSearchOpts(),
-                                       *MDC.ScanInstance.getASTReader(), *MF,
+                                       MDC.ScanInstance.getASTReader(), *MF,
                                        MDC.PrebuiltModulesASTMap,
                                        MDC.Service.getOptimizeArgs());
 

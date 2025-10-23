@@ -576,7 +576,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromDump(StringRef ASTDumpPath) {
   auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
       DiagnosticIDs::create(), *DiagOpts, DiagClient);
   return ASTUnit::LoadFromASTFile(
-      ASTDumpPath, CI.getPCHContainerOperations()->getRawReader(),
+      ASTDumpPath, CI.getPCHContainerOperations().getRawReader(),
       ASTUnit::LoadEverything, CI.getVirtualFileSystemPtr(), DiagOpts, Diags,
       CI.getFileSystemOpts(), CI.getHeaderSearchOpts());
 }
@@ -621,7 +621,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
 
   return ASTUnit::LoadFromCommandLine(
       CommandLineArgs.begin(), (CommandLineArgs.end()),
-      CI.getPCHContainerOperations(), DiagOpts, Diags,
+      CI.getPCHContainerOperationsPtr(), DiagOpts, Diags,
       CI.getHeaderSearchOpts().ResourceDir);
 }
 

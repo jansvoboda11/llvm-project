@@ -41,6 +41,7 @@
 #include "clang/Serialization/GlobalModuleIndex.h"
 #include "clang/Serialization/InMemoryModuleCache.h"
 #include "clang/Serialization/ModuleCache.h"
+#include "clang/Serialization/PCHContainerOperations.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -202,23 +203,18 @@ std::unique_ptr<Sema> CompilerInstance::takeSema() {
   return std::move(TheSema);
 }
 
-IntrusiveRefCntPtr<ASTReader> CompilerInstance::getASTReader() const {
+ASTReader &CompilerInstance::getASTReader() const {
+  assert(TheASTReader && "No ASTReader on CompilerInstance");
+  return *TheASTReader;
+}
+
+IntrusiveRefCntPtr<ASTReader> CompilerInstance::getASTReaderPtr() const {
   return TheASTReader;
 }
 void CompilerInstance::setASTReader(IntrusiveRefCntPtr<ASTReader> Reader) {
   assert(ModCache.get() == &Reader->getModuleManager().getModuleCache() &&
          "Expected ASTReader to use the same PCM cache");
   TheASTReader = std::move(Reader);
-}
-
-std::shared_ptr<ModuleDependencyCollector>
-CompilerInstance::getModuleDepCollector() const {
-  return ModuleDepCollector;
-}
-
-void CompilerInstance::setModuleDepCollector(
-    std::shared_ptr<ModuleDependencyCollector> Collector) {
-  ModuleDepCollector = std::move(Collector);
 }
 
 static void collectHeaderMaps(const HeaderSearch &HS,
@@ -1156,7 +1152,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   // CompilerInstance::CompilerInstance is responsible for finalizing the
   // buffers to prevent use-after-frees.
   auto InstancePtr = std::make_unique<CompilerInstance>(
-      std::move(Invocation), getPCHContainerOperations(), ModCache);
+      std::move(Invocation), getPCHContainerOperationsPtr(), ModCache);
   auto &Instance = *InstancePtr;
 
   auto &Inv = Instance.getInvocation();
@@ -1209,7 +1205,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
     // If we're collecting module dependencies, we need to share a collector
     // between all of the module CompilerInstances. Other than that, we don't
     // want to produce any dependency output from the module build.
-    Instance.setModuleDepCollector(getModuleDepCollector());
+    Instance.setModuleDepCollector(ModuleDepCollector);
   }
   Inv.getDependencyOutputOpts() = DependencyOutputOptions();
 
@@ -1379,7 +1375,7 @@ static bool readASTAfterCompileModule(CompilerInstance &ImportingInstance,
 
   // Try to read the module file, now that we've compiled it.
   ASTReader::ASTReadResult ReadResult =
-      ImportingInstance.getASTReader()->ReadAST(
+      ImportingInstance.getASTReader().ReadAST(
           ModuleFileName, serialization::MK_ImplicitModule, ImportLoc,
           ModuleLoadCapabilities);
   if (ReadResult == ASTReader::Success)
@@ -1779,7 +1775,7 @@ ModuleLoadResult CompilerInstance::findOrCompileModuleAndReadAST(
   }
 
   // Create an ASTReader on demand.
-  if (!getASTReader())
+  if (!hasASTReader())
     createASTReader();
 
   // Time how long it takes to load the module.
@@ -1798,13 +1794,12 @@ ModuleLoadResult CompilerInstance::findOrCompileModuleAndReadAST(
                           : Source == MS_PrebuiltModulePath
                                 ? 0
                                 : ASTReader::ARR_ConfigurationMismatch;
-  switch (getASTReader()->ReadAST(ModuleFilename,
-                                  Source == MS_PrebuiltModulePath
-                                      ? serialization::MK_PrebuiltModule
-                                      : Source == MS_ModuleBuildPragma
-                                            ? serialization::MK_ExplicitModule
-                                            : serialization::MK_ImplicitModule,
-                                  ImportLoc, ARRFlags)) {
+  switch (getASTReader().ReadAST(
+      ModuleFilename,
+      Source == MS_PrebuiltModulePath  ? serialization::MK_PrebuiltModule
+      : Source == MS_ModuleBuildPragma ? serialization::MK_ExplicitModule
+                                       : serialization::MK_ImplicitModule,
+      ImportLoc, ARRFlags)) {
   case ASTReader::Success: {
     if (M)
       return M;

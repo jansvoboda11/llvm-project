@@ -221,7 +221,7 @@ public:
       return;
 
     serialization::ModuleFile *MF =
-        CI.getASTReader()->getModuleManager().lookup(*File);
+        CI.getASTReader().getModuleManager().lookup(*File);
     assert(MF && "missing module file for loaded module?");
 
     // Not interested in PCH / preambles.
@@ -244,7 +244,7 @@ public:
     // Rewrite the contents of the module in a separate compiler instance.
     CompilerInstance Instance(
         std::make_shared<CompilerInvocation>(CI.getInvocation()),
-        CI.getPCHContainerOperations(), CI.getModuleCachePtr());
+        CI.getPCHContainerOperationsPtr(), CI.getModuleCachePtr());
     Instance.setVirtualFileSystem(CI.getVirtualFileSystemPtr());
     Instance.createDiagnostics(
         new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
@@ -295,7 +295,7 @@ bool RewriteIncludesAction::BeginSourceFileAction(CompilerInstance &CI) {
   // module files.
   if (CI.getPreprocessorOutputOpts().RewriteImports) {
     CI.createASTReader();
-    CI.getASTReader()->addListener(
+    CI.getASTReader().addListener(
         std::make_unique<RewriteImportsListener>(CI, OutputStream));
   }
 

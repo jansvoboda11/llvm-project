@@ -123,7 +123,7 @@ clang::createChainedIncludesSource(CompilerInstance &CI,
         DiagnosticIDs::create(), CI.getDiagnosticOpts(), DiagClient);
 
     auto Clang = std::make_unique<CompilerInstance>(
-        std::move(CInvok), CI.getPCHContainerOperations());
+        std::move(CInvok), CI.getPCHContainerOperationsPtr());
     Clang->createVirtualFileSystem();
     Clang->setDiagnostics(Diags);
     Clang->setTarget(TargetInfo::CreateTargetInfo(

@@ -113,10 +113,10 @@ public:
     // PrecompilePreambleConsumer/PCHGenerator is setup. This would be called
     // when Preamble consists of modules. Therefore while capturing AST context,
     // we have to reset ast consumer and ASTMutationListener.
-    if (CI.getASTReader()) {
-      CI.getASTReader()->setDeserializationListener(nullptr);
+    if (CI.hasASTReader()) {
+      CI.getASTReader().setDeserializationListener(nullptr);
       // This just sets consumer to null when DeserializationListener is null.
-      CI.getASTReader()->StartTranslationUnit(nullptr);
+      CI.getASTReader().StartTranslationUnit(nullptr);
     }
     CI.getASTContext().setASTMutationListener(nullptr);
     CapturedCtx.emplace(CI);

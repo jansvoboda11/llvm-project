@@ -144,7 +144,7 @@ TEST_F(ModuleCacheTest, CachedModuleNewPath) {
       createInvocationAndEnableFree(Args2, CIOpts);
   ASSERT_TRUE(Invocation2);
   CompilerInstance Instance2(std::move(Invocation2),
-                             Instance.getPCHContainerOperations(),
+                             Instance.getPCHContainerOperationsPtr(),
                              Instance.getModuleCachePtr());
   Instance2.setVirtualFileSystem(CIOpts.VFS);
   Instance2.setDiagnostics(Diags);
@@ -190,7 +190,7 @@ TEST_F(ModuleCacheTest, CachedModuleNewPathAllowErrors) {
       createInvocationAndEnableFree(Args2, CIOpts);
   ASSERT_TRUE(Invocation2);
   CompilerInstance Instance2(std::move(Invocation2),
-                             Instance.getPCHContainerOperations(),
+                             Instance.getPCHContainerOperationsPtr(),
                              Instance.getModuleCachePtr());
   Instance2.setVirtualFileSystem(CIOpts.VFS);
   Instance2.setDiagnostics(Diags);

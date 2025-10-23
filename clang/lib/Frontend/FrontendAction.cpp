@@ -1246,8 +1246,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
       if (CI.getLangOpts().Modules || !CI.hasASTContext() ||
           !CI.getASTContext().getExternalSource()) {
         CI.createASTReader();
-        CI.getASTReader()->setDeserializationListener(DeserialListener,
-                                                      DeleteDeserialListener);
+        CI.getASTReader().setDeserializationListener(DeserialListener,
+                                                     DeleteDeserialListener);
       }
     }
 
@@ -1266,7 +1266,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   } else {
     // FIXME: If this is a problem, recover from it by creating a multiplex
     // source.
-    assert((!CI.getLangOpts().Modules || CI.getASTReader()) &&
+    assert((!CI.getLangOpts().Modules || CI.hasASTReader()) &&
            "modules enabled but created an external source that "
            "doesn't support modules");
   }
