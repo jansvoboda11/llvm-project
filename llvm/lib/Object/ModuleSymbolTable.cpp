@@ -36,9 +36,11 @@
 #include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
 #include <cassert>
@@ -101,6 +103,10 @@ initializeRecordStreamer(const Module &M,
   std::unique_ptr<MemoryBuffer> Buffer(
       MemoryBuffer::getMemBuffer(InlineAsm, "<inline asm>"));
   SourceMgr SrcMgr;
+  SrcMgr.setVirtualFileSystem([] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }());
   SrcMgr.AddNewSourceBuffer(std::move(Buffer), SMLoc());
 
   MCContext MCCtx(TT, MAI.get(), MRI.get(), STI.get(), &SrcMgr);
