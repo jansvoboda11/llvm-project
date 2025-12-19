@@ -349,8 +349,8 @@ static int fillCommandLineSymbols(MCAsmParser &Parser) {
 }
 
 static int AssembleInput(const char *ProgName, const Target *TheTarget,
-                         SourceMgr &SrcMgr, MCContext &Ctx, MCStreamer &Str,
-                         MCAsmInfo &MAI, MCSubtargetInfo &STI,
+                         SourceMgrWithIncludeSupport &SrcMgr, MCContext &Ctx,
+                         MCStreamer &Str, MCAsmInfo &MAI, MCSubtargetInfo &STI,
                          MCInstrInfo &MCII, MCTargetOptions const &MCOptions) {
   std::unique_ptr<MCAsmParser> Parser(
       createMCAsmParser(SrcMgr, Ctx, Str, MAI));
@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
   }
   MemoryBuffer *Buffer = BufferPtr->get();
 
-  SourceMgr SrcMgr;
+  SourceMgrWithIncludeSupport SrcMgr(vfs::getRealFileSystem());
 
   // Tell SrcMgr about this buffer, which is what the parser will pick up.
   SrcMgr.AddNewSourceBuffer(std::move(*BufferPtr), SMLoc());
@@ -440,7 +440,6 @@ int main(int argc, char **argv) {
   // Record the location of the include directories so that the lexer can find
   // it later.
   SrcMgr.setIncludeDirs(IncludeDirs);
-  SrcMgr.setVirtualFileSystem(vfs::getRealFileSystem());
 
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TheTriple));
   assert(MRI && "Unable to create target register info!");

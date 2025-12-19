@@ -39,57 +39,6 @@ using namespace llvm;
 
 static const size_t TabStop = 8;
 
-// Out of line to avoid needing definition of vfs::FileSystem in header.
-SourceMgr::SourceMgr() = default;
-SourceMgr::SourceMgr(IntrusiveRefCntPtr<vfs::FileSystem> FS)
-    : FS(std::move(FS)) {}
-SourceMgr::SourceMgr(SourceMgr &&) = default;
-SourceMgr &SourceMgr::operator=(SourceMgr &&) = default;
-SourceMgr::~SourceMgr() = default;
-
-IntrusiveRefCntPtr<vfs::FileSystem> SourceMgr::getVirtualFileSystem() const {
-  return FS;
-}
-
-void SourceMgr::setVirtualFileSystem(IntrusiveRefCntPtr<vfs::FileSystem> FS) {
-  this->FS = std::move(FS);
-}
-
-unsigned SourceMgr::AddIncludeFile(const std::string &Filename,
-                                   SMLoc IncludeLoc,
-                                   std::string &IncludedFile) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> NewBufOrErr =
-      OpenIncludeFile(Filename, IncludedFile);
-  if (!NewBufOrErr)
-    return 0;
-
-  return AddNewSourceBuffer(std::move(*NewBufOrErr), IncludeLoc);
-}
-
-ErrorOr<std::unique_ptr<MemoryBuffer>>
-SourceMgr::OpenIncludeFile(const std::string &Filename,
-                           std::string &IncludedFile) {
-  auto GetFile = [this](StringRef Path) {
-    return FS ? FS->getBufferForFile(Path) : MemoryBuffer::getFile(Path);
-  };
-
-  ErrorOr<std::unique_ptr<MemoryBuffer>> NewBufOrErr = GetFile(Filename);
-
-  SmallString<64> Buffer(Filename);
-  // If the file didn't exist directly, see if it's in an include path.
-  for (unsigned i = 0, e = IncludeDirectories.size(); i != e && !NewBufOrErr;
-       ++i) {
-    Buffer = IncludeDirectories[i];
-    sys::path::append(Buffer, Filename);
-    NewBufOrErr = GetFile(Buffer);
-  }
-
-  if (NewBufOrErr)
-    IncludedFile = static_cast<std::string>(Buffer);
-
-  return NewBufOrErr;
-}
-
 unsigned SourceMgr::FindBufferContainingLoc(SMLoc Loc) const {
   for (unsigned i = 0, e = Buffers.size(); i != e; ++i)
     if (Loc.getPointer() >= Buffers[i].Buffer->getBufferStart() &&
@@ -380,6 +329,43 @@ void SourceMgr::PrintMessage(SMLoc Loc, SourceMgr::DiagKind Kind,
                              const Twine &Msg, ArrayRef<SMRange> Ranges,
                              ArrayRef<SMFixIt> FixIts, bool ShowColors) const {
   PrintMessage(errs(), Loc, Kind, Msg, Ranges, FixIts, ShowColors);
+}
+
+// Out of line to avoid needing definition of vfs::FileSystem in header.
+SourceMgrWithIncludeSupport::SourceMgrWithIncludeSupport(
+    IntrusiveRefCntPtr<vfs::FileSystem> FS)
+    : FS(std::move(FS)) {
+  assert(this->FS && "FileSystem not provided");
+}
+
+unsigned SourceMgrWithIncludeSupport::AddIncludeFile(
+    const std::string &Filename, SMLoc IncludeLoc, std::string &IncludedFile) {
+  ErrorOr<std::unique_ptr<MemoryBuffer>> NewBufOrErr =
+      OpenIncludeFile(Filename, IncludedFile);
+  if (!NewBufOrErr)
+    return 0;
+
+  return AddNewSourceBuffer(std::move(*NewBufOrErr), IncludeLoc);
+}
+
+ErrorOr<std::unique_ptr<MemoryBuffer>>
+SourceMgrWithIncludeSupport::OpenIncludeFile(const std::string &Filename,
+                                             std::string &IncludedFile) {
+  auto NewBufOrErr = FS->getBufferForFile(Filename);
+
+  SmallString<64> Buffer(Filename);
+  // If the file didn't exist directly, see if it's in an include path.
+  for (unsigned I = 0, E = IncludeDirectories.size(); I != E && !NewBufOrErr;
+       ++I) {
+    Buffer = IncludeDirectories[I];
+    sys::path::append(Buffer, Filename);
+    NewBufOrErr = FS->getBufferForFile(Buffer);
+  }
+
+  if (NewBufOrErr)
+    IncludedFile = static_cast<std::string>(Buffer);
+
+  return NewBufOrErr;
 }
 
 //===----------------------------------------------------------------------===//

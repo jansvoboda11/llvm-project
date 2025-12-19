@@ -24,7 +24,7 @@
 
 namespace llvm {
 template <typename T> class ArrayRef;
-class SourceMgr;
+class SourceMgrWithIncludeSupport;
 class Twine;
 
 namespace tgtok {
@@ -190,7 +190,7 @@ static inline bool isStringValue(tgtok::TokKind Kind) {
 
 /// TGLexer - TableGen Lexer class.
 class TGLexer {
-  SourceMgr &SrcMgr;
+  SourceMgrWithIncludeSupport &SrcMgr;
 
   const char *CurPtr = nullptr;
   StringRef CurBuf;
@@ -213,7 +213,7 @@ private:
   DependenciesSetTy Dependencies;
 
 public:
-  TGLexer(SourceMgr &SrcMgr, ArrayRef<std::string> Macros);
+  TGLexer(SourceMgrWithIncludeSupport &SrcMgr, ArrayRef<std::string> Macros);
 
   tgtok::TokKind Lex() { return CurCode = LexToken(CurPtr == CurBuf.begin()); }
 

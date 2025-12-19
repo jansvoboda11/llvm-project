@@ -197,7 +197,7 @@ protected:
   bool enabledGenDwarfForAssembly();
 
 public:
-  AsmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
+  AsmParser(SourceMgrWithIncludeSupport &SM, MCContext &Ctx, MCStreamer &Out,
             const MCAsmInfo &MAI, unsigned CB);
   AsmParser(const AsmParser &) = delete;
   AsmParser &operator=(const AsmParser &) = delete;
@@ -718,8 +718,8 @@ private:
                                  MCAsmParserSemaCallback *SI);
 
 public:
-  HLASMAsmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
-                 const MCAsmInfo &MAI, unsigned CB = 0)
+  HLASMAsmParser(SourceMgrWithIncludeSupport &SM, MCContext &Ctx,
+                 MCStreamer &Out, const MCAsmInfo &MAI, unsigned CB = 0)
       : AsmParser(SM, Ctx, Out, MAI, CB), Lexer(getLexer()), Out(Out) {
     Lexer.setSkipSpace(false);
     Lexer.setAllowHashInIdentifier(true);
@@ -741,8 +741,8 @@ extern cl::opt<unsigned> AsmMacroMaxNestingDepth;
 
 } // end namespace llvm
 
-AsmParser::AsmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
-                     const MCAsmInfo &MAI, unsigned CB = 0)
+AsmParser::AsmParser(SourceMgrWithIncludeSupport &SM, MCContext &Ctx,
+                     MCStreamer &Out, const MCAsmInfo &MAI, unsigned CB = 0)
     : MCAsmParser(Ctx, Out, SM, MAI), CurBuffer(CB ? CB : SM.getMainFileID()),
       MacrosEnabledFlag(true) {
   HadError = false;
@@ -6305,9 +6305,9 @@ bool llvm::MCParserUtils::parseAssignmentExpression(StringRef Name,
 }
 
 /// Create an MCAsmParser instance.
-MCAsmParser *llvm::createMCAsmParser(SourceMgr &SM, MCContext &C,
-                                     MCStreamer &Out, const MCAsmInfo &MAI,
-                                     unsigned CB) {
+MCAsmParser *llvm::createMCAsmParser(SourceMgrWithIncludeSupport &SM,
+                                     MCContext &C, MCStreamer &Out,
+                                     const MCAsmInfo &MAI, unsigned CB) {
   if (C.getTargetTriple().isSystemZ() && C.getTargetTriple().isOSzOS())
     return new HLASMAsmParser(SM, C, Out, MAI, CB);
 

@@ -14,15 +14,15 @@
 
 using namespace llvm;
 
-bool llvm::TableGenParseFile(SourceMgr &InputSrcMgr, RecordKeeper &Records) {
+bool llvm::TableGenParseFile(SourceMgrWithIncludeSupport &InputSrcMgr,
+                             RecordKeeper &Records) {
   // Initialize the global TableGen source manager by temporarily taking control
   // of the input buffer in `SrcMgr`. This is kind of a hack, but allows for
   // preserving TableGen's current awkward diagnostic behavior. If we can remove
   // this reliance, we could drop all of this.
-  SrcMgr = SourceMgr();
+  SrcMgr = SourceMgrWithIncludeSupport(vfs::getRealFileSystem());
   SrcMgr.takeSourceBuffersFrom(InputSrcMgr);
   SrcMgr.setIncludeDirs(InputSrcMgr.getIncludeDirs());
-  SrcMgr.setVirtualFileSystem(InputSrcMgr.getVirtualFileSystem());
   SrcMgr.setDiagHandler(InputSrcMgr.getDiagHandler(),
                         InputSrcMgr.getDiagContext());
 
@@ -38,6 +38,6 @@ bool llvm::TableGenParseFile(SourceMgr &InputSrcMgr, RecordKeeper &Records) {
   // After parsing, reclaim the source manager buffers from TableGen's global
   // manager.
   InputSrcMgr.takeSourceBuffersFrom(SrcMgr);
-  SrcMgr = SourceMgr();
+  SrcMgr = SourceMgrWithIncludeSupport(vfs::getRealFileSystem());
   return ParseResult;
 }

@@ -24,6 +24,8 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
+
 #include <string>
 
 #ifdef __linux__
@@ -232,7 +234,7 @@ Expected<std::vector<BenchmarkCode>> readSnippets(const LLVMState &State,
     return make_error<Failure>("cannot read snippet: " + Filename + ": " +
                                EC.message());
   }
-  SourceMgr SM;
+  SourceMgrWithIncludeSupport SM(vfs::getRealFileSystem());
   SM.AddNewSourceBuffer(std::move(BufferPtr.get()), SMLoc());
 
   BenchmarkCode Result;

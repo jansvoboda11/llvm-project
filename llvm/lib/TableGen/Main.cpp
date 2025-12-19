@@ -151,7 +151,6 @@ int llvm::TableGenMain(const char *argv0, MultiFileTableGenMainFn MainFn) {
   // Record the location of the include directory so that the lexer can find
   // it later.
   SrcMgr.setIncludeDirs(IncludeDirs);
-  SrcMgr.setVirtualFileSystem(vfs::getRealFileSystem());
 
   TGParser Parser(SrcMgr, MacroNames, Records, NoWarnOnUnusedTemplateArgs);
 

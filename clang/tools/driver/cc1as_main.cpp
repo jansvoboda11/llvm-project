@@ -436,7 +436,7 @@ static bool ExecuteAssemblerImpl(AssemblerInvocation &Opts,
            << Opts.InputFile << EC.message();
   }
 
-  SourceMgr SrcMgr;
+  SourceMgrWithIncludeSupport SrcMgr(VFS);
 
   // Tell SrcMgr about this buffer, which is what the parser will pick up.
   unsigned BufferIndex = SrcMgr.AddNewSourceBuffer(std::move(*Buffer), SMLoc());
@@ -444,7 +444,6 @@ static bool ExecuteAssemblerImpl(AssemblerInvocation &Opts,
   // Record the location of the include directories so that the lexer can find
   // it later.
   SrcMgr.setIncludeDirs(Opts.IncludePaths);
-  SrcMgr.setVirtualFileSystem(VFS);
 
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Opts.Triple));
   assert(MRI && "Unable to create target register info!");

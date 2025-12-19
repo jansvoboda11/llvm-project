@@ -102,8 +102,7 @@ initializeRecordStreamer(const Module &M,
 
   std::unique_ptr<MemoryBuffer> Buffer(
       MemoryBuffer::getMemBuffer(InlineAsm, "<inline asm>"));
-  SourceMgr SrcMgr;
-  SrcMgr.setVirtualFileSystem([] {
+  SourceMgrWithIncludeSupport SrcMgr([] {
     auto BypassSandbox = sys::sandbox::scopedDisable();
     return vfs::getRealFileSystem();
   }());

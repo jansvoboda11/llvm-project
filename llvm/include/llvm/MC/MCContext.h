@@ -71,6 +71,7 @@ template <typename T> class SmallVectorImpl;
 class SMDiagnostic;
 class SMLoc;
 class SourceMgr;
+class SourceMgrWithIncludeSupport;
 enum class EmitDwarfUnwindType;
 
 namespace wasm {
@@ -111,7 +112,7 @@ private:
   const SourceMgr *SrcMgr = nullptr;
 
   /// The SourceMgr for inline assembly, if any.
-  std::unique_ptr<SourceMgr> InlineSrcMgr;
+  std::unique_ptr<SourceMgrWithIncludeSupport> InlineSrcMgr;
   std::vector<const MDNode *> LocInfos;
 
   DiagHandlerTy DiagHandler;
@@ -401,7 +402,9 @@ public:
   const SourceMgr *getSourceManager() const { return SrcMgr; }
 
   LLVM_ABI void initInlineSourceManager();
-  SourceMgr *getInlineSourceManager() { return InlineSrcMgr.get(); }
+  SourceMgrWithIncludeSupport *getInlineSourceManager() {
+    return InlineSrcMgr.get();
+  }
   std::vector<const MDNode *> &getLocInfos() { return LocInfos; }
   void setDiagnosticHandler(DiagHandlerTy DiagHandler) {
     this->DiagHandler = DiagHandler;

@@ -11,17 +11,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/Twine.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/Support/WithColor.h"
 #include "llvm/TableGen/Error.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/WithColor.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Record.h"
 #include <cstdlib>
 
 using namespace llvm;
 
-SourceMgr llvm::SrcMgr;
+SourceMgrWithIncludeSupport llvm::SrcMgr(vfs::getRealFileSystem());
 unsigned llvm::ErrorsPrinted = 0;
 
 static void PrintMessage(ArrayRef<SMLoc> Locs, SourceMgr::DiagKind Kind,

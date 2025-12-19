@@ -10,6 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TableGen/Parser.h"
 #include "llvm/TableGen/Record.h"
 #include "gmock/gmock.h"
@@ -25,7 +26,7 @@ TEST(Parser, SanityTest) {
     }
   )td";
 
-  SourceMgr SrcMgr;
+  SourceMgrWithIncludeSupport SrcMgr(vfs::getRealFileSystem());
   SrcMgr.AddNewSourceBuffer(
       MemoryBuffer::getMemBuffer(SimpleTdSource, "test_buffer"), SMLoc());
 

@@ -174,8 +174,8 @@ class TGParser {
   bool TrackReferenceLocs = false;
 
 public:
-  TGParser(SourceMgr &SM, ArrayRef<std::string> Macros, RecordKeeper &records,
-           const bool NoWarnOnUnusedTemplateArgs = false,
+  TGParser(SourceMgrWithIncludeSupport &SM, ArrayRef<std::string> Macros,
+           RecordKeeper &records, const bool NoWarnOnUnusedTemplateArgs = false,
            const bool TrackReferenceLocs = false)
       : Lex(SM, Macros), CurMultiClass(nullptr), Records(records),
         NoWarnOnUnusedTemplateArgs(NoWarnOnUnusedTemplateArgs),

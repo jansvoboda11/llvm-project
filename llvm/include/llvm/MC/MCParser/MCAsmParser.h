@@ -137,11 +137,12 @@ private:
   MCTargetAsmParser *TargetParser = nullptr;
 
 protected: // Can only create subclasses.
-  MCAsmParser(MCContext &, MCStreamer &, SourceMgr &, const MCAsmInfo &);
+  MCAsmParser(MCContext &, MCStreamer &, SourceMgrWithIncludeSupport &,
+              const MCAsmInfo &);
 
   MCContext &Ctx;
   MCStreamer &Out;
-  SourceMgr &SrcMgr;
+  SourceMgrWithIncludeSupport &SrcMgr;
   const MCAsmInfo &MAI;
   AsmLexer Lexer;
   SmallVector<MCPendingError, 0> PendingErrors;
@@ -163,7 +164,7 @@ public:
 
   MCContext &getContext() { return Ctx; }
   MCStreamer &getStreamer() { return Out; }
-  SourceMgr &getSourceManager() { return SrcMgr; }
+  SourceMgrWithIncludeSupport &getSourceManager() { return SrcMgr; }
   AsmLexer &getLexer() { return Lexer; }
   const AsmLexer &getLexer() const { return Lexer; }
 
@@ -339,11 +340,13 @@ public:
 };
 
 /// Create an MCAsmParser instance for parsing assembly similar to gas syntax
-LLVM_ABI MCAsmParser *createMCAsmParser(SourceMgr &, MCContext &, MCStreamer &,
+LLVM_ABI MCAsmParser *createMCAsmParser(SourceMgrWithIncludeSupport &,
+                                        MCContext &, MCStreamer &,
                                         const MCAsmInfo &, unsigned CB = 0);
 
 /// Create an MCAsmParser instance for parsing Microsoft MASM-style assembly
-LLVM_ABI MCAsmParser *createMCMasmParser(SourceMgr &, MCContext &, MCStreamer &,
+LLVM_ABI MCAsmParser *createMCMasmParser(SourceMgrWithIncludeSupport &,
+                                         MCContext &, MCStreamer &,
                                          const MCAsmInfo &, struct tm,
                                          unsigned CB = 0);
 

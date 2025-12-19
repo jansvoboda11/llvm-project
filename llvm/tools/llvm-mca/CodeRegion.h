@@ -148,7 +148,7 @@ class CodeRegions {
 
 protected:
   // A source manager. Used by the tool to generate meaningful warnings.
-  llvm::SourceMgr &SM;
+  llvm::SourceMgrWithIncludeSupport &SM;
 
   using UniqueCodeRegion = std::unique_ptr<CodeRegion>;
   std::vector<UniqueCodeRegion> Regions;
@@ -156,7 +156,8 @@ protected:
   bool FoundErrors;
 
 public:
-  CodeRegions(llvm::SourceMgr &S) : SM(S), FoundErrors(false) {}
+  CodeRegions(llvm::SourceMgrWithIncludeSupport &S)
+      : SM(S), FoundErrors(false) {}
   virtual ~CodeRegions() = default;
 
   typedef std::vector<UniqueCodeRegion>::iterator iterator;
@@ -168,7 +169,7 @@ public:
   const_iterator end() const { return Regions.cend(); }
 
   void addInstruction(const llvm::MCInst &Instruction);
-  llvm::SourceMgr &getSourceMgr() const { return SM; }
+  llvm::SourceMgrWithIncludeSupport &getSourceMgr() const { return SM; }
 
   llvm::ArrayRef<llvm::MCInst> getInstructionSequence(unsigned Idx) const {
     return Regions[Idx]->getInstructions();
@@ -193,7 +194,7 @@ public:
 };
 
 struct AnalysisRegions : public CodeRegions {
-  AnalysisRegions(llvm::SourceMgr &S);
+  AnalysisRegions(llvm::SourceMgrWithIncludeSupport &S);
 
   void beginRegion(llvm::StringRef Description, llvm::SMLoc Loc) override;
   void beginRegion(llvm::StringRef Description, llvm::SMLoc Loc,
@@ -203,7 +204,7 @@ struct AnalysisRegions : public CodeRegions {
 
 struct InstrumentRegions : public CodeRegions {
 
-  InstrumentRegions(llvm::SourceMgr &S);
+  InstrumentRegions(llvm::SourceMgrWithIncludeSupport &S);
 
   void beginRegion(llvm::StringRef Description, llvm::SMLoc Loc) override{};
   void beginRegion(llvm::StringRef Description, llvm::SMLoc Loc,

@@ -31,7 +31,8 @@ void CodeRegions::addInstruction(const MCInst &Instruction) {
       Region->addInstruction(Instruction);
 }
 
-AnalysisRegions::AnalysisRegions(llvm::SourceMgr &S) : CodeRegions(S) {
+AnalysisRegions::AnalysisRegions(llvm::SourceMgrWithIncludeSupport &S)
+    : CodeRegions(S) {
   // Create a default region for the input code sequence.
   Regions.emplace_back(std::make_unique<CodeRegion>("", SMLoc()));
 }
@@ -112,7 +113,8 @@ void AnalysisRegions::endRegion(StringRef Description, SMLoc Loc) {
   }
 }
 
-InstrumentRegions::InstrumentRegions(llvm::SourceMgr &S) : CodeRegions(S) {}
+InstrumentRegions::InstrumentRegions(llvm::SourceMgrWithIncludeSupport &S)
+    : CodeRegions(S) {}
 
 void InstrumentRegions::beginRegion(StringRef Description, SMLoc Loc,
                                     UniqueInstrument I) {

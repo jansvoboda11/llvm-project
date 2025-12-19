@@ -58,6 +58,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/TargetParser/Host.h"
 
@@ -446,7 +447,7 @@ int main(int argc, char **argv) {
       TheTarget->createMCAsmInfo(*MRI, TheTriple, MCOptions));
   assert(MAI && "Unable to create target asm info!");
 
-  SourceMgr SrcMgr;
+  SourceMgrWithIncludeSupport SrcMgr(vfs::getRealFileSystem());
 
   // Tell SrcMgr about this buffer, which is what the parser will pick up.
   SrcMgr.AddNewSourceBuffer(std::move(*BufferPtr), SMLoc());

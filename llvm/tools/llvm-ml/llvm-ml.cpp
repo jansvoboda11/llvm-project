@@ -128,8 +128,8 @@ static int AsLexInput(SourceMgr &SrcMgr, MCAsmInfo &MAI, raw_ostream &OS) {
 }
 
 static int AssembleInput(StringRef ProgName, const Target *TheTarget,
-                         SourceMgr &SrcMgr, MCContext &Ctx, MCStreamer &Str,
-                         MCAsmInfo &MAI, MCSubtargetInfo &STI,
+                         SourceMgrWithIncludeSupport &SrcMgr, MCContext &Ctx,
+                         MCStreamer &Str, MCAsmInfo &MAI, MCSubtargetInfo &STI,
                          MCInstrInfo &MCII, MCTargetOptions &MCOptions,
                          const opt::ArgList &InputArgs) {
   struct tm TM;
@@ -293,7 +293,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     return 1;
   }
 
-  SourceMgr SrcMgr;
+  SourceMgrWithIncludeSupport SrcMgr(vfs::getRealFileSystem());
 
   // Tell SrcMgr about this buffer, which is what the parser will pick up.
   SrcMgr.AddNewSourceBuffer(std::move(*BufferPtr), SMLoc());
@@ -314,7 +314,6 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     }
   }
   SrcMgr.setIncludeDirs(IncludeDirs);
-  SrcMgr.setVirtualFileSystem(vfs::getRealFileSystem());
 
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TheTriple));
   assert(MRI && "Unable to create target register info!");

@@ -565,7 +565,10 @@ StmtResult Parser::ParseMicrosoftAsmStatement(SourceLocation AsmLoc) {
     return EmptyStmt();
   }
 
-  llvm::SourceMgr TempSrcMgr;
+  llvm::SourceMgrWithIncludeSupport TempSrcMgr(getPreprocessor()
+                                                   .getSourceManager()
+                                                   .getFileManager()
+                                                   .getVirtualFileSystemPtr());
   llvm::MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &TempSrcMgr);
   std::unique_ptr<llvm::MCObjectFileInfo> MOFI(
       TheTarget->createMCObjectFileInfo(Ctx, /*PIC=*/false));

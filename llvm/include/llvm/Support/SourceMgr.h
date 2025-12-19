@@ -90,38 +90,19 @@ private:
   /// This is all of the buffers that we are reading from.
   std::vector<SrcBuffer> Buffers;
 
-  // This is the list of directories we should search for include files in.
-  std::vector<std::string> IncludeDirectories;
-
   DiagHandlerTy DiagHandler = nullptr;
   void *DiagContext = nullptr;
-
-  // Optional file system for finding include files.
-  IntrusiveRefCntPtr<vfs::FileSystem> FS;
 
   bool isValidBufferID(unsigned i) const { return i && i <= Buffers.size(); }
 
 public:
   /// Create new source manager without support for include files.
-  LLVM_ABI SourceMgr();
-  /// Create new source manager with the capability of finding include files
-  /// via the provided file system.
-  explicit SourceMgr(IntrusiveRefCntPtr<vfs::FileSystem> FS);
+  LLVM_ABI SourceMgr() = default;
   SourceMgr(const SourceMgr &) = delete;
   SourceMgr &operator=(const SourceMgr &) = delete;
-  SourceMgr(SourceMgr &&);
-  SourceMgr &operator=(SourceMgr &&);
-  LLVM_ABI ~SourceMgr();
-
-  IntrusiveRefCntPtr<vfs::FileSystem> getVirtualFileSystem() const;
-  LLVM_ABI void setVirtualFileSystem(IntrusiveRefCntPtr<vfs::FileSystem> FS);
-
-  /// Return the include directories of this source manager.
-  ArrayRef<std::string> getIncludeDirs() const { return IncludeDirectories; }
-
-  void setIncludeDirs(const std::vector<std::string> &Dirs) {
-    IncludeDirectories = Dirs;
-  }
+  SourceMgr(SourceMgr &&) = default;
+  SourceMgr &operator=(SourceMgr &&) = default;
+  LLVM_ABI ~SourceMgr() = default;
 
   /// Specify a diagnostic handler to be invoked every time PrintMessage is
   /// called. \p Ctx is passed into the handler when it is invoked.
@@ -181,26 +162,6 @@ public:
     SrcMgr.Buffers.clear();
     Buffers[OldNumBuffers].IncludeLoc = MainBufferIncludeLoc;
   }
-
-  /// Search for a file with the specified name in the current directory or in
-  /// one of the IncludeDirs.
-  ///
-  /// If no file is found, this returns 0, otherwise it returns the buffer ID
-  /// of the stacked file. The full path to the included file can be found in
-  /// \p IncludedFile.
-  LLVM_ABI unsigned AddIncludeFile(const std::string &Filename,
-                                   SMLoc IncludeLoc, std::string &IncludedFile);
-
-  /// Search for a file with the specified name in the current directory or in
-  /// one of the IncludeDirs, and try to open it **without** adding to the
-  /// SourceMgr. If the opened file is intended to be added to the source
-  /// manager, prefer `AddIncludeFile` instead.
-  ///
-  /// If no file is found, this returns an Error, otherwise it returns the
-  /// buffer of the stacked file. The full path to the included file can be
-  /// found in \p IncludedFile.
-  LLVM_ABI ErrorOr<std::unique_ptr<MemoryBuffer>>
-  OpenIncludeFile(const std::string &Filename, std::string &IncludedFile);
 
   /// Return the ID of the buffer containing the specified location.
   ///
@@ -266,6 +227,46 @@ public:
   /// \param IncludeLoc The location of the include.
   /// \param OS the raw_ostream to print on.
   LLVM_ABI void PrintIncludeStack(SMLoc IncludeLoc, raw_ostream &OS) const;
+};
+
+class SourceMgrWithIncludeSupport : public SourceMgr {
+  // Optional file system for finding include files.
+  IntrusiveRefCntPtr<vfs::FileSystem> FS;
+
+  // This is the list of directories we should search for include files in.
+  std::vector<std::string> IncludeDirectories;
+
+public:
+  /// Create new source manager with the capability of finding include files
+  /// via the provided file system.
+  explicit SourceMgrWithIncludeSupport(IntrusiveRefCntPtr<vfs::FileSystem> FS);
+
+  /// Return the include directories of this source manager.
+  ArrayRef<std::string> getIncludeDirs() const { return IncludeDirectories; }
+
+  void setIncludeDirs(const std::vector<std::string> &Dirs) {
+    IncludeDirectories = Dirs;
+  }
+
+  /// Search for a file with the specified name in the current directory or in
+  /// one of the IncludeDirs.
+  ///
+  /// If no file is found, this returns 0, otherwise it returns the buffer ID
+  /// of the stacked file. The full path to the included file can be found in
+  /// \p IncludedFile.
+  LLVM_ABI unsigned AddIncludeFile(const std::string &Filename,
+                                   SMLoc IncludeLoc, std::string &IncludedFile);
+
+  /// Search for a file with the specified name in the current directory or in
+  /// one of the IncludeDirs, and try to open it **without** adding to the
+  /// SourceMgr. If the opened file is intended to be added to the source
+  /// manager, prefer `AddIncludeFile` instead.
+  ///
+  /// If no file is found, this returns an Error, otherwise it returns the
+  /// buffer of the stacked file. The full path to the included file can be
+  /// found in \p IncludedFile.
+  LLVM_ABI ErrorOr<std::unique_ptr<MemoryBuffer>>
+  OpenIncludeFile(const std::string &Filename, std::string &IncludedFile);
 };
 
 /// Represents a single fixit, a replacement of one range of text with another.

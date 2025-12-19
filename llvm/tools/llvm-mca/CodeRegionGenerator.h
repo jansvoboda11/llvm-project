@@ -161,7 +161,8 @@ protected:
   AnalysisRegions Regions;
 
 public:
-  AnalysisRegionGenerator(llvm::SourceMgr &SM) : Regions(SM) {}
+  AnalysisRegionGenerator(llvm::SourceMgrWithIncludeSupport &SM)
+      : Regions(SM) {}
 
   virtual Expected<const AnalysisRegions &>
   parseAnalysisRegions(const std::unique_ptr<MCInstPrinter> &IP,
@@ -174,7 +175,8 @@ protected:
   InstrumentRegions Regions;
 
 public:
-  InstrumentRegionGenerator(llvm::SourceMgr &SM) : Regions(SM) {}
+  InstrumentRegionGenerator(llvm::SourceMgrWithIncludeSupport &SM)
+      : Regions(SM) {}
 
   virtual Expected<const InstrumentRegions &>
   parseInstrumentRegions(const std::unique_ptr<MCInstPrinter> &IP,
@@ -214,9 +216,10 @@ class AsmAnalysisRegionGenerator final : public AnalysisRegionGenerator,
   MCStreamerWrapper Streamer;
 
 public:
-  AsmAnalysisRegionGenerator(const Target &T, llvm::SourceMgr &SM, MCContext &C,
-                             const MCAsmInfo &A, const MCSubtargetInfo &S,
-                             const MCInstrInfo &I)
+  AsmAnalysisRegionGenerator(const Target &T,
+                             llvm::SourceMgrWithIncludeSupport &SM,
+                             MCContext &C, const MCAsmInfo &A,
+                             const MCSubtargetInfo &S, const MCInstrInfo &I)
       : AnalysisRegionGenerator(SM), AsmCodeRegionGenerator(T, C, A, S, I),
         CC(Regions), Streamer(Ctx, Regions) {}
 
@@ -248,7 +251,8 @@ class AsmInstrumentRegionGenerator final : public InstrumentRegionGenerator,
   InstrumentMCStreamer Streamer;
 
 public:
-  AsmInstrumentRegionGenerator(const Target &T, llvm::SourceMgr &SM,
+  AsmInstrumentRegionGenerator(const Target &T,
+                               llvm::SourceMgrWithIncludeSupport &SM,
                                MCContext &C, const MCAsmInfo &A,
                                const MCSubtargetInfo &S, const MCInstrInfo &I,
                                InstrumentManager &IM)

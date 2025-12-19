@@ -15,7 +15,7 @@
 
 namespace llvm {
 class RecordKeeper;
-class SourceMgr;
+class SourceMgrWithIncludeSupport;
 
 /// Parse the TableGen file defined within the main buffer of the given
 /// SourceMgr. On success, populates the provided RecordKeeper with the parsed
@@ -23,7 +23,8 @@ class SourceMgr;
 ///
 /// NOTE: TableGen currently relies on global state within a given parser
 ///       invocation, so this function is not thread-safe.
-bool TableGenParseFile(SourceMgr &InputSrcMgr, RecordKeeper &Records);
+bool TableGenParseFile(SourceMgrWithIncludeSupport &InputSrcMgr,
+                       RecordKeeper &Records);
 
 } // end namespace llvm
 

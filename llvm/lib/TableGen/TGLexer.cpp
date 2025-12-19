@@ -72,7 +72,8 @@ static const char *lexMacroName(StringRef Str) {
   return Next;
 }
 
-TGLexer::TGLexer(SourceMgr &SM, ArrayRef<std::string> Macros) : SrcMgr(SM) {
+TGLexer::TGLexer(SourceMgrWithIncludeSupport &SM, ArrayRef<std::string> Macros)
+    : SrcMgr(SM) {
   CurBuffer = SrcMgr.getMainFileID();
   CurBuf = SrcMgr.getMemoryBuffer(CurBuffer)->getBuffer();
   CurPtr = CurBuf.begin();

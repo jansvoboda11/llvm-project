@@ -511,7 +511,7 @@ TEST_F(SourceMgrTest, PrintWithoutLoc) {
 TEST_F(SourceMgrTest, IncludeDirs) {
   auto VFS = makeIntrusiveRefCnt<vfs::InMemoryFileSystem>();
   VFS->addFile("include/file", 0, MemoryBuffer::getMemBuffer("contents"));
-  SM.setVirtualFileSystem(std::move(VFS));
+  SourceMgrWithIncludeSupport SM(VFS);
   SM.setIncludeDirs({"include"});
   std::string ResolvedPath;
   unsigned NumBuffers = SM.AddIncludeFile("file", SMLoc(), ResolvedPath);

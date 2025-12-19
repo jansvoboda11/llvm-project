@@ -452,7 +452,7 @@ private:
   uint16_t LocalCounter = 0;
 
 public:
-  MasmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
+  MasmParser(SourceMgrWithIncludeSupport &SM, MCContext &Ctx, MCStreamer &Out,
              const MCAsmInfo &MAI, struct tm TM, unsigned CB = 0);
   MasmParser(const MasmParser &) = delete;
   MasmParser &operator=(const MasmParser &) = delete;
@@ -967,8 +967,9 @@ extern cl::opt<unsigned> AsmMacroMaxNestingDepth;
 
 enum { DEFAULT_ADDRSPACE = 0 };
 
-MasmParser::MasmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
-                       const MCAsmInfo &MAI, struct tm TM, unsigned CB)
+MasmParser::MasmParser(SourceMgrWithIncludeSupport &SM, MCContext &Ctx,
+                       MCStreamer &Out, const MCAsmInfo &MAI, struct tm TM,
+                       unsigned CB)
     : MCAsmParser(Ctx, Out, SM, MAI), CurBuffer(CB ? CB : SM.getMainFileID()),
       TM(TM) {
   HadError = false;
@@ -6262,8 +6263,9 @@ bool MasmParser::evaluateBuiltinMacroFunction(BuiltinFunction Function,
 }
 
 /// Create an MCAsmParser instance.
-MCAsmParser *llvm::createMCMasmParser(SourceMgr &SM, MCContext &C,
-                                      MCStreamer &Out, const MCAsmInfo &MAI,
-                                      struct tm TM, unsigned CB) {
+MCAsmParser *llvm::createMCMasmParser(SourceMgrWithIncludeSupport &SM,
+                                      MCContext &C, MCStreamer &Out,
+                                      const MCAsmInfo &MAI, struct tm TM,
+                                      unsigned CB) {
   return new MasmParser(SM, C, Out, MAI, TM, CB);
 }

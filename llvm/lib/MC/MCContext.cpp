@@ -44,10 +44,12 @@
 #include "llvm/MC/SectionKind.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstdlib>
@@ -127,7 +129,10 @@ MCContext::~MCContext() {
 
 void MCContext::initInlineSourceManager() {
   if (!InlineSrcMgr)
-    InlineSrcMgr.reset(new SourceMgr());
+    InlineSrcMgr.reset(new SourceMgrWithIncludeSupport([] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return vfs::getRealFileSystem();
+    }()));
 }
 
 //===----------------------------------------------------------------------===//

@@ -14,6 +14,7 @@
 #include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SMLoc.h"
+#include "llvm/Support/SourceMgr.h"
 
 namespace llvm {
 
