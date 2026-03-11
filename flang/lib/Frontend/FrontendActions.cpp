@@ -67,6 +67,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/RISCVISAInfo.h"
 #include "llvm/TargetParser/RISCVTargetParser.h"
@@ -191,7 +192,8 @@ bool CodeGenAction::beginSourceFileAction() {
   // If the input is an LLVM file, just parse it and return.
   if (this->getCurrentInput().getKind().getLanguage() == Language::LLVM_IR) {
     llvm::SMDiagnostic err;
-    llvmModule = llvm::parseIRFile(getCurrentInput().getFile(), err, *llvmCtx);
+    llvmModule = llvm::parseIRFile(getCurrentInput().getFile(), err, *llvmCtx,
+                                   *llvm::vfs::getRealFileSystem());
     if (!llvmModule || llvm::verifyModule(*llvmModule, &llvm::errs())) {
       err.print("flang", llvm::errs());
       unsigned diagID = ci.getDiagnostics().getCustomDiagID(

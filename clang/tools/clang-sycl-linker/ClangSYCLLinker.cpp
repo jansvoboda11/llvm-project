@@ -44,6 +44,7 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -325,7 +326,8 @@ static Error runCodeGen(StringRef File, const ArgList &Args,
 
   // Parse input module.
   SMDiagnostic Err;
-  std::unique_ptr<Module> M = parseIRFile(File, Err, C);
+  std::unique_ptr<Module> M = parseIRFile(File, Err, C,
+                                          *vfs::getRealFileSystem());
   if (!M)
     return createStringError(Err.getMessage());
 
