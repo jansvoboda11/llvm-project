@@ -294,7 +294,7 @@ static void setPGOOptions(TargetMachine &TM) {
 
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &,
                          LLVMContext &Context, std::string &OutputFilename,
-                         MemoryBuffer *StdinBuffer = nullptr);
+                         MemoryBufferRef Buffer);
 
 [[noreturn]] static void reportError(Twine Msg, StringRef Filename = "") {
   SmallString<256> Prefix;
@@ -382,6 +382,8 @@ int main(int argc, char **argv) {
   InitializeAllAsmPrinters();
   InitializeAllAsmParsers();
 
+  auto VFS = vfs::getRealFileSystem();
+
   // Initialize codegen and IR passes used by llc so that the -print-after,
   // -print-before, and -stop-after options work.
   PassRegistry *Registry = PassRegistry::getPassRegistry();
@@ -413,7 +415,8 @@ int main(int argc, char **argv) {
   // Register the target printer for --version.
   cl::AddExtraVersionPrinter(TargetRegistry::printRegisteredTargetsForVersion);
 
-  cl::ParseCommandLineOptions(argc, argv, "llvm system compiler\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm system compiler\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   if (!PassPipeline.empty() && !getRunPassNames().empty()) {
     errs() << "The `llc -run-pass=...` syntax for the new pass manager is "
@@ -458,20 +461,15 @@ int main(int argc, char **argv) {
 
   // Read stdin early before library code runs, as library code must not read
   // from stdin. Pass the buffer down to compileModule.
-  std::unique_ptr<MemoryBuffer> StdinBuffer;
-  if (InputFilename == "-") {
-    if (auto BufferOrErr = MemoryBuffer::getSTDIN())
-      StdinBuffer = std::move(*BufferOrErr);
-    else {
-      reportError(BufferOrErr.getError().message(), "-");
-    }
-  }
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = InputFilename == "-" ? MemoryBuffer::getSTDIN() : VFS->getBufferForFile(InputFilename);
+  if (!BufferOrErr)
+    reportError(BufferOrErr.getError().message(), "-");
 
   // Compile the module TimeCompilations times to give better compile time
   // metrics.
   for (unsigned I = TimeCompilations; I; --I)
     if (int RetVal = compileModule(argv, PluginList, Context, OutputFilename,
-                                   StdinBuffer.get()))
+                                   (*BufferOrErr)->getMemBufferRef()))
       return RetVal;
 
   if (RemarksFile)
@@ -511,7 +509,7 @@ static bool addPass(PassManagerBase &PM, const char *argv0, StringRef PassName,
 
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
                          LLVMContext &Context, std::string &OutputFilename,
-                         MemoryBuffer *StdinBuffer) {
+                         MemoryBufferRef Buffer) {
   // Load the module to be compiled...
   SMDiagnostic Err;
   std::unique_ptr<Module> M;
@@ -645,13 +643,7 @@ static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
       if (MIR)
         M = MIR->parseIRModule(SetDataLayout);
     } else {
-      if (StdinBuffer)
-        M = parseIR(StdinBuffer->getMemBufferRef(), Err, Context,
-                    ParserCallbacks(SetDataLayout));
-      else
-        M = parseIRFile(InputFilename, Err, Context,
-                        *vfs::getRealFileSystem(),
-                        ParserCallbacks(SetDataLayout));
+      M = parseIR(Buffer, Err, Context, ParserCallbacks(SetDataLayout));
     }
     if (!M) {
       Err.print(argv[0], WithColor::error(errs(), argv[0]));

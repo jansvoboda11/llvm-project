@@ -141,7 +141,10 @@ public:
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
-  cl::ParseCommandLineOptions(argc, argv, "llvm ub-aware interpreter\n");
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "llvm ub-aware interpreter\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   if (EntryFunc.empty()) {
     WithColor::error() << "--entry-function name cannot be empty\n";
@@ -152,18 +155,17 @@ int main(int argc, char **argv) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner;
-  if (InputFile == "-") {
-    auto BufferOrErr = MemoryBuffer::getSTDIN();
-    if (!BufferOrErr) {
-      errs() << argv[0] << ": error reading stdin: "
-             << BufferOrErr.getError().message() << "\n";
-      return 1;
-    }
-    Owner = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
-  } else {
-    Owner = parseIRFile(InputFile, Err, Context, *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> BufferOrErr =
+    InputFile == "-" ? MemoryBuffer::getSTDIN()
+                     : VFS->getBufferForFile(InputFile);
+  if (!BufferOrErr) {
+    errs() << argv[0] << ": error reading stdin: "
+            << BufferOrErr.getError().message() << "\n";
+    exit(1);
   }
+  std::unique_ptr<Module> Owner =
+      parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
+  Module *Mod = Owner.get();
   Module *Mod = Owner.get();
   if (!Mod) {
     Err.print(argv[0], errs());

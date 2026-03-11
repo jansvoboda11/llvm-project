@@ -56,11 +56,10 @@ llvm::getLazyIRModule(std::unique_ptr<MemoryBuffer> Buffer, SMDiagnostic &Err,
 std::unique_ptr<Module> llvm::getLazyIRFileModule(StringRef Filename,
                                                   SMDiagnostic &Err,
                                                   LLVMContext &Context,
-                                                  bool ShouldLazyLoadMetadata,
-                                                  vfs::FileSystem *FS) {
+                                                  vfs::FileSystem &FS,
+                                                  bool ShouldLazyLoadMetadata) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      FS ? FS->getBufferForFile(Filename)
-         : MemoryBuffer::getFileOrSTDIN(Filename);
+      FS.getBufferForFile(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
@@ -104,9 +103,7 @@ std::unique_ptr<Module> llvm::parseIRFile(StringRef Filename, SMDiagnostic &Err,
                                           ParserCallbacks Callbacks,
                                           AsmParserContext *ParserContext) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      FS.getBufferForFile(Filename, /*FileSize=*/-1,
-                          /*RequiresNullTerminator=*/true,
-                          /*IsVolatile=*/false, /*IsText=*/true);
+      FS.getBufferForFile(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());

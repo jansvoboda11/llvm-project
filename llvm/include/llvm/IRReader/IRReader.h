@@ -49,8 +49,8 @@ getLazyIRModule(std::unique_ptr<MemoryBuffer> Buffer, SMDiagnostic &Err,
 /// reader to optionally enable lazy metadata loading.
 LLVM_ABI std::unique_ptr<Module>
 getLazyIRFileModule(StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-                    bool ShouldLazyLoadMetadata = false,
-                    vfs::FileSystem *FS = nullptr);/// If the given MemoryBuffer holds a bitcode image, return a Module
+                    vfs::FileSystem &FS, bool ShouldLazyLoadMetadata = false);
+/// If the given MemoryBuffer holds a bitcode image, return a Module
 /// for it.  Otherwise, attempt to parse it as LLVM Assembly and return
 /// a Module for it.
 /// \param DataLayoutCallback Override datalayout in the llvm assembly.

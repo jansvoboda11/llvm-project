@@ -428,8 +428,11 @@ int main(int argc, char **argv, char * const *envp) {
   InitializeNativeTargetAsmPrinter();
   InitializeNativeTargetAsmParser();
 
+  auto VFS = vfs::getRealFileSystem();
+
   cl::ParseCommandLineOptions(argc, argv,
-                              "llvm interpreter & dynamic compiler\n");
+                              "llvm interpreter & dynamic compiler\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   // If the user doesn't want core files, disable them.
   if (DisableCoreFiles)
@@ -453,18 +456,16 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner;
-  if (InputFile == "-") {
-    auto BufferOrErr = MemoryBuffer::getSTDIN();
-    if (!BufferOrErr) {
-      errs() << argv[0] << ": error reading stdin: "
-             << BufferOrErr.getError().message() << "\n";
-      exit(1);
-    }
-    Owner = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
-  } else {
-    Owner = parseIRFile(InputFile, Err, Context, *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> BufferOrErr =
+      InputFile == "-" ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(InputFile);
+  if (!BufferOrErr) {
+    errs() << argv[0] << ": error reading stdin: "
+            << BufferOrErr.getError().message() << "\n";
+    exit(1);
   }
+  std::unique_ptr<Module> Owner =
+      parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
   Module *Mod = Owner.get();
   if (!Mod)
     reportError(Err, argv[0]);

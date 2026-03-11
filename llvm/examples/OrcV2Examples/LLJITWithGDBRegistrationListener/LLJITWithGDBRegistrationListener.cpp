@@ -48,7 +48,10 @@ int main(int argc, char *argv[]) {
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
 
-  cl::ParseCommandLineOptions(argc, argv, "LLJITWithGDBRegistrationListener");
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "LLJITWithGDBRegistrationListener",
+                              /*Errs=*/nullptr, VFS.get());
   ExitOnErr.setBanner(std::string(argv[0]) + ": ");
 
   // Detect the host and set code model to small.
@@ -85,8 +88,7 @@ int main(int argc, char *argv[]) {
   for (auto &InputFile : InputFiles) {
     auto Ctx = std::make_unique<LLVMContext>();
     SMDiagnostic Err;
-    std::unique_ptr<Module> M = parseIRFile(InputFile, Err, *Ctx,
-                                             *vfs::getRealFileSystem());
+    std::unique_ptr<Module> M = parseIRFile(InputFile, Err, *Ctx, *VFS);
     if (!M) {
       Err.print(argv[0], errs());
       return 1;

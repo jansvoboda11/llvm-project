@@ -49,8 +49,10 @@ static cl::list<std::string> InputFilenames(cl::Positional,
                                             cl::cat(CatCategory));
 
 int main(int argc, char **argv) {
+  auto VFS = vfs::getRealFileSystem();
   cl::HideUnrelatedOptions(CatCategory);
-  cl::ParseCommandLineOptions(argc, argv, "Module concatenation");
+  cl::ParseCommandLineOptions(argc, argv, "Module concatenation",
+                              /*Errs=*/nullptr, VFS.get());
 
   ExitOnError ExitOnErr("llvm-cat: ");
   LLVMContext Context;
@@ -59,8 +61,10 @@ int main(int argc, char **argv) {
   BitcodeWriter Writer(Buffer);
   if (BinaryCat) {
     for (const auto &InputFilename : InputFilenames) {
-      std::unique_ptr<MemoryBuffer> MB = ExitOnErr(
-          errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
+      ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+          InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                               : VFS->getBufferForFile(InputFilename);
+      auto MB = ExitOnErr(errorOrToExpected(std::move(BufferOrErr)));
       std::vector<BitcodeModule> Mods = ExitOnErr(getBitcodeModuleList(*MB));
       for (auto &BitcodeMod : Mods) {
         llvm::append_range(Buffer, BitcodeMod.getBuffer());
@@ -73,8 +77,11 @@ int main(int argc, char **argv) {
     std::vector<std::unique_ptr<Module>> OwnedMods;
     for (const auto &InputFilename : InputFilenames) {
       SMDiagnostic Err;
-      std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
-                                              *vfs::getRealFileSystem());
+      ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+          InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                               : VFS->getBufferForFile(InputFilename);
+      auto MB = ExitOnErr(errorOrToExpected(std::move(BufferOrErr)));
+      std::unique_ptr<Module> M = parseIR(MB->getMemBufferRef(), Err, Context);
       if (!M) {
         Err.print(argv[0], errs());
         return 1;

@@ -57,9 +57,10 @@ inline llvm::Expected<llvm::orc::ThreadSafeModule>
 parseExampleModuleFromFile(llvm::StringRef FileName) {
   using namespace llvm;
   auto Ctx = std::make_unique<LLVMContext>();
+  auto VFS = vfs::getRealFileSystem();
   SMDiagnostic Err;
 
-  if (auto M = parseIRFile(FileName, Err, *Ctx, *vfs::getRealFileSystem()))
+  if (auto M = parseIRFile(FileName, Err, *Ctx, *VFS))
     return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
 
   return createSMDiagnosticError(Err);

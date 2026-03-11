@@ -193,7 +193,7 @@ bool CodeGenAction::beginSourceFileAction() {
   if (this->getCurrentInput().getKind().getLanguage() == Language::LLVM_IR) {
     llvm::SMDiagnostic err;
     llvmModule = llvm::parseIRFile(getCurrentInput().getFile(), err, *llvmCtx,
-                                   *llvm::vfs::getRealFileSystem());
+                                   ci.getVirtualFileSystem());
     if (!llvmModule || llvm::verifyModule(*llvmModule, &llvm::errs())) {
       err.print("flang", llvm::errs());
       unsigned diagID = ci.getDiagnostics().getCustomDiagID(

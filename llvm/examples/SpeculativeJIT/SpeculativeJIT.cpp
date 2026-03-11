@@ -156,7 +156,10 @@ int main(int argc, char *argv[]) {
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
 
-  cl::ParseCommandLineOptions(argc, argv, "SpeculativeJIT");
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "SpeculativeJIT", /*Errs=*/nullptr,
+                              VFS.get());
   ExitOnErr.setBanner(std::string(argv[0]) + ": ");
 
   if (NumThreads < 1) {
@@ -172,7 +175,7 @@ int main(int argc, char *argv[]) {
   for (const auto &InputFile : InputFiles) {
     SMDiagnostic Err;
     auto Ctx = std::make_unique<LLVMContext>();
-    auto M = parseIRFile(InputFile, Err, *Ctx, *vfs::getRealFileSystem());
+    auto M = parseIRFile(InputFile, Err, *Ctx, *VFS);
     if (!M) {
       Err.print(argv[0], errs());
       return 1;
