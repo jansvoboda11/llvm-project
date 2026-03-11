@@ -360,7 +360,7 @@ bool llvm::runPassPipeline(
     OutputKind OK, VerifierKind VK, bool ShouldPreserveAssemblyUseListOrder,
     bool ShouldPreserveBitcodeUseListOrder, bool EmitSummaryIndex,
     bool EmitModuleHash, bool EnableDebugify, bool VerifyDIPreserve,
-    bool EnableProfcheck, bool UnifiedLTO) {
+    bool EnableProfcheck, bool UnifiedLTO, vfs::FileSystem *FS) {
   std::optional<PGOOptions> P;
   switch (PGOKindFlag) {
   case InstrGen:
@@ -459,7 +459,7 @@ bool llvm::runPassPipeline(
   PTO.LoopUnrolling = !DisableLoopUnrolling;
   PTO.UnifiedLTO = UnifiedLTO;
   PTO.LoopFusion = EnableLoopFusion;
-  PassBuilder PB(TM, PTO, P, &PIC);
+  PassBuilder PB(TM, PTO, P, &PIC, FS);
   registerEPCallbacks(PB);
 
   // For any loaded plugins, let them register pass builder callbacks.

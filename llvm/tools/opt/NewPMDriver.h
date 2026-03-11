@@ -31,6 +31,10 @@ class TargetMachine;
 class ToolOutputFile;
 class TargetLibraryInfoImpl;
 
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+
 extern cl::opt<bool> DebugifyEach;
 extern cl::opt<std::string> DebugifyExport;
 
@@ -75,7 +79,8 @@ bool runPassPipeline(
     bool ShouldPreserveAssemblyUseListOrder,
     bool ShouldPreserveBitcodeUseListOrder, bool EmitSummaryIndex,
     bool EmitModuleHash, bool EnableDebugify, bool VerifyDIPreserve,
-    bool EnableProfcheck, bool UnifiedLTO = false);
+    bool EnableProfcheck, bool UnifiedLTO = false,
+    vfs::FileSystem *FS = nullptr);
 } // namespace llvm
 
 #endif

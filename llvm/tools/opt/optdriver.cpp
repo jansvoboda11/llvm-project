@@ -59,6 +59,8 @@
 #include "llvm/Transforms/IPO/WholeProgramDevirt.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Debugify.h"
+#include "llvm/Support/IOSandbox.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
 #include <memory>
 #include <optional>
@@ -401,6 +403,10 @@ optMain(int argc, char **argv,
         ArrayRef<std::function<void(PassBuilder &)>> PassBuilderCallbacks) {
   InitLLVM X(argc, argv);
 
+  // Create the VFS before enabling the sandbox — the sandbox prohibits
+  // calling getRealFileSystem() directly.
+  IntrusiveRefCntPtr<vfs::FileSystem> VFS = vfs::getRealFileSystem();
+
   // Enable debug stream buffering.
   EnableDebugBuffering = true;
 
@@ -457,7 +463,23 @@ optMain(int argc, char **argv,
   cl::AddExtraVersionPrinter(sys::printDefaultTargetAndDetectedCPU);
 
   cl::ParseCommandLineOptions(
-      argc, argv, "llvm .bc -> .bc modular optimizer and analysis printer\n");
+      argc, argv, "llvm .bc -> .bc modular optimizer and analysis printer\n",
+      /*Errs=*/nullptr, VFS.get());
+
+  // If the input is stdin, read it now before enabling the IO sandbox.
+  // Library code is not supposed to read from stdin; the tool owns that.
+  std::unique_ptr<MemoryBuffer> StdinBuffer;
+  if (InputFilename == "-") {
+    if (auto BufferOrErr = MemoryBuffer::getSTDIN())
+      StdinBuffer = std::move(*BufferOrErr);
+    else {
+      errs() << argv[0] << ": could not read stdin: "
+             << BufferOrErr.getError().message() << "\n";
+      return 1;
+    }
+  }
+
+  auto EnableSandbox = llvm::sys::sandbox::scopedEnable();
 
   LLVMContext Context;
 
@@ -544,13 +566,16 @@ optMain(int argc, char **argv,
     return Str;
   };
   std::unique_ptr<Module> M;
-  if (NoUpgradeDebugInfo)
+  if (StdinBuffer)
+    M = parseIR(StdinBuffer->getMemBufferRef(), Err, Context,
+                ParserCallbacks(SetDataLayout));
+  else if (NoUpgradeDebugInfo)
     M = parseAssemblyFileWithIndexNoUpgradeDebugInfo(
             InputFilename, Err, Context, nullptr, SetDataLayout)
             .Mod;
   else
     M = parseIRFile(InputFilename, Err, Context,
-                    ParserCallbacks(SetDataLayout));
+                    *VFS, ParserCallbacks(SetDataLayout));
 
   if (!M) {
     Err.print(argv[0], errs());
@@ -754,7 +779,7 @@ optMain(int argc, char **argv,
             VK, /* ShouldPreserveAssemblyUseListOrder */ false,
             /* ShouldPreserveBitcodeUseListOrder */ true, EmitSummaryIndex,
             EmitModuleHash, EnableDebugify, VerifyDebugInfoPreserve,
-            EnableProfileVerification, UnifiedLTO))
+            EnableProfileVerification, UnifiedLTO, VFS.get()))
       return 1;
     return codegen::MaybeSaveStatistics(OutputFilename, "opt");
   }
