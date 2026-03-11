@@ -208,10 +208,13 @@ Expected<SmallVector<std::string>> getInput(const ArgList &Args) {
 /// are LLVM IR bitcode files.
 // TODO: Support SPIR-V IR files.
 Expected<std::unique_ptr<Module>> getBitcodeModule(StringRef File,
-                                                   LLVMContext &C) {
+                                                   LLVMContext &C,
+                                                   vfs::FileSystem &VFS) {
   SMDiagnostic Err;
-
-  auto M = getLazyIRFileModule(File, Err, C);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = VFS.getBufferForFile(File);
+  if (!BufferOrErr)
+    return createStringError(BufferOrErr.getError().message());
+  auto M = getLazyIRModule(std::move(*BufferOrErr), Err, C);
   if (M)
     return std::move(M);
   return createStringError(Err.getMessage());
@@ -251,7 +254,8 @@ Expected<SmallVector<std::string>> getSYCLDeviceLibs(const ArgList &Args) {
 /// 3. Link all the images gathered in Step 2 with the output of Step 1 using
 /// linkInModule API. LinkOnlyNeeded flag is used.
 Expected<StringRef> linkDeviceCode(ArrayRef<std::string> InputFiles,
-                                   const ArgList &Args, LLVMContext &C) {
+                                   const ArgList &Args, LLVMContext &C,
+                                   vfs::FileSystem &VFS) {
   llvm::TimeTraceScope TimeScope("SYCL link device code");
 
   assert(InputFiles.size() && "No inputs to link");
@@ -260,7 +264,7 @@ Expected<StringRef> linkDeviceCode(ArrayRef<std::string> InputFiles,
   Linker L(*LinkerOutput);
   // Link SYCL device input files.
   for (auto &File : InputFiles) {
-    auto ModOrErr = getBitcodeModule(File, C);
+    auto ModOrErr = getBitcodeModule(File, C, VFS);
     if (!ModOrErr)
       return ModOrErr.takeError();
     if (L.linkInModule(std::move(*ModOrErr)))
@@ -275,7 +279,7 @@ Expected<StringRef> linkDeviceCode(ArrayRef<std::string> InputFiles,
   // Link in SYCL device library files.
   const llvm::Triple Triple(Args.getLastArgValue(OPT_triple_EQ));
   for (auto &File : *SYCLDeviceLibFiles) {
-    auto LibMod = getBitcodeModule(File, C);
+    auto LibMod = getBitcodeModule(File, C, VFS);
     if (!LibMod)
       return LibMod.takeError();
     if ((*LibMod)->getTargetTriple() == Triple) {
@@ -321,13 +325,16 @@ Expected<StringRef> linkDeviceCode(ArrayRef<std::string> InputFiles,
 /// \param 'OutputFile' The output file name.
 /// \param 'C' The LLVM context.
 static Error runCodeGen(StringRef File, const ArgList &Args,
-                        StringRef OutputFile, LLVMContext &C) {
+                        StringRef OutputFile, LLVMContext &C,
+                        vfs::FileSystem &VFS) {
   llvm::TimeTraceScope TimeScope("Code generation");
 
   // Parse input module.
   SMDiagnostic Err;
-  std::unique_ptr<Module> M = parseIRFile(File, Err, C,
-                                          *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = VFS.getBufferForFile(File);
+  if (!BufferOrErr)
+    return createStringError(BufferOrErr.getError().message());
+  std::unique_ptr<Module> M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, C);
   if (!M)
     return createStringError(Err.getMessage());
 
@@ -467,13 +474,14 @@ static Error runAOTCompile(StringRef InputFile, StringRef OutputFile,
 /// Performs the following steps:
 /// 1. Link input device code (user code and SYCL device library code).
 /// 2. Run SPIR-V code generation.
-Error runSYCLLink(ArrayRef<std::string> Files, const ArgList &Args) {
+Error runSYCLLink(ArrayRef<std::string> Files, const ArgList &Args,
+                  vfs::FileSystem &VFS) {
   llvm::TimeTraceScope TimeScope("SYCL device linking");
 
   LLVMContext C;
 
   // Link all input bitcode files and SYCL device library files, if any.
-  auto LinkedFile = linkDeviceCode(Files, Args, C);
+  auto LinkedFile = linkDeviceCode(Files, Args, C, VFS);
   if (!LinkedFile)
     return LinkedFile.takeError();
 
@@ -488,7 +496,7 @@ Error runSYCLLink(ArrayRef<std::string> Files, const ArgList &Args) {
   SmallVector<SmallString<0>> SymbolTable;
   for (size_t I = 0, E = SplitModules.size(); I != E; ++I) {
     Expected<std::unique_ptr<Module>> ModOrErr =
-        getBitcodeModule(SplitModules[I], C);
+        getBitcodeModule(SplitModules[I], C, VFS);
     if (!ModOrErr)
       return ModOrErr.takeError();
 
@@ -510,7 +518,7 @@ Error runSYCLLink(ArrayRef<std::string> Files, const ArgList &Args) {
   for (size_t I = 0, E = SplitModules.size(); I != E; ++I) {
     StringRef Stem = OutputFile.rsplit('.').first;
     std::string SPVFile = (Stem + "_" + Twine(I) + ".spv").str();
-    if (Error Err = runCodeGen(SplitModules[I], Args, SPVFile, C))
+    if (Error Err = runCodeGen(SplitModules[I], Args, SPVFile, C, VFS))
       return Err;
     if (!IsAOTCompileNeeded) {
       SplitModules[I] = SPVFile;
@@ -567,6 +575,8 @@ int main(int argc, char **argv) {
   InitializeAllAsmParsers();
   InitializeAllAsmPrinters();
 
+  auto VFS = vfs::getRealFileSystem();
+
   Executable = argv[0];
   sys::PrintStackTraceOnErrorSignal(argv[0]);
 
@@ -619,7 +629,7 @@ int main(int argc, char **argv) {
     reportError(FilesOrErr.takeError());
 
   // Run SYCL linking process on the generated inputs.
-  if (Error Err = runSYCLLink(*FilesOrErr, Args))
+  if (Error Err = runSYCLLink(*FilesOrErr, Args, *VFS))
     reportError(std::move(Err));
 
   // Remove the temporary files created.

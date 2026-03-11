@@ -553,25 +553,25 @@ int main(int argc, char **argv) {
   EnableDebugBuffering = true;
 
   cl::HideUnrelatedOptions(Cat);
+
+  auto VFS = vfs::getRealFileSystem();
+
   cl::ParseCommandLineOptions(argc, argv,
-                              "llvm tool to verify use-list order\n");
+                              "llvm tool to verify use-list order\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   LLVMContext Context;
   SMDiagnostic Err;
 
   // Load the input module...
-  std::unique_ptr<Module> M;
-  if (InputFilename == "-") {
-    auto BufferOrErr = MemoryBuffer::getSTDIN();
-    if (!BufferOrErr) {
-      errs() << argv[0] << ": error reading stdin: "
-             << BufferOrErr.getError().message() << "\n";
-      return 1;
-    }
-    M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
-  } else {
-    M = parseIRFile(InputFilename, Err, Context, *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename);
+  if (!BufferOrErr) {
+    errs() << argv[0] << ": " << BufferOrErr.getError().message() << "\n";
+    return 1;
   }
+  std::unique_ptr<Module> M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
 
   if (!M) {
     Err.print(argv[0], errs());

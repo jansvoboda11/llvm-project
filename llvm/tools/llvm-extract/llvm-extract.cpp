@@ -30,6 +30,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/BlockExtractor.h"
 #include "llvm/Transforms/IPO/ExtractGV.h"
@@ -132,13 +133,17 @@ static cl::opt<bool> OutputAssembly("S",
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
+  auto VFS = vfs::getRealFileSystem();
+
   LLVMContext Context;
   cl::HideUnrelatedOptions(ExtractCat);
-  cl::ParseCommandLineOptions(argc, argv, "llvm extractor\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm extractor\n", /*Errs=*/nullptr,
+                              VFS.get());
 
   // Use lazy loading, since we only care about selected global values.
   SMDiagnostic Err;
-  std::unique_ptr<Module> M = getLazyIRFileModule(InputFilename, Err, Context);
+  std::unique_ptr<Module> M =
+      getLazyIRFileModule(InputFilename, Err, Context, *VFS);
 
   if (!M) {
     Err.print(argv[0], errs());

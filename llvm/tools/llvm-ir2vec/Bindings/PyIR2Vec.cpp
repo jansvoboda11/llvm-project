@@ -31,7 +31,14 @@ namespace {
 std::unique_ptr<Module> getLLVMIR(const std::string &Filename,
                                   LLVMContext &Context) {
   SMDiagnostic Err;
-  auto M = parseIRFile(Filename, Err, Context, *vfs::getRealFileSystem());
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      VFS->getBufferForFile(Filename);
+  if (!BufferOrErr)
+    throw nb::value_error(("Failed to open IR file '" + Filename +
+                           "': " + BufferOrErr.getError().message())
+                              .c_str());
+  auto M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
   if (!M)
     throw nb::value_error(("Failed to parse IR file '" + Filename +
                            "': " + Err.getMessage().str())

@@ -74,6 +74,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -346,6 +347,9 @@ int main(int argc, char **argv) {
   // Show Common, IR2Vec and MIR2Vec option categories
   cl::HideUnrelatedOptions(ArrayRef<const cl::OptionCategory *>{
       &CommonCategory, &ir2vec::IR2VecCategory, &mir2vec::MIR2VecCategory});
+
+  auto VFS = vfs::getRealFileSystem();
+
   cl::ParseCommandLineOptions(
       argc, argv,
       "IR2Vec/MIR2Vec - Embedding Generation Tool\n"
@@ -353,7 +357,8 @@ int main(int argc, char **argv) {
       "supports triplet generation for vocabulary "
       "training and embedding generation.\n\n"
       "See https://llvm.org/docs/CommandGuide/llvm-ir2vec.html for more "
-      "information.\n");
+      "information.\n",
+      /*Errs=*/nullptr, VFS.get());
 
   std::error_code EC;
   raw_fd_ostream OS(OutputFilename, EC);
@@ -373,8 +378,14 @@ int main(int argc, char **argv) {
     // Parse the input LLVM IR file or stdin
     SMDiagnostic Err;
     LLVMContext Context;
-    std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
-                                            *vfs::getRealFileSystem());
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+        InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                             : VFS->getBufferForFile(InputFilename);
+    if (!BufferOrErr) {
+      WithColor::error(errs(), ToolName) << BufferOrErr.getError().message() << "\n";
+      return 1;
+    }
+    std::unique_ptr<Module> M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
     if (!M) {
       Err.print(ToolName, errs());
       return 1;

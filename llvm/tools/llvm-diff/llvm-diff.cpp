@@ -30,10 +30,15 @@ using namespace llvm;
 /// Reads a module from a file.  On error, messages are written to stderr
 /// and null is returned.
 static std::unique_ptr<Module> readModule(LLVMContext &Context,
+                                          vfs::FileSystem &FS,
                                           StringRef Name) {
   SMDiagnostic Diag;
-  std::unique_ptr<Module> M = parseIRFile(Name, Diag, Context,
-                                          *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = FS.getBufferForFile(Name);
+  if (!BufferOrErr) {
+    Diag.print("llvm-diff", errs());
+    return nullptr;
+  }
+  std::unique_ptr<Module> M = parseIR((*BufferOrErr)->getMemBufferRef(), Diag, Context);
   if (!M)
     Diag.print("llvm-diff", errs());
   return M;
@@ -70,13 +75,17 @@ static cl::list<std::string> GlobalsToCompare(cl::Positional,
 
 int main(int argc, char **argv) {
   cl::HideUnrelatedOptions({&DiffCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv);
+
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, /*Overview=*/"",
+                              /*Errs=*/nullptr, VFS.get());
 
   LLVMContext Context;
 
   // Load both modules.  Die if that fails.
-  std::unique_ptr<Module> LModule = readModule(Context, LeftFilename);
-  std::unique_ptr<Module> RModule = readModule(Context, RightFilename);
+  std::unique_ptr<Module> LModule = readModule(Context, *VFS, LeftFilename);
+  std::unique_ptr<Module> RModule = readModule(Context, *VFS, RightFilename);
   if (!LModule || !RModule) return 1;
 
   DiffConsumer Consumer;

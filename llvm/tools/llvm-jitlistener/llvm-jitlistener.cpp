@@ -142,7 +142,7 @@ unsigned int GetNewMethodID(void) {
 
 class JitEventListenerTest {
 protected:
-  void InitEE(const std::string &IRFile) {
+  void InitEE(const std::string &IRFile, vfs::FileSystem &VFS) {
     // If we have a native target, initialize it to ensure it is linked in and
     // usable by the JIT.
     InitializeNativeTarget();
@@ -150,8 +150,14 @@ protected:
 
     // Parse the bitcode...
     SMDiagnostic Err;
-    std::unique_ptr<Module> TheModule(parseIRFile(IRFile, Err, Context,
-                                                  *vfs::getRealFileSystem()));
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+        VFS.getBufferForFile(IRFile);
+    if (!BufferOrErr) {
+      errs() << BufferOrErr.getError().message();
+      return;
+    }
+    std::unique_ptr<Module> TheModule(
+        parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context));
     if (!TheModule) {
       errs() << Err.getMessage();
       return;
@@ -192,8 +198,8 @@ protected:
   std::unique_ptr<ExecutionEngine> TheJIT;
 
 public:
-  void ProcessInput(const std::string &Filename) {
-    InitEE(Filename);
+  void ProcessInput(const std::string &Filename, vfs::FileSystem &VFS) {
+    InitEE(Filename, VFS);
 
     std::unique_ptr<llvm::JITEventListener> Listener(
         JITEventListener::createIntelJITEventListener(new IntelJITEventsWrapper(
@@ -219,9 +225,13 @@ InputFilename(cl::Positional, cl::desc("<input IR file>"),
 
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "llvm jit event listener test utility\n");
+
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "llvm jit event listener test utility\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   JitEventListenerTest Test;
-  Test.ProcessInput(InputFilename);
+  Test.ProcessInput(InputFilename, *VFS);
   return 0;
 }

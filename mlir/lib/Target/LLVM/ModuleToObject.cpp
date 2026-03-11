@@ -27,6 +27,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/Internalize.h"
@@ -76,7 +77,8 @@ std::unique_ptr<llvm::Module>
 ModuleToObject::loadBitcodeFile(llvm::LLVMContext &context, StringRef path) {
   llvm::SMDiagnostic error;
   std::unique_ptr<llvm::Module> library =
-      llvm::getLazyIRFileModule(path, error, context);
+      llvm::getLazyIRFileModule(path, error, context,
+                                *llvm::vfs::getRealFileSystem());
   if (!library) {
     getOperation().emitError() << "Failed loading file from " << path
                                << ", error: " << error.getMessage();

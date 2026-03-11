@@ -109,12 +109,22 @@ exportToFile(const StringRef FilePath,
 int main(int argc, const char *argv[]) {
   InitLLVM X(argc, argv);
 
-  cl::ParseCommandLineOptions(argc, argv, "LLVM IR Similarity Visualizer\n");
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "LLVM IR Similarity Visualizer\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   LLVMContext CurrContext;
   SMDiagnostic Err;
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      InputSourceFile == "-" ? MemoryBuffer::getSTDIN()
+                             : VFS->getBufferForFile(InputSourceFile);
+  if (!BufferOrErr) {
+    errs() << argv[0] << ": " << BufferOrErr.getError().message() << "\n";
+    return 1;
+  }
   std::unique_ptr<Module> ModuleToAnalyze =
-      parseIRFile(InputSourceFile, Err, CurrContext, *vfs::getRealFileSystem());
+      parseIR((*BufferOrErr)->getMemBufferRef(), Err, CurrContext);
 
   if (!ModuleToAnalyze) {
     Err.print(argv[0], errs());

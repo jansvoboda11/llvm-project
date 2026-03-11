@@ -40,6 +40,7 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/Internalize.h"
@@ -198,6 +199,7 @@ static std::unique_ptr<Module> loadFile(const std::string &FileName,
   // the memory overhead.
   std::unique_ptr<Module> Result =
       getLazyIRFileModule(FileName, Err, Context,
+                          *vfs::getRealFileSystem(),
                           /* ShouldLazyLoadMetadata = */ true);
   if (!Result) {
     Err.print("function-import", errs());

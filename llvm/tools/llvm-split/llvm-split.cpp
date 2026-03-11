@@ -241,7 +241,11 @@ int main(int argc, char **argv) {
   LLVMContext Context;
   SMDiagnostic Err;
   cl::HideUnrelatedOptions({&SplitCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "LLVM module splitter\n");
+
+  auto VFS = vfs::getRealFileSystem();
+
+  cl::ParseCommandLineOptions(argc, argv, "LLVM module splitter\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   Triple TT(MTriple);
 
@@ -262,18 +266,14 @@ int main(int argc, char **argv) {
         TT, MCPU, /*FS*/ "", Options, std::nullopt, std::nullopt));
   }
 
-  std::unique_ptr<Module> M;
-  if (InputFilename == "-") {
-    auto BufferOrErr = MemoryBuffer::getSTDIN();
-    if (!BufferOrErr) {
-      errs() << argv[0] << ": error reading stdin: "
-             << BufferOrErr.getError().message() << "\n";
-      return 1;
-    }
-    M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
-  } else {
-    M = parseIRFile(InputFilename, Err, Context, *vfs::getRealFileSystem());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename);
+  if (!BufferOrErr) {
+    errs() << argv[0] << ": " << BufferOrErr.getError().message() << "\n";
+    return 1;
   }
+  std::unique_ptr<Module> M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
 
   if (!M) {
     Err.print(argv[0], errs());
