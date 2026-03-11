@@ -17,6 +17,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ThreadPool.h"
 
@@ -171,7 +172,7 @@ int main(int argc, char *argv[]) {
   for (const auto &InputFile : InputFiles) {
     SMDiagnostic Err;
     auto Ctx = std::make_unique<LLVMContext>();
-    auto M = parseIRFile(InputFile, Err, *Ctx);
+    auto M = parseIRFile(InputFile, Err, *Ctx, *vfs::getRealFileSystem());
     if (!M) {
       Err.print(argv[0], errs());
       return 1;

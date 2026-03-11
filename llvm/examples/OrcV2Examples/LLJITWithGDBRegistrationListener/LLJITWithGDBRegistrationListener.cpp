@@ -85,7 +85,8 @@ int main(int argc, char *argv[]) {
   for (auto &InputFile : InputFiles) {
     auto Ctx = std::make_unique<LLVMContext>();
     SMDiagnostic Err;
-    std::unique_ptr<Module> M = parseIRFile(InputFile, Err, *Ctx);
+    std::unique_ptr<Module> M = parseIRFile(InputFile, Err, *Ctx,
+                                             *vfs::getRealFileSystem());
     if (!M) {
       Err.print(argv[0], errs());
       return 1;

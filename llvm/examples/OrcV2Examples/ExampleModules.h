@@ -21,6 +21,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 const llvm::StringRef Add1Example =
     R"(
@@ -58,7 +59,7 @@ parseExampleModuleFromFile(llvm::StringRef FileName) {
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
 
-  if (auto M = parseIRFile(FileName, Err, *Ctx))
+  if (auto M = parseIRFile(FileName, Err, *Ctx, *vfs::getRealFileSystem()))
     return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
 
   return createSMDiagnosticError(Err);
