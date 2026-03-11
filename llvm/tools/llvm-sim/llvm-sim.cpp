@@ -120,7 +120,10 @@ int main(int argc, const char *argv[]) {
       InputSourceFile == "-" ? MemoryBuffer::getSTDIN()
                              : VFS->getBufferForFile(InputSourceFile);
   if (!BufferOrErr) {
-    errs() << argv[0] << ": " << BufferOrErr.getError().message() << "\n";
+    Err = SMDiagnostic(InputSourceFile, SourceMgr::DK_Error,
+                       "Could not open input file: " +
+                           BufferOrErr.getError().message());
+    Err.print(argv[0], errs());
     return 1;
   }
   std::unique_ptr<Module> ModuleToAnalyze =

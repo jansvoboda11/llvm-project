@@ -26,6 +26,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
@@ -142,8 +143,18 @@ int main(int argc, char **argv) {
 
   // Use lazy loading, since we only care about selected global values.
   SMDiagnostic Err;
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename);
+  if (!BufferOrErr) {
+    Err = SMDiagnostic(InputFilename, SourceMgr::DK_Error,
+                       "Could not open input file: " +
+                           BufferOrErr.getError().message());
+    Err.print(argv[0], errs());
+    return 1;
+  }
   std::unique_ptr<Module> M =
-      getLazyIRFileModule(InputFilename, Err, Context, *VFS);
+      getLazyIRModule(std::move(*BufferOrErr), Err, Context);
 
   if (!M) {
     Err.print(argv[0], errs());
