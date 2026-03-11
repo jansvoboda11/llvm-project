@@ -28,10 +28,12 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Transforms/IPO/FunctionImport.h"
 #include "llvm/Transforms/IPO/Internalize.h"
@@ -296,7 +298,8 @@ struct LLVMLinkDiagnosticHandler : public DiagnosticHandler {
 } // namespace
 
 /// Import any functions requested via the -import option.
-static bool importFunctions(const char *argv0, Module &DestModule) {
+static bool importFunctions(const char *argv0, Module &DestModule,
+                            vfs::FileSystem &VFS) {
   if (SummaryIndex.empty())
     return true;
   std::unique_ptr<ModuleSummaryIndex> Index =
@@ -306,10 +309,10 @@ static bool importFunctions(const char *argv0, Module &DestModule) {
   FunctionImporter::ImportIDTable ImportIDs;
   FunctionImporter::ImportMapTy ImportList(ImportIDs);
 
-  auto ModuleLoader = [&DestModule](const char *argv0,
-                                    const std::string &Identifier) {
+  auto ModuleLoader = [&DestModule, &VFS](const char *argv0,
+                                          const std::string &Identifier) {
     std::unique_ptr<MemoryBuffer> Buffer = ExitOnErr(errorOrToExpected(
-        MemoryBuffer::getFileOrSTDIN(Identifier, /*IsText=*/true)));
+        VFS.getBufferForFile(Identifier)));
     return loadFile(argv0, std::move(Buffer), DestModule.getContext(), false);
   };
 
@@ -374,13 +377,15 @@ static bool importFunctions(const char *argv0, Module &DestModule) {
 }
 
 static bool linkFiles(const char *argv0, LLVMContext &Context, Linker &L,
-                      const cl::list<std::string> &Files, unsigned Flags) {
+                      const cl::list<std::string> &Files, unsigned Flags,
+                      vfs::FileSystem &VFS) {
   // Filter out flags that don't apply to the first file we load.
   unsigned ApplicableFlags = Flags & Linker::Flags::OverrideFromSrc;
   // Similar to some flags, internalization doesn't apply to the first file.
   bool InternalizeLinkedSymbols = false;
   for (const auto &File : Files) {
-    auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+    auto BufferOrErr = File == "-" ? MemoryBuffer::getSTDIN()
+                                   : VFS.getBufferForFile(File);
 
     // When we encounter a missing file, make sure we expose its name.
     if (auto EC = BufferOrErr.getError())
@@ -463,8 +468,11 @@ int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
   ExitOnErr.setBanner(std::string(argv[0]) + ": ");
 
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&LinkCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm linker\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm linker\n", /*Errs=*/nullptr,
+                              VFS.get());
 
   LLVMContext Context;
   Context.setDiagnosticHandler(std::make_unique<LLVMLinkDiagnosticHandler>(),
@@ -481,16 +489,16 @@ int main(int argc, char **argv) {
     Flags |= Linker::Flags::LinkOnlyNeeded;
 
   // First add all the regular input files
-  if (!linkFiles(argv[0], Context, L, InputFilenames, Flags))
+  if (!linkFiles(argv[0], Context, L, InputFilenames, Flags, *VFS))
     return 1;
 
   // Next the -override ones.
   if (!linkFiles(argv[0], Context, L, OverridingInputs,
-                 Flags | Linker::Flags::OverrideFromSrc))
+                 Flags | Linker::Flags::OverrideFromSrc, *VFS))
     return 1;
 
   // Import any functions requested via -import
-  if (!importFunctions(argv[0], *Composite))
+  if (!importFunctions(argv[0], *Composite, *VFS))
     return 1;
 
   if (DumpAsm)
