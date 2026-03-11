@@ -466,7 +466,7 @@ optMain(int argc, char **argv,
       argc, argv, "llvm .bc -> .bc modular optimizer and analysis printer\n",
       /*Errs=*/nullptr, VFS.get());
 
-  // If the input is stdin, read it now before enabling the IO sandbox.
+  // If the input is stdin, read it now before passing to parseIR.
   // Library code is not supposed to read from stdin; the tool owns that.
   std::unique_ptr<MemoryBuffer> StdinBuffer;
   if (InputFilename == "-") {
@@ -479,7 +479,9 @@ optMain(int argc, char **argv,
     }
   }
 
-  auto EnableSandbox = llvm::sys::sandbox::scopedEnable();
+  // TODO: Enable the IO sandbox here once all passes have been updated to
+  // use vfs::FileSystem instead of direct filesystem access.
+  // auto EnableSandbox = llvm::sys::sandbox::scopedEnable();
 
   LLVMContext Context;
 
