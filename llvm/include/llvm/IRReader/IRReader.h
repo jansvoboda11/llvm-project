@@ -28,6 +28,10 @@ class Module;
 class SMDiagnostic;
 class LLVMContext;
 
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+
 /// If the given MemoryBuffer holds a bitcode image, return a Module
 /// for it which does lazy deserialization of function bodies.  Otherwise,
 /// attempt to parse it as LLVM Assembly and return a fully populated
@@ -45,9 +49,8 @@ getLazyIRModule(std::unique_ptr<MemoryBuffer> Buffer, SMDiagnostic &Err,
 /// reader to optionally enable lazy metadata loading.
 LLVM_ABI std::unique_ptr<Module>
 getLazyIRFileModule(StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-                    bool ShouldLazyLoadMetadata = false);
-
-/// If the given MemoryBuffer holds a bitcode image, return a Module
+                    bool ShouldLazyLoadMetadata = false,
+                    vfs::FileSystem *FS = nullptr);/// If the given MemoryBuffer holds a bitcode image, return a Module
 /// for it.  Otherwise, attempt to parse it as LLVM Assembly and return
 /// a Module for it.
 /// \param DataLayoutCallback Override datalayout in the llvm assembly.
@@ -58,11 +61,12 @@ parseIR(MemoryBufferRef Buffer, SMDiagnostic &Err, LLVMContext &Context,
 
 /// If the given file holds a bitcode image, return a Module for it.
 /// Otherwise, attempt to parse it as LLVM Assembly and return a Module
-/// for it.
+/// for it. The caller is responsible for reading stdin before calling this
+/// function if needed; this function only opens regular files via \p FS.
 /// \param DataLayoutCallback Override datalayout in the llvm assembly.
 LLVM_ABI std::unique_ptr<Module>
 parseIRFile(StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-            ParserCallbacks Callbacks = {},
+            vfs::FileSystem &FS, ParserCallbacks Callbacks = {},
             AsmParserContext *ParserContext = nullptr);
 }
 

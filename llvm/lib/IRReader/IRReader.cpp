@@ -16,6 +16,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 #include <optional>
@@ -55,9 +56,11 @@ llvm::getLazyIRModule(std::unique_ptr<MemoryBuffer> Buffer, SMDiagnostic &Err,
 std::unique_ptr<Module> llvm::getLazyIRFileModule(StringRef Filename,
                                                   SMDiagnostic &Err,
                                                   LLVMContext &Context,
-                                                  bool ShouldLazyLoadMetadata) {
+                                                  bool ShouldLazyLoadMetadata,
+                                                  vfs::FileSystem *FS) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      FS ? FS->getBufferForFile(Filename)
+         : MemoryBuffer::getFileOrSTDIN(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
@@ -97,10 +100,13 @@ std::unique_ptr<Module> llvm::parseIR(MemoryBufferRef Buffer, SMDiagnostic &Err,
 
 std::unique_ptr<Module> llvm::parseIRFile(StringRef Filename, SMDiagnostic &Err,
                                           LLVMContext &Context,
+                                          vfs::FileSystem &FS,
                                           ParserCallbacks Callbacks,
                                           AsmParserContext *ParserContext) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+      FS.getBufferForFile(Filename, /*FileSize=*/-1,
+                          /*RequiresNullTerminator=*/true,
+                          /*IsVolatile=*/false, /*IsText=*/true);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
