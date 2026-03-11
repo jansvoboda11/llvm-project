@@ -17,6 +17,7 @@
 #include "llvm/IR/ModuleSummaryIndex.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <system_error>
 
 using namespace llvm;
@@ -64,9 +65,10 @@ llvm::parseAssembly(MemoryBufferRef F, SMDiagnostic &Err, LLVMContext &Context,
 std::unique_ptr<Module> llvm::parseAssemblyFile(StringRef Filename,
                                                 SMDiagnostic &Err,
                                                 LLVMContext &Context,
+                                                vfs::FileSystem &FS,
                                                 SlotMapping *Slots) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      FS.getBufferForFile(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
@@ -96,20 +98,28 @@ parseAssemblyWithIndex(MemoryBufferRef F, SMDiagnostic &Err,
 ParsedModuleAndIndex llvm::parseAssemblyWithIndex(MemoryBufferRef F,
                                                   SMDiagnostic &Err,
                                                   LLVMContext &Context,
-                                                  SlotMapping *Slots) {
-  return ::parseAssemblyWithIndex(
-      F, Err, Context, Slots,
-      /*UpgradeDebugInfo*/ true,
-      [](StringRef, StringRef) { return std::nullopt; });
+                                                  SlotMapping *Slots,
+                                                  DataLayoutCallbackTy DataLayoutCallback) {
+  return ::parseAssemblyWithIndex(F, Err, Context, Slots,
+                                  /*UpgradeDebugInfo*/ true,
+                                  DataLayoutCallback);
+}
+
+ParsedModuleAndIndex llvm::parseAssemblyWithIndexNoUpgradeDebugInfo(
+    MemoryBufferRef F, SMDiagnostic &Err, LLVMContext &Context,
+    SlotMapping *Slots, DataLayoutCallbackTy DataLayoutCallback) {
+  return ::parseAssemblyWithIndex(F, Err, Context, Slots,
+                                  /*UpgradeDebugInfo*/ false,
+                                  DataLayoutCallback);
 }
 
 static ParsedModuleAndIndex
 parseAssemblyFileWithIndex(StringRef Filename, SMDiagnostic &Err,
-                           LLVMContext &Context, SlotMapping *Slots,
-                           bool UpgradeDebugInfo,
+                           LLVMContext &Context, vfs::FileSystem &FS,
+                           SlotMapping *Slots, bool UpgradeDebugInfo,
                            DataLayoutCallbackTy DataLayoutCallback) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+      FS.getBufferForFile(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
@@ -123,17 +133,19 @@ parseAssemblyFileWithIndex(StringRef Filename, SMDiagnostic &Err,
 
 ParsedModuleAndIndex
 llvm::parseAssemblyFileWithIndex(StringRef Filename, SMDiagnostic &Err,
-                                 LLVMContext &Context, SlotMapping *Slots,
+                                 LLVMContext &Context, vfs::FileSystem &FS,
+                                 SlotMapping *Slots,
                                  DataLayoutCallbackTy DataLayoutCallback) {
-  return ::parseAssemblyFileWithIndex(Filename, Err, Context, Slots,
+  return ::parseAssemblyFileWithIndex(Filename, Err, Context, FS, Slots,
                                       /*UpgradeDebugInfo*/ true,
                                       DataLayoutCallback);
 }
 
 ParsedModuleAndIndex llvm::parseAssemblyFileWithIndexNoUpgradeDebugInfo(
     StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-    SlotMapping *Slots, DataLayoutCallbackTy DataLayoutCallback) {
-  return ::parseAssemblyFileWithIndex(Filename, Err, Context, Slots,
+    vfs::FileSystem &FS, SlotMapping *Slots,
+    DataLayoutCallbackTy DataLayoutCallback) {
+  return ::parseAssemblyFileWithIndex(Filename, Err, Context, FS, Slots,
                                       /*UpgradeDebugInfo*/ false,
                                       DataLayoutCallback);
 }

@@ -32,6 +32,10 @@ struct SlotMapping;
 class SMDiagnostic;
 class Type;
 
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+
 typedef llvm::function_ref<std::optional<std::string>(StringRef, StringRef)>
     DataLayoutCallbackTy;
 
@@ -48,7 +52,7 @@ typedef llvm::function_ref<std::optional<std::string>(StringRef, StringRef)>
 ///              parsing.
 LLVM_ABI std::unique_ptr<Module>
 parseAssemblyFile(StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-                  SlotMapping *Slots = nullptr);
+                  vfs::FileSystem &FS, SlotMapping *Slots = nullptr);
 
 /// The function is a secondary interface to the LLVM Assembly Parser. It parses
 /// an ASCII string that (presumably) contains LLVM Assembly code. It returns a
@@ -88,7 +92,7 @@ struct ParsedModuleAndIndex {
 /// \param DataLayoutCallback Override datalayout in the llvm assembly.
 LLVM_ABI ParsedModuleAndIndex parseAssemblyFileWithIndex(
     StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-    SlotMapping *Slots = nullptr,
+    vfs::FileSystem &FS, SlotMapping *Slots = nullptr,
     DataLayoutCallbackTy DataLayoutCallback = [](StringRef, StringRef) {
       return std::nullopt;
     });
@@ -96,7 +100,8 @@ LLVM_ABI ParsedModuleAndIndex parseAssemblyFileWithIndex(
 /// Only for use in llvm-as for testing; this does not produce a valid module.
 LLVM_ABI ParsedModuleAndIndex parseAssemblyFileWithIndexNoUpgradeDebugInfo(
     StringRef Filename, SMDiagnostic &Err, LLVMContext &Context,
-    SlotMapping *Slots, DataLayoutCallbackTy DataLayoutCallback);
+    vfs::FileSystem &FS, SlotMapping *Slots,
+    DataLayoutCallbackTy DataLayoutCallback);
 
 /// This function is a main interface to the LLVM Assembly Parser. It parses
 /// an ASCII file that (presumably) contains LLVM Assembly code for a module
@@ -144,7 +149,16 @@ LLVM_ABI std::unique_ptr<Module> parseAssembly(
 /// parseAssemblyFileWithIndex is a wrapper around this function.
 LLVM_ABI ParsedModuleAndIndex
 parseAssemblyWithIndex(MemoryBufferRef F, SMDiagnostic &Err,
-                       LLVMContext &Context, SlotMapping *Slots = nullptr);
+                       LLVMContext &Context, SlotMapping *Slots = nullptr,
+                       DataLayoutCallbackTy DataLayoutCallback =
+                           [](StringRef, StringRef) { return std::nullopt; });
+
+/// Only for use in llvm-as for testing; this does not produce a valid module.
+/// parseAssemblyFileWithIndexNoUpgradeDebugInfo is a wrapper around this.
+LLVM_ABI ParsedModuleAndIndex
+parseAssemblyWithIndexNoUpgradeDebugInfo(
+    MemoryBufferRef F, SMDiagnostic &Err, LLVMContext &Context,
+    SlotMapping *Slots, DataLayoutCallbackTy DataLayoutCallback);
 
 /// Parse LLVM Assembly for summary index from a MemoryBuffer.
 ///

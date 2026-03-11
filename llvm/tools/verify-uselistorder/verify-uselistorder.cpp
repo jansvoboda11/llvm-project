@@ -174,7 +174,8 @@ std::unique_ptr<Module> TempFile::readBitcode(LLVMContext &Context) const {
 std::unique_ptr<Module> TempFile::readAssembly(LLVMContext &Context) const {
   LLVM_DEBUG(dbgs() << " - read assembly\n");
   SMDiagnostic Err;
-  std::unique_ptr<Module> M = parseAssemblyFile(Filename, Err, Context);
+  std::unique_ptr<Module> M = parseAssemblyFile(Filename, Err, Context,
+                                                *vfs::getRealFileSystem());
   if (!M)
     Err.print("verify-uselistorder", errs());
   return M;

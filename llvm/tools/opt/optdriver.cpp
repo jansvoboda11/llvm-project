@@ -573,7 +573,7 @@ optMain(int argc, char **argv,
                 ParserCallbacks(SetDataLayout));
   else if (NoUpgradeDebugInfo)
     M = parseAssemblyFileWithIndexNoUpgradeDebugInfo(
-            InputFilename, Err, Context, nullptr, SetDataLayout)
+            InputFilename, Err, Context, *VFS, nullptr, SetDataLayout)
             .Mod;
   else
     M = parseIRFile(InputFilename, Err, Context,

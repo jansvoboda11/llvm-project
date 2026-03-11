@@ -23,9 +23,11 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <memory>
 #include <optional>
 using namespace llvm;
@@ -109,12 +111,26 @@ static void WriteOutputFile(const Module *M, const ModuleSummaryIndex *Index) {
 
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
+
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions(AsCat);
-  cl::ParseCommandLineOptions(argc, argv, "llvm .ll -> .bc assembler\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm .ll -> .bc assembler\n",
+                              /*Errs=*/nullptr, VFS.get());
   LLVMContext Context;
 
   // Parse the file now...
   SMDiagnostic Err;
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename);
+  if (!BufferOrErr) {
+    Err = SMDiagnostic(InputFilename, SourceMgr::DK_Error,
+                       "Could not open input file: " +
+                           BufferOrErr.getError().message());
+    Err.print(argv[0], errs());
+    return 1;
+  }
   auto SetDataLayout = [](StringRef, StringRef) -> std::optional<std::string> {
     if (ClDataLayout.empty())
       return std::nullopt;
@@ -122,11 +138,12 @@ int main(int argc, char **argv) {
   };
   ParsedModuleAndIndex ModuleAndIndex;
   if (DisableVerify) {
-    ModuleAndIndex = parseAssemblyFileWithIndexNoUpgradeDebugInfo(
-        InputFilename, Err, Context, nullptr, SetDataLayout);
+    ModuleAndIndex = parseAssemblyWithIndexNoUpgradeDebugInfo(
+        (*BufferOrErr)->getMemBufferRef(), Err, Context, nullptr, SetDataLayout);
   } else {
-    ModuleAndIndex = parseAssemblyFileWithIndex(InputFilename, Err, Context,
-                                                nullptr, SetDataLayout);
+    ModuleAndIndex = parseAssemblyWithIndex((*BufferOrErr)->getMemBufferRef(),
+                                            Err, Context, nullptr,
+                                            SetDataLayout);
   }
   std::unique_ptr<Module> M = std::move(ModuleAndIndex.Mod);
   if (!M) {

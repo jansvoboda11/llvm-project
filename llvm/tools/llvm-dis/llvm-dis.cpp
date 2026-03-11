@@ -48,6 +48,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include <system_error>
 using namespace llvm;
@@ -175,8 +176,11 @@ int main(int argc, char **argv) {
 
   ExitOnErr.setBanner(std::string(argv[0]) + ": error: ");
 
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&DisCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm .bc -> .ll disassembler\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm .bc -> .ll disassembler\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   if (InputFilenames.size() < 1) {
     InputFilenames.push_back("-");
@@ -194,7 +198,8 @@ int main(int argc, char **argv) {
         std::make_unique<LLVMDisDiagnosticHandler>(argv[0]));
 
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(InputFilename);
+        InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                             : VFS->getBufferForFile(InputFilename);
     if (std::error_code EC = BufferOrErr.getError()) {
       WithColor::error() << InputFilename << ": " << EC.message() << '\n';
       return 1;
