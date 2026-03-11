@@ -166,7 +166,6 @@ int main(int argc, char **argv) {
   std::unique_ptr<Module> Owner =
       parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
   Module *Mod = Owner.get();
-  Module *Mod = Owner.get();
   if (!Mod) {
     Err.print(argv[0], errs());
     return 1;
