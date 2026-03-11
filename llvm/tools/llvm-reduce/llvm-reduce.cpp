@@ -22,6 +22,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -138,12 +139,15 @@ int main(int Argc, char **Argv) {
   InitLLVM X(Argc, Argv);
   const StringRef ToolName(Argv[0]);
 
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&LLVMReduceOptions, &getColorCategory()});
   cl::ParseCommandLineOptions(
       Argc, Argv,
       "LLVM automatic testcase reducer.\n"
       "See https://llvm.org/docs/CommandGuide/llvm-reduce.html for more "
-      "information.\n");
+      "information.\n",
+      /*Errs=*/nullptr, VFS.get());
 
   if (Argc == 1) {
     cl::PrintHelpMessage();
@@ -181,7 +185,8 @@ int main(int Argc, char **Argv) {
   std::unique_ptr<TargetMachine> TM;
 
   auto [OriginalProgram, InputIsBitcode] =
-      parseReducerWorkItem(ToolName, InputFilename, Context, TM, ReduceModeMIR);
+      parseReducerWorkItem(ToolName, InputFilename, Context, TM, ReduceModeMIR,
+                           *VFS);
   if (!OriginalProgram) {
     return 1;
   }

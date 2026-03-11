@@ -21,6 +21,10 @@ class TargetMachine;
 class TestRunner;
 struct BitcodeLTOInfo;
 
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+
 class ReducerWorkItem {
 public:
   std::shared_ptr<Module> M;
@@ -64,7 +68,8 @@ private:
 
 std::pair<std::unique_ptr<ReducerWorkItem>, bool>
 parseReducerWorkItem(StringRef ToolName, StringRef Filename, LLVMContext &Ctxt,
-                     std::unique_ptr<TargetMachine> &TM, bool IsMIR);
+                     std::unique_ptr<TargetMachine> &TM, bool IsMIR,
+                     llvm::vfs::FileSystem &VFS);
 } // namespace llvm
 
 #endif

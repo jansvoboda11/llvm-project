@@ -35,6 +35,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/Host.h"
@@ -822,7 +823,8 @@ void ReducerWorkItem::writeBitcode(raw_ostream &OutStream) const {
 std::pair<std::unique_ptr<ReducerWorkItem>, bool>
 llvm::parseReducerWorkItem(StringRef ToolName, StringRef Filename,
                            LLVMContext &Ctxt,
-                           std::unique_ptr<TargetMachine> &TM, bool IsMIR) {
+                           std::unique_ptr<TargetMachine> &TM, bool IsMIR,
+                           vfs::FileSystem &VFS) {
   bool IsBitcode = false;
   Triple TheTriple;
 
@@ -831,7 +833,8 @@ llvm::parseReducerWorkItem(StringRef ToolName, StringRef Filename,
   if (IsMIR) {
     initializeTargetInfo();
 
-    auto FileOrErr = MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+    auto FileOrErr = Filename == "-" ? MemoryBuffer::getSTDIN()
+                                     : VFS.getBufferForFile(Filename);
     if (std::error_code EC = FileOrErr.getError()) {
       WithColor::error(errs(), ToolName) << EC.message() << '\n';
       return {nullptr, false};
@@ -865,7 +868,8 @@ llvm::parseReducerWorkItem(StringRef ToolName, StringRef Filename,
   } else {
     SMDiagnostic Err;
     ErrorOr<std::unique_ptr<MemoryBuffer>> MB =
-        MemoryBuffer::getFileOrSTDIN(Filename);
+        Filename == "-" ? MemoryBuffer::getSTDIN()
+                        : VFS.getBufferForFile(Filename);
     if (std::error_code EC = MB.getError()) {
       WithColor::error(errs(), ToolName)
           << Filename << ": " << EC.message() << "\n";
