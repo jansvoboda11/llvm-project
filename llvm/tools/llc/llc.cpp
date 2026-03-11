@@ -293,7 +293,8 @@ static void setPGOOptions(TargetMachine &TM) {
 }
 
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &,
-                         LLVMContext &Context, std::string &OutputFilename);
+                         LLVMContext &Context, std::string &OutputFilename,
+                         MemoryBuffer *StdinBuffer = nullptr);
 
 [[noreturn]] static void reportError(Twine Msg, StringRef Filename = "") {
   SmallString<256> Prefix;
@@ -510,7 +511,7 @@ static bool addPass(PassManagerBase &PM, const char *argv0, StringRef PassName,
 
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
                          LLVMContext &Context, std::string &OutputFilename,
-                         MemoryBuffer *StdinBuffer = nullptr) {
+                         MemoryBuffer *StdinBuffer) {
   // Load the module to be compiled...
   SMDiagnostic Err;
   std::unique_ptr<Module> M;

@@ -453,8 +453,18 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context,
-                                              *vfs::getRealFileSystem());
+  std::unique_ptr<Module> Owner;
+  if (InputFile == "-") {
+    auto BufferOrErr = MemoryBuffer::getSTDIN();
+    if (!BufferOrErr) {
+      errs() << argv[0] << ": error reading stdin: "
+             << BufferOrErr.getError().message() << "\n";
+      exit(1);
+    }
+    Owner = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
+  } else {
+    Owner = parseIRFile(InputFile, Err, Context, *vfs::getRealFileSystem());
+  }
   Module *Mod = Owner.get();
   if (!Mod)
     reportError(Err, argv[0]);
