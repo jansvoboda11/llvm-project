@@ -26,6 +26,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
@@ -260,7 +261,8 @@ int main(int argc, char **argv) {
         TT, MCPU, /*FS*/ "", Options, std::nullopt, std::nullopt));
   }
 
-  std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context);
+  std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
+                                          *vfs::getRealFileSystem());
 
   if (!M) {
     Err.print(argv[0], errs());

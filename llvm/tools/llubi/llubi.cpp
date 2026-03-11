@@ -23,6 +23,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -150,7 +151,8 @@ int main(int argc, char **argv) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context);
+  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context,
+                                              *vfs::getRealFileSystem());
   Module *Mod = Owner.get();
   if (!Mod) {
     Err.print(argv[0], errs());

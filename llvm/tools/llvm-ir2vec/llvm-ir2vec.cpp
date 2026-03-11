@@ -80,6 +80,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
@@ -372,7 +373,8 @@ int main(int argc, char **argv) {
     // Parse the input LLVM IR file or stdin
     SMDiagnostic Err;
     LLVMContext Context;
-    std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context);
+    std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
+                                            *vfs::getRealFileSystem());
     if (!M) {
       Err.print(ToolName, errs());
       return 1;

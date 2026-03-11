@@ -19,6 +19,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
@@ -31,7 +32,8 @@ using namespace llvm;
 static std::unique_ptr<Module> readModule(LLVMContext &Context,
                                           StringRef Name) {
   SMDiagnostic Diag;
-  std::unique_ptr<Module> M = parseIRFile(Name, Diag, Context);
+  std::unique_ptr<Module> M = parseIRFile(Name, Diag, Context,
+                                          *vfs::getRealFileSystem());
   if (!M)
     Diag.print("llvm-diff", errs());
   return M;

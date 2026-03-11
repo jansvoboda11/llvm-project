@@ -11,6 +11,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -30,7 +31,7 @@ namespace {
 std::unique_ptr<Module> getLLVMIR(const std::string &Filename,
                                   LLVMContext &Context) {
   SMDiagnostic Err;
-  auto M = parseIRFile(Filename, Err, Context);
+  auto M = parseIRFile(Filename, Err, Context, *vfs::getRealFileSystem());
   if (!M)
     throw nb::value_error(("Failed to parse IR file '" + Filename +
                            "': " + Err.getMessage().str())

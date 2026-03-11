@@ -21,6 +21,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 using namespace llvm;
@@ -113,7 +114,7 @@ int main(int argc, const char *argv[]) {
   LLVMContext CurrContext;
   SMDiagnostic Err;
   std::unique_ptr<Module> ModuleToAnalyze =
-      parseIRFile(InputSourceFile, Err, CurrContext);
+      parseIRFile(InputSourceFile, Err, CurrContext, *vfs::getRealFileSystem());
 
   if (!ModuleToAnalyze) {
     Err.print(argv[0], errs());

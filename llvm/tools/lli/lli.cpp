@@ -63,6 +63,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
@@ -452,7 +453,8 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context);
+  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context,
+                                              *vfs::getRealFileSystem());
   Module *Mod = Owner.get();
   if (!Mod)
     reportError(Err, argv[0]);
@@ -534,7 +536,8 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load any additional modules specified on the command line.
   for (unsigned i = 0, e = ExtraModules.size(); i != e; ++i) {
-    std::unique_ptr<Module> XMod = parseIRFile(ExtraModules[i], Err, Context);
+    std::unique_ptr<Module> XMod = parseIRFile(ExtraModules[i], Err, Context,
+                                               *vfs::getRealFileSystem());
     if (!XMod)
       reportError(Err, argv[0]);
     if (EnableCacheManager) {
@@ -873,7 +876,8 @@ static Expected<orc::ThreadSafeModule>
 loadModule(StringRef Path, orc::ThreadSafeContext TSCtx) {
   SMDiagnostic Err;
   auto M = TSCtx.withContextDo(
-      [&](LLVMContext *Ctx) { return parseIRFile(Path, Err, *Ctx); });
+      [&](LLVMContext *Ctx) { return parseIRFile(Path, Err, *Ctx,
+                                                 *vfs::getRealFileSystem()); });
   if (!M) {
     std::string ErrMsg;
     {

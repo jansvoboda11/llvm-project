@@ -20,6 +20,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -72,7 +73,8 @@ int main(int argc, char **argv) {
     std::vector<std::unique_ptr<Module>> OwnedMods;
     for (const auto &InputFilename : InputFilenames) {
       SMDiagnostic Err;
-      std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context);
+      std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
+                                              *vfs::getRealFileSystem());
       if (!M) {
         Err.print(argv[0], errs());
         return 1;

@@ -24,6 +24,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -149,7 +150,8 @@ protected:
 
     // Parse the bitcode...
     SMDiagnostic Err;
-    std::unique_ptr<Module> TheModule(parseIRFile(IRFile, Err, Context));
+    std::unique_ptr<Module> TheModule(parseIRFile(IRFile, Err, Context,
+                                                  *vfs::getRealFileSystem()));
     if (!TheModule) {
       errs() << Err.getMessage();
       return;

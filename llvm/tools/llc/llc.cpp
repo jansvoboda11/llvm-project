@@ -51,6 +51,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -630,6 +631,7 @@ static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
         M = MIR->parseIRModule(SetDataLayout);
     } else {
       M = parseIRFile(InputFilename, Err, Context,
+                      *vfs::getRealFileSystem(),
                       ParserCallbacks(SetDataLayout));
     }
     if (!M) {
