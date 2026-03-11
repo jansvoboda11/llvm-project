@@ -18,6 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/InitLLVM.h"
@@ -151,8 +152,18 @@ int main(int argc, char **argv) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Owner = parseIRFile(InputFile, Err, Context,
-                                              *vfs::getRealFileSystem());
+  std::unique_ptr<Module> Owner;
+  if (InputFile == "-") {
+    auto BufferOrErr = MemoryBuffer::getSTDIN();
+    if (!BufferOrErr) {
+      errs() << argv[0] << ": error reading stdin: "
+             << BufferOrErr.getError().message() << "\n";
+      return 1;
+    }
+    Owner = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
+  } else {
+    Owner = parseIRFile(InputFile, Err, Context, *vfs::getRealFileSystem());
+  }
   Module *Mod = Owner.get();
   if (!Mod) {
     Err.print(argv[0], errs());

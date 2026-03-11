@@ -20,6 +20,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -261,8 +262,18 @@ int main(int argc, char **argv) {
         TT, MCPU, /*FS*/ "", Options, std::nullopt, std::nullopt));
   }
 
-  std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
-                                          *vfs::getRealFileSystem());
+  std::unique_ptr<Module> M;
+  if (InputFilename == "-") {
+    auto BufferOrErr = MemoryBuffer::getSTDIN();
+    if (!BufferOrErr) {
+      errs() << argv[0] << ": error reading stdin: "
+             << BufferOrErr.getError().message() << "\n";
+      return 1;
+    }
+    M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
+  } else {
+    M = parseIRFile(InputFilename, Err, Context, *vfs::getRealFileSystem());
+  }
 
   if (!M) {
     Err.print(argv[0], errs());

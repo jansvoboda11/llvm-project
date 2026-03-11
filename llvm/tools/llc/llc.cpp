@@ -47,6 +47,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PGOOptions.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PluginLoader.h"
@@ -454,10 +455,22 @@ int main(int argc, char **argv) {
   if (InputLanguage != "" && InputLanguage != "ir" && InputLanguage != "mir")
     reportError("input language must be '', 'IR' or 'MIR'");
 
+  // Read stdin early before library code runs, as library code must not read
+  // from stdin. Pass the buffer down to compileModule.
+  std::unique_ptr<MemoryBuffer> StdinBuffer;
+  if (InputFilename == "-") {
+    if (auto BufferOrErr = MemoryBuffer::getSTDIN())
+      StdinBuffer = std::move(*BufferOrErr);
+    else {
+      reportError(BufferOrErr.getError().message(), "-");
+    }
+  }
+
   // Compile the module TimeCompilations times to give better compile time
   // metrics.
   for (unsigned I = TimeCompilations; I; --I)
-    if (int RetVal = compileModule(argv, PluginList, Context, OutputFilename))
+    if (int RetVal = compileModule(argv, PluginList, Context, OutputFilename,
+                                   StdinBuffer.get()))
       return RetVal;
 
   if (RemarksFile)
@@ -496,7 +509,8 @@ static bool addPass(PassManagerBase &PM, const char *argv0, StringRef PassName,
 }
 
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
-                         LLVMContext &Context, std::string &OutputFilename) {
+                         LLVMContext &Context, std::string &OutputFilename,
+                         MemoryBuffer *StdinBuffer = nullptr) {
   // Load the module to be compiled...
   SMDiagnostic Err;
   std::unique_ptr<Module> M;
@@ -630,9 +644,13 @@ static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
       if (MIR)
         M = MIR->parseIRModule(SetDataLayout);
     } else {
-      M = parseIRFile(InputFilename, Err, Context,
-                      *vfs::getRealFileSystem(),
-                      ParserCallbacks(SetDataLayout));
+      if (StdinBuffer)
+        M = parseIR(StdinBuffer->getMemBufferRef(), Err, Context,
+                    ParserCallbacks(SetDataLayout));
+      else
+        M = parseIRFile(InputFilename, Err, Context,
+                        *vfs::getRealFileSystem(),
+                        ParserCallbacks(SetDataLayout));
     }
     if (!M) {
       Err.print(argv[0], WithColor::error(errs(), argv[0]));

@@ -560,8 +560,18 @@ int main(int argc, char **argv) {
   SMDiagnostic Err;
 
   // Load the input module...
-  std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context,
-                                          *vfs::getRealFileSystem());
+  std::unique_ptr<Module> M;
+  if (InputFilename == "-") {
+    auto BufferOrErr = MemoryBuffer::getSTDIN();
+    if (!BufferOrErr) {
+      errs() << argv[0] << ": error reading stdin: "
+             << BufferOrErr.getError().message() << "\n";
+      return 1;
+    }
+    M = parseIR((*BufferOrErr)->getMemBufferRef(), Err, Context);
+  } else {
+    M = parseIRFile(InputFilename, Err, Context, *vfs::getRealFileSystem());
+  }
 
   if (!M) {
     Err.print(argv[0], errs());
