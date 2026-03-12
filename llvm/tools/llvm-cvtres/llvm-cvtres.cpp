@@ -26,6 +26,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <system_error>
@@ -171,10 +172,11 @@ int main(int Argc, const char **Argv) {
 
   WindowsResourceParser Parser;
 
+  auto VFS = vfs::getRealFileSystem();
   for (const auto &File : InputFiles) {
     std::unique_ptr<MemoryBuffer> Buffer = error(
-        File, MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                           /*RequiresNullTerminator=*/false));
+        File, VFS->getBufferForFile(
+                  File, -1, /*RequiresNullTerminator=*/false));
     file_magic Type = identify_magic(Buffer->getMemBufferRef().getBuffer());
     if (Type != file_magic::windows_resource)
       reportError(File + ": unrecognized file format.\n");
@@ -220,8 +222,8 @@ int main(int Argc, const char **Argv) {
   if (Verbose) {
     std::unique_ptr<MemoryBuffer> Buffer =
         error(OutputFile,
-              MemoryBuffer::getFileOrSTDIN(OutputFile, /*IsText=*/false,
-                                           /*RequiresNullTerminator=*/false));
+              VFS->getBufferForFile(
+                  OutputFile, -1, /*RequiresNullTerminator=*/false));
 
     ScopedPrinter W(errs());
     W.printBinaryBlock("Output File Raw Data",

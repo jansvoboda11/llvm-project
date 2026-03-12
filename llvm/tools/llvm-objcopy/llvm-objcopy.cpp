@@ -36,6 +36,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -138,8 +139,11 @@ static Error executeObjcopy(ConfigManager &ConfigMgr) {
 
   if (Config.InputFormat == FileFormat::Binary ||
       Config.InputFormat == FileFormat::IHex) {
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFileOrSTDIN(Config.InputFilename);
+        Config.InputFilename == "-"
+            ? MemoryBuffer::getSTDIN()
+            : VFS->getBufferForFile(Config.InputFilename);
     if (!BufOrErr)
       return createFileError(Config.InputFilename, BufOrErr.getError());
     MemoryBufferHolder = std::move(*BufOrErr);

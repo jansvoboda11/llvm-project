@@ -20,6 +20,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -143,20 +144,31 @@ int main(int argc, const char *argv[]) {
   InitLLVM X(argc, argv);
 
   cl::HideUnrelatedOptions({&CXXMapCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "LLVM C++ mangled name remapper\n");
+  auto VFS = vfs::getRealFileSystem();
+  cl::ParseCommandLineOptions(argc, argv, "LLVM C++ mangled name remapper\n",
+                              nullptr, VFS.get());
 
   auto OldSymbolBufOrError =
-      MemoryBuffer::getFileOrSTDIN(OldSymbolFile, /*IsText=*/true);
+      OldSymbolFile == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(OldSymbolFile, -1,
+                                  true);
   if (!OldSymbolBufOrError)
     exitWithErrorCode(OldSymbolBufOrError.getError(), OldSymbolFile);
 
   auto NewSymbolBufOrError =
-      MemoryBuffer::getFileOrSTDIN(NewSymbolFile, /*IsText=*/true);
+      NewSymbolFile == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(NewSymbolFile, -1,
+                                  true);
   if (!NewSymbolBufOrError)
     exitWithErrorCode(NewSymbolBufOrError.getError(), NewSymbolFile);
 
   auto RemappingBufOrError =
-      MemoryBuffer::getFileOrSTDIN(RemappingFile, /*IsText=*/true);
+      RemappingFile == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(RemappingFile, -1,
+                                  true);
   if (!RemappingBufOrError)
     exitWithErrorCode(RemappingBufOrError.getError(), RemappingFile);
 

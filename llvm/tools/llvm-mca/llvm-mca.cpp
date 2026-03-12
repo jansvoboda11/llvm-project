@@ -55,6 +55,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -376,9 +377,12 @@ int main(int argc, char **argv) {
 
   cl::HideUnrelatedOptions({&ToolOptions, &ViewOptions});
 
+  auto VFS = vfs::getRealFileSystem();
+
   // Parse flags and initialize target options.
   cl::ParseCommandLineOptions(argc, argv,
-                              "llvm machine code performance analyzer.\n");
+                              "llvm machine code performance analyzer.\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   Triple TheTriple(TripleNameOpt.empty()
                        ? Triple::normalize(sys::getDefaultTargetTriple())
@@ -397,7 +401,8 @@ int main(int argc, char **argv) {
   std::unique_ptr<MemoryBuffer> InputBuffer;
   if (!WantsCPUHelp) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(InputFilename);
+        InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                             : VFS->getBufferForFile(InputFilename);
     if (!BufferOrErr) {
       std::error_code EC = BufferOrErr.getError();
       WithColor::error() << InputFilename << ": " << EC.message() << '\n';

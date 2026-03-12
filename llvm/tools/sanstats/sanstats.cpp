@@ -17,6 +17,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
 #include <stdint.h>
@@ -127,11 +128,14 @@ static const char *ReadModule(char SizeofPtr, const char *Begin,
 
 int main(int argc, char **argv) {
   cl::HideUnrelatedOptions(Cat);
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(argc, argv,
-                              "Sanitizer Statistics Processing Tool");
+                              "Sanitizer Statistics Processing Tool",
+                              nullptr, VFS.get());
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = MemoryBuffer::getFile(
-      ClInputFile, /*IsText=*/false, /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr =
+      VFS->getBufferForFile(
+          ClInputFile, -1, /*RequiresNullTerminator=*/false);
   if (!MBOrErr) {
     errs() << argv[0] << ": " << ClInputFile << ": "
            << MBOrErr.getError().message() << '\n';

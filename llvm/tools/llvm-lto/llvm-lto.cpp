@@ -45,6 +45,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
@@ -349,9 +350,9 @@ static void maybeVerifyModule(const Module &Mod) {
 
 static std::unique_ptr<LTOModule>
 getLocalLTOModule(StringRef Path, std::unique_ptr<MemoryBuffer> &Buffer,
-                  const TargetOptions &Options) {
+                  const TargetOptions &Options, vfs::FileSystem &VFS) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Path);
+      VFS.getBufferForFile(Path);
   error(BufferOrErr, "error loading file '" + Path + "'");
   Buffer = std::move(BufferOrErr.get());
   CurrentActivity = ("loading file '" + Path + "'").str();
@@ -460,11 +461,11 @@ static void printLTOSymbolAttributes(lto_symbol_attributes Attrs) {
 /// The main point here is to provide lit-testable coverage for the LTOModule
 /// functionality that's exposed by the C API. Moreover, this provides testing
 /// coverage for modules that have been created in their own contexts.
-static void testLTOModule(const TargetOptions &Options) {
+static void testLTOModule(const TargetOptions &Options, vfs::FileSystem &VFS) {
   for (auto &Filename : InputFilenames) {
     std::unique_ptr<MemoryBuffer> Buffer;
     std::unique_ptr<LTOModule> Module =
-        getLocalLTOModule(Filename, Buffer, Options);
+        getLocalLTOModule(Filename, Buffer, Options, VFS);
 
     if (ListSymbolsOnly) {
       // List the symbols.
@@ -484,15 +485,18 @@ static void testLTOModule(const TargetOptions &Options) {
   }
 }
 
-static std::unique_ptr<MemoryBuffer> loadFile(StringRef Filename) {
+static std::unique_ptr<MemoryBuffer> loadFile(StringRef Filename,
+                                               vfs::FileSystem &VFS) {
     ExitOnError ExitOnErr("llvm-lto: error loading file '" + Filename.str() +
         "': ");
-    return ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Filename)));
+    return ExitOnErr(errorOrToExpected(
+        Filename == "-" ? MemoryBuffer::getSTDIN()
+                        : VFS.getBufferForFile(Filename)));
 }
 
-static void listDependentLibraries() {
+static void listDependentLibraries(vfs::FileSystem &VFS) {
   for (auto &Filename : InputFilenames) {
-    auto Buffer = loadFile(Filename);
+    auto Buffer = loadFile(Filename, VFS);
     std::string E;
     std::unique_ptr<lto::InputFile> Input(LTOModule::createInputFile(
         Buffer->getBufferStart(), Buffer->getBufferSize(), Filename.c_str(),
@@ -540,12 +544,13 @@ static void printMachOCPUOnly() {
 ///
 /// This is meant to enable testing of ThinLTO combined index generation,
 /// currently available via the gold plugin via -thinlto.
-static void createCombinedModuleSummaryIndex() {
+static void createCombinedModuleSummaryIndex(vfs::FileSystem &VFS) {
   ModuleSummaryIndex CombinedIndex(/*HaveGVs=*/false);
   for (auto &Filename : InputFilenames) {
     ExitOnError ExitOnErr("llvm-lto: error loading file '" + Filename + "': ");
-    std::unique_ptr<MemoryBuffer> MB =
-        ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Filename)));
+    std::unique_ptr<MemoryBuffer> MB = ExitOnErr(errorOrToExpected(
+        Filename == "-" ? MemoryBuffer::getSTDIN()
+                        : VFS.getBufferForFile(Filename)));
     ExitOnErr(readModuleSummaryIndex(*MB, CombinedIndex));
   }
   // In order to use this index for testing, specifically import testing, we
@@ -594,13 +599,13 @@ static std::string getThinLTOOutputFile(StringRef Path, StringRef OldPrefix,
 namespace thinlto {
 
 std::vector<std::unique_ptr<MemoryBuffer>>
-loadAllFilesForIndex(const ModuleSummaryIndex &Index) {
+loadAllFilesForIndex(const ModuleSummaryIndex &Index, vfs::FileSystem &VFS) {
   std::vector<std::unique_ptr<MemoryBuffer>> InputBuffers;
 
   for (auto &ModPath : Index.modulePaths()) {
     const auto &Filename = ModPath.first();
     std::string CurrentActivity = ("loading file '" + Filename + "'").str();
-    auto InputOrErr = MemoryBuffer::getFile(Filename);
+    auto InputOrErr = VFS.getBufferForFile(Filename);
     error(InputOrErr, "error " + CurrentActivity);
     InputBuffers.push_back(std::move(*InputOrErr));
   }
@@ -654,7 +659,8 @@ class ThinLTOProcessing {
 public:
   ThinLTOCodeGenerator ThinGenerator;
 
-  ThinLTOProcessing(const TargetOptions &Options) {
+  ThinLTOProcessing(const TargetOptions &Options, vfs::FileSystem &VFS)
+      : VFS(VFS) {
     ThinGenerator.setCodePICModel(codegen::getExplicitRelocModel());
     ThinGenerator.setTargetOptions(Options);
     ThinGenerator.setCacheDir(ThinLTOCacheDir);
@@ -694,6 +700,8 @@ public:
   }
 
 private:
+  vfs::FileSystem &VFS;
+
   /// Load the input files, create the combined index, and write it out.
   void thinLink() {
     // Perform "ThinLink": just produce the index
@@ -706,7 +714,7 @@ private:
     for (unsigned i = 0; i < InputFilenames.size(); ++i) {
       auto &Filename = InputFilenames[i];
       std::string CurrentActivity = "loading file '" + Filename + "'";
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = VFS.getBufferForFile(Filename);
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -738,7 +746,7 @@ private:
     auto Index = loadCombinedIndex();
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
 
@@ -776,7 +784,7 @@ private:
     auto Index = loadCombinedIndex();
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
       std::string OutputName = OutputFilename;
@@ -803,7 +811,7 @@ private:
     auto Index = loadCombinedIndex();
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
 
@@ -829,14 +837,14 @@ private:
                          "ones.");
 
     auto Index = loadCombinedIndex();
-    auto InputBuffers = loadAllFilesForIndex(*Index);
+    auto InputBuffers = loadAllFilesForIndex(*Index, VFS);
     for (auto &MemBuffer : InputBuffers)
       ThinGenerator.addModule(MemBuffer->getBufferIdentifier(),
                               MemBuffer->getBuffer());
 
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
 
@@ -862,14 +870,14 @@ private:
                 "-exported-symbol\n";
 
     auto Index = loadCombinedIndex();
-    auto InputBuffers = loadAllFilesForIndex(*Index);
+    auto InputBuffers = loadAllFilesForIndex(*Index, VFS);
     for (auto &MemBuffer : InputBuffers)
       ThinGenerator.addModule(MemBuffer->getBufferIdentifier(),
                               MemBuffer->getBuffer());
 
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
 
@@ -894,7 +902,7 @@ private:
 
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto Buffer = loadFile(Filename);
+      auto Buffer = loadFile(Filename, VFS);
       auto Input = loadInputFile(Buffer->getMemBufferRef());
       auto TheModule = loadModuleFromInput(*Input, Ctx);
 
@@ -920,7 +928,7 @@ private:
     std::vector<std::unique_ptr<MemoryBuffer>> InputBuffers;
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = VFS.getBufferForFile(Filename);
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -959,7 +967,7 @@ private:
     for (unsigned i = 0; i < InputFilenames.size(); ++i) {
       auto &Filename = InputFilenames[i];
       std::string CurrentActivity = "loading file '" + Filename + "'";
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = VFS.getBufferForFile(Filename);
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -997,8 +1005,12 @@ private:
 
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
+
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&LTOCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm LTO linker\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm LTO linker\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   if (OptLevel < '0' || OptLevel > '3')
     error("optimization level must be between 0 and 3");
@@ -1013,12 +1025,12 @@ int main(int argc, char **argv) {
   TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(Triple());
 
   if (ListSymbolsOnly || QueryHasCtorDtor) {
-    testLTOModule(Options);
+    testLTOModule(Options, *VFS);
     return 0;
   }
 
   if (ListDependentLibrariesOnly) {
-    listDependentLibraries();
+    listDependentLibraries(*VFS);
     return 0;
   }
 
@@ -1032,7 +1044,7 @@ int main(int argc, char **argv) {
       ExitOnError ExitOnErr(std::string(*argv) + ": error loading file '" +
                             Filename + "': ");
       std::unique_ptr<MemoryBuffer> BufferOrErr =
-          ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(Filename)));
+          ExitOnErr(errorOrToExpected(VFS->getBufferForFile(Filename)));
       auto Buffer = std::move(BufferOrErr.get());
       if (ExitOnErr(isBitcodeContainingObjCCategory(*Buffer)))
         outs() << "Bitcode " << Filename << " contains ObjC\n";
@@ -1050,13 +1062,13 @@ int main(int argc, char **argv) {
   if (ThinLTOMode.getNumOccurrences()) {
     if (ThinLTOMode.getNumOccurrences() > 1)
       report_fatal_error("You can't specify more than one -thinlto-action");
-    thinlto::ThinLTOProcessing ThinLTOProcessor(Options);
+    thinlto::ThinLTOProcessing ThinLTOProcessor(Options, *VFS);
     ThinLTOProcessor.run();
     return 0;
   }
 
   if (ThinLTO) {
-    createCombinedModuleSummaryIndex();
+    createCombinedModuleSummaryIndex(*VFS);
     return 0;
   }
 

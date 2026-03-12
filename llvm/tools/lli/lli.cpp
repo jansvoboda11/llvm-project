@@ -328,9 +328,10 @@ public:
     if (!getCacheFilename(ModuleID, CacheName))
       return nullptr;
     // Load the object from the cache filename
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> IRObjectBuffer =
-        MemoryBuffer::getFile(CacheName, /*IsText=*/false,
-                              /*RequiresNullTerminator=*/false);
+        VFS->getBufferForFile(
+            CacheName, -1, /*RequiresNullTerminator=*/false);
     // If the file isn't there, that's OK.
     if (!IRObjectBuffer)
       return nullptr;
@@ -573,7 +574,8 @@ int main(int argc, char **argv, char * const *envp) {
 
   for (unsigned i = 0, e = ExtraArchives.size(); i != e; ++i) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> ArBufOrErr =
-        MemoryBuffer::getFileOrSTDIN(ExtraArchives[i]);
+        ExtraArchives[i] == "-" ? MemoryBuffer::getSTDIN()
+                                : VFS->getBufferForFile(ExtraArchives[i]);
     if (!ArBufOrErr)
       reportError(Err, argv[0]);
     std::unique_ptr<MemoryBuffer> &ArBuf = ArBufOrErr.get();
@@ -1165,7 +1167,9 @@ static int runOrcJIT(const char *ProgName) {
 
   // Add the objects.
   for (auto &ObjPath : ExtraObjects) {
-    auto Obj = ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(ObjPath)));
+    auto VFS = vfs::getRealFileSystem();
+    auto Obj = ExitOnErr(errorOrToExpected(
+        VFS->getBufferForFile(ObjPath)));
     ExitOnErr(J->addObjectFile(std::move(Obj)));
   }
 

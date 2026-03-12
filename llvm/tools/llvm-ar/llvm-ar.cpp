@@ -34,6 +34,7 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -293,8 +294,9 @@ static void getArchive() {
 }
 
 static object::Archive &readLibrary(const Twine &Library) {
-  auto BufOrErr = MemoryBuffer::getFile(Library, /*IsText=*/false,
-                                        /*RequiresNullTerminator=*/false);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrErr = VFS->getBufferForFile(
+      Library, -1, /*RequiresNullTerminator=*/false);
   failIfError(BufOrErr.getError(), "could not open library " + Library);
   ArchiveBuffers.push_back(std::move(*BufOrErr));
   auto LibOrErr =
@@ -1145,8 +1147,10 @@ static void performOperation(ArchiveOperation Operation,
 
 static int performOperation(ArchiveOperation Operation) {
   // Create or open the archive object.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = MemoryBuffer::getFile(
-      ArchiveName, /*IsText=*/false, /*RequiresNullTerminator=*/false);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
+      VFS->getBufferForFile(
+          ArchiveName, -1, /*RequiresNullTerminator=*/false);
   std::error_code EC = Buf.getError();
   if (EC && EC != errc::no_such_file_or_directory)
     fail("unable to open '" + ArchiveName + "': " + EC.message());

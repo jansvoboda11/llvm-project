@@ -600,7 +600,10 @@ class SymbolRemapper {
 public:
   /// Build a SymbolRemapper from a file containing a list of old/new symbols.
   static std::unique_ptr<SymbolRemapper> create(StringRef InputFile) {
-    auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFile);
+    auto VFS = vfs::getRealFileSystem();
+    auto BufOrError = InputFile == "-"
+                          ? MemoryBuffer::getSTDIN()
+                          : VFS->getBufferForFile(InputFile);
     if (!BufOrError)
       exitWithErrorCode(BufOrError.getError(), InputFile);
 
@@ -1534,7 +1537,10 @@ getInputFileBuf(const StringRef &InputFile) {
   if (InputFile == "")
     return {};
 
-  auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrError = InputFile == "-"
+                        ? MemoryBuffer::getSTDIN()
+                        : VFS->getBufferForFile(InputFile);
   if (!BufOrError)
     exitWithErrorCode(BufOrError.getError(), InputFile);
 

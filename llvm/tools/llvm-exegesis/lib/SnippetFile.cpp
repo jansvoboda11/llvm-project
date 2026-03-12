@@ -24,6 +24,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <string>
 
 #ifdef __linux__
@@ -226,8 +227,10 @@ private:
 // Reads code snippets from file `Filename`.
 Expected<std::vector<BenchmarkCode>> readSnippets(const LLVMState &State,
                                                   StringRef Filename) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferPtr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(Filename);
   if (std::error_code EC = BufferPtr.getError()) {
     return make_error<Failure>("cannot read snippet: " + Filename + ": " +
                                EC.message());

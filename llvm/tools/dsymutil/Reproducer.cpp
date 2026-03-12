@@ -73,8 +73,9 @@ ReproducerUse::~ReproducerUse() = default;
 ReproducerUse::ReproducerUse(StringRef Root, std::error_code &EC) {
   SmallString<128> Mapping(Root);
   sys::path::append(Mapping, "mapping.yaml");
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
-      vfs::getRealFileSystem()->getBufferForFile(Mapping.str());
+      VFS->getBufferForFile(Mapping.str());
 
   if (!Buffer) {
     EC = Buffer.getError();

@@ -91,6 +91,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -783,9 +784,12 @@ static ExitOnError ExitOnErr;
 
 static void yamlToPdb(StringRef Path) {
   BumpPtrAllocator Allocator;
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> ErrorOrBuffer =
-      MemoryBuffer::getFileOrSTDIN(Path, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+      Path == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(Path, -1,
+                                  /*RequiresNullTerminator=*/false);
 
   if (ErrorOrBuffer.getError()) {
     ExitOnErr(createFileError(Path, errorCodeToError(ErrorOrBuffer.getError())));

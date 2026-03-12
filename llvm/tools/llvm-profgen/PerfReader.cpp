@@ -16,6 +16,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #define DEBUG_TYPE "perf-reader"
 
@@ -389,7 +390,8 @@ Error PerfReaderBase::parseDataAccessPerfTraces(
 
   llvm::Regex LogRegex(DataAccessSamplePattern);
 
-  auto BufferOrErr = MemoryBuffer::getFile(DataAccessPerfTraceFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufferOrErr = VFS->getBufferForFile(DataAccessPerfTraceFile);
   std::error_code EC = BufferOrErr.getError();
   if (EC)
     return make_error<StringError>("Failed to open perf trace file: " +

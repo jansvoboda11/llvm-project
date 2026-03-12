@@ -36,6 +36,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <future>
@@ -421,9 +422,10 @@ static int printLineInfoForInput(bool LoadObjects, bool UseDebugObj) {
     RuntimeDyld Dyld(MemMgr, MemMgr);
 
     // Load the input memory buffer.
-
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-        MemoryBuffer::getFileOrSTDIN(File);
+        File == "-" ? MemoryBuffer::getSTDIN()
+                    : VFS->getBufferForFile(File);
     if (std::error_code EC = InputBuffer.getError())
       ErrorAndExit("unable to read input: '" + EC.message() + "'");
 
@@ -556,10 +558,12 @@ static int executeInput() {
     InputFileList.push_back("-");
   {
     TimeRegion TR(Timers ? &Timers->LoadObjectsTimer : nullptr);
+    auto VFS = vfs::getRealFileSystem();
     for (auto &File : InputFileList) {
       // Load the input memory buffer.
       ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-          MemoryBuffer::getFileOrSTDIN(File);
+          File == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(File);
       if (std::error_code EC = InputBuffer.getError())
         ErrorAndExit("unable to read input: '" + EC.message() + "'");
       Expected<std::unique_ptr<ObjectFile>> MaybeObj(
@@ -629,9 +633,12 @@ static int executeInput() {
 }
 
 static int checkAllExpressions(RuntimeDyldChecker &Checker) {
+  auto VFS = vfs::getRealFileSystem();
   for (const auto& CheckerFileName : CheckFiles) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> CheckerFileBuf =
-        MemoryBuffer::getFileOrSTDIN(CheckerFileName);
+        CheckerFileName == "-"
+            ? MemoryBuffer::getSTDIN()
+            : VFS->getBufferForFile(CheckerFileName);
     if (std::error_code EC = CheckerFileBuf.getError())
       ErrorAndExit("unable to read input '" + CheckerFileName + "': " +
                    EC.message());
@@ -959,10 +966,12 @@ static int linkAndVerify() {
   // If we don't have any input files, read from stdin.
   if (!InputFileList.size())
     InputFileList.push_back("-");
+  auto VFS = vfs::getRealFileSystem();
   for (auto &InputFile : InputFileList) {
     // Load the input memory buffer.
     ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-        MemoryBuffer::getFileOrSTDIN(InputFile);
+        InputFile == "-" ? MemoryBuffer::getSTDIN()
+                         : VFS->getBufferForFile(InputFile);
 
     if (std::error_code EC = InputBuffer.getError())
       ErrorAndExit("unable to read input: '" + EC.message() + "'");

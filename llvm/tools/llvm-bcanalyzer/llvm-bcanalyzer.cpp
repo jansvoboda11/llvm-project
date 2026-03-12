@@ -32,6 +32,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
@@ -85,10 +86,12 @@ static Error reportError(StringRef Message) {
   return createStringError(std::errc::illegal_byte_sequence, Message.data());
 }
 
-static Expected<std::unique_ptr<MemoryBuffer>> openBitcodeFile(StringRef Path) {
+static Expected<std::unique_ptr<MemoryBuffer>>
+openBitcodeFile(StringRef Path, vfs::FileSystem &VFS) {
   // Read the input file.
   Expected<std::unique_ptr<MemoryBuffer>> MemBufOrErr =
-      errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Path));
+      errorOrToExpected(Path == "-" ? MemoryBuffer::getSTDIN()
+                                    : VFS.getBufferForFile(Path));
   if (Error E = MemBufOrErr.takeError())
     return std::move(E);
 
@@ -103,14 +106,17 @@ static Expected<std::unique_ptr<MemoryBuffer>> openBitcodeFile(StringRef Path) {
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&BCAnalyzerCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm-bcanalyzer file analyzer\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm-bcanalyzer file analyzer\n",
+                              /*Errs=*/nullptr, VFS.get());
   ExitOnError ExitOnErr("llvm-bcanalyzer: ");
 
-  std::unique_ptr<MemoryBuffer> MB = ExitOnErr(openBitcodeFile(InputFilename));
+  std::unique_ptr<MemoryBuffer> MB = ExitOnErr(openBitcodeFile(InputFilename, *VFS));
   std::unique_ptr<MemoryBuffer> BlockInfoMB = nullptr;
   if (!BlockInfoFilename.empty())
-    BlockInfoMB = ExitOnErr(openBitcodeFile(BlockInfoFilename));
+    BlockInfoMB = ExitOnErr(openBitcodeFile(BlockInfoFilename, *VFS));
 
   BitcodeAnalyzer BA(MB->getBuffer(),
                      BlockInfoMB

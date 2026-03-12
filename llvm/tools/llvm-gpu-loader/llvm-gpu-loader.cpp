@@ -23,6 +23,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/TargetParser/Triple.h"
 
@@ -198,11 +199,12 @@ void launchKernel(ol_queue_handle_t Queue, ol_device_handle_t Device,
 int main(int argc, const char **argv, const char **envp) {
   sys::PrintStackTraceOnErrorSignal(argv[0]);
   cl::HideUnrelatedOptions(LoaderCategory);
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(
       argc, argv,
       "A utility used to launch unit tests built for a GPU target. This is\n"
       "intended to provide an interface similar to cross-compiling "
-      "emulators\n");
+      "emulators\n", nullptr, VFS.get());
 
   if (Help) {
     cl::PrintHelpMessage();
@@ -213,7 +215,8 @@ int main(int argc, const char **argv, const char **envp) {
     handleError(std::move(Err));
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> ImageOrErr =
-      MemoryBuffer::getFileOrSTDIN(File);
+      File == "-" ? MemoryBuffer::getSTDIN()
+                  : VFS->getBufferForFile(File);
   if (std::error_code EC = ImageOrErr.getError())
     handleError(errorCodeToError(EC));
   MemoryBufferRef Image = **ImageOrErr;

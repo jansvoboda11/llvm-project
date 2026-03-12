@@ -31,6 +31,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
@@ -854,8 +855,10 @@ static bool handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
 
 static bool handleFile(StringRef Filename, HandlerFn HandleObj,
                        raw_ostream &OS) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(Filename);
   error(Filename, BuffOrErr.getError());
   std::unique_ptr<MemoryBuffer> Buffer = std::move(BuffOrErr.get());
   return handleBuffer(Filename, *Buffer, HandleObj, OS);

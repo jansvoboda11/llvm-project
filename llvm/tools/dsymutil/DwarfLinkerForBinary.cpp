@@ -77,6 +77,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
@@ -782,7 +783,8 @@ bool DwarfLinkerForBinary::linkImpl(
       if (!SwiftModules.insert(File).second)
         continue;
 
-      auto ErrorOrMem = MemoryBuffer::getFile(File);
+      auto VFS = vfs::getRealFileSystem();
+      auto ErrorOrMem = VFS->getBufferForFile(File);
       if (!ErrorOrMem) {
         reportWarning("Could not open '" + File + "'");
         continue;

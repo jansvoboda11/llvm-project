@@ -17,8 +17,10 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace llvm;
@@ -45,13 +47,19 @@ static cl::opt<unsigned> ModuleIndex("n", cl::Required,
                                      cl::cat(ModextractCategory));
 
 int main(int argc, char **argv) {
+  InitLLVM X(argc, argv);
+
+  auto VFS = vfs::getRealFileSystem();
+
   cl::HideUnrelatedOptions({&ModextractCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "Module extractor");
+  cl::ParseCommandLineOptions(argc, argv, "Module extractor", /*Errs=*/nullptr,
+                              VFS.get());
 
   ExitOnError ExitOnErr("llvm-modextract: error: ");
 
-  std::unique_ptr<MemoryBuffer> MB =
-      ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
+  std::unique_ptr<MemoryBuffer> MB = ExitOnErr(errorOrToExpected(
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename)));
   std::vector<BitcodeModule> Ms = ExitOnErr(getBitcodeModuleList(*MB));
 
   LLVMContext Context;

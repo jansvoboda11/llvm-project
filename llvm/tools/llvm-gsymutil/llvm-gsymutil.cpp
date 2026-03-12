@@ -23,6 +23,7 @@
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
@@ -493,8 +494,10 @@ static llvm::Error handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
 static llvm::Error handleFileConversionToGSYM(StringRef Filename,
                                               const std::string &OutFile,
                                               OutputAggregator &Out) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(Filename);
   error(Filename, BuffOrErr.getError());
   std::unique_ptr<MemoryBuffer> Buffer = std::move(BuffOrErr.get());
   return handleBuffer(Filename, *Buffer, OutFile, Out);

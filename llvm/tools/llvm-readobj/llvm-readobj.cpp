@@ -45,6 +45,7 @@
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ScopedPrinter.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace llvm;
@@ -624,9 +625,11 @@ static void dumpWindowsResourceFile(WindowsResource *WinRes,
 
 /// Opens \a File and dumps it.
 static void dumpInput(StringRef File, ScopedPrinter &Writer) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+      File == "-" ? MemoryBuffer::getSTDIN()
+                  : VFS->getBufferForFile(
+                        File, -1, /*RequiresNullTerminator=*/false);
   if (std::error_code EC = FileOrErr.getError())
     return reportError(errorCodeToError(EC), File);
 

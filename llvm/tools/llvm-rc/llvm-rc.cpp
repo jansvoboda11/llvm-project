@@ -34,6 +34,7 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
@@ -608,8 +609,9 @@ void doRc(std::string Src, std::string Dest, RcOptions &Opts,
   }
 
   // Read and tokenize the input file.
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> File =
-      MemoryBuffer::getFile(PreprocessedFile, /*IsText=*/true);
+      VFS->getBufferForFile(PreprocessedFile, -1, true);
   if (!File) {
     fatalError("Error opening file '" + Twine(PreprocessedFile) +
                "': " + File.getError().message());
@@ -688,8 +690,9 @@ void doRc(std::string Src, std::string Dest, RcOptions &Opts,
 void doCvtres(std::string Src, std::string Dest, std::string TargetTriple) {
   object::WindowsResourceParser Parser;
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Src, /*IsText=*/true);
+      VFS->getBufferForFile(Src, -1, true);
   if (!BufferOrErr)
     fatalError("Error opening file '" + Twine(Src) +
                "': " + BufferOrErr.getError().message());

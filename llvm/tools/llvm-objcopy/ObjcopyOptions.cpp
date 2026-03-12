@@ -24,6 +24,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace llvm::objcopy;
@@ -364,7 +365,8 @@ static Error addSymbolsFromFile(NameMatcher &Symbols, BumpPtrAllocator &Alloc,
                                 function_ref<Error(Error)> ErrorCallback) {
   StringSaver Saver(Alloc);
   SmallVector<StringRef, 16> Lines;
-  auto BufOrErr = MemoryBuffer::getFile(Filename);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrErr = VFS->getBufferForFile(Filename);
   if (!BufOrErr)
     return createFileError(Filename, BufOrErr.getError());
 
@@ -387,7 +389,8 @@ static Error addSymbolsToRenameFromFile(StringMap<StringRef> &SymbolsToRename,
                                         StringRef Filename) {
   StringSaver Saver(Alloc);
   SmallVector<StringRef, 16> Lines;
-  auto BufOrErr = MemoryBuffer::getFile(Filename);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrErr = VFS->getBufferForFile(Filename);
   if (!BufOrErr)
     return createFileError(Filename, BufOrErr.getError());
 
@@ -588,8 +591,9 @@ static Error loadNewSectionData(StringRef ArgValue, StringRef OptionName,
                                                          OptionName +
                                                          ": missing file name");
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(SecPair.second);
+      VFS->getBufferForFile(SecPair.second);
   if (!BufOrErr)
     return createFileError(SecPair.second,
                            errorCodeToError(BufOrErr.getError()));
@@ -920,7 +924,9 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
   // checksum for every target file inside an archive by precomputing the CRC
   // here. This prevents a significant amount of I/O.
   if (!Config.AddGnuDebugLink.empty()) {
-    auto DebugOrErr = MemoryBuffer::getFile(Config.AddGnuDebugLink);
+    auto VFS = vfs::getRealFileSystem();
+    auto DebugOrErr =
+        VFS->getBufferForFile(Config.AddGnuDebugLink);
     if (!DebugOrErr)
       return createFileError(Config.AddGnuDebugLink, DebugOrErr.getError());
     auto Debug = std::move(*DebugOrErr);

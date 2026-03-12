@@ -14,7 +14,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace llvm;
@@ -52,9 +54,11 @@ static Error dumpObject(const ObjectFile &Obj, raw_ostream &OS) {
 }
 
 static Error dumpInput(StringRef File, raw_ostream &OS) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+      File == "-" ? MemoryBuffer::getSTDIN()
+                  : VFS->getBufferForFile(
+                        File, -1, /*RequiresNullTerminator=*/false);
   if (std::error_code EC = FileOrErr.getError())
     return errorCodeToError(EC);
   std::unique_ptr<MemoryBuffer> &Buffer = FileOrErr.get();

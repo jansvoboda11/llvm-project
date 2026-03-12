@@ -235,8 +235,9 @@ static void readInts(const char *Start, const char *End,
 
 ErrorOr<std::unique_ptr<RawCoverage>>
 RawCoverage::read(const std::string &FileName) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(FileName);
+      VFS->getBufferForFile(FileName);
   if (!BufOrErr)
     return BufOrErr.getError();
   std::unique_ptr<MemoryBuffer> Buf = std::move(BufOrErr.get());
@@ -399,8 +400,9 @@ SymbolizedCoverage::read(const std::string &InputFile) {
   auto Coverage(std::make_unique<SymbolizedCoverage>());
 
   std::map<std::string, CoveragePoint> Points;
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(InputFile);
+      VFS->getBufferForFile(InputFile);
   failIfError(BufOrErr);
 
   SourceMgr SM;
@@ -886,8 +888,9 @@ static ErrorOr<bool> isCoverageFile(const std::string &FileName) {
   if (!SancovFileRegex.match(ShortFileName))
     return false;
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(FileName);
+      VFS->getBufferForFile(FileName);
   if (!BufOrErr) {
     errs() << "Warning: " << BufOrErr.getError().message() << "("
            << BufOrErr.getError().value()
@@ -912,8 +915,9 @@ static std::unique_ptr<SymbolizedCoverage>
 symbolize(const RawCoverage &Data, const std::string ObjectFile) {
   auto Coverage = std::make_unique<SymbolizedCoverage>();
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(ObjectFile);
+      VFS->getBufferForFile(ObjectFile);
   failIfError(BufOrErr);
   SHA1 Hasher;
   Hasher.update((*BufOrErr)->getBuffer());

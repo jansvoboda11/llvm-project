@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
@@ -97,11 +98,13 @@ int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
   cl::HideUnrelatedOptions({&UndNameCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm-undname\n");
+  auto VFS = vfs::getRealFileSystem();
+  cl::ParseCommandLineOptions(argc, argv, "llvm-undname\n", nullptr, VFS.get());
 
   if (!RawFile.empty()) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-        MemoryBuffer::getFileOrSTDIN(RawFile);
+        RawFile == "-" ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(RawFile);
     if (std::error_code EC = FileOrErr.getError()) {
       WithColor::error() << "Could not open input file \'" << RawFile
                          << "\': " << EC.message() << '\n';

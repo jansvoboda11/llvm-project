@@ -28,6 +28,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -199,7 +200,9 @@ bool lto_module_is_object_file(const char* path) {
 
 bool lto_module_is_object_file_for_target(const char* path,
                                           const char* target_triplet_prefix) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer = MemoryBuffer::getFile(path);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
+      VFS->getBufferForFile(path);
   if (!Buffer)
     return false;
   return LTOModule::isBitcodeForTarget(Buffer->get(),

@@ -20,6 +20,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -130,8 +131,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-      MemoryBuffer::getFileOrSTDIN(Input, /*IsText=*/true);
+      Input == "-" ? MemoryBuffer::getSTDIN()
+                   : VFS->getBufferForFile(
+                         Input, -1, true, false, /*IsText=*/true);
   if (std::error_code EC = Buf.getError()) {
     WithColor::error(errs(), ProgName) << Input << ": " << EC.message() << '\n';
     return 1;

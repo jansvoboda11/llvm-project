@@ -67,6 +67,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <chrono>
 #include <cstring>
 #include <deque>
@@ -409,7 +410,8 @@ private:
 };
 
 Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &FileName) {
-  if (auto F = MemoryBuffer::getFile(FileName))
+  auto VFS = vfs::getRealFileSystem();
+  if (auto F = VFS->getBufferForFile(FileName))
     return std::move(*F);
   else
     return createFileError(FileName, F.getError());
@@ -2895,7 +2897,10 @@ static Error symbolicateBacktraces() {
     return Symtab.takeError();
 
   for (auto InputFile : InputFiles) {
-    auto BacktraceBuffer = MemoryBuffer::getFileOrSTDIN(InputFile);
+    auto VFS = vfs::getRealFileSystem();
+    auto BacktraceBuffer = InputFile == "-"
+                               ? MemoryBuffer::getSTDIN()
+                               : VFS->getBufferForFile(InputFile);
     if (!BacktraceBuffer)
       return createFileError(InputFile, BacktraceBuffer.getError());
 

@@ -67,7 +67,8 @@ static cl::opt<bool> Summarize("summarize", cl::desc("Print the summary only."),
 ExitOnError ExitOnErr;
 
 static void printBlameContext(const DILineInfo &LineInfo, unsigned Context) {
-  auto FileOrErr = MemoryBuffer::getFile(LineInfo.FileName);
+  auto VFS = vfs::getRealFileSystem();
+  auto FileOrErr = VFS->getBufferForFile(LineInfo.FileName);
   if (!FileOrErr) {
     errs() << "Could not open file: " << LineInfo.FileName << "\n";
     return;
@@ -255,12 +256,14 @@ printIndirectCFInstructions(FileAnalysis &Analysis,
 
 int main(int argc, char **argv) {
   cl::HideUnrelatedOptions({&CFIVerifyCategory, &getColorCategory()});
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(
       argc, argv,
       "Identifies whether Control Flow Integrity protects all indirect control "
       "flow instructions in the provided object file, DSO or binary.\nNote: "
       "Anything statically linked into the provided file *must* be compiled "
-      "with '-g'. This can be relaxed through the '--ignore-dwarf' flag.");
+      "with '-g'. This can be relaxed through the '--ignore-dwarf' flag.",
+      nullptr, VFS.get());
 
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();

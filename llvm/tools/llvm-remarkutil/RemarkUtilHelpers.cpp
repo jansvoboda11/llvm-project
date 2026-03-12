@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "RemarkUtilHelpers.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 namespace llvm {
 namespace remarks {
@@ -17,7 +18,10 @@ namespace remarks {
 /// otherwise.
 Expected<std::unique_ptr<MemoryBuffer>>
 getInputMemoryBuffer(StringRef InputFileName) {
-  auto MaybeBuf = MemoryBuffer::getFileOrSTDIN(InputFileName);
+  auto VFS = vfs::getRealFileSystem();
+  auto MaybeBuf = InputFileName == "-"
+                      ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(InputFileName);
   if (auto ErrorCode = MaybeBuf.getError())
     return createStringError(ErrorCode,
                              Twine("Cannot open file '" + InputFileName +

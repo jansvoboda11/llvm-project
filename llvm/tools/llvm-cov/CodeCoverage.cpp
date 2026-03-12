@@ -292,7 +292,8 @@ CodeCoverageTool::getSourceFile(StringRef SourceFile) {
   for (const auto &Files : LoadedSourceFiles)
     if (isEquivalentFile(SourceFile, Files.first))
       return *Files.second;
-  auto Buffer = MemoryBuffer::getFile(SourceFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto Buffer = VFS->getBufferForFile(SourceFile);
   if (auto EC = Buffer.getError()) {
     error(EC.message(), SourceFile);
     return EC;
@@ -604,7 +605,8 @@ void CodeCoverageTool::demangleSymbols(const CoverageMapping &Coverage) {
   }
 
   // Parse the demangler's output.
-  auto BufOrError = MemoryBuffer::getFile(OutputPath);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrError = VFS->getBufferForFile(OutputPath);
   if (!BufOrError) {
     error(OutputPath, BufOrError.getError().message());
     return;

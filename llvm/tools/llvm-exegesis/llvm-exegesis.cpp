@@ -43,6 +43,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <string>
@@ -639,9 +640,11 @@ static void analysisMain() {
   LLVMInitialize##TargetName##Disassembler();
 #include "llvm/Config/TargetExegesis.def"
 
+  auto VFS = vfs::getRealFileSystem();
   auto MemoryBuffer = ExitOnFileError(
       BenchmarkFile,
-      errorOrToExpected(MemoryBuffer::getFile(BenchmarkFile, /*IsText=*/true)));
+      errorOrToExpected(
+          VFS->getBufferForFile(BenchmarkFile, -1, true)));
 
   const auto TriplesAndCpus = ExitOnFileError(
       BenchmarkFile,
@@ -719,9 +722,11 @@ int main(int Argc, char **Argv) {
   cl::HideUnrelatedOptions({&exegesis::Options, &exegesis::BenchmarkOptions,
                             &exegesis::AnalysisOptions});
 
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(Argc, Argv,
                               "llvm host machine instruction characteristics "
-                              "measurment and analysis.\n");
+                              "measurment and analysis.\n",
+                              nullptr, VFS.get());
 
   exegesis::ExitOnErr.setExitCodeMapper([](const Error &Err) {
     if (Err.isA<exegesis::ClusteringError>())

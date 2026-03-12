@@ -506,8 +506,9 @@ int main(int Argc, char const *Argv[]) {
   InitializeAllTargetInfos();
   InitializeAllAsmPrinters();
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Opts.InputFileName);
+      VFS->getBufferForFile(Opts.InputFileName);
   if (BuffOrErr.getError())
     error(createFileError(Opts.InputFileName, BuffOrErr.getError()));
 

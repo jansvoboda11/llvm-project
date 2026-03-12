@@ -20,6 +20,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TextAPI/DylibReader.h"
 #include "llvm/TextAPI/TextAPIError.h"
@@ -131,8 +132,9 @@ static void read_link(const Twine &Path, SmallVectorImpl<char> &Output) {
 static std::unique_ptr<InterfaceFile>
 getInterfaceFile(const StringRef Filename, bool ResetBanner = true) {
   ExitOnErr.setBanner(TOOLNAME + ": error: '" + Filename.str() + "' ");
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Filename, /*IsText=*/true);
+      VFS->getBufferForFile(Filename, -1, true);
   if (BufferOrErr.getError())
     ExitOnErr(errorCodeToError(BufferOrErr.getError()));
   auto Buffer = std::move(*BufferOrErr);

@@ -18,6 +18,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -147,7 +148,10 @@ DebugMap::DebugMap(const Triple &BinaryTriple, StringRef BinaryPath,
 ErrorOr<std::vector<std::unique_ptr<DebugMap>>>
 DebugMap::parseYAMLDebugMap(BinaryHolder &BinHolder, StringRef InputFile,
                             StringRef PrependPath, bool Verbose) {
-  auto ErrOrFile = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto ErrOrFile = InputFile == "-"
+                       ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(InputFile);
   if (auto Err = ErrOrFile.getError())
     return Err;
 

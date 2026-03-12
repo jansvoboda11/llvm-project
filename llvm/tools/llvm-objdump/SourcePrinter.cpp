@@ -19,6 +19,7 @@
 #include "llvm/DebugInfo/DWARF/LowLevel/DWARFExpression.h"
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #define DEBUG_TYPE "objdump"
 
@@ -608,8 +609,10 @@ bool SourcePrinter::cacheSource(const DILineInfo &LineInfo) {
   if (LineInfo.Source) {
     Buffer = MemoryBuffer::getMemBuffer(*LineInfo.Source);
   } else {
+    auto VFS = vfs::getRealFileSystem();
     auto BufferOrError =
-        MemoryBuffer::getFile(LineInfo.FileName, /*IsText=*/true);
+        VFS->getBufferForFile(LineInfo.FileName, -1,
+                              true);
     if (!BufferOrError) {
       if (MissingSources.insert(LineInfo.FileName).second)
         reportWarning("failed to find source " + LineInfo.FileName,

@@ -20,6 +20,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -256,9 +257,10 @@ int main(int Argc, char **Argv) {
 static Expected<std::unique_ptr<MemoryBuffer>> openBuffer(StringRef DataPath) {
   if (DataPath.empty())
     return createStringError("--data missing");
+  auto VFS = llvm::vfs::getRealFileSystem();
   return errorOrToExpected(DataPath == "-"
                                ? llvm::MemoryBuffer::getSTDIN()
-                               : llvm::MemoryBuffer::getFile(DataPath));
+                               : VFS->getBufferForFile(DataPath));
 }
 
 int dump(ObjectStore &CAS) {

@@ -151,8 +151,9 @@ bool TempFile::writeAssembly(const Module &M) const {
 
 std::unique_ptr<Module> TempFile::readBitcode(LLVMContext &Context) const {
   LLVM_DEBUG(dbgs() << " - read bitcode\n");
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOr =
-      MemoryBuffer::getFile(Filename);
+      VFS->getBufferForFile(Filename);
   if (!BufferOr) {
     errs() << "verify-uselistorder: error: " << BufferOr.getError().message()
            << "\n";

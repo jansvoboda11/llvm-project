@@ -198,8 +198,10 @@ static bool handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
 static bool handleFile(StringRef Filename,
                        OutlinedHashTreeRecord &GlobalOutlineRecord,
                        StableFunctionMapRecord &GlobalFunctionMapRecord) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(Filename);
   if (std::error_code EC = BuffOrErr.getError())
     exitWithErrorCode(EC, Filename);
   return handleBuffer(Filename, *BuffOrErr.get(), GlobalOutlineRecord,

@@ -43,6 +43,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ThreadPool.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -716,7 +717,9 @@ int dsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
 
     auto ParseAllowDisallowFile =
         [&](const std::string &FilePath) -> Expected<StringSet<>> {
-      auto BufOrErr = MemoryBuffer::getFile(FilePath);
+      auto VFS = vfs::getRealFileSystem();
+      auto BufOrErr =
+          VFS->getBufferForFile(FilePath);
       if (!BufOrErr)
         return make_error<StringError>(
             Twine("cannot open allow/disallow file '") + FilePath +

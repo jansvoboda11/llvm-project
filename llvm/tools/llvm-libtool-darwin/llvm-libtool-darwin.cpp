@@ -146,9 +146,10 @@ static Error processFileList() {
   StringRef FileName, DirName;
   std::tie(FileName, DirName) = StringRef(FileList).rsplit(",");
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(FileName, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+      VFS->getBufferForFile(
+          FileName, -1, /*RequiresNullTerminator=*/false);
   if (std::error_code EC = FileOrErr.getError())
     return createFileError(FileName, errorCodeToError(EC));
   const MemoryBuffer &Ref = *FileOrErr.get();

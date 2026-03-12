@@ -45,6 +45,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
@@ -2349,8 +2350,10 @@ static void dumpSymbolicFile(SymbolicFile *O, std::vector<NMSymbol> &SymbolList,
 
 static std::vector<NMSymbol> dumpSymbolNamesFromFile(StringRef Filename) {
   std::vector<NMSymbol> SymbolList;
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(Filename);
   if (error(BufferOrErr.getError(), Filename))
     return SymbolList;
 

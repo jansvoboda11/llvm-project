@@ -25,6 +25,7 @@
 #include "llvm/Support/HTTP/HTTPClient.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LLVMDriver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 
@@ -139,8 +140,10 @@ int llvm_debuginfod_find_main(int argc, char **argv,
 
   if (DumpToStdout) {
     // Print the contents of the artifact.
-    ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = MemoryBuffer::getFile(
-        Path, /*IsText=*/false, /*RequiresNullTerminator=*/false);
+    auto VFS = vfs::getRealFileSystem();
+    ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
+        VFS->getBufferForFile(
+            Path, -1, /*RequiresNullTerminator=*/false);
     ExitOnDebuginfodFindError(errorCodeToError(Buf.getError()));
     outs() << Buf.get()->getBuffer();
   } else

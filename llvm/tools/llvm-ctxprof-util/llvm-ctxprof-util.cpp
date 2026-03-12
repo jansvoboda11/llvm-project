@@ -19,6 +19,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -47,8 +48,12 @@ static cl::opt<std::string> OutputFilename("output", cl::value_desc("output"),
 namespace {
 // Save the bitstream profile from the JSON representation.
 Error convertFromYaml() {
+  auto VFS = vfs::getRealFileSystem();
   auto BufOrError =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+      InputFilename == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(InputFilename, -1,
+                                  true);
   if (!BufOrError)
     return createFileError(InputFilename, BufOrError.getError());
 
@@ -65,7 +70,11 @@ Error convertFromYaml() {
 }
 
 Error convertToYaml() {
-  auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFilename);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrError = InputFilename == "-"
+                        ? MemoryBuffer::getSTDIN()
+                        : VFS->getBufferForFile(
+                              InputFilename);
   if (!BufOrError)
     return createFileError(InputFilename, BufOrError.getError());
 

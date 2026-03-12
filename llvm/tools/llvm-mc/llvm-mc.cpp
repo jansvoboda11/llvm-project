@@ -391,7 +391,10 @@ int main(int argc, char **argv) {
   cl::AddExtraVersionPrinter(TargetRegistry::printRegisteredTargetsForVersion);
 
   cl::HideUnrelatedOptions({&MCCategory, &getColorCategory()});
-  cl::ParseCommandLineOptions(argc, argv, "llvm machine code playground\n");
+
+  auto VFS = vfs::getRealFileSystem();
+  cl::ParseCommandLineOptions(argc, argv, "llvm machine code playground\n",
+                              /*Errs=*/nullptr, VFS.get());
 
   if (TimeTrace)
     timeTraceProfilerInitialize(TimeTraceGranularity, argv[0]);
@@ -425,7 +428,9 @@ int main(int argc, char **argv) {
   Triple TheTriple(TripleName);
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferPtr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+                           : VFS->getBufferForFile(InputFilename, -1, true,
+                                                   false, /*IsText=*/true);
   if (std::error_code EC = BufferPtr.getError()) {
     WithColor::error(errs(), ProgName)
         << InputFilename << ": " << EC.message() << '\n';

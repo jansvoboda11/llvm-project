@@ -24,6 +24,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace llvm;
@@ -87,6 +88,7 @@ static Error writeFile(StringRef Filename, StringRef Data) {
 static Error bundleImages() {
   SmallVector<char, 1024> BinaryData;
   raw_svector_ostream OS(BinaryData);
+  auto VFS = llvm::vfs::getRealFileSystem();
   for (StringRef Image : DeviceImages) {
     BumpPtrAllocator Alloc;
     StringSaver Saver(Alloc);
@@ -101,7 +103,8 @@ static Error bundleImages() {
       OffloadBinary::OffloadingImage ImageBinary{};
 
       llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ObjectOrErr =
-          llvm::MemoryBuffer::getFileOrSTDIN(File);
+          File == "-" ? llvm::MemoryBuffer::getSTDIN()
+                      : VFS->getBufferForFile(File);
       if (std::error_code EC = ObjectOrErr.getError())
         return errorCodeToError(EC);
 
@@ -136,8 +139,10 @@ static Error bundleImages() {
 }
 
 static Error unbundleImages() {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFileOrSTDIN(InputFile);
+      InputFile == "-" ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(InputFile);
   if (std::error_code EC = BufferOrErr.getError())
     return createFileError(InputFile, EC);
   std::unique_ptr<MemoryBuffer> Buffer = std::move(*BufferOrErr);

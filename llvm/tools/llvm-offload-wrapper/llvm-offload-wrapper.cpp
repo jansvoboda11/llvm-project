@@ -25,6 +25,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/TargetParser/Host.h"
 
@@ -105,9 +106,11 @@ static Error wrapImages(ArrayRef<ArrayRef<char>> BuffersToWrap) {
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
   cl::HideUnrelatedOptions(OffloadWrapeprCategory);
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Generate runtime registration code for a device binary image\n");
+      "Generate runtime registration code for a device binary image\n",
+      nullptr, VFS.get());
 
   if (Help) {
     cl::PrintHelpMessage();
@@ -123,7 +126,8 @@ int main(int argc, char **argv) {
   SmallVector<ArrayRef<char>> BuffersToWrap;
   for (StringRef Input : InputFiles) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(Input);
+        Input == "-" ? MemoryBuffer::getSTDIN()
+                     : VFS->getBufferForFile(Input);
     if (std::error_code EC = BufferOrErr.getError())
       ReportError(createFileError(Input, EC));
     std::unique_ptr<MemoryBuffer> &Buffer =

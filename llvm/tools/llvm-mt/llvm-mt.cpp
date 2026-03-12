@@ -23,6 +23,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/WindowsManifest/WindowsManifestMerger.h"
@@ -127,9 +128,10 @@ int llvm_mt_main(int Argc, char **Argv, const llvm::ToolContext &) {
 
   windows_manifest::WindowsManifestMerger Merger;
 
+  auto VFS = vfs::getRealFileSystem();
   for (const auto &File : InputFiles) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> ManifestOrErr =
-        MemoryBuffer::getFile(File);
+        VFS->getBufferForFile(File);
     if (!ManifestOrErr)
       reportError(File, ManifestOrErr.getError());
     error(Merger.merge(*ManifestOrErr.get()));
@@ -142,7 +144,7 @@ int llvm_mt_main(int Argc, char **Argv, const llvm::ToolContext &) {
   int ExitCode = 0;
   if (InputArgs.hasArg(OPT_notify_update)) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> OutBuffOrErr =
-        MemoryBuffer::getFile(OutputFile);
+        VFS->getBufferForFile(OutputFile);
     // Assume if we couldn't open the output file then it doesn't exist meaning
     // there was a change.
     bool Same = false;

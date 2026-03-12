@@ -43,6 +43,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
@@ -7188,8 +7189,10 @@ objdump::getMachODSymObject(const MachOObjectFile *MachOOF, StringRef Filename,
 
   if (!DSYMPath.empty()) {
     // Load the file.
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFileOrSTDIN(DSYMPath);
+        DSYMPath == "-" ? MemoryBuffer::getSTDIN()
+                        : VFS->getBufferForFile(DSYMPath);
     if (std::error_code EC = BufOrErr.getError()) {
       reportError(errorCodeToError(EC), DSYMPath);
       return nullptr;

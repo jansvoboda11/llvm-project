@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RelocationMap.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 namespace llvm {
 
@@ -37,7 +38,10 @@ struct YAMLContext {
 ErrorOr<std::unique_ptr<RelocationMap>>
 RelocationMap::parseYAMLRelocationMap(StringRef InputFile,
                                       StringRef PrependPath) {
-  auto ErrOrFile = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto ErrOrFile = InputFile == "-"
+                       ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(InputFile);
   if (auto Err = ErrOrFile.getError())
     return Err;
 

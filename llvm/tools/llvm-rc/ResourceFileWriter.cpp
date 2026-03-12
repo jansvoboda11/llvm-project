@@ -19,6 +19,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm::support;
 
@@ -1573,6 +1574,7 @@ Expected<std::unique_ptr<MemoryBuffer>>
 ResourceFileWriter::loadFile(StringRef File) const {
   SmallString<128> Path;
   SmallString<128> Cwd;
+  auto VFS = vfs::getRealFileSystem();
 
   // 0. The file path is absolute or has a root directory, so we shouldn't
   // try to append it on top of other base directories. (An absolute path
@@ -1584,16 +1586,16 @@ ResourceFileWriter::loadFile(StringRef File) const {
   // properly though, so if using that to append paths below, this early
   // exception case could be removed.)
   if (sys::path::has_root_directory(File))
-    return errorOrToExpected(MemoryBuffer::getFile(
-        File, /*IsText=*/false, /*RequiresNullTerminator=*/false));
+    return errorOrToExpected(VFS->getBufferForFile(
+        File, -1, /*RequiresNullTerminator=*/false));
 
   // 1. The current working directory.
   sys::fs::current_path(Cwd);
   Path.assign(Cwd.begin(), Cwd.end());
   sys::path::append(Path, File);
   if (sys::fs::exists(Path))
-    return errorOrToExpected(MemoryBuffer::getFile(
-        Path, /*IsText=*/false, /*RequiresNullTerminator=*/false));
+    return errorOrToExpected(VFS->getBufferForFile(
+        Path, -1, /*RequiresNullTerminator=*/false));
 
   // 2. The directory of the input resource file, if it is different from the
   // current working directory.
@@ -1601,22 +1603,22 @@ ResourceFileWriter::loadFile(StringRef File) const {
   Path.assign(InputFileDir.begin(), InputFileDir.end());
   sys::path::append(Path, File);
   if (sys::fs::exists(Path))
-    return errorOrToExpected(MemoryBuffer::getFile(
-        Path, /*IsText=*/false, /*RequiresNullTerminator=*/false));
+    return errorOrToExpected(VFS->getBufferForFile(
+        Path, -1, /*RequiresNullTerminator=*/false));
 
   // 3. All of the include directories specified on the command line.
   for (StringRef ForceInclude : Params.Include) {
     Path.assign(ForceInclude.begin(), ForceInclude.end());
     sys::path::append(Path, File);
     if (sys::fs::exists(Path))
-      return errorOrToExpected(MemoryBuffer::getFile(
-          Path, /*IsText=*/false, /*RequiresNullTerminator=*/false));
+      return errorOrToExpected(VFS->getBufferForFile(
+          Path, -1, /*RequiresNullTerminator=*/false));
   }
 
   if (!Params.NoInclude) {
     if (auto Result = llvm::sys::Process::FindInEnvPath("INCLUDE", File))
-      return errorOrToExpected(MemoryBuffer::getFile(
-          *Result, /*IsText=*/false, /*RequiresNullTerminator=*/false));
+      return errorOrToExpected(VFS->getBufferForFile(
+          *Result, -1, /*RequiresNullTerminator=*/false));
   }
 
   return make_error<StringError>("error : file not found : " + Twine(File),

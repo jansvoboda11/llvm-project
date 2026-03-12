@@ -285,8 +285,11 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     SafeSEH = false;
   }
 
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferPtr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename);
+      InputFilename == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(InputFilename);
   if (std::error_code EC = BufferPtr.getError()) {
     WithColor::error(errs(), ProgName)
         << InputFilename << ": " << EC.message() << '\n';

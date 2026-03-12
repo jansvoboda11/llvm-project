@@ -30,6 +30,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/TypeSize.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdlib>
@@ -153,8 +154,9 @@ typedef std::map<std::string, std::map<int, std::map<std::string, std::map<int,
 } // anonymous namespace
 
 static bool readLocationInfo(LocationInfoTy &LocationInfo) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-      MemoryBuffer::getFile(InputFileName.c_str());
+      VFS->getBufferForFile(InputFileName.c_str());
   if (std::error_code EC = Buf.getError()) {
     WithColor::error() << "Can't open file " << InputFileName << ": "
                        << EC.message() << "\n";
@@ -278,8 +280,9 @@ static bool writeReport(LocationInfoTy &LocationInfo) {
 
     const auto &FileInfo = FI.second;
 
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-        MemoryBuffer::getFile(FileName);
+        VFS->getBufferForFile(FileName);
     if (std::error_code EC = Buf.getError()) {
       WithColor::error() << "Can't open file " << FileName << ": "
                          << EC.message() << "\n";
@@ -480,10 +483,11 @@ int main(int argc, const char **argv) {
   InitLLVM X(argc, argv);
 
   cl::HideUnrelatedOptions(OptReportCategory);
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(
       argc, argv,
       "A tool to generate an optimization report from YAML optimization"
-      " record files.\n");
+      " record files.\n", nullptr, VFS.get());
 
   LocationInfoTy LocationInfo;
   if (!readLocationInfo(LocationInfo))

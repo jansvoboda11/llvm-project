@@ -23,6 +23,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include <cctype>
 #include <string>
@@ -173,9 +174,13 @@ int main(int argc, char **argv) {
   if (InputFileNames.empty())
     InputFileNames.push_back("-");
 
+  auto VFS = vfs::getRealFileSystem();
   for (const auto &File : InputFileNames) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
-        MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+        File == "-" ? MemoryBuffer::getSTDIN()
+                    : VFS->getBufferForFile(
+                          File, -1, /*RequiresNullTerminator=*/true,
+                          /*IsVolatile=*/false, /*IsText=*/true);
     if (std::error_code EC = Buffer.getError())
       errs() << File << ": " << EC.message() << '\n';
     else

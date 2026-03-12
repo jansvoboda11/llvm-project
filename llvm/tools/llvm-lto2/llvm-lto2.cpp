@@ -30,6 +30,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/TimeProfiler.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <atomic>
 
 using namespace llvm;
@@ -279,8 +280,9 @@ static int usage() {
   return 1;
 }
 
-static int run(int argc, char **argv) {
-  cl::ParseCommandLineOptions(argc, argv, "Resolution-based LTO test harness");
+static int run(int argc, char **argv, vfs::FileSystem &VFS) {
+  cl::ParseCommandLineOptions(argc, argv, "Resolution-based LTO test harness",
+                              /*Errs=*/nullptr, &VFS);
 
   if (TimeTrace)
     timeTraceProfilerInitialize(TimeTraceGranularity, argv[0]);
@@ -452,7 +454,7 @@ static int run(int argc, char **argv) {
   LTO Lto(std::move(Conf), std::move(Backend), 1, LTOMode);
 
   for (std::string F : InputFilenames) {
-    std::unique_ptr<MemoryBuffer> MB = check(MemoryBuffer::getFile(F), F);
+    std::unique_ptr<MemoryBuffer> MB = check(VFS.getBufferForFile(F), F);
     std::unique_ptr<InputFile> Input =
         check(InputFile::create(MB->getMemBufferRef()), F);
 
@@ -523,10 +525,10 @@ static int run(int argc, char **argv) {
   return static_cast<int>(HasErrors);
 }
 
-static int dumpSymtab(int argc, char **argv) {
+static int dumpSymtab(int argc, char **argv, vfs::FileSystem &VFS) {
   for (StringRef F : make_range(argv + 1, argv + argc)) {
     std::unique_ptr<MemoryBuffer> MB =
-        check(MemoryBuffer::getFile(F), std::string(F));
+        check(VFS.getBufferForFile(F), std::string(F));
     BitcodeFileContents BFC =
         check(getBitcodeFileContents(*MB), std::string(F));
 
@@ -630,6 +632,8 @@ int main(int argc, char **argv) {
   InitializeAllAsmPrinters();
   InitializeAllAsmParsers();
 
+  auto VFS = vfs::getRealFileSystem();
+
   // FIXME: This should use llvm::cl subcommands, but it isn't currently
   // possible to pass an argument not associated with a subcommand to a
   // subcommand (e.g. -use-new-pm).
@@ -640,9 +644,9 @@ int main(int argc, char **argv) {
   // Ensure that argv[0] is correct after adjusting argv/argc.
   argv[1] = argv[0];
   if (Subcommand == "dump-symtab")
-    return dumpSymtab(argc - 1, argv + 1);
+    return dumpSymtab(argc - 1, argv + 1, *VFS);
   if (Subcommand == "run")
-    return run(argc - 1, argv + 1);
+    return run(argc - 1, argv + 1, *VFS);
   if (Subcommand == "print-guid" && argc > 2) {
     // Note the name of the function we're calling: this won't return the right
     // answer for internal linkage symbols.
