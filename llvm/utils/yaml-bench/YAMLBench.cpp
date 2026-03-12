@@ -18,6 +18,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
@@ -181,13 +182,16 @@ static std::string createJSONText(size_t MemoryMB, unsigned ValueSize) {
 }
 
 int main(int argc, char **argv) {
-  llvm::cl::ParseCommandLineOptions(argc, argv);
+  auto VFS = vfs::getRealFileSystem();
+  llvm::cl::ParseCommandLineOptions(argc, argv, /*Overview=*/"",
+                                    /*Errs=*/nullptr, VFS.get());
   bool ShowColors = UseColor == cl::BOU_UNSET
                         ? sys::Process::StandardOutHasColors()
                         : UseColor == cl::BOU_TRUE;
   if (Input.getNumOccurrences()) {
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFileOrSTDIN(Input);
+        Input == "-" ? MemoryBuffer::getSTDIN()
+            : VFS->getBufferForFile(Input);
     if (!BufOrErr)
       return 1;
     MemoryBuffer &Buf = *BufOrErr.get();

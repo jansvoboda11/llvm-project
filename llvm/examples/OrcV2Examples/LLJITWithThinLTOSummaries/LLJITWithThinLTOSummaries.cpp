@@ -44,6 +44,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -162,8 +163,9 @@ Expected<ThreadSafeModule> loadModule(StringRef Path,
                                       orc::ThreadSafeContext TSCtx) {
   outs() << "About to load module: " << Path << "\n";
 
+  auto VFS = vfs::getRealFileSystem();
   Expected<std::unique_ptr<MemoryBuffer>> BitcodeBuffer =
-      errorOrToExpected(MemoryBuffer::getFile(Path));
+      errorOrToExpected(VFS->getBufferForFile(Path));
   if (!BitcodeBuffer)
     return BitcodeBuffer.takeError();
 
@@ -189,9 +191,10 @@ int main(int Argc, char *Argv[]) {
   ExitOnError ExitOnErr;
   ExitOnErr.setBanner(std::string(Argv[0]) + ": ");
 
+  auto VFS = vfs::getRealFileSystem();
   // (1) Read the index file and parse the module summary index.
   std::unique_ptr<MemoryBuffer> SummaryBuffer =
-      ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(IndexFile)));
+      ExitOnErr(errorOrToExpected(VFS->getBufferForFile(IndexFile)));
 
   std::unique_ptr<ModuleSummaryIndex> SummaryIndex =
       ExitOnErr(getModuleSummaryIndex(SummaryBuffer->getMemBufferRef()));

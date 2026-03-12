@@ -21,6 +21,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include <string>
 #include <system_error>
@@ -143,12 +144,13 @@ static int handle(MemoryBuffer &inputBuf, StringRef input) {
 int main(int argc, const char **argv) {
   toolName = sys::path::stem(argv[0]);
   cl::HideUnrelatedOptions({&cat});
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(
       argc, argv,
       "Split input into multiple parts separated by regex '^(.|//)--- ' and "
       "extract the part specified by '^(.|//)--- <part>'\n",
       nullptr,
-      /*VFS=*/nullptr,
+      /*VFS=*/VFS.get(),
       /*EnvVar=*/nullptr,
       /*LongOptionsUseDoubleDash=*/true);
 
@@ -157,7 +159,8 @@ int main(int argc, const char **argv) {
   if (output.empty())
     fatal("", "output directory is not specified");
   ErrorOr<std::unique_ptr<MemoryBuffer>> bufferOrErr =
-      MemoryBuffer::getFileOrSTDIN(input, /*IsText=*/true);
+      input == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(input);
   if (std::error_code ec = bufferOrErr.getError())
     fatal(input, ec.message());
 

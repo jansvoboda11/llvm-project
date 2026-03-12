@@ -21,6 +21,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
@@ -733,8 +734,9 @@ int main(int argc, char **argv) {
   llvm::sys::Process::UseANSIEscapeCodes(true);
 
   InitLLVM X(argc, argv);
+  auto VFS = vfs::getRealFileSystem();
   cl::ParseCommandLineOptions(argc, argv, /*Overview*/ "", /*Errs*/ nullptr,
-                              /*VFS*/ nullptr, "FILECHECK_OPTS");
+                              /*VFS*/ VFS.get(), "FILECHECK_OPTS");
 
   // Select -dump-input* values.  The -help documentation specifies the default
   // value and which value to choose if an option is specified multiple times.
@@ -808,7 +810,8 @@ int main(int argc, char **argv) {
 
   // Read the expected strings from the check file.
   ErrorOr<std::unique_ptr<MemoryBuffer>> CheckFileOrErr =
-      MemoryBuffer::getFileOrSTDIN(CheckFilename, /*IsText=*/true);
+      CheckFilename == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(CheckFilename);
   if (std::error_code EC = CheckFileOrErr.getError()) {
     errs() << "Could not open check file '" << CheckFilename
            << "': " << EC.message() << '\n';
@@ -830,7 +833,8 @@ int main(int argc, char **argv) {
 
   // Open the file to check and add it to SourceMgr.
   ErrorOr<std::unique_ptr<MemoryBuffer>> InputFileOrErr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+      InputFilename == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(InputFilename);
   if (InputFilename == "-")
     InputFilename = "<stdin>"; // Overwrite for improved diagnostic messages
   if (std::error_code EC = InputFileOrErr.getError()) {

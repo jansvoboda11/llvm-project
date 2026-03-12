@@ -18,6 +18,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include <cctype>
@@ -715,13 +716,16 @@ public:
         // This file isn't in our cache
         return NULL;
       }
-      std::unique_ptr<MemoryBuffer> IRObjectBuffer;
-      MemoryBuffer::getFile(IRCacheFile.c_str(), IRObjectBuffer, -1, false);
+      auto VFS = vfs::getRealFileSystem();
+      auto IRObjectBufferOrErr = VFS->getBufferForFile(
+          IRCacheFile.c_str(), -1, /*RequiresNullTerminator=*/false);
+      if (!IRObjectBufferOrErr)
+        return NULL;
       // MCJIT will want to write into this buffer, and we don't want that
       // because the file has probably just been mmapped.  Instead we make
       // a copy.  The filed-based buffer will be released when it goes
       // out of scope.
-      return MemoryBuffer::getMemBufferCopy(IRObjectBuffer->getBuffer());
+      return MemoryBuffer::getMemBufferCopy((*IRObjectBufferOrErr)->getBuffer());
     }
 
     return NULL;

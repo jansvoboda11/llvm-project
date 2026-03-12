@@ -12,6 +12,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Triple.h"
 #include <random>
 #include <string>
@@ -45,7 +46,9 @@ static std::vector<std::string> getRandomFuncNames() {
 
 #ifdef SYMBOL_TEST_DATA_FILE
 static std::vector<std::string> readSymbolsFromFile(StringRef InputFile) {
-  auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFile, /*IsText=*/true);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrError = InputFile == "-" ? MemoryBuffer::getSTDIN()
+      : VFS->getBufferForFile(InputFile);
   if (!BufOrError) {
     reportFatalUsageError("failed to open \'" + Twine(InputFile) +
                           "\': " + BufOrError.getError().message());

@@ -18,7 +18,9 @@
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "../ExampleModules.h"
@@ -215,9 +217,10 @@ int main(int argc, char *argv[]) {
 
   if (!InputObjects.empty()) {
     // Load the input objects.
+    auto VFS = vfs::getRealFileSystem();
     for (auto InputObject : InputObjects) {
       auto ObjBuffer =
-          ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(InputObject)));
+          ExitOnErr(errorOrToExpected(VFS->getBufferForFile(InputObject)));
       ExitOnErr(J->addObjectFile(std::move(ObjBuffer)));
     }
   } else {

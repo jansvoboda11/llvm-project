@@ -31,6 +31,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mustache.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <string>
 
 using namespace llvm;
@@ -170,8 +171,9 @@ static void registerPartials(const Value *Partials, Template &T) {
 }
 
 static json::Value readJsonFromFile(StringRef &InputFile) {
+  auto VFS = vfs::getRealFileSystem();
   std::unique_ptr<MemoryBuffer> Buffer =
-      ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(InputFile)));
+      ExitOnErr(errorOrToExpected(VFS->getBufferForFile(InputFile)));
   return ExitOnErr(parse(Buffer->getBuffer()));
 }
 
