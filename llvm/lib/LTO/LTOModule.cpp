@@ -30,6 +30,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
@@ -57,8 +58,9 @@ bool LTOModule::isBitcodeFile(const void *Mem, size_t Length) {
 }
 
 bool LTOModule::isBitcodeFile(StringRef Path) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Path);
+      VFS->getBufferForFile(Path);
   if (!BufferOrErr)
     return false;
 
@@ -106,8 +108,9 @@ std::string LTOModule::getProducerString(MemoryBuffer *Buffer) {
 ErrorOr<std::unique_ptr<LTOModule>>
 LTOModule::createFromFile(LLVMContext &Context, StringRef path,
                           const TargetOptions &options) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(path);
+      VFS->getBufferForFile(path);
   if (std::error_code EC = BufferOrErr.getError()) {
     Context.emitError(EC.message());
     return EC;

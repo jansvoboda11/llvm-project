@@ -26,6 +26,7 @@
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -335,8 +336,8 @@ Expected<InputFile> InputFile::open(StringRef Path, bool AllowUnknownFile) {
         formatv("File {0} is not a supported file type", Path),
         inconvertibleErrorCode());
 
-  auto Result = MemoryBuffer::getFile(Path, /*IsText=*/false,
-                                      /*RequiresNullTerminator=*/false);
+  auto VFS = vfs::getRealFileSystem();
+  auto Result = VFS->getBufferForFile(Path, -1, /*RequiresNullTerminator=*/false);
   if (!Result)
     return make_error<StringError>(
         formatv("File {0} could not be opened", Path), Result.getError());

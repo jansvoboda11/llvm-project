@@ -28,6 +28,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
 #include <array>
@@ -193,7 +194,8 @@ collectAddressSymbols(void **AddressList, unsigned AddressCount,
     return {};
 
   SmallVector<std::pair<unsigned, std::string>, 0> Result;
-  auto OutputBuf = MemoryBuffer::getFile(OutputFile.c_str());
+  auto VFS = vfs::getRealFileSystem();
+  auto OutputBuf = VFS->getBufferForFile(OutputFile.c_str());
   if (!OutputBuf)
     return {};
   StringRef Output = OutputBuf.get()->getBuffer();

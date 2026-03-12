@@ -105,6 +105,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/GlobPattern.h"
 #include "llvm/Support/TimeProfiler.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
@@ -1040,8 +1041,10 @@ bool DevirtModule::runForTesting(Module &M, ModuleAnalysisManager &MAM,
   if (!ClReadSummary.empty()) {
     ExitOnError ExitOnErr("-wholeprogramdevirt-read-summary: " + ClReadSummary +
                           ": ");
+    auto VFS = vfs::getRealFileSystem();
     auto ReadSummaryFile =
-        ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(ClReadSummary)));
+        ExitOnErr(errorOrToExpected(
+            VFS->getBufferForFile(ClReadSummary)));
     if (Expected<std::unique_ptr<ModuleSummaryIndex>> SummaryOrErr =
             getModuleSummaryIndex(*ReadSummaryFile)) {
       Summary = std::move(*SummaryOrErr);

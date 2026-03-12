@@ -25,9 +25,9 @@
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include <optional>
 
@@ -1110,9 +1110,8 @@ std::string BTFDebug::populateFileContent(const DIFile *File) {
   Content.push_back(Line); // Line 0 for empty string
 
   auto LoadFile = [](StringRef FileName) {
-    // FIXME(sandboxing): Propagating vfs::FileSystem here is lots of work.
-    auto BypassSandbox = sys::sandbox::scopedDisable();
-    return MemoryBuffer::getFile(FileName);
+    auto VFS = vfs::getRealFileSystem();
+    return VFS->getBufferForFile(FileName);
   };
 
   std::unique_ptr<MemoryBuffer> Buf;

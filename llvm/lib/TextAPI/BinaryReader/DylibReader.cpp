@@ -17,6 +17,7 @@
 #include "llvm/Object/Binary.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/TextAPI/InterfaceFile.h"
 #include "llvm/TextAPI/RecordsSlice.h"
@@ -502,7 +503,8 @@ DylibReader::accumulateSourceLocFromDSYM(const StringRef DSYM,
     return SymbolToSourceLocMap();
 
   const StringRef Path = DSYMsOrErr->front();
-  auto BufOrErr = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrErr = VFS->getBufferForFile(Path);
   if (auto Err = BufOrErr.getError())
     return SymbolToSourceLocMap();
 

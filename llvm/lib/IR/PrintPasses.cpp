@@ -12,6 +12,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <unordered_set>
 
 using namespace llvm;
@@ -240,7 +241,8 @@ std::string llvm::doSystemDiff(StringRef Before, StringRef After,
   if (Result < 0)
     return "Error executing system diff.";
   std::string Diff;
-  auto B = MemoryBuffer::getFile(FileName[2]);
+  auto VFS = vfs::getRealFileSystem();
+  auto B = VFS->getBufferForFile(FileName[2]);
   if (B && *B)
     Diff = (*B)->getBuffer().str();
   else

@@ -54,6 +54,7 @@
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VCSRevision.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/IPO.h"
@@ -370,12 +371,13 @@ std::string llvm::computeLTOCacheKey(
     AddUint64(V);
 
   if (!Conf.SampleProfile.empty()) {
-    auto FileOrErr = MemoryBuffer::getFile(Conf.SampleProfile);
+    auto VFS = vfs::getRealFileSystem();
+    auto FileOrErr = VFS->getBufferForFile(Conf.SampleProfile);
     if (FileOrErr) {
       Hasher.update(FileOrErr.get()->getBuffer());
 
       if (!Conf.ProfileRemapping.empty()) {
-        FileOrErr = MemoryBuffer::getFile(Conf.ProfileRemapping);
+        FileOrErr = VFS->getBufferForFile(Conf.ProfileRemapping);
         if (FileOrErr)
           Hasher.update(FileOrErr.get()->getBuffer());
       }
@@ -2714,9 +2716,10 @@ public:
         }
         // Load the native object from a file into a memory buffer
         // and store its contents in the output buffer.
+        auto VFS = vfs::getRealFileSystem();
         auto ObjFileMbOrErr =
-            MemoryBuffer::getFile(Job.NativeObjectPath, /*IsText=*/false,
-                                  /*RequiresNullTerminator=*/false);
+            VFS->getBufferForFile(
+                Job.NativeObjectPath, -1, /*RequiresNullTerminator=*/false);
         if (std::error_code EC = ObjFileMbOrErr.getError())
           return make_error<StringError>(
               BCError + "cannot open native object file: " +

@@ -40,6 +40,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstdlib>
@@ -4595,7 +4596,8 @@ LLVMBool LLVMCreateMemoryBufferWithContentsOfFile(
     LLVMMemoryBufferRef *OutMemBuf,
     char **OutMessage) {
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = VFS->getBufferForFile(Path);
   if (std::error_code EC = MBOrErr.getError()) {
     *OutMessage = strdup(EC.message().c_str());
     return 1;

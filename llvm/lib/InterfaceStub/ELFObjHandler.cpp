@@ -17,6 +17,7 @@
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 
 using llvm::object::ELFObjectFile;
@@ -662,8 +663,9 @@ static Error writeELFBinaryToFile(StringRef FilePath, const IFSStub &Stub,
   Builder.write(Buf.data());
 
   if (WriteIfChanged) {
+    auto VFS = vfs::getRealFileSystem();
     if (ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError =
-            MemoryBuffer::getFile(FilePath)) {
+            VFS->getBufferForFile(FilePath)) {
       // Compare Stub output with existing Stub file.
       // If Stub file unchanged, abort updating.
       if ((*BufOrError)->getBufferSize() == Builder.getSize() &&

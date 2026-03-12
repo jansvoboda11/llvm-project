@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
@@ -65,7 +66,8 @@ private:
 
 /// Gets all of the blocks specified in the input file.
 void BlockExtractor::loadFile() {
-  auto ErrOrBuf = MemoryBuffer::getFile(BlockExtractorFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto ErrOrBuf = VFS->getBufferForFile(BlockExtractorFile);
   if (ErrOrBuf.getError())
     report_fatal_error("BlockExtractor couldn't load the file.");
   // Read the file.

@@ -42,6 +42,7 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/SHA1.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/CallPromotionUtils.h"
@@ -6414,8 +6415,10 @@ MemProfContextDisambiguation::MemProfContextDisambiguation(
   if (MemProfImportSummary.empty())
     return;
 
+  auto VFS = vfs::getRealFileSystem();
   auto ReadSummaryFile =
-      errorOrToExpected(MemoryBuffer::getFile(MemProfImportSummary));
+      errorOrToExpected(
+          VFS->getBufferForFile(MemProfImportSummary));
   if (!ReadSummaryFile) {
     logAllUnhandledErrors(ReadSummaryFile.takeError(), errs(),
                           "Error loading file '" + MemProfImportSummary +

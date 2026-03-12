@@ -75,6 +75,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include <memory>
 #include <string>
@@ -249,8 +250,9 @@ using PatternRewriteNamedAliasDescriptor =
 
 bool RewriteMapParser::parse(const std::string &MapFile,
                              RewriteDescriptorList *DL) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> Mapping =
-      MemoryBuffer::getFile(MapFile);
+      VFS->getBufferForFile(MapFile);
 
   if (!Mapping)
     report_fatal_error(Twine("unable to read rewrite map '") + MapFile +

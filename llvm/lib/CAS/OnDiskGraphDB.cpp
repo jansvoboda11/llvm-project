@@ -62,6 +62,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <atomic>
 #include <mutex>
 #include <optional>
@@ -969,8 +970,8 @@ Error OnDiskGraphDB::validate(bool Deep, HashingFuncT Hasher) const {
       // If need to validate the content of the file later, just load the
       // buffer here. Otherwise, just check the existance of the file.
       if (Deep) {
-        auto File = MemoryBuffer::getFile(Path, /*IsText=*/false,
-                                          /*RequiresNullTerminator=*/false);
+        auto VFS = vfs::getRealFileSystem();
+        auto File = VFS->getBufferForFile(Path, -1, /*RequiresNullTerminator=*/false);
         if (!File || !*File)
           return formatError("record file \'" + Path + "\' does not exist");
 
@@ -1659,7 +1660,8 @@ Error OnDiskGraphDB::storeFile(
     return createFileError(FilePath, EC);
 
   if (FileSize <= TrieRecord::MaxEmbeddedSize) {
-    auto Buf = MemoryBuffer::getFile(FilePath);
+    auto VFS = vfs::getRealFileSystem();
+    auto Buf = VFS->getBufferForFile(FilePath);
     if (!Buf)
       return createFileError(FilePath, Buf.getError());
     return store(ID, {}, arrayRefFromStringRef<char>((*Buf)->getBuffer()));

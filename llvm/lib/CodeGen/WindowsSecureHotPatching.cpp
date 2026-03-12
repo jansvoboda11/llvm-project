@@ -147,6 +147,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 
@@ -217,7 +218,8 @@ bool WindowsSecureHotPatching::doInitialization(Module &M) {
     std::vector<std::string> HotPatchFunctionsList;
 
     if (!LLVMMSSecureHotPatchFunctionsFile.empty()) {
-      auto BufOrErr = MemoryBuffer::getFile(LLVMMSSecureHotPatchFunctionsFile);
+      auto VFS = vfs::getRealFileSystem();
+      auto BufOrErr = VFS->getBufferForFile(LLVMMSSecureHotPatchFunctionsFile);
       if (BufOrErr) {
         const MemoryBuffer &FileBuffer = **BufOrErr;
         for (line_iterator I(FileBuffer.getMemBufferRef(), true), E; I != E;

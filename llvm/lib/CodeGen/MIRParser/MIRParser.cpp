@@ -36,6 +36,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 #include <memory>
@@ -1307,7 +1308,11 @@ bool MIRParser::parseMachineFunctions(Module &M, ModuleAnalysisManager &MAM) {
 std::unique_ptr<MIRParser> llvm::createMIRParserFromFile(
     StringRef Filename, SMDiagnostic &Error, LLVMContext &Context,
     std::function<void(Function &)> ProcessIRFunction) {
-  auto FileOrErr = MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+  auto VFS = vfs::getRealFileSystem();
+  auto FileOrErr = Filename == "-"
+                       ? MemoryBuffer::getSTDIN()
+                       : VFS->getBufferForFile(Filename, -1,
+                                               true);
   if (std::error_code EC = FileOrErr.getError()) {
     Error = SMDiagnostic(Filename, SourceMgr::DK_Error,
                          "could not open input file: " + EC.message());

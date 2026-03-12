@@ -13,6 +13,7 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -279,8 +280,8 @@ file_magic llvm::identify_magic(StringRef Magic) {
 }
 
 std::error_code llvm::identify_magic(const Twine &Path, file_magic &Result) {
-  auto FileOrError = MemoryBuffer::getFile(Path, /*IsText=*/false,
-                                           /*RequiresNullTerminator=*/false);
+  auto VFS = vfs::getRealFileSystem();
+  auto FileOrError = VFS->getBufferForFile(Path, -1, /*RequiresNullTerminator=*/false);
   if (!FileOrError)
     return FileOrError.getError();
 

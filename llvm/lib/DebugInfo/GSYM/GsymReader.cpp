@@ -18,6 +18,7 @@
 #include "llvm/Support/BinaryStreamReader.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace gsym;
@@ -31,8 +32,10 @@ GsymReader::~GsymReader() = default;
 
 llvm::Expected<GsymReader> GsymReader::openFile(StringRef Filename) {
   // Open the input file and return an appropriate error if needed.
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(Filename);
   auto Err = BuffOrErr.getError();
   if (Err)
     return llvm::errorCodeToError(Err);

@@ -15,6 +15,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 #include <vector>
@@ -149,7 +150,8 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(FunctionYAML)
 
 Error CallSiteInfoLoader::loadYAML(StringRef YAMLFile) {
   // Step 1: Read YAML file
-  auto BufferOrError = MemoryBuffer::getFile(YAMLFile, /*IsText=*/true);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufferOrError = VFS->getBufferForFile(YAMLFile);
   if (!BufferOrError)
     return errorCodeToError(BufferOrError.getError());
 

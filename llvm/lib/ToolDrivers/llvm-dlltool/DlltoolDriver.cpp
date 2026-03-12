@@ -21,6 +21,7 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Host.h"
 
 #include <optional>
@@ -63,7 +64,8 @@ public:
 
 // Opens a file. Path has to be resolved already.
 std::unique_ptr<MemoryBuffer> openFile(const Twine &Path) {
-  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> MB = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> MB = VFS->getBufferForFile(Path);
 
   if (std::error_code EC = MB.getError()) {
     llvm::errs() << "cannot open file " << Path << ": " << EC.message() << "\n";
@@ -251,8 +253,9 @@ bool identifyImportName(const COFFObjectFile &Obj, StringRef ObjName,
 }
 
 int doIdentify(StringRef File, bool IdentifyStrict) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MaybeBuf = MemoryBuffer::getFile(
-      File, /*IsText=*/false, /*RequiredNullTerminator=*/false);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MaybeBuf = VFS->getBufferForFile(
+      File, -1, /*RequiresNullTerminator=*/false);
   if (!MaybeBuf)
     return printError(errorCodeToError(MaybeBuf.getError()), File);
   if (identify_magic(MaybeBuf.get()->getBuffer()) != file_magic::archive) {

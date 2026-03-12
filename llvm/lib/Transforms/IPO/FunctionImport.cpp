@@ -699,7 +699,9 @@ class WorkloadImportsManager : public ModuleImportsManager {
       });
     };
     std::error_code EC;
-    auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(WorkloadDefinitions);
+    auto VFS = vfs::getRealFileSystem();
+    auto BufferOrErr = WorkloadDefinitions == "-" ? MemoryBuffer::getSTDIN()
+        : VFS->getBufferForFile(WorkloadDefinitions);
     if (std::error_code EC = BufferOrErr.getError()) {
       report_fatal_error("Failed to open context file");
       return;
@@ -756,7 +758,9 @@ class WorkloadImportsManager : public ModuleImportsManager {
 
   void loadFromCtxProf() {
     std::error_code EC;
-    auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(UseCtxProfile);
+    auto VFS = vfs::getRealFileSystem();
+    auto BufferOrErr = UseCtxProfile == "-" ? MemoryBuffer::getSTDIN()
+        : VFS->getBufferForFile(UseCtxProfile);
     if (std::error_code EC = BufferOrErr.getError()) {
       report_fatal_error("Failed to open contextual profile file");
       return;

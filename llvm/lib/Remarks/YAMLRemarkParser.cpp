@@ -16,6 +16,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 
 using namespace llvm;
@@ -125,8 +126,9 @@ Expected<std::unique_ptr<YAMLRemarkParser>> remarks::createYAMLParserFromMeta(
       sys::path::append(FullPath, ExternalFilePath);
 
       // Try to open the file and start parsing from there.
+      auto VFS = vfs::getRealFileSystem();
       ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-          MemoryBuffer::getFile(FullPath);
+          VFS->getBufferForFile(FullPath);
       if (std::error_code EC = BufferOrErr.getError())
         return createFileError(FullPath, EC);
 

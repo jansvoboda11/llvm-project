@@ -70,7 +70,8 @@ ErrorOr<std::unique_ptr<MemoryBuffer>>
 SourceMgr::OpenIncludeFile(const std::string &Filename,
                            std::string &IncludedFile) {
   auto GetFile = [this](StringRef Path) {
-    return FS ? FS->getBufferForFile(Path) : MemoryBuffer::getFile(Path);
+    auto VFS = FS ? FS : vfs::getRealFileSystem();
+    return VFS->getBufferForFile(Path);
   };
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> NewBufOrErr = GetFile(Filename);

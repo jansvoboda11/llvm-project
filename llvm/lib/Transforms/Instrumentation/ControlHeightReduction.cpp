@@ -34,6 +34,7 @@
 #include "llvm/Support/BranchProbability.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
@@ -78,8 +79,9 @@ static StringSet<> CHRModules;
 static StringSet<> CHRFunctions;
 
 static void parseCHRFilterFiles() {
+  auto VFS = vfs::getRealFileSystem();
   if (!CHRModuleList.empty()) {
-    auto FileOrErr = MemoryBuffer::getFile(CHRModuleList);
+    auto FileOrErr = VFS->getBufferForFile(CHRModuleList);
     if (!FileOrErr) {
       errs() << "Error: Couldn't read the chr-module-list file " << CHRModuleList << "\n";
       std::exit(1);
@@ -94,7 +96,7 @@ static void parseCHRFilterFiles() {
     }
   }
   if (!CHRFunctionList.empty()) {
-    auto FileOrErr = MemoryBuffer::getFile(CHRFunctionList);
+    auto FileOrErr = VFS->getBufferForFile(CHRFunctionList);
     if (!FileOrErr) {
       errs() << "Error: Couldn't read the chr-function-list file " << CHRFunctionList << "\n";
       std::exit(1);

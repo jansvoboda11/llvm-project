@@ -17,6 +17,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cmath>
@@ -39,8 +40,9 @@ class SourceCode {
     if (EmbeddedSource)
       return EmbeddedSource;
     else {
+      auto VFS = vfs::getRealFileSystem();
       ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-          MemoryBuffer::getFile(FileName);
+          VFS->getBufferForFile(FileName);
       if (!BufOrErr)
         return std::nullopt;
       MemBuf = std::move(*BufOrErr);

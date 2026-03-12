@@ -21,6 +21,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace mir2vec;
@@ -461,7 +462,9 @@ Error MIR2VecVocabProvider::readVocabulary(VocabMap &OpcodeVocab,
         "MIR2Vec vocabulary file path not specified; set it "
         "using --mir2vec-vocab-path");
 
-  auto BufOrError = MemoryBuffer::getFileOrSTDIN(VocabFile, /*IsText=*/true);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufOrError = VocabFile == "-" ? MemoryBuffer::getSTDIN()
+      : VFS->getBufferForFile(VocabFile);
   if (!BufOrError)
     return createFileError(VocabFile, BufOrError.getError());
 

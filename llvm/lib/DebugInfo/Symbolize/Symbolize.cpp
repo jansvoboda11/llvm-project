@@ -34,6 +34,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <cassert>
 #include <cstring>
 
@@ -313,8 +314,9 @@ std::string getDarwinDWARFResourceForPath(const std::string &Path,
 }
 
 bool checkFileCRC(StringRef Path, uint32_t CRCHash) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> MB =
-      MemoryBuffer::getFileOrSTDIN(Path);
+      VFS->getBufferForFile(Path);
   if (!MB)
     return false;
   return CRCHash == llvm::crc32(arrayRefFromStringRef(MB.get()->getBuffer()));

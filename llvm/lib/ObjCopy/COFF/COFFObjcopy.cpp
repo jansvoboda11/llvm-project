@@ -19,6 +19,7 @@
 #include "llvm/Support/CRC.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <cassert>
 
 namespace llvm {
@@ -42,8 +43,9 @@ static uint64_t getNextRVA(const Object &Obj) {
 
 static Expected<std::vector<uint8_t>>
 createGnuDebugLinkSectionContents(StringRef File) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> LinkTargetOrErr =
-      MemoryBuffer::getFile(File);
+      VFS->getBufferForFile(File);
   if (!LinkTargetOrErr)
     return createFileError(File, LinkTargetOrErr.getError());
   auto LinkTarget = std::move(*LinkTargetOrErr);

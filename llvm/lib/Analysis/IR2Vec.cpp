@@ -26,6 +26,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace ir2vec;
@@ -482,8 +483,10 @@ using VocabMap = std::map<std::string, Embedding>;
 /// Read vocabulary JSON file and populate the section maps.
 Error readVocabularyFromFile(StringRef VocabFilePath, VocabMap &OpcVocab,
                              VocabMap &TypeVocab, VocabMap &ArgVocab) {
+  auto VFS = vfs::getRealFileSystem();
   auto BufOrError =
-      MemoryBuffer::getFileOrSTDIN(VocabFilePath, /*IsText=*/true);
+      VocabFilePath == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(VocabFilePath);
   if (!BufOrError)
     return createFileError(VocabFilePath, BufOrError.getError());
 

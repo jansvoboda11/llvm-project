@@ -21,6 +21,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <optional>
@@ -613,9 +614,10 @@ public:
   LineConsumer(StringRef Filename) {
     // Open source files without requiring a NUL terminator. The concurrent
     // modification may nullify the NUL terminator condition.
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/false,
-                                     /*RequiresNullTerminator=*/false);
+        VFS->getBufferForFile(Filename, -1,
+                              /*RequiresNullTerminator=*/false);
     if (std::error_code EC = BufferOrErr.getError()) {
       errs() << Filename << ": " << EC.message() << "\n";
       Remaining = "";

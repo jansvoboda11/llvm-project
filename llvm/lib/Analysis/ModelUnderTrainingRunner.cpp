@@ -17,6 +17,7 @@
 #include "llvm/Analysis/ModelUnderTrainingRunner.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 
 using namespace llvm;
@@ -36,7 +37,9 @@ loadOutputSpecs(LLVMContext &Ctx, StringRef ExpectedDecisionName,
     FileName = {OutputSpecsPath.data(), OutputSpecsPath.size()};
   }
 
-  auto BufferOrError = MemoryBuffer::getFileOrSTDIN(FileName);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufferOrError = FileName == "-" ? MemoryBuffer::getSTDIN()
+      : VFS->getBufferForFile(FileName);
   if (!BufferOrError) {
     Ctx.emitError("Error opening output specs file: " + FileName + " : " +
                   BufferOrError.getError().message());

@@ -719,8 +719,9 @@ Error lto::thinBackend(const Config &Conf, unsigned Task, AddStreamFn AddStream,
                                      /*IsImporting*/ true);
     }
 
+    auto VFS = llvm::vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> MBOrErr =
-        llvm::MemoryBuffer::getFile(Identifier);
+        VFS->getBufferForFile(Identifier);
     if (!MBOrErr)
       return Expected<std::unique_ptr<llvm::Module>>(make_error<StringError>(
           Twine("Error loading imported file ") + Identifier + " : ",

@@ -13,6 +13,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
@@ -99,7 +100,9 @@ PreservedAnalyses ForceFunctionAttrsPass::run(Module &M,
                                               ModuleAnalysisManager &) {
   bool Changed = false;
   if (!CSVFilePath.empty()) {
-    auto BufferOrError = MemoryBuffer::getFileOrSTDIN(CSVFilePath);
+    auto VFS = vfs::getRealFileSystem();
+    auto BufferOrError = CSVFilePath == "-" ? MemoryBuffer::getSTDIN()
+        : VFS->getBufferForFile(CSVFilePath);
     if (!BufferOrError) {
       std::error_code EC = BufferOrError.getError();
       M.getContext().emitError("cannot open CSV file: " + EC.message());

@@ -17,6 +17,7 @@
 #include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 #include "llvm/DebugInfo/PDB/PDB.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace llvm::object;
@@ -126,8 +127,10 @@ static std::string searchForObj(const StringRef Path,
   SmallString<128> ObjPath(Path);
   llvm::sys::path::replace_extension(ObjPath, Extension);
   if (llvm::sys::fs::exists(ObjPath)) {
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-        MemoryBuffer::getFileOrSTDIN(ObjPath);
+        ObjPath == "-" ? MemoryBuffer::getSTDIN()
+            : VFS->getBufferForFile(ObjPath);
     if (!BuffOrErr)
       return {};
     return std::string(ObjPath);
@@ -204,8 +207,10 @@ Error LVReaderHandler::handleFile(LVReaders &Readers, StringRef Filename,
   // Convert any Windows backslashes into forward slashes to get the path.
   std::string ConvertedPath =
       sys::path::convert_to_slash(Filename, sys::path::Style::windows);
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(ConvertedPath);
+      ConvertedPath == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(ConvertedPath);
   if (BuffOrErr.getError()) {
     return createStringError(errc::bad_file_descriptor,
                              "File '%s' does not exist.",

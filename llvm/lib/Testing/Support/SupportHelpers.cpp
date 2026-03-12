@@ -6,6 +6,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #include "gtest/gtest.h"
 
@@ -39,7 +40,8 @@ SmallString<128> llvm::unittest::getInputFileDirectory(const char *Argv0) {
 
   EXPECT_TRUE(Found) << "Unit test source directory file does not exist.";
 
-  auto File = MemoryBuffer::getFile(InputFilePath, /*IsText=*/true);
+  auto VFS = vfs::getRealFileSystem();
+  auto File = VFS->getBufferForFile(InputFilePath);
 
   EXPECT_TRUE(static_cast<bool>(File))
       << "Could not open unit test source directory file.";

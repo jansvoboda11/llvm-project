@@ -28,6 +28,7 @@
 #include "llvm/IR/Mangler.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #define DEBUG_TYPE "orc"
 
@@ -1141,7 +1142,8 @@ Expected<JITDylibSP> ExecutorNativePlatform::operator()(LLJIT &J) {
 
   std::unique_ptr<MemoryBuffer> RuntimeArchiveBuffer;
   if (OrcRuntime.index() == 0) {
-    auto A = errorOrToExpected(MemoryBuffer::getFile(std::get<0>(OrcRuntime)));
+    auto VFS = vfs::getRealFileSystem();
+    auto A = errorOrToExpected(VFS->getBufferForFile(std::get<0>(OrcRuntime)));
     if (!A)
       return A.takeError();
     RuntimeArchiveBuffer = std::move(*A);

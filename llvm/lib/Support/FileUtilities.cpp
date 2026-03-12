@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <cstdint>
@@ -181,7 +182,8 @@ int llvm::DiffFilesWithTolerance(StringRef NameA,
                                  std::string *Error) {
   // Now its safe to mmap the files into memory because both files
   // have a non-zero size.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> F1OrErr = MemoryBuffer::getFile(NameA);
+  auto VFS = vfs::getRealFileSystem();
+  ErrorOr<std::unique_ptr<MemoryBuffer>> F1OrErr = VFS->getBufferForFile(NameA);
   if (std::error_code EC = F1OrErr.getError()) {
     if (Error)
       *Error = EC.message();
@@ -189,7 +191,7 @@ int llvm::DiffFilesWithTolerance(StringRef NameA,
   }
   MemoryBuffer &F1 = *F1OrErr.get();
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> F2OrErr = MemoryBuffer::getFile(NameB);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> F2OrErr = VFS->getBufferForFile(NameB);
   if (std::error_code EC = F2OrErr.getError()) {
     if (Error)
       *Error = EC.message();

@@ -38,6 +38,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ThreadPool.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/xxhash.h"
 
 #include <atomic>
@@ -236,8 +237,9 @@ static SmallVector<std::string, 0> getHeaders() {
   const char *Filename = getenv("DEBUGINFOD_HEADERS_FILE");
   if (!Filename)
     return {};
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> HeadersFile =
-      MemoryBuffer::getFile(Filename, /*IsText=*/true);
+      VFS->getBufferForFile(Filename);
   if (!HeadersFile)
     return {};
 

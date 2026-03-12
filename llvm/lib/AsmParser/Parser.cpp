@@ -187,8 +187,10 @@ llvm::parseSummaryIndexAssembly(MemoryBufferRef F, SMDiagnostic &Err) {
 
 std::unique_ptr<ModuleSummaryIndex>
 llvm::parseSummaryIndexAssemblyFile(StringRef Filename, SMDiagnostic &Err) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+      Filename == "-" ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(Filename);
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());

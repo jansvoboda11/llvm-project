@@ -20,6 +20,7 @@
 #include "llvm/ExecutionEngine/Orc/EPCDynamicLibrarySearchGenerator.h"
 
 #include "llvm/ExecutionEngine/JITLink/x86_64.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #define DEBUG_TYPE "orc"
 
@@ -226,7 +227,8 @@ COFFPlatform::Create(ObjectLinkingLayer &ObjLinkingLayer, JITDylib &PlatformJD,
                      const char *VCRuntimePath,
                      std::optional<SymbolAliasMap> RuntimeAliases) {
 
-  auto ArchiveBuffer = MemoryBuffer::getFile(OrcRuntimePath);
+  auto VFS = vfs::getRealFileSystem();
+  auto ArchiveBuffer = VFS->getBufferForFile(OrcRuntimePath);
   if (!ArchiveBuffer)
     return createFileError(OrcRuntimePath, ArchiveBuffer.getError());
 

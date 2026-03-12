@@ -85,6 +85,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -241,7 +242,8 @@ static Error validateOutOfProcess(StringRef LLVMCasBinary, StringRef RootPath,
       Err += ": ";
       Err += ErrMsg;
     }
-    auto StdErrBuf = MemoryBuffer::getFile(StdErrPath.c_str());
+    auto VFS = vfs::getRealFileSystem();
+    auto StdErrBuf = VFS->getBufferForFile(StdErrPath.c_str());
     if (StdErrBuf && !(*StdErrBuf)->getBuffer().empty()) {
       Err += ": ";
       Err += (*StdErrBuf)->getBuffer();

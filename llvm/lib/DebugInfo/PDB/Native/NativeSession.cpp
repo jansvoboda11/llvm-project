@@ -37,6 +37,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #include <cassert>
 #include <memory>
@@ -102,9 +103,9 @@ static Error validatePdbMagic(StringRef PdbPath) {
 
 static Expected<std::unique_ptr<PDBFile>>
 loadPdbFile(StringRef PdbPath, std::unique_ptr<BumpPtrAllocator> &Allocator) {
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> ErrorOrBuffer =
-      MemoryBuffer::getFile(PdbPath, /*IsText=*/false,
-                            /*RequiresNullTerminator=*/false);
+      VFS->getBufferForFile(PdbPath, -1, /*RequiresNullTerminator=*/false);
   if (!ErrorOrBuffer)
     return make_error<RawError>(ErrorOrBuffer.getError());
   std::unique_ptr<llvm::MemoryBuffer> Buffer = std::move(*ErrorOrBuffer);

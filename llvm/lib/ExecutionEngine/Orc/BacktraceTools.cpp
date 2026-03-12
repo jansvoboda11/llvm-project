@@ -13,6 +13,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 namespace llvm::orc {
 
@@ -60,7 +61,8 @@ void SymbolTableDumpPlugin::modifyPassConfig(
 }
 
 Expected<DumpedSymbolTable> DumpedSymbolTable::Create(StringRef Path) {
-  auto MB = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  auto MB = VFS->getBufferForFile(Path);
   if (!MB)
     return createFileError(Path, MB.getError());
 

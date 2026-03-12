@@ -14,6 +14,7 @@
 #include "BitstreamRemarkParser.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 
 using namespace llvm;
@@ -394,8 +395,9 @@ Error BitstreamRemarkParser::processExternalFilePath() {
   // External file: open the external file, parse it, check if its metadata
   // matches the one from the separate metadata, then replace the current
   // parser with the one parsing the remarks.
+  auto VFS = vfs::getRealFileSystem();
   ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(FullPath);
+      VFS->getBufferForFile(FullPath);
   if (std::error_code EC = BufferOrErr.getError())
     return createFileError(FullPath, EC);
 

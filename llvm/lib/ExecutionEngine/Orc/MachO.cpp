@@ -16,6 +16,7 @@
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/TapiUniversal.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 #define DEBUG_TYPE "orc"
 
@@ -326,7 +327,8 @@ getDylibInterfaceFromDylib(ExecutionSession &ES, Twine Path,
   if (!InitCPUSubType)
     return InitCPUSubType.takeError();
 
-  auto Buf = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  auto Buf = VFS->getBufferForFile(Path);
   if (!Buf)
     return createFileError(Path, Buf.getError());
 
@@ -391,7 +393,8 @@ getDylibInterfaceFromTapiFile(ExecutionSession &ES, Twine Path,
                               GetFallbackArchsFn GetFallbackArchs) {
   SymbolNameSet Symbols;
 
-  auto TapiFileBuffer = MemoryBuffer::getFile(Path);
+  auto VFS = vfs::getRealFileSystem();
+  auto TapiFileBuffer = VFS->getBufferForFile(Path);
   if (!TapiFileBuffer)
     return createFileError(Path, TapiFileBuffer.getError());
 

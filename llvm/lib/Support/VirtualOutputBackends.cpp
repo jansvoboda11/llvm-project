@@ -24,6 +24,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Support/VirtualOutputError.h"
 
@@ -484,7 +485,8 @@ Error OnDiskOutputFile::keep() {
   // See if we should append instead of move.
   if (Config.getAppend() && OutputPath != "-") {
     // Read TempFile for the content to append.
-    auto Content = MemoryBuffer::getFile(*TempPath);
+    auto VFS = vfs::getRealFileSystem();
+    auto Content = VFS->getBufferForFile(*TempPath);
     if (!Content)
       return convertToTempFileOutputError(*TempPath, OutputPath,
                                           Content.getError());

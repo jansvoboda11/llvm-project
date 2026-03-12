@@ -17,6 +17,7 @@
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <memory>
 
 using namespace llvm;
@@ -31,7 +32,12 @@ ReplayInlineAdvisor::ReplayInlineAdvisor(
     : InlineAdvisor(M, FAM, IC), OriginalAdvisor(std::move(OriginalAdvisor)),
       ReplaySettings(ReplaySettings), EmitRemarks(EmitRemarks) {
 
-  auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(ReplaySettings.ReplayFile);
+  auto VFS = vfs::getRealFileSystem();
+  auto BufferOrErr =
+      ReplaySettings.ReplayFile == "-"
+          ? MemoryBuffer::getSTDIN()
+          : VFS->getBufferForFile(
+                ReplaySettings.ReplayFile);
   std::error_code EC = BufferOrErr.getError();
   if (EC) {
     Context.emitError("Could not open remarks file: " + EC.message());

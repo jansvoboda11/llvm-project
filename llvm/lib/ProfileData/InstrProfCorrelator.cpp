@@ -17,6 +17,7 @@
 #include "llvm/Object/MachO.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include <optional>
 
@@ -150,14 +151,17 @@ InstrProfCorrelator::get(StringRef Filename, ProfCorrelatorKind FileKind,
             "using multiple objects is not yet supported");
       Filename = *DsymObjectsOrErr->begin();
     }
-    auto BufferOrErr = errorOrToExpected(MemoryBuffer::getFile(Filename));
+    auto VFS = vfs::getRealFileSystem();
+    auto BufferOrErr =
+        errorOrToExpected(VFS->getBufferForFile(Filename));
     if (auto Err = BufferOrErr.takeError())
       return std::move(Err);
 
     return get(std::move(*BufferOrErr), FileKind);
   }
   if (FileKind == BINARY) {
-    auto BufferOrErr = errorOrToExpected(MemoryBuffer::getFile(Filename));
+    auto BufferOrErr =
+        errorOrToExpected(VFS->getBufferForFile(Filename));
     if (auto Err = BufferOrErr.takeError())
       return std::move(Err);
 

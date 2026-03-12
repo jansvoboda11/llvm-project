@@ -708,7 +708,7 @@ bool llvm::findVCToolChainViaSetupConfig(
     sys::path::append(ToolsVersionFilePath, "Auxiliary", "Build",
                       "Microsoft.VCToolsVersion.default.txt");
 
-    auto ToolsVersionFile = MemoryBuffer::getFile(ToolsVersionFilePath);
+    auto ToolsVersionFile = VFS.getBufferForFile(ToolsVersionFilePath);
     if (!ToolsVersionFile)
       return false;
 

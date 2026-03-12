@@ -32,6 +32,7 @@
 #include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/WithColor.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -372,12 +373,13 @@ Error LVCodeViewReader::loadTypeServer(TypeServer2Record &TS) {
   });
 
   SmallString<128> ServerName(TS.getName());
-  BuffOrErr = MemoryBuffer::getFile(ServerName);
+  auto VFS = vfs::getRealFileSystem();
+  BuffOrErr = VFS->getBufferForFile(ServerName);
   if (BuffOrErr.getError()) {
     // The server name does not exist. Try in the same directory as the
     // input file.
     ServerName = createAlternativePath(ServerName);
-    BuffOrErr = MemoryBuffer::getFile(ServerName);
+    BuffOrErr = VFS->getBufferForFile(ServerName);
     if (BuffOrErr.getError()) {
       // For the error message, use the original type server name.
       return createStringError(errc::bad_file_descriptor,
@@ -428,7 +430,8 @@ Error LVCodeViewReader::loadPrecompiledObject(PrecompRecord &Precomp,
   });
 
   SmallString<128> ServerName(Precomp.getPrecompFilePath());
-  BuffOrErr = MemoryBuffer::getFile(ServerName);
+  auto VFS = vfs::getRealFileSystem();
+  BuffOrErr = VFS->getBufferForFile(ServerName);
   if (BuffOrErr.getError()) {
     // The server name does not exist. Try in the directory as the input file.
     ServerName = createAlternativePath(ServerName);
@@ -900,8 +903,10 @@ Error LVCodeViewReader::createScopes(PDBFile &Pdb) {
   // Open the executable associated with the PDB file and get the section
   // addresses used to calculate linear addresses for CodeView Symbols.
   if (!ExePath.empty()) {
+    auto VFS = vfs::getRealFileSystem();
     ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-        MemoryBuffer::getFileOrSTDIN(ExePath);
+        ExePath == "-" ? MemoryBuffer::getSTDIN()
+            : VFS->getBufferForFile(ExePath);
     if (BuffOrErr.getError()) {
       return createStringError(errc::bad_file_descriptor,
                                "File '%s' does not exist.", ExePath.c_str());
