@@ -815,6 +815,12 @@ private:
   /// declarations in that submodule that could be made visible.
   HiddenNamesMapType HiddenNamesMap;
 
+  /// The name visibility of submodules that have been made visible by
+  /// \c makeModuleVisible() but haven't been deserialized yet. Applied when
+  /// the submodule gets deserialized.
+  llvm::DenseMap<serialization::SubmoduleID, Module::NameVisibilityKind>
+      PendingNameVisibility;
+
   /// A vector containing selectors that have already been loaded.
   ///
   /// This vector is indexed by the Selector ID (-1). NULL selector
@@ -1701,6 +1707,15 @@ public:
   getModuleFileLevelDecls(ModuleFile &Mod);
 
 private:
+  /// Get the deserialized submodule with the given global ID, if any.
+  Module *getLoadedSubmodule(serialization::SubmoduleID GlobalID) const;
+
+  /// Get the entry of the given submodule in the \c SUBMODULE_VISIBILITY_GRAPH
+  /// record, if it's usable. Sets \p F to the module file of the submodule.
+  std::optional<ArrayRef<llvm::support::ulittle32_t>>
+  getSubmoduleVisibilityGraphEntry(serialization::SubmoduleID GlobalID,
+                                   ModuleFile *&F);
+
   bool isConsumerInterestedIn(Decl *D);
   void PassInterestingDeclsToConsumer();
   void PassInterestingDeclToConsumer(Decl *D);
@@ -2411,6 +2426,13 @@ public:
 
   /// Retrieve the submodule that corresponds to a global submodule ID.
   Module *getSubmodule(uint32_t GlobalID) override;
+
+  std::optional<unsigned> getSubmoduleVisibilityID(uint64_t GlobalID) override;
+  std::optional<bool> isSubmoduleUnimportable(uint64_t GlobalID) override;
+  bool getSubmoduleExports(uint64_t GlobalID,
+                           SmallVectorImpl<uint64_t> &Exports) override;
+  bool getSubmoduleConflicts(uint64_t GlobalID,
+                             SmallVectorImpl<uint64_t> &Conflicts) override;
 
   /// Retrieve the module that corresponds to the given module ID.
   ///

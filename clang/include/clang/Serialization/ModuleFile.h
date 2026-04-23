@@ -460,6 +460,15 @@ public:
   /// Remapping table for submodule IDs in this module.
   ContinuousRangeMap<uint32_t, int, 2> SubmoduleRemap;
 
+  /// Whether \c Module::VisibilityID values have been reserved for the
+  /// submodules in this module file, starting at \c BaseVisibilityID. This is
+  /// the case when the submodules are deserialized lazily.
+  bool HasReservedVisibilityIDs = false;
+
+  /// The first \c Module::VisibilityID reserved for submodules in this module
+  /// file.
+  unsigned BaseVisibilityID = 0;
+
   /// The cursor to the start of the submodules block.
   llvm::BitstreamCursor SubmodulesCursor;
 
@@ -468,6 +477,14 @@ public:
 
   /// Relative offsets for all submodule entries in the AST file.
   const llvm::support::unaligned_uint64_t *SubmoduleOffsets = nullptr;
+
+  /// The offsets of per-submodule entries in \c SubmoduleVisibilityGraph, from
+  /// the \c SUBMODULE_VISIBILITY_GRAPH record. Has \c LocalNumSubmodules + 1
+  /// elements.
+  const llvm::support::ulittle32_t *SubmoduleVisibilityGraphOffsets = nullptr;
+
+  /// The per-submodule entries from the \c SUBMODULE_VISIBILITY_GRAPH record.
+  const llvm::support::ulittle32_t *SubmoduleVisibilityGraph = nullptr;
 
   // === Selectors ===
 

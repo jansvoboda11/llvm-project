@@ -770,14 +770,21 @@ ModuleMap::findOrCreateModuleForHeaderInUmbrellaDir(FileEntryRef File) {
       // the directory of the umbrella header and the directory where
       // the actual header is located.
       bool Explicit = UmbrellaModule->InferExplicitSubmodules;
+      auto FindOrCreateSubmodule = [&](StringRef Name, Module *Parent) {
+        // Deserialize the submodule if it comes from an AST file, instead of
+        // creating a separate Module object for it.
+        if (Module *Existing = lookupModuleQualified(Name, Parent))
+          return Existing;
+        return findOrCreateModuleFirst(Name, Parent, /*IsFramework=*/false,
+                                       Explicit);
+      };
 
       for (DirectoryEntryRef SkippedDir : llvm::reverse(SkippedDirs)) {
         // Find or create the module that corresponds to this directory name.
         SmallString<32> NameBuf;
         StringRef Name = sanitizeFilenameAsIdentifier(
             llvm::sys::path::stem(SkippedDir.getName()), NameBuf);
-        Result = findOrCreateModuleFirst(Name, Result, /*IsFramework=*/false,
-                                         Explicit);
+        Result = FindOrCreateSubmodule(Name, Result);
         setInferredModuleAllowedBy(Result, UmbrellaModuleMap);
 
         // Associate the module and the directory.
@@ -785,23 +792,26 @@ ModuleMap::findOrCreateModuleForHeaderInUmbrellaDir(FileEntryRef File) {
 
         // If inferred submodules export everything they import, add a
         // wildcard to the set of exports.
-        if (UmbrellaModule->InferExportWildcard && Result->Exports.empty())
+        if (UmbrellaModule->InferExportWildcard && Result->Exports.empty()) {
           Result->Exports.push_back(Module::ExportDecl(nullptr, true));
+          Result->invalidateVisibilityGraphSource();
+        }
       }
 
       // Infer a submodule with the same name as this header file.
       SmallString<32> NameBuf;
       StringRef Name = sanitizeFilenameAsIdentifier(
                          llvm::sys::path::stem(File.getName()), NameBuf);
-      Result = findOrCreateModuleFirst(Name, Result, /*IsFramework=*/false,
-                                       Explicit);
+      Result = FindOrCreateSubmodule(Name, Result);
       setInferredModuleAllowedBy(Result, UmbrellaModuleMap);
       Result->addTopHeader(File);
 
       // If inferred submodules export everything they import, add a
       // wildcard to the set of exports.
-      if (UmbrellaModule->InferExportWildcard && Result->Exports.empty())
+      if (UmbrellaModule->InferExportWildcard && Result->Exports.empty()) {
         Result->Exports.push_back(Module::ExportDecl(nullptr, true));
+        Result->invalidateVisibilityGraphSource();
+      }
     } else {
       // Record each of the directories we stepped through as being part of
       // the module we found, since the umbrella header covers them all.
@@ -952,7 +962,7 @@ Module *ModuleMap::findOrInferSubmodule(Module *Parent, StringRef Name) {
     return nullptr;
   Module *Result = new (ModulesAlloc.Allocate())
       Module(ModuleConstructorTag{}, Name, SourceLocation(), Parent, false,
-             Parent->InferExplicitSubmodules, 0);
+             Parent->InferExplicitSubmodules, NumCreatedModules++);
   Result->InferExplicitSubmodules = Parent->InferExplicitSubmodules;
   Result->InferSubmodules = Parent->InferSubmodules;
   Result->InferExportWildcard = Parent->InferExportWildcard;
@@ -994,12 +1004,18 @@ std::pair<Module *, bool> ModuleMap::findOrCreateModule(StringRef Name,
 
 Module *ModuleMap::createModule(StringRef Name, Module *Parent,
                                 bool IsFramework, bool IsExplicit) {
-  assert(!lookupModuleQualified(Name, Parent).getExisting() &&
-         "Creating duplicate submodule");
+  ModuleRef ResultRef = lookupModuleQualified(Name, Parent);
+  assert(!ResultRef.getExisting() && "Creating duplicate submodule");
+
+  // If this submodule hasn't been deserialized yet, ASTReader might have
+  // reserved its visibility ID and propagated visibility through it already.
+  std::optional<unsigned> VisibilityID = ResultRef.getReservedVisibilityID();
+  if (!VisibilityID)
+    VisibilityID = NumCreatedModules++;
 
   Module *Result = new (ModulesAlloc.Allocate())
       Module(ModuleConstructorTag{}, Name, SourceLocation(), Parent,
-             IsFramework, IsExplicit, NumCreatedModules++);
+             IsFramework, IsExplicit, *VisibilityID);
   if (!Parent) {
     if (LangOpts.CurrentModule == Name)
       SourceModule = Result;

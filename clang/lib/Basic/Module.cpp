@@ -675,6 +675,80 @@ LLVM_DUMP_METHOD void Module::dump() const {
   print(llvm::errs(), 0, true);
 }
 
+std::optional<unsigned> ModuleRef::getReservedVisibilityID() const {
+  if (isUnmaterialized())
+    return ExternalSource.getPointer()->getSubmoduleVisibilityID(SubmoduleID);
+  return std::nullopt;
+}
+
+std::optional<unsigned> ModuleRef::getVisibilityID() const {
+  if (Existing)
+    return Existing->getVisibilityID();
+  if (std::optional<unsigned> ID = getReservedVisibilityID())
+    return ID;
+  if (Module *M = *this)
+    return M->getVisibilityID();
+  return std::nullopt;
+}
+
+bool ModuleRef::isUnimportable() const {
+  if (isUnmaterialized())
+    if (std::optional<bool> Unimportable =
+            ExternalSource.getPointer()->isSubmoduleUnimportable(SubmoduleID))
+      return *Unimportable;
+  Module *M = *this;
+  return !M || M->isUnimportable();
+}
+
+/// Get the external source and the ID that can be used to query the exports
+/// and conflicts of the module referenced by \p Ref without materializing it.
+static std::pair<ExternalSubmoduleSource *, uint64_t>
+getVisibilityGraphSource(const ModuleRef &Ref) {
+  if (Module *M = Ref.getExisting())
+    return {M->VisibilityGraphSource, M->VisibilityGraphID};
+  if (Ref.isUnmaterialized())
+    return {Ref.getExternalSource(), Ref.getExternalID()};
+  return {nullptr, 0};
+}
+
+void ModuleRef::getExportedModules(SmallVectorImpl<ModuleRef> &Exported) const {
+  auto [Source, ID] = getVisibilityGraphSource(*this);
+  if (Source && ID) {
+    SmallVector<uint64_t, 16> ExportIDs;
+    if (Source->getSubmoduleExports(ID, ExportIDs)) {
+      for (uint64_t ExportID : ExportIDs)
+        Exported.push_back(ModuleRef(Source, ExportID));
+      return;
+    }
+  }
+
+  if (Module *M = *this) {
+    SmallVector<Module *, 16> Mods;
+    M->getExportedModules(Mods);
+    Exported.append(Mods.begin(), Mods.end());
+  }
+}
+
+bool ModuleRef::hasConflict(
+    llvm::function_ref<bool(ModuleRef)> IsVisible) const {
+  auto [Source, ID] = getVisibilityGraphSource(*this);
+  if (Source && ID) {
+    SmallVector<uint64_t, 4> ConflictIDs;
+    if (Source->getSubmoduleConflicts(ID, ConflictIDs)) {
+      for (uint64_t ConflictID : ConflictIDs)
+        if (IsVisible(ModuleRef(Source, ConflictID)))
+          return true;
+      return false;
+    }
+  }
+
+  if (Module *M = *this)
+    return llvm::any_of(M->Conflicts, [&](const Module::Conflict &C) {
+      return IsVisible(C.Other);
+    });
+  return false;
+}
+
 void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
                                   bool IncludeExports, VisibleCallback Vis,
                                   ConflictCallback Cb) {
@@ -687,40 +761,51 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
   ++Generation;
 
   struct Visiting {
-    Module *M;
+    ModuleRef Ref;
     Visiting *ExportedBy;
   };
 
-  std::function<void(Visiting)> VisitModule = [&](Visiting V) {
+  std::function<void(Visiting)> Visit = [&](Visiting V) {
     // Nothing to do for a module that's already visible.
-    unsigned ID = V.M->getVisibilityID();
-    if (ImportLocs.size() <= ID)
-      ImportLocs.resize(ID + 1);
-    else if (ImportLocs[ID].isValid())
+    std::optional<unsigned> ID = V.Ref.getVisibilityID();
+    if (!ID)
+      return;
+    if (ImportLocs.size() <= *ID)
+      ImportLocs.resize(*ID + 1);
+    else if (ImportLocs[*ID].isValid())
       return;
 
-    ImportLocs[ID] = Loc;
-    Vis(V.M);
+    ImportLocs[*ID] = Loc;
+    Vis(V.Ref);
 
     // Make any exported modules visible.
     if (IncludeExports) {
-      SmallVector<Module *, 16> Exports;
-      V.M->getExportedModules(Exports);
-      for (Module *E : Exports) {
+      SmallVector<ModuleRef, 16> Exports;
+      V.Ref.getExportedModules(Exports);
+      for (ModuleRef E : Exports) {
         // Don't import non-importable modules.
-        if (!E->isUnimportable())
-          VisitModule({E, &V});
+        if (!E.isUnimportable())
+          Visit({E, &V});
       }
     }
 
-    for (auto &C : V.M->Conflicts) {
+    // Conflicts are rare. Only materialize the modules involved when there is
+    // one, to produce the diagnostic.
+    auto IsVisible = [&](ModuleRef C) { return isVisible(C); };
+    if (!V.Ref.hasConflict(IsVisible))
+      return;
+
+    Module *VM = V.Ref;
+    if (!VM)
+      return;
+    for (auto &C : VM->Conflicts) {
       if (isVisible(C.Other)) {
-        llvm::SmallVector<Module*, 8> Path;
+        llvm::SmallVector<Module *, 8> Path;
         for (Visiting *I = &V; I; I = I->ExportedBy)
-          Path.push_back(I->M);
+          Path.push_back(I->Ref);
         Cb(Path, C.Other, C.Message);
       }
     }
   };
-  VisitModule({M, nullptr});
+  Visit({ModuleRef(M), nullptr});
 }

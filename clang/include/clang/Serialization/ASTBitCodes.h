@@ -754,6 +754,11 @@ enum ASTRecordTypes {
 
   /// Record code for the OpenMP 'requires' directives seen in the TU.
   OMP_REQUIRES_DECLS = 81,
+
+  /// Record that encodes the exports, conflicts and flags of each submodule,
+  /// so that visibility can be propagated without deserializing submodules.
+  /// See \c ASTWriter::WriteSubmoduleVisibilityGraph() for the format.
+  SUBMODULE_VISIBILITY_GRAPH = 82,
 };
 
 /// Record types used within a source manager block.
@@ -818,6 +823,13 @@ enum PreprocessorDetailRecordTypes {
   /// Describes an inclusion directive within the preprocessing
   /// record.
   PPD_INCLUSION_DIRECTIVE = 2
+};
+
+/// Flags of a submodule in the \c SUBMODULE_VISIBILITY_GRAPH record.
+enum SubmoduleVisibilityGraphFlags {
+  /// The submodule has requirements, which may make it unimportable. (The
+  /// importability of its ancestors needs to be checked too.)
+  SUBMODULE_VISIBILITY_MAY_BE_UNIMPORTABLE = 0x1,
 };
 
 /// Record types used within a submodule description block.

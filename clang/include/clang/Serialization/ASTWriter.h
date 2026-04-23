@@ -600,6 +600,7 @@ private:
   void WritePreprocessorDetail(PreprocessingRecord &PPRec,
                                uint64_t MacroOffsetsBase);
   void WriteSubmodules(Module *WritingModule, ASTContext *Context);
+  void WriteSubmoduleVisibilityGraph(ArrayRef<Module *> Submodules);
 
   void WritePragmaDiagnosticMappings(const DiagnosticsEngine &Diag,
                                      bool isModule);

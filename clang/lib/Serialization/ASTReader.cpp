@@ -3877,6 +3877,7 @@ llvm::Error ASTReader::ReadASTBlock(ModuleFile &F,
       case IMPORTED_MODULES:
       case MACRO_OFFSET:
       case SUBMODULE_METADATA:
+      case SUBMODULE_VISIBILITY_GRAPH:
         break;
       default:
         continue;
@@ -3924,10 +3925,33 @@ llvm::Error ASTReader::ReadASTBlock(ModuleFile &F,
       } else {
         // If we didn't know this module, we loaded it transitively. Deserialize
         // just the top-level module to register it with ModuleMap, but load the
-        // rest lazily.
+        // rest lazily. Reserve visibility IDs for all submodules so that
+        // visibility can be propagated without deserializing them.
+        ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
+        F.HasReservedVisibilityIDs = true;
+        F.BaseVisibilityID = ModMap.reserveVisibilityIDs(F.LocalNumSubmodules);
         ReadSubmodule(F.LocalTopLevelSubmoduleID);
       }
 
+      break;
+    }
+
+    case SUBMODULE_VISIBILITY_GRAPH: {
+      // See ASTWriter::WriteSubmoduleVisibilityGraph() for the format.
+      using Word = llvm::support::ulittle32_t;
+      if (Record.size() != 1 || Record[0] != F.LocalNumSubmodules ||
+          Blob.size() % sizeof(Word) != 0 ||
+          Blob.size() / sizeof(Word) < uint64_t(F.LocalNumSubmodules) + 1)
+        return llvm::createStringError(std::errc::illegal_byte_sequence,
+                                       "malformed submodule visibility graph");
+      const Word *Offsets = reinterpret_cast<const Word *>(Blob.data());
+      const Word *Entries = Offsets + F.LocalNumSubmodules + 1;
+      if (Offsets[F.LocalNumSubmodules] !=
+          Blob.size() / sizeof(Word) - F.LocalNumSubmodules - 1)
+        return llvm::createStringError(std::errc::illegal_byte_sequence,
+                                       "malformed submodule visibility graph");
+      F.SubmoduleVisibilityGraphOffsets = Offsets;
+      F.SubmoduleVisibilityGraph = Entries;
       break;
     }
 
@@ -4991,44 +5015,80 @@ void ASTReader::makeNamesVisible(const HiddenNames &Names, Module *Owner) {
 void ASTReader::makeModuleVisible(Module *Mod,
                                   Module::NameVisibilityKind NameVisibility,
                                   SourceLocation ImportLoc) {
-  llvm::SmallPtrSet<Module *, 4> Visited;
-  SmallVector<Module *, 4> Stack;
+  // The visibility IDs of modules we pushed onto the stack.
+  llvm::SmallDenseSet<unsigned, 16> Visited;
+  SmallVector<ModuleRef, 4> Stack;
   Stack.push_back(Mod);
   while (!Stack.empty()) {
-    Mod = Stack.pop_back_val();
-
-    if (NameVisibility <= Mod->NameVisibility) {
-      // This module already has this level of visibility (or greater), so
-      // there is nothing more to do.
+    ModuleRef Ref = Stack.pop_back_val();
+    if (!Ref)
       continue;
+
+    // Find out whether the module has been deserialized, without deserializing
+    // it if we can propagate visibility through it using the visibility graph.
+    Module *M = Ref.getExisting();
+    SubmoduleID ID = 0;
+    if (!M) {
+      assert(Ref.getExternalSource() == this && "Foreign submodule source");
+      ID = Ref.getExternalID();
+      M = getLoadedSubmodule(ID);
+      if (!M) {
+        // Modules that aren't importable cannot be made visible. Deserialize
+        // the module unless we know it's importable, in which case the
+        // visibility graph can also provide its exports.
+        std::optional<bool> Unimportable = isSubmoduleUnimportable(ID);
+        if (Unimportable && *Unimportable)
+          continue;
+        if (!Unimportable) {
+          M = getSubmodule(ID);
+          if (!M)
+            continue;
+        }
+      }
     }
 
-    if (Mod->isUnimportable()) {
-      // Modules that aren't importable cannot be made visible.
-      continue;
-    }
+    if (!M) {
+      // The module hasn't been deserialized yet, so it has no deserialized
+      // names. Remember the visibility to apply on deserialization.
+      Module::NameVisibilityKind &Pending = PendingNameVisibility[ID];
+      if (NameVisibility <= Pending)
+        continue;
+      Pending = NameVisibility;
+    } else {
+      if (NameVisibility <= M->NameVisibility) {
+        // This module already has this level of visibility (or greater), so
+        // there is nothing more to do.
+        continue;
+      }
 
-    // Update the module's name visibility.
-    Mod->NameVisibility = NameVisibility;
+      if (M->isUnimportable()) {
+        // Modules that aren't importable cannot be made visible.
+        continue;
+      }
 
-    // If we've already deserialized any names from this module,
-    // mark them as visible.
-    HiddenNamesMapType::iterator Hidden = HiddenNamesMap.find(Mod);
-    if (Hidden != HiddenNamesMap.end()) {
-      auto HiddenNames = std::move(*Hidden);
-      HiddenNamesMap.erase(Hidden);
-      makeNamesVisible(HiddenNames.second, HiddenNames.first);
-      assert(!HiddenNamesMap.contains(Mod) &&
-             "making names visible added hidden names");
+      // Update the module's name visibility.
+      M->NameVisibility = NameVisibility;
+
+      // If we've already deserialized any names from this module,
+      // mark them as visible.
+      HiddenNamesMapType::iterator Hidden = HiddenNamesMap.find(M);
+      if (Hidden != HiddenNamesMap.end()) {
+        auto HiddenNames = std::move(*Hidden);
+        HiddenNamesMap.erase(Hidden);
+        makeNamesVisible(HiddenNames.second, HiddenNames.first);
+        assert(!HiddenNamesMap.contains(M) &&
+               "making names visible added hidden names");
+      }
+
+      Ref = ModuleRef(M);
     }
 
     // Push any exported modules onto the stack to be marked as visible.
-    SmallVector<Module *, 16> Exports;
-    Mod->getExportedModules(Exports);
-    for (SmallVectorImpl<Module *>::iterator
-           I = Exports.begin(), E = Exports.end(); I != E; ++I) {
-      Module *Exported = *I;
-      if (Visited.insert(Exported).second)
+    SmallVector<ModuleRef, 16> Exports;
+    Ref.getExportedModules(Exports);
+    for (ModuleRef Exported : Exports) {
+      std::optional<unsigned> VisibilityID = Exported.getVisibilityID();
+      if (VisibilityID && Visited.insert(*VisibilityID).second)
         Stack.push_back(Exported);
     }
   }
@@ -6471,12 +6531,6 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
 
   ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
   bool KnowsTopLevelModule = ModMap.findModule(F.ModuleName) != nullptr;
-  // If we don't know the top-level module, there's no point in doing qualified
-  // lookup of its submodules; it won't find anything anywhere within this tree.
-  // Let's skip that and avoid some string lookups.
-  auto CreateModule = !KnowsTopLevelModule
-                          ? &ModuleMap::createModule
-                          : &ModuleMap::findOrCreateModuleFirst;
 
   Module *CurrentModule = nullptr;
   RecordData Record;
@@ -6554,8 +6608,31 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
           return nullptr;
       }
 
-      CurrentModule = std::invoke(CreateModule, &ModMap, Name, ParentModule,
-                                  IsFramework, IsExplicit);
+      // If we don't know the top-level module, there's no point in doing
+      // qualified lookup of its submodules; it won't find anything anywhere
+      // within this tree. Let's skip that and avoid some string lookups.
+      bool IsNew = true;
+      if (KnowsTopLevelModule)
+        std::tie(CurrentModule, IsNew) = ModMap.findOrCreateModule(
+            Name, ParentModule, IsFramework, IsExplicit);
+      else
+        CurrentModule =
+            ModMap.createModule(Name, ParentModule, IsFramework, IsExplicit);
+
+      if (F.HasReservedVisibilityIDs) {
+        // Submodules created by ModuleMap::createModule() are assigned the
+        // visibility ID reserved for them, so that visibility recorded before
+        // deserialization applies. The top-level module is deserialized right
+        // after the reservation, so it doesn't matter it gets a fresh ID.
+        assert((!ParentModule || CurrentModule->getVisibilityID() ==
+                                     F.BaseVisibilityID + Index) &&
+               "Submodule did not get its reserved visibility ID");
+
+        // If this module comes solely from the module file, the visibility
+        // graph in the module file describes it, unless it gets modified later.
+        if (IsNew)
+          CurrentModule->setVisibilityGraphSource(this, GlobalID);
+      }
 
       if (!ParentModule) {
         if ([[maybe_unused]] const ModuleFileKey *CurFileKey =
@@ -6619,6 +6696,15 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
         DeserializationListener->ModuleRead(GlobalID, CurrentModule);
 
       SubmodulesLoaded[GlobalIndex] = CurrentModule;
+
+      // Apply the visibility this module was given by makeModuleVisible()
+      // before it was deserialized, before anything can observe the module.
+      if (auto It = PendingNameVisibility.find(GlobalID);
+          It != PendingNameVisibility.end()) {
+        if (It->second > CurrentModule->NameVisibility)
+          CurrentModule->NameVisibility = It->second;
+        PendingNameVisibility.erase(It);
+      }
 
       // Clear out data that will be replaced by what is in the module file.
       CurrentModule->LinkLibraries.clear();
@@ -6767,6 +6853,113 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     }
     }
   }
+}
+
+Module *ASTReader::getLoadedSubmodule(SubmoduleID GlobalID) const {
+  if (GlobalID < NUM_PREDEF_SUBMODULE_IDS)
+    return nullptr;
+  SubmoduleID GlobalIndex = GlobalID - NUM_PREDEF_SUBMODULE_IDS;
+  if (GlobalIndex >= SubmodulesLoaded.size())
+    return nullptr;
+  return SubmodulesLoaded[GlobalIndex];
+}
+
+std::optional<unsigned> ASTReader::getSubmoduleVisibilityID(uint64_t GlobalID) {
+  if (GlobalID < NUM_PREDEF_SUBMODULE_IDS ||
+      GlobalID - NUM_PREDEF_SUBMODULE_IDS >= SubmodulesLoaded.size())
+    return std::nullopt;
+
+  if (Module *M = getLoadedSubmodule(GlobalID))
+    return M->getVisibilityID();
+
+  auto It = GlobalSubmoduleMap.find(GlobalID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+  if (!F.HasReservedVisibilityIDs)
+    return std::nullopt;
+  return F.BaseVisibilityID +
+         (GlobalID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS);
+}
+
+std::optional<ArrayRef<llvm::support::ulittle32_t>>
+ASTReader::getSubmoduleVisibilityGraphEntry(SubmoduleID GlobalID,
+                                            ModuleFile *&F) {
+  if (GlobalID < NUM_PREDEF_SUBMODULE_IDS ||
+      GlobalID - NUM_PREDEF_SUBMODULE_IDS >= SubmodulesLoaded.size())
+    return std::nullopt;
+
+  // The visibility graph doesn't describe deserialized modules that have been
+  // modified since.
+  if (Module *M = getLoadedSubmodule(GlobalID))
+    if (M->VisibilityGraphSource != this)
+      return std::nullopt;
+
+  auto It = GlobalSubmoduleMap.find(GlobalID);
+  assert(It != GlobalSubmoduleMap.end());
+  F = It->second;
+  // We need the reserved visibility IDs to propagate visibility through
+  // modules that haven't been deserialized yet. If the submodules of this
+  // module file have been deserialized eagerly, they may have also been
+  // modified by the module map.
+  if (!F->HasReservedVisibilityIDs || !F->SubmoduleVisibilityGraph)
+    return std::nullopt;
+
+  unsigned Index = GlobalID - F->BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+  uint32_t Begin = F->SubmoduleVisibilityGraphOffsets[Index];
+  uint32_t End = F->SubmoduleVisibilityGraphOffsets[Index + 1];
+  uint32_t Size = F->SubmoduleVisibilityGraphOffsets[F->LocalNumSubmodules];
+  // The entry starts with the flags, the parent and the number of exports.
+  if (Begin > End || End > Size || End - Begin < 3 ||
+      End - Begin - 3 < F->SubmoduleVisibilityGraph[Begin + 2])
+    return std::nullopt;
+  return ArrayRef(F->SubmoduleVisibilityGraph + Begin,
+                  F->SubmoduleVisibilityGraph + End);
+}
+
+std::optional<bool> ASTReader::isSubmoduleUnimportable(uint64_t GlobalID) {
+  // The module is unimportable if it has unsatisfied requirements or if its
+  // parent is unimportable. Walk up the parents until we find a deserialized
+  // one; the top-level module is always deserialized, so this usually doesn't
+  // need to look far. Limit the walk to guard against malformed files.
+  for (unsigned Depth = 0; Depth != SubmodulesLoaded.size() + 1; ++Depth) {
+    if (Module *M = getLoadedSubmodule(GlobalID))
+      return M->isUnimportable();
+
+    ModuleFile *F;
+    auto Entry = getSubmoduleVisibilityGraphEntry(GlobalID, F);
+    if (!Entry)
+      return std::nullopt;
+    // Checking the requirements of the module requires deserializing it.
+    if ((*Entry)[0] & SUBMODULE_VISIBILITY_MAY_BE_UNIMPORTABLE)
+      return std::nullopt;
+    uint32_t LocalParentID = (*Entry)[1];
+    if (!LocalParentID)
+      return false;
+    GlobalID = getGlobalSubmoduleID(*F, LocalParentID);
+  }
+  return std::nullopt;
+}
+
+bool ASTReader::getSubmoduleExports(uint64_t GlobalID,
+                                    SmallVectorImpl<uint64_t> &Exports) {
+  ModuleFile *F;
+  auto Entry = getSubmoduleVisibilityGraphEntry(GlobalID, F);
+  if (!Entry)
+    return false;
+  for (uint32_t LocalID : Entry->slice(3, (*Entry)[2]))
+    Exports.push_back(getGlobalSubmoduleID(*F, LocalID));
+  return true;
+}
+
+bool ASTReader::getSubmoduleConflicts(uint64_t GlobalID,
+                                      SmallVectorImpl<uint64_t> &Conflicts) {
+  ModuleFile *F;
+  auto Entry = getSubmoduleVisibilityGraphEntry(GlobalID, F);
+  if (!Entry)
+    return false;
+  for (uint32_t LocalID : Entry->drop_front(3 + (*Entry)[2]))
+    Conflicts.push_back(getGlobalSubmoduleID(*F, LocalID));
+  return true;
 }
 
 /// Parse the record that corresponds to a LangOptions data
@@ -9237,6 +9430,8 @@ void ASTReader::PrintStats() {
       MacrosLoaded.size() - llvm::count(MacrosLoaded, (MacroInfo *)nullptr);
   unsigned NumSelectorsLoaded =
       SelectorsLoaded.size() - llvm::count(SelectorsLoaded, Selector());
+  unsigned NumSubmodulesLoaded =
+      SubmodulesLoaded.size() - llvm::count(SubmodulesLoaded, nullptr);
 
   if (unsigned TotalNumSLocEntries = getTotalNumSLocs())
     std::fprintf(stderr, "  %u/%u source location entries read (%f%%)\n",
@@ -9262,6 +9457,10 @@ void ASTReader::PrintStats() {
     std::fprintf(stderr, "  %u/%u selectors read (%f%%)\n",
                  NumSelectorsLoaded, (unsigned)SelectorsLoaded.size(),
                  ((float)NumSelectorsLoaded/SelectorsLoaded.size() * 100));
+  if (!SubmodulesLoaded.empty())
+    std::fprintf(stderr, "  %u/%u submodules read (%f%%)\n",
+                 NumSubmodulesLoaded, (unsigned)SubmodulesLoaded.size(),
+                 ((float)NumSubmodulesLoaded / SubmodulesLoaded.size() * 100));
   if (TotalNumStatements)
     std::fprintf(stderr, "  %u/%u statements read (%f%%)\n",
                  NumStatementsRead, TotalNumStatements,

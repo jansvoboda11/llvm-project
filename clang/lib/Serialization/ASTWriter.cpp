@@ -928,6 +928,7 @@ void ASTWriter::WriteBlockInfoBlock() {
   // AST Top-Level Block.
   BLOCK(AST_BLOCK);
   RECORD(SUBMODULE_METADATA);
+  RECORD(SUBMODULE_VISIBILITY_GRAPH);
   RECORD(TYPE_OFFSET);
   RECORD(DECL_OFFSET);
   RECORD(IDENTIFIER_OFFSET);
@@ -3138,6 +3139,9 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
 
   unsigned TopLevelID = getSubmoduleID(WritingModule);
 
+  // Submodules by their local index, for the visibility graph.
+  SmallVector<Module *> SubmodulesByIndex;
+
   // Write all of the submodules.
   std::queue<Module *> Q;
   Q.push(WritingModule);
@@ -3158,6 +3162,10 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     uint64_t Offset = Stream.GetCurrentBitNo() - SubmoduleOffsetBase;
     assert((Offset >> 32) == 0 && "Submodule offset too large");
     SubmoduleOffsets[Index] = Offset;
+
+    if (Index >= SubmodulesByIndex.size())
+      SubmodulesByIndex.resize(Index + 1);
+    SubmodulesByIndex[Index] = Mod;
 
     uint64_t ParentID = 0;
     if (Mod->Parent) {
@@ -3265,7 +3273,13 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
       for (const auto &E : Mod->Exports) {
         // FIXME: This may fail; we don't require that all exported modules
         // are local or imported.
-        Record.push_back(getSubmoduleID(E.first));
+        unsigned ID = getSubmoduleID(E.first);
+        // Don't let ID 0 of an unknown module turn a restricted wildcard into
+        // an unrestricted one. Since all imported modules are known, a wildcard
+        // restricted to an unknown module doesn't export anything.
+        if (!ID && E.first)
+          continue;
+        Record.push_back(ID);
         Record.push_back(E.second);
       }
       Stream.EmitRecord(SUBMODULE_EXPORTS, Record);
@@ -3354,6 +3368,80 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
       FirstSubmoduleID - NUM_PREDEF_SUBMODULE_IDS, TopLevelID};
   Stream.EmitRecordWithBlob(SubmoduleMetadataAbbrev, Record,
                             bytes(SubmoduleOffsets));
+
+  WriteSubmoduleVisibilityGraph(SubmodulesByIndex);
+}
+
+void ASTWriter::WriteSubmoduleVisibilityGraph(ArrayRef<Module *> Submodules) {
+  using namespace llvm;
+
+  // For each submodule, write the information VisibleModuleSet::setVisible()
+  // and ASTReader::makeModuleVisible() need to propagate visibility from that
+  // submodule without deserializing other submodules. The record contains the
+  // number of submodules N and a blob of little-endian 32-bit words. The first
+  // N + 1 words are offsets (relative to the end of the offsets) of the
+  // per-submodule entries, so that the entry of submodule with index I spans
+  // words [Offsets[I], Offsets[I + 1]). Each entry consists of:
+  //  - flags (see SubmoduleVisibilityGraphFlags),
+  //  - the submodule ID of the parent module (or 0),
+  //  - the number of exported modules E,
+  //  - E submodule IDs of the exported modules,
+  //  - submodule IDs of the conflicting modules (until the end of the entry).
+  // Modules without a submodule ID (i.e. not local and not loaded from an AST
+  // file) can't be referenced and are skipped.
+  SmallVector<uint32_t> Offsets;
+  SmallVector<uint32_t> Entries;
+  Offsets.reserve(Submodules.size() + 1);
+  for (Module *Mod : Submodules) {
+    Offsets.push_back(Entries.size());
+    if (!Mod) {
+      // Unknown submodule. An empty entry makes the reader deserialize it.
+      continue;
+    }
+
+    // The reader determines unimportability from the requirements of the
+    // module and its ancestors, given its own LangOptions and TargetInfo.
+    uint32_t Flags = 0;
+    if (!Mod->Requirements.empty())
+      Flags |= SUBMODULE_VISIBILITY_MAY_BE_UNIMPORTABLE;
+    Entries.push_back(Flags);
+    Entries.push_back(SubmoduleIDs.lookup(Mod->Parent));
+
+    size_t NumExportsIdx = Entries.size();
+    Entries.push_back(0);
+    SmallVector<Module *, 16> Exports;
+    Mod->getExportedModules(Exports);
+    for (Module *E : Exports)
+      if (unsigned ID = SubmoduleIDs.lookup(E))
+        Entries.push_back(ID);
+    Entries[NumExportsIdx] = Entries.size() - NumExportsIdx - 1;
+
+    for (const Module::Conflict &C : Mod->Conflicts)
+      if (unsigned ID = SubmoduleIDs.lookup(C.Other))
+        Entries.push_back(ID);
+  }
+  Offsets.push_back(Entries.size());
+
+  SmallString<0> Blob;
+  Blob.reserve((Offsets.size() + Entries.size()) * sizeof(uint32_t));
+  {
+    llvm::raw_svector_ostream OS(Blob);
+    llvm::support::endian::Writer W(OS, llvm::endianness::little);
+    for (uint32_t Word : Offsets)
+      W.write<uint32_t>(Word);
+    for (uint32_t Word : Entries)
+      W.write<uint32_t>(Word);
+  }
+
+  auto Abbrev = std::make_shared<BitCodeAbbrev>();
+  Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_VISIBILITY_GRAPH));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // Submodule count
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));
+  unsigned AbbrevID = Stream.EmitAbbrev(std::move(Abbrev));
+
+  RecordData::value_type Record[] = {SUBMODULE_VISIBILITY_GRAPH,
+                                     Submodules.size()};
+  Stream.EmitRecordWithBlob(AbbrevID, Record, Blob);
 }
 
 void ASTWriter::WritePragmaDiagnosticMappings(const DiagnosticsEngine &Diag,
