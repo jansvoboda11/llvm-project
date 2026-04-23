@@ -755,6 +755,15 @@ enum ASTRecordTypes {
   /// Record that encodes the number of submodules, their base ID in the AST
   /// file, and for each module the relative bit offset into the stream.
   SUBMODULE_METADATA = 80,
+
+  /// Pre-computed export graph for lazy submodule visibility propagation.
+  /// For each submodule, stores the list of exported submodule IDs (local to
+  /// the owning module file) so that visibility can be propagated without
+  /// deserializing the Module objects.
+  SUBMODULE_EXPORT_GRAPH = 81,
+
+  /// Pre-computed conflict graph for lazy submodule conflict checking.
+  SUBMODULE_CONFLICT_GRAPH = 82,
 };
 
 /// Record types used within a source manager block.

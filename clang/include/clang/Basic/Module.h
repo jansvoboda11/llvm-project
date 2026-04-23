@@ -56,6 +56,30 @@ class TargetInfo;
 class ExternalSubmoduleSource {
 public:
   virtual Module *getSubmodule(uint32_t GlobalID) = 0;
+
+  /// Get the pre-allocated VisibilityID for a submodule identified by its
+  /// global SubmoduleID, without deserializing the Module object.
+  /// Returns std::nullopt if no pre-allocated IDs are available (eagerly-loaded
+  /// modules).
+  virtual std::optional<unsigned>
+  getVisibilityID(uint64_t GlobalSubmoduleID) = 0;
+
+  /// Get the global SubmoduleIDs of all same-PCM modules exported by the
+  /// given submodule, using the pre-computed export graph. Returns false if
+  /// no export graph is available.
+  virtual bool
+  getExportedSubmoduleIDs(uint64_t GlobalSubmoduleID,
+                          SmallVectorImpl<uint64_t> &ExportGlobalIDs) = 0;
+
+  /// Get the global SubmoduleIDs of all modules that conflict with the
+  /// given submodule, using the pre-computed conflict graph. Returns false
+  /// if no conflict graph is available.
+  virtual bool
+  getConflictingSubmoduleIDs(uint64_t GlobalSubmoduleID,
+                             SmallVectorImpl<uint64_t> &ConflictGlobalIDs) {
+    return false;
+  }
+
   virtual ~ExternalSubmoduleSource() = default;
 };
 
@@ -284,6 +308,19 @@ public:
   }
 
   Module *operator->() const { return *this; }
+
+  /// Get the VisibilityID reserved for this module, if any.
+  std::optional<unsigned> getReservedVisibilityID() const;
+
+  /// Get the VisibilityID of this module.
+  unsigned getVisibilityID() const;
+
+  /// Get all exported submodules, without triggering deserialization where
+  /// possible.
+  void getExportedModules(SmallVectorImpl<ModuleRef> &Exported) const;
+
+  /// Get all conflicting submodules.
+  void getConflicts(SmallVectorImpl<ModuleRef> &Conflicts) const;
 };
 
 /// Required to construct a Module.
@@ -630,6 +667,15 @@ public:
 
   /// The set of export declarations.
   SmallVector<ExportDecl, 2> Exports;
+
+  /// Pre-computed export data from the PCM export graph. When non-empty,
+  /// setVisible can propagate visibility through these SubmoduleIDs without
+  /// deserializing Module objects. Only contains same-PCM exports.
+  SmallVector<uint64_t, 0> LazyExportedSubmoduleIDs;
+
+  /// The ExternalSubmoduleSource that can resolve LazyExportedSubmoduleIDs
+  /// to VisibilityIDs and provide further export graph entries.
+  ExternalSubmoduleSource *LazyExportSource = nullptr;
 
   /// Describes an exported module that has not yet been resolved
   /// (perhaps because the module it refers to has not yet been loaded).
@@ -1022,6 +1068,11 @@ public:
 
   unsigned getVisibilityID() const { return VisibilityID; }
 
+  /// Override the visibility ID assigned at construction time.
+  /// Used by the ASTReader to assign pre-allocated IDs for lazy
+  /// deserialization.
+  void setVisibilityID(unsigned ID) { VisibilityID = ID; }
+
   using submodule_iterator = std::vector<ModuleRef>::iterator;
   using submodule_const_iterator = std::vector<ModuleRef>::const_iterator;
 
@@ -1081,6 +1132,12 @@ public:
     return getImportLoc(M).isValid();
   }
 
+  /// Determine whether a module (possibly not yet deserialized) is visible.
+  bool isVisible(ModuleRef Ref) const {
+    unsigned VisID = Ref.getVisibilityID();
+    return VisID < ImportLocs.size() && ImportLocs[VisID].isValid();
+  }
+
   /// Get the location at which the import of a module was triggered.
   SourceLocation getImportLoc(const Module *M) const {
     return M && M->getVisibilityID() < ImportLocs.size()
@@ -1090,7 +1147,7 @@ public:
 
   /// A callback to call when a module is made visible (directly or
   /// indirectly) by a call to \ref setVisible.
-  using VisibleCallback = llvm::function_ref<void(Module *M)>;
+  using VisibleCallback = llvm::function_ref<void(ModuleRef M)>;
 
   /// A callback to call when a module conflict is found. \p Path
   /// consists of a sequence of modules from the conflicting module to the one
@@ -1102,7 +1159,7 @@ public:
   /// Make a specific module visible.
   void setVisible(
       Module *M, SourceLocation Loc, bool IncludeExports = true,
-      VisibleCallback Vis = [](Module *) {},
+      VisibleCallback Vis = [](ModuleRef) {},
       ConflictCallback Cb = [](ArrayRef<Module *>, Module *, StringRef) {});
 
 private:

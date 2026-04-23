@@ -993,12 +993,19 @@ std::pair<Module *, bool> ModuleMap::findOrCreateModule(StringRef Name,
 
 Module *ModuleMap::createModule(StringRef Name, Module *Parent,
                                 bool IsFramework, bool IsExplicit) {
-  assert(!lookupModuleQualified(Name, Parent).getExisting() &&
-         "Creating duplicate submodule");
+  ModuleRef ResultRef = lookupModuleQualified(Name, Parent);
+  assert(!ResultRef.getExisting() && "Creating duplicate submodule");
+
+  unsigned VisibilityID = [&]() {
+    // The visibility ID of this submodule might've been reserved by ASTReader.
+    if (auto ID = ResultRef.getReservedVisibilityID(); ID)
+      return *ID;
+    return NumCreatedModules++;
+  }();
 
   Module *Result = new (ModulesAlloc.Allocate())
       Module(ModuleConstructorTag{}, Name, SourceLocation(), Parent,
-             IsFramework, IsExplicit, NumCreatedModules++);
+             IsFramework, IsExplicit, VisibilityID);
   if (!Parent) {
     if (LangOpts.CurrentModule == Name)
       SourceModule = Result;

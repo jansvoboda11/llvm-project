@@ -3821,6 +3821,8 @@ llvm::Error ASTReader::ReadASTBlock(ModuleFile &F,
       case IMPORTED_MODULES:
       case MACRO_OFFSET:
       case SUBMODULE_METADATA:
+      case SUBMODULE_EXPORT_GRAPH:
+      case SUBMODULE_CONFLICT_GRAPH:
         break;
       default:
         continue;
@@ -3868,10 +3870,33 @@ llvm::Error ASTReader::ReadASTBlock(ModuleFile &F,
       } else {
         // If we didn't know this module, we loaded it transitively. Deserialize
         // just the top-level module to register it with ModuleMap, but load the
-        // rest lazily.
+        // rest lazily. Pre-allocate VisibilityIDs for all submodules so that
+        // visibility can be propagated without deserializing Module objects.
+        ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
+        F.BaseVisibilityID = ModMap.reserveVisibilityIDs(F.LocalNumSubmodules);
         ReadSubmodule(F.LocalTopLevelSubmoduleID);
       }
 
+      break;
+    }
+
+    case SUBMODULE_EXPORT_GRAPH: {
+      // Blob layout: uint32_t offsets[N+1], uint32_t exportIDs[total]
+      // where N = Record[0] (number of submodules).
+      // This record is emitted before SUBMODULE_METADATA so that the export
+      // graph is available when SUBMODULE_METADATA triggers deserialization.
+      unsigned NumSubmodules = Record[0];
+      const uint32_t *Data = reinterpret_cast<const uint32_t *>(Blob.data());
+      F.ExportGraphOffsets = Data;
+      F.ExportGraphIDs = Data + NumSubmodules + 1;
+      break;
+    }
+
+    case SUBMODULE_CONFLICT_GRAPH: {
+      unsigned NumSubmodules = Record[0];
+      const uint32_t *Data = reinterpret_cast<const uint32_t *>(Blob.data());
+      F.ConflictGraphOffsets = Data;
+      F.ConflictGraphIDs = Data + NumSubmodules + 1;
       break;
     }
 
@@ -4864,6 +4889,37 @@ void ASTReader::makeModuleVisible(Module *Mod,
   llvm::SmallPtrSet<Module *, 4> Visited;
   SmallVector<Module *, 4> Stack;
   Stack.push_back(Mod);
+
+  // Track SubmoduleIDs we've already visited in the export-graph fast path.
+  llvm::SmallDenseSet<uint64_t, 16> VisitedIDs;
+
+  // Fast path: walk the export graph by SubmoduleID for un-deserialized
+  // modules. We can't set NameVisibility (no Module*), but we record which
+  // SubmoduleIDs need deferred NameVisibility in step 5.
+  std::function<void(uint64_t)> VisitByID = [&](uint64_t GlobalSubmoduleID) {
+    if (!VisitedIDs.insert(GlobalSubmoduleID).second)
+      return;
+
+    // If the module IS already deserialized, use the normal path.
+    SubmoduleID ID = static_cast<SubmoduleID>(GlobalSubmoduleID);
+    unsigned GlobalIndex = ID - NUM_PREDEF_SUBMODULE_IDS;
+    if (GlobalIndex < SubmodulesLoaded.size() && SubmodulesLoaded[GlobalIndex]) {
+      Module *M = SubmodulesLoaded[GlobalIndex];
+      if (Visited.insert(M).second)
+        Stack.push_back(M);
+      return;
+    }
+
+    // Un-deserialized module: record deferred NameVisibility and walk exports.
+    auto &Pending = PendingNameVisibility[ID];
+    if (NameVisibility > Pending)
+      Pending = NameVisibility;
+    SmallVector<uint64_t, 16> ExportIDs;
+    if (getExportedSubmoduleIDs(GlobalSubmoduleID, ExportIDs))
+      for (uint64_t EID : ExportIDs)
+        VisitByID(EID);
+  };
+
   while (!Stack.empty()) {
     Mod = Stack.pop_back_val();
 
@@ -4893,13 +4949,17 @@ void ASTReader::makeModuleVisible(Module *Mod,
     }
 
     // Push any exported modules onto the stack to be marked as visible.
-    SmallVector<Module *, 16> Exports;
-    Mod->getExportedModules(Exports);
-    for (SmallVectorImpl<Module *>::iterator
-           I = Exports.begin(), E = Exports.end(); I != E; ++I) {
-      Module *Exported = *I;
-      if (Visited.insert(Exported).second)
-        Stack.push_back(Exported);
+    if (Mod->LazyExportSource && !Mod->LazyExportedSubmoduleIDs.empty()) {
+      // Fast path: use the pre-computed export graph.
+      for (uint64_t GID : Mod->LazyExportedSubmoduleIDs)
+        VisitByID(GID);
+    } else {
+      SmallVector<Module *, 16> Exports;
+      Mod->getExportedModules(Exports);
+      for (Module *Exported : Exports) {
+        if (Visited.insert(Exported).second)
+          Stack.push_back(Exported);
+      }
     }
   }
 }
@@ -6387,6 +6447,14 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
                                       "malformed module definition"));
         return nullptr;
       }
+      // Apply any deferred NameVisibility that was recorded while this module
+      // was traversed via the export graph fast path but not yet deserialized.
+      if (auto It = PendingNameVisibility.find(GlobalID);
+          It != PendingNameVisibility.end()) {
+        if (It->second > CurrentModule->NameVisibility)
+          CurrentModule->NameVisibility = It->second;
+        PendingNameVisibility.erase(It);
+      }
       return CurrentModule;
 
     case SUBMODULE_DEFINITION: {
@@ -6425,6 +6493,13 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
 
       CurrentModule = std::invoke(CreateModule, &ModMap, Name, ParentModule,
                                   IsFramework, IsExplicit);
+
+      // If this module file has pre-allocated VisibilityIDs (lazy path),
+      // assign the pre-allocated ID to the newly created module.
+      if (F.BaseVisibilityID) {
+        unsigned Index = GlobalID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+        CurrentModule->setVisibilityID(F.BaseVisibilityID + Index);
+      }
 
       if (!ParentModule) {
         if ([[maybe_unused]] const ModuleFileKey *CurFileKey =
@@ -6505,6 +6580,21 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       CurrentModule->IsUnimportable =
           ParentModule && ParentModule->IsUnimportable;
       CurrentModule->IsAvailable = !CurrentModule->IsUnimportable;
+
+      // Populate pre-computed export data from the export graph so that
+      // setVisible can propagate visibility without deserializing children.
+      if (F.ExportGraphOffsets && F.BaseVisibilityID) {
+        unsigned Start = F.ExportGraphOffsets[Index];
+        unsigned End = F.ExportGraphOffsets[Index + 1];
+        CurrentModule->LazyExportSource = this;
+        CurrentModule->LazyExportedSubmoduleIDs.reserve(End - Start);
+        for (unsigned I = Start; I < End; ++I) {
+          SubmoduleID LocalExportID = F.ExportGraphIDs[I];
+          SubmoduleID GlobalExportID = getGlobalSubmoduleID(F, LocalExportID);
+          CurrentModule->LazyExportedSubmoduleIDs.push_back(GlobalExportID);
+        }
+      }
+
       break;
     }
 
@@ -6636,6 +6726,73 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     }
     }
   }
+}
+
+std::optional<unsigned>
+ASTReader::getVisibilityID(uint64_t GlobalSubmoduleID) {
+  SubmoduleID ID = static_cast<SubmoduleID>(GlobalSubmoduleID);
+  unsigned GlobalIndex = ID - NUM_PREDEF_SUBMODULE_IDS;
+
+  // If already deserialized, use the Module's actual VisibilityID.
+  if (GlobalIndex < SubmodulesLoaded.size() && SubmodulesLoaded[GlobalIndex])
+    return SubmodulesLoaded[GlobalIndex]->getVisibilityID();
+
+  // Use the pre-allocated VisibilityID if available.
+  auto It = GlobalSubmoduleMap.find(ID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+  if (!F.BaseVisibilityID)
+    return std::nullopt;
+
+  // Pre-allocated lazy path: use the offset within the file's VisibilityID block.
+  unsigned LocalIndex = ID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+  return F.BaseVisibilityID + LocalIndex;
+}
+
+bool ASTReader::getExportedSubmoduleIDs(
+    uint64_t GlobalSubmoduleID,
+    SmallVectorImpl<uint64_t> &ExportGlobalIDs) {
+  SubmoduleID ID = static_cast<SubmoduleID>(GlobalSubmoduleID);
+  auto It = GlobalSubmoduleMap.find(ID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+
+  if (!F.ExportGraphOffsets)
+    return false;
+
+  unsigned LocalIndex = ID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+  unsigned Start = F.ExportGraphOffsets[LocalIndex];
+  unsigned End = F.ExportGraphOffsets[LocalIndex + 1];
+
+  for (unsigned I = Start; I < End; ++I) {
+    SubmoduleID LocalExportID = F.ExportGraphIDs[I];
+    SubmoduleID GlobalExportID = getGlobalSubmoduleID(F, LocalExportID);
+    ExportGlobalIDs.push_back(GlobalExportID);
+  }
+  return true;
+}
+
+bool ASTReader::getConflictingSubmoduleIDs(
+    uint64_t GlobalSubmoduleID,
+    SmallVectorImpl<uint64_t> &ConflictGlobalIDs) {
+  SubmoduleID ID = static_cast<SubmoduleID>(GlobalSubmoduleID);
+  auto It = GlobalSubmoduleMap.find(ID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+
+  if (!F.ConflictGraphOffsets)
+    return false;
+
+  unsigned LocalIndex = ID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+  unsigned Start = F.ConflictGraphOffsets[LocalIndex];
+  unsigned End = F.ConflictGraphOffsets[LocalIndex + 1];
+
+  for (unsigned I = Start; I < End; ++I) {
+    SubmoduleID LocalConflictID = F.ConflictGraphIDs[I];
+    SubmoduleID GlobalConflictID = getGlobalSubmoduleID(F, LocalConflictID);
+    ConflictGlobalIDs.push_back(GlobalConflictID);
+  }
+  return true;
 }
 
 /// Parse the record that corresponds to a LangOptions data

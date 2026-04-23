@@ -457,6 +457,10 @@ public:
   /// Remapping table for submodule IDs in this module.
   ContinuousRangeMap<uint32_t, int, 2> SubmoduleRemap;
 
+  /// Base VisibilityID pre-allocated for lazily-loaded submodules.
+  /// Zero means no pre-allocation (all submodules deserialized eagerly).
+  unsigned BaseVisibilityID = 0;
+
   /// The cursor to the start of the submodules block.
   llvm::BitstreamCursor SubmodulesCursor;
 
@@ -465,6 +469,17 @@ public:
 
   /// Relative offsets for all submodule entries in the AST file.
   const llvm::support::unaligned_uint64_t *SubmoduleOffsets = nullptr;
+
+  /// Pre-computed export graph. For each local submodule index i (0-based),
+  /// ExportGraphOffsets[i] gives the starting index into ExportGraphIDs, and
+  /// ExportGraphOffsets[i+1] gives the end index. The IDs are local to this
+  /// module file and need remapping via SubmoduleRemap.
+  const uint32_t *ExportGraphOffsets = nullptr;
+  const uint32_t *ExportGraphIDs = nullptr;
+
+  /// Pre-computed conflict graph. Same layout as ExportGraph.
+  const uint32_t *ConflictGraphOffsets = nullptr;
+  const uint32_t *ConflictGraphIDs = nullptr;
 
   // === Selectors ===
 

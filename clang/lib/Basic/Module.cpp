@@ -651,6 +651,54 @@ LLVM_DUMP_METHOD void Module::dump() const {
   print(llvm::errs(), 0, true);
 }
 
+std::optional<unsigned> ModuleRef::getReservedVisibilityID() const {
+  if (ExternalSource.getPointer() && SubmoduleID)
+    return ExternalSource.getPointer()->getVisibilityID(SubmoduleID);
+  return std::nullopt;
+}
+
+unsigned ModuleRef::getVisibilityID() const {
+  assert(*this);
+  if (Existing)
+    return Existing->getVisibilityID();
+  auto MaybeID = ExternalSource.getPointer()->getVisibilityID(SubmoduleID);
+  assert(MaybeID);
+  return *MaybeID;
+}
+
+void ModuleRef::getExportedModules(SmallVectorImpl<ModuleRef> &Exported) const {
+  if (Existing) {
+    if (Existing->LazyExportSource &&
+        !Existing->LazyExportedSubmoduleIDs.empty()) {
+      for (uint64_t GID : Existing->LazyExportedSubmoduleIDs)
+        Exported.push_back(ModuleRef(Existing->LazyExportSource, GID));
+    } else {
+      SmallVector<Module *, 16> Mods;
+      Existing->getExportedModules(Mods);
+      for (Module *E : Mods)
+        if (!E->isUnimportable())
+          Exported.push_back(ModuleRef(E));
+    }
+  } else if (ExternalSource.getPointer() && SubmoduleID) {
+    SmallVector<uint64_t, 16> ExportIDs;
+    if (ExternalSource.getPointer()->getExportedSubmoduleIDs(SubmoduleID, ExportIDs))
+      for (uint64_t EID : ExportIDs)
+        Exported.push_back(ModuleRef(ExternalSource.getPointer(), EID));
+  }
+}
+
+void ModuleRef::getConflicts(SmallVectorImpl<ModuleRef> &Conflicts) const {
+  if (Existing) {
+    for (auto &C : Existing->Conflicts)
+      Conflicts.push_back(C.Other);
+  } else if (ExternalSource.getPointer() && SubmoduleID) {
+    SmallVector<uint64_t, 4> ConflictIDs;
+    if (ExternalSource.getPointer()->getConflictingSubmoduleIDs(SubmoduleID, ConflictIDs))
+      for (uint64_t CID : ConflictIDs)
+        Conflicts.push_back(ModuleRef(ExternalSource.getPointer(), CID));
+  }
+}
+
 void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
                                   bool IncludeExports, VisibleCallback Vis,
                                   ConflictCallback Cb) {
@@ -663,40 +711,49 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
   ++Generation;
 
   struct Visiting {
-    Module *M;
+    ModuleRef Ref;
     Visiting *ExportedBy;
   };
 
-  std::function<void(Visiting)> VisitModule = [&](Visiting V) {
+  std::function<void(Visiting)> Visit = [&](Visiting V) {
     // Nothing to do for a module that's already visible.
-    unsigned ID = V.M->getVisibilityID();
+    unsigned ID = V.Ref.getVisibilityID();
     if (ImportLocs.size() <= ID)
       ImportLocs.resize(ID + 1);
     else if (ImportLocs[ID].isValid())
       return;
 
     ImportLocs[ID] = Loc;
-    Vis(V.M);
+    Vis(V.Ref);
 
-    // Make any exported modules visible.
     if (IncludeExports) {
-      SmallVector<Module *, 16> Exports;
-      V.M->getExportedModules(Exports);
-      for (Module *E : Exports) {
-        // Don't import non-importable modules.
-        if (!E->isUnimportable())
-          VisitModule({E, &V});
-      }
+      SmallVector<ModuleRef, 16> Exports;
+      V.Ref.getExportedModules(Exports);
+      for (ModuleRef &E : Exports)
+        Visit({E, &V});
     }
 
-    for (auto &C : V.M->Conflicts) {
-      if (isVisible(C.Other)) {
-        llvm::SmallVector<Module*, 8> Path;
+    SmallVector<ModuleRef, 4> Conflicts;
+    V.Ref.getConflicts(Conflicts);
+    for (ModuleRef &C : Conflicts) {
+      if (isVisible(C)) {
+        // Actual conflict detected — deserialize for the diagnostic.
+        Module *Self = V.Ref;
+        Module *ConflictMod = C;
+        if (!Self || !ConflictMod)
+          continue;
+        StringRef Message;
+        for (auto &MC : Self->Conflicts)
+          if (Module *Other = MC.Other; Other == ConflictMod) {
+            Message = MC.Message;
+            break;
+          }
+        SmallVector<Module *, 8> Path;
         for (Visiting *I = &V; I; I = I->ExportedBy)
-          Path.push_back(I->M);
-        Cb(Path, C.Other, C.Message);
+          Path.push_back(I->Ref);
+        Cb(Path, ConflictMod, Message);
       }
     }
   };
-  VisitModule({M, nullptr});
+  Visit({ModuleRef(M), nullptr});
 }

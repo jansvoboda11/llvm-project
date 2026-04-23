@@ -819,6 +819,12 @@ private:
   /// declarations in that submodule that could be made visible.
   HiddenNamesMapType HiddenNamesMap;
 
+  /// Deferred NameVisibility updates for submodules that were traversed
+  /// via the export graph fast path but not yet deserialized. Applied
+  /// when the Module is eventually created in getOrReadSubmodule.
+  llvm::DenseMap<serialization::SubmoduleID, Module::NameVisibilityKind>
+      PendingNameVisibility;
+
   /// A vector containing selectors that have already been loaded.
   ///
   /// This vector is indexed by the Selector ID (-1). NULL selector
@@ -2416,6 +2422,20 @@ public:
 
   /// Retrieve the submodule that corresponds to a global submodule ID.
   Module *getSubmodule(uint32_t GlobalID) override;
+
+  /// Get the pre-allocated VisibilityID for a submodule without deserializing.
+  std::optional<unsigned>
+  getVisibilityID(uint64_t GlobalSubmoduleID) override;
+
+  /// Get same-PCM exports using the pre-computed export graph.
+  bool getExportedSubmoduleIDs(
+      uint64_t GlobalSubmoduleID,
+      SmallVectorImpl<uint64_t> &ExportGlobalIDs) override;
+
+  /// Get same-PCM conflicts using the pre-computed conflict graph.
+  bool getConflictingSubmoduleIDs(
+      uint64_t GlobalSubmoduleID,
+      SmallVectorImpl<uint64_t> &ConflictGlobalIDs) override;
 
   /// Retrieve the module that corresponds to the given module ID.
   ///

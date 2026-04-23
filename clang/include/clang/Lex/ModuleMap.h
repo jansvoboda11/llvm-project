@@ -579,6 +579,14 @@ public:
   Module *createModule(StringRef Name, Module *Parent, bool IsFramework,
                        bool IsExplicit);
 
+  /// Reserve a contiguous block of VisibilityIDs for lazily-loaded submodules.
+  /// Returns the base ID of the reserved range.
+  unsigned reserveVisibilityIDs(unsigned N) {
+    unsigned Base = NumCreatedModules;
+    NumCreatedModules += N;
+    return Base;
+  }
+
   /// Create a global module fragment for a C++ module unit.
   ///
   /// We model the global module fragment as a submodule of the module

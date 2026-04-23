@@ -920,6 +920,8 @@ void ASTWriter::WriteBlockInfoBlock() {
   // AST Top-Level Block.
   BLOCK(AST_BLOCK);
   RECORD(SUBMODULE_METADATA);
+  RECORD(SUBMODULE_EXPORT_GRAPH);
+  RECORD(SUBMODULE_CONFLICT_GRAPH);
   RECORD(TYPE_OFFSET);
   RECORD(DECL_OFFSET);
   RECORD(IDENTIFIER_OFFSET);
@@ -3091,6 +3093,9 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
 
   unsigned TopLevelID = getSubmoduleID(WritingModule);
 
+  // Collect modules by local index for export graph computation.
+  SmallVector<Module *> SubmodulesByIndex;
+
   // Write all of the submodules.
   std::queue<Module *> Q;
   Q.push(WritingModule);
@@ -3111,6 +3116,11 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     uint64_t Offset = Stream.GetCurrentBitNo() - SubmoduleOffsetBase;
     assert((Offset >> 32) == 0 && "Submodule offset too large");
     SubmoduleOffsets[Index] = Offset;
+
+    // Track module by index for export graph computation.
+    if (Index >= SubmodulesByIndex.size())
+      SubmodulesByIndex.resize(Index + 1);
+    SubmodulesByIndex[Index] = Mod;
 
     uint64_t ParentID = 0;
     if (Mod->Parent) {
@@ -3293,6 +3303,90 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
   assert((NextSubmoduleID - FirstSubmoduleID == SubmoduleOffsets.size()) &&
          "Wrong # of submodules; found a reference to a non-local, "
          "non-imported submodule?");
+
+  // Build and emit the pre-computed export graph BEFORE SUBMODULE_METADATA,
+  // so the reader has export data available when SUBMODULE_METADATA triggers
+  // module deserialization.
+  {
+    SmallVector<uint32_t> ExportGraphOffsets;
+    SmallVector<uint32_t> ExportGraphIDs;
+    ExportGraphOffsets.reserve(SubmodulesByIndex.size() + 1);
+
+    for (unsigned I = 0, N = SubmodulesByIndex.size(); I < N; ++I) {
+      ExportGraphOffsets.push_back(ExportGraphIDs.size());
+      Module *Mod = SubmodulesByIndex[I];
+      if (!Mod)
+        continue;
+
+      SmallVector<Module *, 16> Exports;
+      Mod->getExportedModules(Exports);
+      for (Module *E : Exports) {
+        unsigned EID = getSubmoduleID(E);
+        if (EID != 0) // Only same-PCM exports; cross-PCM get ID 0.
+          ExportGraphIDs.push_back(EID);
+      }
+    }
+    ExportGraphOffsets.push_back(ExportGraphIDs.size());
+
+    // Blob layout: uint32_t offsets[N+1], uint32_t exportIDs[total]
+    SmallVector<uint32_t> BlobData;
+    BlobData.reserve(ExportGraphOffsets.size() + ExportGraphIDs.size());
+    BlobData.append(ExportGraphOffsets.begin(), ExportGraphOffsets.end());
+    BlobData.append(ExportGraphIDs.begin(), ExportGraphIDs.end());
+
+    Abbrev = std::make_shared<BitCodeAbbrev>();
+    Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_EXPORT_GRAPH));
+    Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // Submodule count
+    Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));
+    unsigned ExportGraphAbbrev = Stream.EmitAbbrev(std::move(Abbrev));
+
+    RecordData::value_type ExportGraphRecord[] = {
+        SUBMODULE_EXPORT_GRAPH,
+        static_cast<RecordData::value_type>(SubmodulesByIndex.size())};
+    Stream.EmitRecordWithBlob(ExportGraphAbbrev, ExportGraphRecord,
+                              bytes(BlobData));
+  }
+
+  // Build and emit the pre-computed conflict graph (same format as export
+  // graph). For each submodule, stores the SubmoduleIDs of conflicting modules.
+  {
+    SmallVector<uint32_t> ConflictGraphOffsets;
+    SmallVector<uint32_t> ConflictGraphIDs;
+    ConflictGraphOffsets.reserve(SubmodulesByIndex.size() + 1);
+
+    for (unsigned I = 0, N = SubmodulesByIndex.size(); I < N; ++I) {
+      ConflictGraphOffsets.push_back(ConflictGraphIDs.size());
+      Module *Mod = SubmodulesByIndex[I];
+      if (!Mod)
+        continue;
+
+      for (const auto &C : Mod->Conflicts) {
+        unsigned CID = getSubmoduleID(C.Other);
+        if (CID != 0) // Only same-PCM conflicts.
+          ConflictGraphIDs.push_back(CID);
+      }
+    }
+    ConflictGraphOffsets.push_back(ConflictGraphIDs.size());
+
+    SmallVector<uint32_t> ConflictBlobData;
+    ConflictBlobData.reserve(ConflictGraphOffsets.size() +
+                             ConflictGraphIDs.size());
+    ConflictBlobData.append(ConflictGraphOffsets.begin(),
+                            ConflictGraphOffsets.end());
+    ConflictBlobData.append(ConflictGraphIDs.begin(), ConflictGraphIDs.end());
+
+    Abbrev = std::make_shared<BitCodeAbbrev>();
+    Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_CONFLICT_GRAPH));
+    Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // Submodule count
+    Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));
+    unsigned ConflictGraphAbbrev = Stream.EmitAbbrev(std::move(Abbrev));
+
+    RecordData::value_type ConflictGraphRecord[] = {
+        SUBMODULE_CONFLICT_GRAPH,
+        static_cast<RecordData::value_type>(SubmodulesByIndex.size())};
+    Stream.EmitRecordWithBlob(ConflictGraphAbbrev, ConflictGraphRecord,
+                              bytes(ConflictBlobData));
+  }
 
   Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(SUBMODULE_METADATA));
