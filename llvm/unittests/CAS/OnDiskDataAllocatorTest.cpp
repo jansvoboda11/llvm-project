@@ -10,6 +10,7 @@
 #include "llvm/CAS/MappedFileRegionArena.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Testing/Support/Error.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 
@@ -19,6 +20,7 @@ using namespace llvm;
 using namespace llvm::cas;
 
 TEST(OnDiskDataAllocatorTest, Allocate) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   unittest::TempDir Temp("data-allocator", /*Unique=*/true);
   constexpr size_t MB = 1024u * 1024u;
 

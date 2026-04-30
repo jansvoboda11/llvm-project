@@ -17,6 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -156,10 +157,14 @@ int main(int argc, const char **argv) {
     fatal("", "input filename is not specified");
   if (output.empty())
     fatal("", "output directory is not specified");
-  ErrorOr<std::unique_ptr<MemoryBuffer>> bufferOrErr =
-      MemoryBuffer::getFileOrSTDIN(input, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> bufferOrErr = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(input, /*IsText=*/true);
+  }();
   if (std::error_code ec = bufferOrErr.getError())
     fatal(input, ec.message());
+
+  auto BypassSandbox = sys::sandbox::scopedDisable();
 
   // Delete output if it is a file or an empty directory, so that we can create
   // a directory.

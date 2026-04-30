@@ -31,6 +31,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/Path.h"
@@ -5404,6 +5405,8 @@ StringRef MachOObjectFile::mapDebugSectionName(StringRef Name) const {
 
 Expected<std::vector<std::string>>
 MachOObjectFile::findDsymObjectMembers(StringRef Path) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   SmallString<256> BundlePath(Path);
   // Normalize input path. This is necessary to accept `bundle.dSYM/`.
   sys::path::remove_dots(BundlePath);

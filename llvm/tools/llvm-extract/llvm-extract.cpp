@@ -25,6 +25,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SourceMgr.h"
@@ -134,7 +135,10 @@ int main(int argc, char **argv) {
 
   LLVMContext Context;
   cl::HideUnrelatedOptions(ExtractCat);
-  cl::ParseCommandLineOptions(argc, argv, "llvm extractor\n");
+  cl::ParseCommandLineOptions(argc, argv, "llvm extractor\n", /*Errs=*/nullptr, /*VFS=*/[] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem().get();
+  }());
 
   // Use lazy loading, since we only care about selected global values.
   SMDiagnostic Err;
@@ -320,7 +324,15 @@ int main(int argc, char **argv) {
     CGSCCAnalysisManager CGAM;
     ModuleAnalysisManager MAM;
 
-    PassBuilder PB;
+    PassBuilder PB{
+      /*TM=*/nullptr,
+                   /*PTO=*/PipelineTuningOptions(),
+                   /*PGOOpt=*/std::nullopt,
+                   /*PIC=*/nullptr,
+                   /*FS=*/[] {
+                     auto BypassSandbox = sys::sandbox::scopedDisable();
+                     return vfs::getRealFileSystem();
+      }()};
 
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
@@ -367,7 +379,15 @@ int main(int argc, char **argv) {
     CGSCCAnalysisManager CGAM;
     ModuleAnalysisManager MAM;
 
-    PassBuilder PB;
+    PassBuilder PB{
+      /*TM=*/nullptr,
+                   /*PTO=*/PipelineTuningOptions(),
+                   /*PGOOpt=*/std::nullopt,
+                   /*PIC=*/nullptr,
+                   /*FS=*/[] {
+                     auto BypassSandbox = sys::sandbox::scopedDisable();
+                     return vfs::getRealFileSystem();
+      }()};
 
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
@@ -388,7 +408,15 @@ int main(int argc, char **argv) {
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
 
-  PassBuilder PB;
+  PassBuilder PB{
+    /*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+    }()};
 
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);

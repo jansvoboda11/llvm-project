@@ -11,13 +11,18 @@
 //===----------------------------------------------------------------------===//
 #include "RemarkUtilHelpers.h"
 
+#include "llvm/Support/IOSandbox.h"
+
 namespace llvm {
 namespace remarks {
 /// \returns A MemoryBuffer for the input file on success, and an Error
 /// otherwise.
 Expected<std::unique_ptr<MemoryBuffer>>
 getInputMemoryBuffer(StringRef InputFileName) {
-  auto MaybeBuf = MemoryBuffer::getFileOrSTDIN(InputFileName);
+  auto MaybeBuf = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFileName);
+  }();
   if (auto ErrorCode = MaybeBuf.getError())
     return createStringError(ErrorCode,
                              Twine("Cannot open file '" + InputFileName +

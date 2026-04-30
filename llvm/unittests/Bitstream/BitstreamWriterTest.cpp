@@ -12,6 +12,7 @@
 #include "llvm/Bitstream/BitCodeEnums.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gmock/gmock.h"
@@ -83,8 +84,10 @@ TEST_P(BitstreamWriterFlushTest, simpleExample) {
   write(TestFile.path(), GetParam(),
         [&](BitstreamWriter &W) { W.EmitVBR(42, 2); });
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MB =
-      MemoryBuffer::getFile(TestFile.path());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MB = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(TestFile.path());
+  }();
   ASSERT_TRUE(!!MB);
   ASSERT_NE(*MB, nullptr);
   BitstreamCursor Cursor((*MB)->getBuffer());
@@ -101,8 +104,10 @@ TEST_P(BitstreamWriterFlushTest, subBlock) {
     W.EmitVBR(42, 2);
     W.ExitBlock();
   });
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MB =
-      MemoryBuffer::getFile(TestFile.path());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MB = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(TestFile.path());
+  }();
   ASSERT_TRUE(!!MB);
   ASSERT_NE(*MB, nullptr);
   BitstreamCursor Cursor((*MB)->getBuffer());
@@ -120,6 +125,8 @@ TEST_P(BitstreamWriterFlushTest, subBlock) {
 }
 
 TEST_P(BitstreamWriterFlushTest, blobRawRead) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   llvm::unittest::TempFile TestFile("bitstream", "", "",
                                     /*Unique*/ true);
   write(TestFile.path(), GetParam(), [&](BitstreamWriter &W) {

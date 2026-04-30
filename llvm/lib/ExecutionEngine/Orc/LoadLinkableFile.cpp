@@ -12,6 +12,7 @@
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/ExecutionEngine/Orc/MachO.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 
 #define DEBUG_TYPE "orc"
 
@@ -41,6 +42,8 @@ checkELFRelocatableObject(std::unique_ptr<MemoryBuffer> Obj, const Triple &TT) {
 Expected<std::pair<std::unique_ptr<MemoryBuffer>, LinkableFileKind>>
 loadLinkableFile(StringRef Path, const Triple &TT, LoadArchives LA,
                  std::optional<StringRef> IdentifierOverride) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   if (!IdentifierOverride)
     IdentifierOverride = Path;
 

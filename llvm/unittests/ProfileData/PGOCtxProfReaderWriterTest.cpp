@@ -12,6 +12,7 @@
 #include "llvm/ProfileData/PGOCtxProfReader.h"
 #include "llvm/ProfileData/PGOCtxProfWriter.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
@@ -94,6 +95,7 @@ void checkSame(const ContextNode &Raw, const PGOCtxProfContext &Profile) {
 }
 
 TEST_F(PGOCtxProfRWTest, RoundTrip) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique*/ true);
   {
     std::error_code EC;
@@ -146,6 +148,7 @@ TEST_F(PGOCtxProfRWTest, RoundTrip) {
 }
 
 TEST_F(PGOCtxProfRWTest, InvalidCounters) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   auto *R = createNode(1, 0, 1);
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique*/ true);
   {
@@ -186,7 +189,10 @@ TEST_F(PGOCtxProfRWTest, CountersAllZero) {
     }
   }
   {
-    auto MB = MemoryBuffer::getFile(ProfileFile.path());
+    auto MB = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(ProfileFile.path());
+    }();
     ASSERT_TRUE(!!MB);
     ASSERT_NE(*MB, nullptr);
     PGOCtxProfileReader Reader((*MB)->getBuffer());
@@ -239,6 +245,7 @@ TEST_F(PGOCtxProfRWTest, Invalid) {
 }
 
 TEST_F(PGOCtxProfRWTest, ValidButEmpty) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique*/ true);
   {
     std::error_code EC;
@@ -262,6 +269,7 @@ TEST_F(PGOCtxProfRWTest, ValidButEmpty) {
 }
 
 TEST_F(PGOCtxProfRWTest, WrongVersion) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique*/ true);
   {
     std::error_code EC;
@@ -284,12 +292,16 @@ TEST_F(PGOCtxProfRWTest, WrongVersion) {
 }
 
 TEST_F(PGOCtxProfRWTest, DuplicateRoots) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique*/ true);
   {
     std::error_code EC;
     raw_fd_stream Out(ProfileFile.path(), EC);
     ASSERT_FALSE(EC);
     {
+        auto ReenableSandbox = sys::sandbox::scopedEnable();
+
       PGOCtxProfileWriter Writer(Out, /*VersionOverride=*/std::nullopt,
                                  /*IncludeEmpty=*/true);
       Writer.startContextSection();
@@ -302,6 +314,7 @@ TEST_F(PGOCtxProfRWTest, DuplicateRoots) {
     auto MB = MemoryBuffer::getFile(ProfileFile.path());
     ASSERT_TRUE(!!MB);
     ASSERT_NE(*MB, nullptr);
+    auto ReenableSandbox = sys::sandbox::scopedEnable();
     PGOCtxProfileReader Reader((*MB)->getBuffer());
     auto Expected = Reader.loadProfiles();
     EXPECT_FALSE(Expected);
@@ -327,7 +340,10 @@ TEST_F(PGOCtxProfRWTest, DuplicateTargets) {
     }
   }
   {
-    auto MB = MemoryBuffer::getFile(ProfileFile.path());
+    auto MB = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(ProfileFile.path());
+    }();
     ASSERT_TRUE(!!MB);
     ASSERT_NE(*MB, nullptr);
     PGOCtxProfileReader Reader((*MB)->getBuffer());

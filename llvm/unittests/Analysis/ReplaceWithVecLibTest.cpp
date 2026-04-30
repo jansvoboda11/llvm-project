@@ -12,6 +12,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
 
@@ -68,7 +69,14 @@ protected:
     FunctionPassManager FPM;
     FPM.addPass(ReplaceWithVeclib());
     std::unique_ptr<Module> M = parseIR(Ctx, IR);
-    PassBuilder PB;
+    PassBuilder PB{/*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+    }()};
     PB.registerFunctionAnalyses(FAM);
 
     // Enable debugging and capture std error

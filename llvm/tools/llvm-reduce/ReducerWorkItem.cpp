@@ -31,6 +31,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -493,6 +494,8 @@ bool ReducerWorkItem::isReduced(const TestRunner &Test) const {
 
   SmallString<128> CurrentFilepath;
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Write ReducerWorkItem to tmp file
   int FD;
   std::error_code EC = sys::fs::createTemporaryFile(
@@ -517,6 +520,7 @@ bool ReducerWorkItem::isReduced(const TestRunner &Test) const {
     exit(1);
   }
 
+  auto ReenableSandbox = sys::sandbox::scopedEnable();
   // Current Chunks aren't interesting
   return Test.run(CurrentFilepath);
 }
@@ -793,7 +797,14 @@ void ReducerWorkItem::writeBitcode(raw_ostream &OutStream) const {
   const bool ShouldPreserveUseListOrder = true;
 
   if (LTOInfo && LTOInfo->IsThinLTO && LTOInfo->EnableSplitLTOUnit) {
-    PassBuilder PB;
+    PassBuilder PB{/*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+    }()};
     LoopAnalysisManager LAM;
     FunctionAnalysisManager FAM;
     CGSCCAnalysisManager CGAM;
@@ -831,7 +842,10 @@ llvm::parseReducerWorkItem(StringRef ToolName, StringRef Filename,
   if (IsMIR) {
     initializeTargetInfo();
 
-    auto FileOrErr = MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+    auto FileOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+    }();
     if (std::error_code EC = FileOrErr.getError()) {
       WithColor::error(errs(), ToolName) << EC.message() << '\n';
       return {nullptr, false};
@@ -867,8 +881,10 @@ llvm::parseReducerWorkItem(StringRef ToolName, StringRef Filename,
     MMM->M = std::move(M);
   } else {
     SMDiagnostic Err;
-    ErrorOr<std::unique_ptr<MemoryBuffer>> MB =
-        MemoryBuffer::getFileOrSTDIN(Filename);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> MB = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Filename);
+    }();
     if (std::error_code EC = MB.getError()) {
       WithColor::error(errs(), ToolName)
           << Filename << ": " << EC.message() << "\n";

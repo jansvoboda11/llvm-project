@@ -34,6 +34,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/GraphWriter.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
@@ -545,6 +546,7 @@ void IRChangedTester::registerCallbacks(PassInstrumentationCallbacks &PIC) {
 }
 
 void IRChangedTester::handleIR(const std::string &S, StringRef PassID) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Store the body into a temporary file
   static SmallVector<int> FD{-1};
   SmallVector<StringRef> SR{S};
@@ -559,6 +561,7 @@ void IRChangedTester::handleIR(const std::string &S, StringRef PassID) {
     return;
   }
 
+  auto ReenableSandbox = sys::sandbox::scopedEnable();
   StringRef Args[] = {TestChanged, FileName[0], PassID};
   int Result = sys::ExecuteAndWait(*Exe, Args);
   if (Result < 0) {
@@ -566,6 +569,7 @@ void IRChangedTester::handleIR(const std::string &S, StringRef PassID) {
     return;
   }
 
+  auto BypassSandbox2 = sys::sandbox::scopedDisable();
   if (cleanUpTempFiles(FileName))
     dbgs() << "Unable to remove temporary file.";
 }

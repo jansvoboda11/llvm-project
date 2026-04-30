@@ -30,6 +30,7 @@
 #include "llvm/Bitcode/BitcodeAnalyzer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/WithColor.h"
@@ -88,7 +89,11 @@ static Error reportError(StringRef Message) {
 static Expected<std::unique_ptr<MemoryBuffer>> openBitcodeFile(StringRef Path) {
   // Read the input file.
   Expected<std::unique_ptr<MemoryBuffer>> MemBufOrErr =
-      errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Path));
+      errorOrToExpected(
+        [&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(Path);
+        }());
   if (Error E = MemBufOrErr.takeError())
     return std::move(E);
 

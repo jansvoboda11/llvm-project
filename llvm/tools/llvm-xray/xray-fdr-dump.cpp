@@ -13,6 +13,7 @@
 #include "xray-registry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/XRay/BlockIndexer.h"
 #include "llvm/XRay/BlockPrinter.h"
 #include "llvm/XRay/BlockVerifier.h"
@@ -34,6 +35,7 @@ static cl::opt<bool> DumpVerify("verify",
                                 cl::init(false), cl::sub(Dump));
 
 static CommandRegistration Unused(&Dump, []() -> Error {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Open the file provided.
   auto FDOrErr = sys::fs::openNativeFileForRead(DumpInput);
   if (!FDOrErr)
@@ -49,6 +51,8 @@ static CommandRegistration Unused(&Dump, []() -> Error {
       *FDOrErr, sys::fs::mapped_file_region::mapmode::readonly, FileSize, 0,
       EC);
   sys::fs::closeFile(*FDOrErr);
+
+  auto ReenableSandbox = sys::sandbox::scopedEnable();
 
   DataExtractor DE(StringRef(MappedFile.data(), MappedFile.size()), true);
   uint64_t OffsetPtr = 0;

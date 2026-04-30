@@ -18,6 +18,7 @@
 #include "llvm/ObjectYAML/ObjectYAML.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -130,8 +131,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-      MemoryBuffer::getFileOrSTDIN(Input, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Input, /*IsText=*/true);
+  }();
   if (std::error_code EC = Buf.getError()) {
     WithColor::error(errs(), ProgName) << Input << ": " << EC.message() << '\n';
     return 1;

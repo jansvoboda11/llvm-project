@@ -14,6 +14,7 @@
 #include "clang/InstallAPI/HeaderFile.h"
 #include "clang/InstallAPI/InstallAPIDiagnostic.h"
 #include "llvm/BinaryFormat/Magic.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Program.h"
 #include "llvm/TargetParser/Host.h"

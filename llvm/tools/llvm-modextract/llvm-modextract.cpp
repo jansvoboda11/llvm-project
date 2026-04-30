@@ -17,6 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
@@ -51,7 +52,10 @@ int main(int argc, char **argv) {
   ExitOnError ExitOnErr("llvm-modextract: error: ");
 
   std::unique_ptr<MemoryBuffer> MB =
-      ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
+      ExitOnErr(errorOrToExpected([&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFileOrSTDIN(InputFilename);
+      }()));
   std::vector<BitcodeModule> Ms = ExitOnErr(getBitcodeModuleList(*MB));
 
   LLVMContext Context;

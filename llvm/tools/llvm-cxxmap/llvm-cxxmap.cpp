@@ -17,6 +17,7 @@
 #include "llvm/ProfileData/SymbolRemappingReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -145,18 +146,22 @@ int main(int argc, const char *argv[]) {
   cl::HideUnrelatedOptions({&CXXMapCategory, &getColorCategory()});
   cl::ParseCommandLineOptions(argc, argv, "LLVM C++ mangled name remapper\n");
 
-  auto OldSymbolBufOrError =
-      MemoryBuffer::getFileOrSTDIN(OldSymbolFile, /*IsText=*/true);
+  auto OldSymbolBufOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable(); return
+MemoryBuffer::getFileOrSTDIN(OldSymbolFile, /*IsText=*/true);
+  }();
   if (!OldSymbolBufOrError)
     exitWithErrorCode(OldSymbolBufOrError.getError(), OldSymbolFile);
 
-  auto NewSymbolBufOrError =
+  auto NewSymbolBufOrError = [&] { auto BypassSandbox = sys::sandbox::scopedDisable(); return
       MemoryBuffer::getFileOrSTDIN(NewSymbolFile, /*IsText=*/true);
+  }();
   if (!NewSymbolBufOrError)
     exitWithErrorCode(NewSymbolBufOrError.getError(), NewSymbolFile);
 
-  auto RemappingBufOrError =
+  auto RemappingBufOrError = [&] { auto BypassSandbox = sys::sandbox::scopedDisable(); return
       MemoryBuffer::getFileOrSTDIN(RemappingFile, /*IsText=*/true);
+  }();
   if (!RemappingBufOrError)
     exitWithErrorCode(RemappingBufOrError.getError(), RemappingFile);
 

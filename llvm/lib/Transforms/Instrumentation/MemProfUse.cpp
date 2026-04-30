@@ -33,6 +33,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/HashBuilder.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Transforms/Utils/LongestCommonSequence.h"
@@ -879,8 +880,10 @@ readMemprof(Module &M, Function &F, IndexedInstrProfReader *MemProfReader,
 MemProfUsePass::MemProfUsePass(std::string MemoryProfileFile,
                                IntrusiveRefCntPtr<vfs::FileSystem> FS)
     : MemoryProfileFileName(MemoryProfileFile), FS(FS) {
-  if (!FS)
+  if (!FS) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     this->FS = vfs::getRealFileSystem();
+  }
 }
 
 PreservedAnalyses MemProfUsePass::run(Module &M, ModuleAnalysisManager &AM) {

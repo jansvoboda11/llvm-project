@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
@@ -174,8 +175,10 @@ int main(int argc, char **argv) {
     InputFileNames.push_back("-");
 
   for (const auto &File : InputFileNames) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
-        MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+    }();
     if (std::error_code EC = Buffer.getError())
       errs() << File << ": " << EC.message() << '\n';
     else

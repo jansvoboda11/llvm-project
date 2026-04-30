@@ -27,6 +27,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -193,8 +194,10 @@ static Error dumpSectionToFile(StringRef SecName, StringRef Filename,
         return createFileError(InputFilename, object_error::parse_failed,
                                "cannot dump section '%s': it has no contents",
                                SecName.str().c_str());
-      Expected<std::unique_ptr<FileOutputBuffer>> BufferOrErr =
-          FileOutputBuffer::create(Filename, Sec.OriginalData.size());
+      Expected<std::unique_ptr<FileOutputBuffer>> BufferOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return FileOutputBuffer::create(Filename, Sec.OriginalData.size());
+      }();
       if (!BufferOrErr)
         return createFileError(Filename, BufferOrErr.takeError());
       std::unique_ptr<FileOutputBuffer> Buf = std::move(*BufferOrErr);

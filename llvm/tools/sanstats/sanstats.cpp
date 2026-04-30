@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
@@ -60,9 +61,12 @@ static const char *ReadModule(char SizeofPtr, const char *Begin,
     return nullptr;
   std::string Filename(FilenameBegin, Begin - FilenameBegin);
 
-  if (!llvm::sys::fs::exists(Filename))
-    Filename = std::string(llvm::sys::path::parent_path(ClInputFile)) +
-               std::string(llvm::sys::path::filename(Filename));
+  {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    if (!llvm::sys::fs::exists(Filename))
+      Filename = std::string(llvm::sys::path::parent_path(ClInputFile)) +
+                 std::string(llvm::sys::path::filename(Filename));
+  }
 
   ++Begin;
   if (Begin == End)
@@ -130,8 +134,11 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv,
                               "Sanitizer Statistics Processing Tool");
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = MemoryBuffer::getFile(
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(
       ClInputFile, /*IsText=*/false, /*RequiresNullTerminator=*/false);
+  }();
   if (!MBOrErr) {
     errs() << argv[0] << ": " << ClInputFile << ": "
            << MBOrErr.getError().message() << '\n';

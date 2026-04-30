@@ -10,6 +10,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 
 using namespace llvm;
 
@@ -33,7 +34,10 @@ void llvm::runIRPassesDeltaPass(Oracle &O, ReducerWorkItem &WorkItem) {
   PassInstrumentationCallbacks PIC;
   PIC.registerShouldRunOptionalPassCallback(
       [&](StringRef, Any) { return !O.shouldKeep(); });
-  PassBuilder PB(nullptr, PipelineTuningOptions(), std::nullopt, &PIC);
+  PassBuilder PB(nullptr, PipelineTuningOptions(), std::nullopt, &PIC, [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }());
 
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);

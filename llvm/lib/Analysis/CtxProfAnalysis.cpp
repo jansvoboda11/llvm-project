@@ -22,6 +22,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/ProfileData/PGOCtxProfReader.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include <deque>
@@ -462,7 +463,10 @@ PGOContextualProfile CtxProfAnalysis::run(Module &M,
                                           ModuleAnalysisManager &MAM) {
   if (!Profile)
     return {};
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MB = MemoryBuffer::getFile(*Profile);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MB = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(*Profile);
+  }();
   if (auto EC = MB.getError()) {
     M.getContext().emitError("could not open contextual profile file: " +
                              EC.message());

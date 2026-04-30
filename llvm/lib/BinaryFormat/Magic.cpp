@@ -12,6 +12,7 @@
 #include "llvm/BinaryFormat/COFF.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
@@ -284,8 +285,11 @@ file_magic llvm::identify_magic(StringRef Magic) {
 }
 
 std::error_code llvm::identify_magic(const Twine &Path, file_magic &Result) {
-  auto FileOrError = MemoryBuffer::getFile(Path, /*IsText=*/false,
+  auto FileOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Path, /*IsText=*/false,
                                            /*RequiresNullTerminator=*/false);
+  }();
   if (!FileOrError)
     return FileOrError.getError();
 

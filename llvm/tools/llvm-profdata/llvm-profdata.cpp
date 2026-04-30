@@ -35,6 +35,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -600,7 +601,10 @@ class SymbolRemapper {
 public:
   /// Build a SymbolRemapper from a file containing a list of old/new symbols.
   static std::unique_ptr<SymbolRemapper> create(StringRef InputFile) {
-    auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFile);
+    auto BufOrError = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(InputFile);
+    }();
     if (!BufOrError)
       exitWithErrorCode(BufOrError.getError(), InputFile);
 
@@ -669,7 +673,10 @@ static void overlapInput(const std::string &BaseFilename,
                          OverlapStats &Overlap,
                          const OverlapFuncFilters &FuncFilter,
                          raw_fd_ostream &OS, bool IsCS) {
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = InstrProfReader::create(TestFilename, *FS);
   if (Error E = ReaderOrErr.takeError()) {
     // Skip the empty profiles by returning sliently.
@@ -702,6 +709,8 @@ loadInput(const WeightedFile &Input, SymbolRemapper *Remapper,
   // WeightedFile &" by value, making a reference to the filename within it
   // invalid outside of this packaged task.
   std::string Filename = Input.Filename;
+
+  auto BypassSandbox = sys::sandbox::scopedDisable();
 
   using ::llvm::memprof::RawMemProfReader;
   if (RawMemProfReader::hasFormat(Input.Filename)) {
@@ -773,7 +782,10 @@ loadInput(const WeightedFile &Input, SymbolRemapper *Remapper,
     return;
   }
 
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   // TODO: This only saves the first non-fatal error from InstrProfReader, and
   // then added to WriterContext::Errors. However, this is not extensible, if
   // we have more non-fatal errors from InstrProfReader in the future. How
@@ -1465,7 +1477,10 @@ static void supplementInstrProfile(const WeightedFileVector &Inputs,
 
   // Read sample profile.
   LLVMContext Context;
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = sampleprof::SampleProfileReader::create(
       SampleFilename.str(), Context, *FS, FSDiscriminatorPassOption);
   if (std::error_code EC = ReaderOrErr.getError())
@@ -1534,7 +1549,10 @@ getInputFileBuf(const StringRef &InputFile) {
   if (InputFile == "")
     return {};
 
-  auto BufOrError = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto BufOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFile);
+  }();
   if (!BufOrError)
     exitWithErrorCode(BufOrError.getError(), InputFile);
 
@@ -1606,7 +1624,10 @@ static void mergeSampleProfile(const WeightedFileVector &Inputs,
   std::optional<bool> ProfileIsProbeBased;
   std::optional<bool> ProfileIsCS;
   for (const auto &Input : Inputs) {
-    auto FS = vfs::getRealFileSystem();
+    auto FS = [] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return vfs::getRealFileSystem();
+    }();
     auto ReaderOrErr = SampleProfileReader::create(Input.Filename, Context, *FS,
                                                    FSDiscriminatorPassOption);
     if (std::error_code EC = ReaderOrErr.getError()) {
@@ -1728,6 +1749,7 @@ static void addWeightedInput(WeightedFileVector &WNI, const WeightedFile &WF) {
     return;
   }
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   llvm::sys::fs::file_status Status;
   llvm::sys::fs::status(Filename, Status);
   if (!llvm::sys::fs::exists(Status))
@@ -2711,7 +2733,10 @@ std::error_code SampleOverlapAggregator::loadProfiles() {
   using namespace sampleprof;
 
   LLVMContext Context;
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto BaseReaderOrErr = SampleProfileReader::create(BaseFilename, Context, *FS,
                                                      FSDiscriminatorPassOption);
   if (std::error_code EC = BaseReaderOrErr.getError())
@@ -2853,7 +2878,10 @@ static int showInstrProfile(ShowFormat SFormat, raw_fd_ostream &OS) {
     exitWithError("JSON output is not supported for instr profiles");
   if (SFormat == ShowFormat::Yaml)
     exitWithError("YAML output is not supported for instr profiles");
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = InstrProfReader::create(Filename, *FS);
   std::vector<uint32_t> Cutoffs = std::move(DetailedSummaryCutoffs);
   if (Cutoffs.empty() && (ShowDetailedSummary || ShowHotFuncList))
@@ -3238,7 +3266,10 @@ static int showSampleProfile(ShowFormat SFormat, raw_fd_ostream &OS) {
     exitWithError("YAML output is not supported for sample profiles");
   using namespace sampleprof;
   LLVMContext Context;
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = SampleProfileReader::create(Filename, Context, *FS,
                                                  FSDiscriminatorPassOption);
   if (std::error_code EC = ReaderOrErr.getError())
@@ -3311,7 +3342,10 @@ static int showMemProfProfile(ShowFormat SFormat, raw_fd_ostream &OS) {
   }
 
   // Show the indexed MemProf profile in YAML.
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = IndexedInstrProfReader::create(Filename, *FS);
   if (Error E = ReaderOrErr.takeError())
     exitWithError(std::move(E), Filename);
@@ -3411,7 +3445,10 @@ static int order_main() {
   raw_fd_ostream OS(OutputFilename.data(), EC, sys::fs::OF_TextWithCRLF);
   if (EC)
     exitWithErrorCode(EC, OutputFilename);
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = InstrProfReader::create(Filename, *FS);
   if (Error E = ReaderOrErr.takeError())
     exitWithError(std::move(E), Filename);
@@ -3482,7 +3519,11 @@ int main(int argc, const char *argv[]) {
     return 1;
   }
 
-  cl::ParseCommandLineOptions(argc, argv, "LLVM profile data\n");
+  cl::ParseCommandLineOptions(
+      argc, argv, "LLVM profile data\n", /*Errs=*/nullptr, /*VFS=*/[] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return vfs::getRealFileSystem().get();
+      }());
 
   if (ShowSubcommand)
     return show_main(ProgName);

@@ -35,6 +35,7 @@
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -427,8 +428,10 @@ int main(int argc, char **argv) {
   // construct the Triple object.
   Triple TheTriple(TripleName);
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferPtr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferPtr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  }();
   if (std::error_code EC = BufferPtr.getError()) {
     WithColor::error(errs(), ProgName)
         << InputFilename << ": " << EC.message() << '\n';
@@ -539,6 +542,7 @@ int main(int argc, char **argv) {
   else {
     // If no compilation dir is set, try to use the current directory.
     SmallString<128> CWD;
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     if (!sys::fs::current_path(CWD))
       Ctx.setCompilationDir(CWD);
   }

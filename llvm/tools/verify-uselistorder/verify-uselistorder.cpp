@@ -41,6 +41,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -150,8 +151,10 @@ bool TempFile::writeAssembly(const Module &M) const {
 
 std::unique_ptr<Module> TempFile::readBitcode(LLVMContext &Context) const {
   LLVM_DEBUG(dbgs() << " - read bitcode\n");
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOr =
-      MemoryBuffer::getFile(Filename);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Filename);
+  }();
   if (!BufferOr) {
     errs() << "verify-uselistorder: error: " << BufferOr.getError().message()
            << "\n";
@@ -366,6 +369,7 @@ static void verifyAfterRoundTrip(const Module &M,
 }
 
 static void verifyBitcodeUseListOrder(const Module &M) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   TempFile F;
   if (F.init("bc"))
     report_fatal_error("failed to initialize bitcode file");
@@ -378,6 +382,7 @@ static void verifyBitcodeUseListOrder(const Module &M) {
 }
 
 static void verifyAssemblyUseListOrder(const Module &M) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   TempFile F;
   if (F.init("ll"))
     report_fatal_error("failed to initialize assembly file");

@@ -22,6 +22,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/SwapByteOrder.h"
@@ -352,6 +353,7 @@ Error object::writeUniversalBinaryToStream(ArrayRef<Slice> Slices,
 Error object::writeUniversalBinary(ArrayRef<Slice> Slices,
                                    StringRef OutputFileName,
                                    FatHeaderType HeaderType) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   const bool IsExecutable = any_of(Slices, [](Slice S) {
     return sys::fs::can_execute(S.getBinary()->getFileName());
   });

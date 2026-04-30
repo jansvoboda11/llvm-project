@@ -24,6 +24,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <memory>
 #include <system_error>
@@ -109,9 +110,11 @@ Expected<std::unique_ptr<Binary>> object::createBinary(MemoryBufferRef Buffer,
 
 Expected<OwningBinary<Binary>>
 object::createBinary(StringRef Path, LLVMContext *Context, bool InitContent) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Path, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Path, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return errorCodeToError(EC);
   std::unique_ptr<MemoryBuffer> &Buffer = FileOrErr.get();

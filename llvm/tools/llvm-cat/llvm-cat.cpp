@@ -21,6 +21,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
@@ -59,7 +60,10 @@ int main(int argc, char **argv) {
   if (BinaryCat) {
     for (const auto &InputFilename : InputFilenames) {
       std::unique_ptr<MemoryBuffer> MB = ExitOnErr(
-          errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
+          errorOrToExpected([&] {
+            auto BypassSandbox = sys::sandbox::scopedDisable();
+            return MemoryBuffer::getFileOrSTDIN(InputFilename);
+          }()));
       std::vector<BitcodeModule> Mods = ExitOnErr(getBitcodeModuleList(*MB));
       for (auto &BitcodeMod : Mods) {
         llvm::append_range(Buffer, BitcodeMod.getBuffer());

@@ -24,6 +24,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/WithColor.h"
@@ -279,6 +280,8 @@ getAllDyLibComponents(const bool IsInDevelopmentTree,
 }
 
 int main(int argc, char **argv) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::vector<StringRef> Components;
   bool PrintLibs = false, PrintLibNames = false, PrintLibFiles = false;
   bool PrintSystemLibs = false, PrintSharedMode = false;

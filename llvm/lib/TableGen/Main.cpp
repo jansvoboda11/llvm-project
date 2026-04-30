@@ -22,6 +22,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SMLoc.h"
@@ -88,6 +89,8 @@ static int reportError(const char *ProgName, Twine Msg) {
 /// This functionality is really only for the benefit of the build system.
 /// It is similar to GCC's `-M*` family of options.
 static int createDependencyFile(const TGParser &Parser, const char *argv0) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+
   if (OutputFilename == "-")
     return reportError(argv0, "the option -d must be used together with -o\n");
 
@@ -137,8 +140,10 @@ int llvm::TableGenMain(const char *argv0, MultiFileTableGenMainFn MainFn) {
   // Parse the input file.
 
   Timer.startTimer("Parse, build records");
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return reportError(argv0, "Could not open input file '" + InputFilename +
                                   "': " + EC.message() + "\n");
@@ -187,6 +192,7 @@ int llvm::TableGenMain(const char *argv0, MultiFileTableGenMainFn MainFn) {
   }
 
   Timer.startTimer("Write output");
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   if (int Ret = WriteOutput(argv0, OutputFilename, OutFiles.MainFile))
     return Ret;
   for (auto [Suffix, Content] : OutFiles.AdditionalFiles) {

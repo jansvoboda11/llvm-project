@@ -18,6 +18,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CBindingWrapping.h"
+#include "llvm/Support/IOSandbox.h"
 
 using namespace llvm;
 
@@ -55,7 +56,10 @@ static LLVMErrorRef runPasses(Module *Mod, Function *Fun, const char *Passes,
   bool VerifyEach = PassOpts->VerifyEach;
 
   PassInstrumentationCallbacks PIC;
-  PassBuilder PB(Machine, PassOpts->PTO, std::nullopt, &PIC);
+  PassBuilder PB(Machine, PassOpts->PTO, std::nullopt, &PIC, [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }());
 
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;

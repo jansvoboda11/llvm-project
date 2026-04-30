@@ -9,6 +9,7 @@
 #include "llvm/ProfileData/SampleProfReader.h"
 #include "llvm/ProfileData/SampleProfWriter.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gtest/gtest.h"
@@ -80,7 +81,10 @@ static ExpectedErrorOr<void *> RunTest(StringRef Input, size_t SizeLimit,
                                        SampleProfileFormat Format,
                                        bool Compress = false) {
   // Read Input profile.
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   LLVMContext Context;
   auto InputBuffer = MemoryBuffer::getMemBuffer(Input);
   DEF_VAR_RETURN_IF_ERROR(
@@ -108,7 +112,10 @@ static ExpectedErrorOr<void *> RunTest(StringRef Input, size_t SizeLimit,
   // Read the temp file to get new profiles. Use the default empty profile if
   // temp file was not written because size limit is too small.
   SampleProfileMap NewProfiles;
-  InputBuffer = MemoryBuffer::getMemBuffer(StringRef(EmptyProfile, 17));
+  InputBuffer = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getMemBuffer(StringRef(EmptyProfile, 17));
+  }();
   DEF_VAR_RETURN_IF_ERROR(
       NewReader, SampleProfileReader::create(InputBuffer, Context, *FS));
   if (!isEmpty) {
@@ -120,7 +127,10 @@ static ExpectedErrorOr<void *> RunTest(StringRef Input, size_t SizeLimit,
 
   // Check temp file is actually within size limit.
   uint64_t FileSize;
-  RETURN_IF_ERROR(sys::fs::file_size(Temp.path(), FileSize));
+  {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    RETURN_IF_ERROR(sys::fs::file_size(Temp.path(), FileSize));
+  }
   EXPECT_LE(FileSize, SizeLimit);
 
   // For every sample in the new profile, confirm it is in the old profile and

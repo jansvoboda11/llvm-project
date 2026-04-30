@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,8 @@ using llvm::unittest::TempLink;
 namespace {
 
 TEST(TempPathTest, TempDir) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::optional<TempDir> Dir1, Dir2;
   StringRef Prefix = "temp-path-test";
   Dir1.emplace(Prefix, /*Unique=*/true);
@@ -41,6 +44,8 @@ TEST(TempPathTest, TempDir) {
 }
 
 TEST(TempPathTest, TempFile) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   TempDir D("temp-path-test", /*Unique=*/true);
   ASSERT_TRUE(sys::fs::exists(D.path()));
 
@@ -69,6 +74,8 @@ TEST(TempPathTest, TempFile) {
 }
 
 TEST(TempPathTest, TempLink) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   TempDir D("temp-path-test", /*Unique=*/true);
   ASSERT_TRUE(sys::fs::exists(D.path()));
   TempFile File(D.path("file"), "suffix", "content");

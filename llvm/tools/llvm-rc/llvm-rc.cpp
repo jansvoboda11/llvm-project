@@ -26,6 +26,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -114,6 +115,7 @@ public:
 };
 
 static ExitOnError ExitOnErr;
+static auto BypassSandbox = sys::sandbox::scopedDisable();
 static FileRemover TempPreprocFile;
 static FileRemover TempResFile;
 

@@ -16,6 +16,7 @@
 #include "llvm/DebugInfo/DIContext.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -39,8 +40,10 @@ class SourceCode {
     if (EmbeddedSource)
       return EmbeddedSource;
     else {
-      ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-          MemoryBuffer::getFile(FileName);
+      ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFile(FileName);
+      }();
       if (!BufOrErr)
         return std::nullopt;
       MemBuf = std::move(*BufOrErr);

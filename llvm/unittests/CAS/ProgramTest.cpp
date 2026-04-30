@@ -12,6 +12,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/ExponentialBackoff.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Testing/Support/Error.h"
@@ -88,6 +89,8 @@ static Error emptyConstructor(MappedFileRegionArena &) {
 }
 
 TEST_F(CASProgramTest, MappedFileRegionArenaTest) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   auto TestAllocator = [](StringRef Path) {
     std::optional<MappedFileRegionArena> Alloc;
     ASSERT_THAT_ERROR(
@@ -154,6 +157,8 @@ TEST_F(CASProgramTest, MappedFileRegionArenaTest) {
 }
 
 TEST_F(CASProgramTest, MappedFileRegionArenaSizeTest) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   using namespace std::chrono_literals;
   if (const char *File = getenv("LLVM_CAS_TEST_MAPPED_FILE_REGION")) {
     ExponentialBackoff Backoff(5s);

@@ -17,6 +17,8 @@
 //
 #include "xray-registry.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -26,7 +28,12 @@ int main(int argc, char *argv[]) {
   cl::ParseCommandLineOptions(argc, argv,
                               "XRay Tools\n\n"
                               "  This program consolidates multiple XRay trace "
-                              "processing tools for convenient access.\n");
+                              "processing tools for convenient access.\n",
+                              /*Errs=*/nullptr,
+                              /*VFS=*/[] {
+                                auto BypassSandbox = sys::sandbox::scopedDisable();
+                                return vfs::getRealFileSystem().get();
+                              }());
   for (auto *SC : cl::getRegisteredSubcommands()) {
     if (*SC) {
       // If no subcommand was provided, we need to explicitly check if this is

@@ -20,6 +20,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/TargetParser/Host.h"
 
@@ -63,7 +64,10 @@ public:
 
 // Opens a file. Path has to be resolved already.
 std::unique_ptr<MemoryBuffer> openFile(const Twine &Path) {
-  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> MB = MemoryBuffer::getFile(Path);
+  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> MB = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Path);
+  }();
 
   if (std::error_code EC = MB.getError()) {
     llvm::errs() << "cannot open file " << Path << ": " << EC.message() << "\n";
@@ -251,8 +255,11 @@ bool identifyImportName(const COFFObjectFile &Obj, StringRef ObjName,
 }
 
 int doIdentify(StringRef File, bool IdentifyStrict) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> MaybeBuf = MemoryBuffer::getFile(
-      File, /*IsText=*/false, /*RequiredNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> MaybeBuf = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(
+        File, /*IsText=*/false, /*RequiredNullTerminator=*/false);
+  }();
   if (!MaybeBuf)
     return printError(errorCodeToError(MaybeBuf.getError()), File);
   if (identify_magic(MaybeBuf.get()->getBuffer()) != file_magic::archive) {

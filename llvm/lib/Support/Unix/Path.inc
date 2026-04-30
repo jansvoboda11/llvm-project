@@ -1492,6 +1492,7 @@ bool home_directory(SmallVectorImpl<char> &result) {
   return true;
 }
 
+// FIXME: Move this and callers into the llvm::sys::fs namespace.
 static bool getDarwinConfDir(bool TempDir, SmallVectorImpl<char> &Result) {
 #if defined(_CS_DARWIN_USER_TEMP_DIR) && defined(_CS_DARWIN_USER_CACHE_DIR)
   // On Darwin, use DARWIN_USER_TEMP_DIR or DARWIN_USER_CACHE_DIR.

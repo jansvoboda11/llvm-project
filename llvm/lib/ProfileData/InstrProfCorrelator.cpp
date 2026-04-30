@@ -17,6 +17,7 @@
 #include "llvm/Object/MachO.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/WithColor.h"
 #include <optional>
 
@@ -114,6 +115,8 @@ llvm::Expected<std::unique_ptr<InstrProfCorrelator>>
 InstrProfCorrelator::get(StringRef Filename, ProfCorrelatorKind FileKind,
                          const object::BuildIDFetcher *BIDFetcher,
                          const ArrayRef<object::BuildID> BIs) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::optional<std::string> Path;
   if (BIDFetcher) {
     if (BIs.empty())

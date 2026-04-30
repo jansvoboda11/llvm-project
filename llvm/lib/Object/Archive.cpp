@@ -22,6 +22,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -579,6 +580,7 @@ Expected<StringRef> Archive::Child::getBuffer() const {
   if (!FullNameOrErr)
     return FullNameOrErr.takeError();
   const std::string &FullName = *FullNameOrErr;
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
       MemoryBuffer::getFile(FullName, false, /*RequiresNullTerminator=*/false);
   if (std::error_code EC = Buf.getError())

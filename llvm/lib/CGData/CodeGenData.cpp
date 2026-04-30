@@ -18,6 +18,7 @@
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/Caching.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/WithColor.h"
 
 #define DEBUG_TYPE "cg-data"
@@ -155,7 +156,10 @@ CodeGenData &CodeGenData::getInstance() {
       // We do not error-out when failing to parse the input file.
       // Instead, just emit an warning message and fall back as if no CGData
       // were available.
-      auto FS = vfs::getRealFileSystem();
+      auto FS = [] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return vfs::getRealFileSystem();
+      }();
       auto ReaderOrErr = CodeGenDataReader::create(CodeGenDataUsePath, *FS);
       if (Error E = ReaderOrErr.takeError()) {
         warn(std::move(E), CodeGenDataUsePath);

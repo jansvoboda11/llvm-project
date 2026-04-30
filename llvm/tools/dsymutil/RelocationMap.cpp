@@ -8,6 +8,8 @@
 
 #include "RelocationMap.h"
 
+#include "llvm/Support/IOSandbox.h"
+
 namespace llvm {
 
 namespace dsymutil {
@@ -37,7 +39,10 @@ struct YAMLContext {
 ErrorOr<std::unique_ptr<RelocationMap>>
 RelocationMap::parseYAMLRelocationMap(StringRef InputFile,
                                       StringRef PrependPath) {
-  auto ErrOrFile = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto ErrOrFile = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFile);
+  }();
   if (auto Err = ErrOrFile.getError())
     return Err;
 

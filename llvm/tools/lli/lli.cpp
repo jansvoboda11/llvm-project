@@ -55,6 +55,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Memory.h"
@@ -327,9 +328,11 @@ public:
     if (!getCacheFilename(ModuleID, CacheName))
       return nullptr;
     // Load the object from the cache filename
-    ErrorOr<std::unique_ptr<MemoryBuffer>> IRObjectBuffer =
-        MemoryBuffer::getFile(CacheName, /*IsText=*/false,
-                              /*RequiresNullTerminator=*/false);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> IRObjectBuffer = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(CacheName, /*IsText=*/false,
+                            /*RequiresNullTerminator=*/false);
+    }();
     // If the file isn't there, that's OK.
     if (!IRObjectBuffer)
       return nullptr;
@@ -558,8 +561,10 @@ int main(int argc, char **argv, char * const *envp) {
   }
 
   for (unsigned i = 0, e = ExtraArchives.size(); i != e; ++i) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> ArBufOrErr =
-        MemoryBuffer::getFileOrSTDIN(ExtraArchives[i]);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> ArBufOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(ExtraArchives[i]);
+    }();
     if (!ArBufOrErr)
       reportError(Err, argv[0]);
     std::unique_ptr<MemoryBuffer> &ArBuf = ArBufOrErr.get();
@@ -1152,7 +1157,10 @@ static int runOrcJIT(const char *ProgName) {
 
   // Add the objects.
   for (auto &ObjPath : ExtraObjects) {
-    auto Obj = ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(ObjPath)));
+    auto Obj = ExitOnErr(errorOrToExpected([&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(ObjPath);
+    }()));
     ExitOnErr(J->addObjectFile(std::move(Obj)));
   }
 

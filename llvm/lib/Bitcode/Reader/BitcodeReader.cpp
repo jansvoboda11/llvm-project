@@ -70,6 +70,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ModRef.h"
@@ -8909,8 +8910,10 @@ Expected<BitcodeLTOInfo> llvm::getBitcodeLTOInfo(MemoryBufferRef Buffer) {
 Expected<std::unique_ptr<ModuleSummaryIndex>>
 llvm::getModuleSummaryIndexForFile(StringRef Path,
                                    bool IgnoreEmptyThinLTOIndexFile) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Path);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Path);
+  }();
   if (!FileOrErr)
     return errorCodeToError(FileOrErr.getError());
   if (IgnoreEmptyThinLTOIndexFile && !(*FileOrErr)->getBufferSize())

@@ -17,6 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -131,8 +132,10 @@ static void read_link(const Twine &Path, SmallVectorImpl<char> &Output) {
 static std::unique_ptr<InterfaceFile>
 getInterfaceFile(const StringRef Filename, bool ResetBanner = true) {
   ExitOnErr.setBanner(TOOLNAME + ": error: '" + Filename.str() + "' ");
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Filename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Filename, /*IsText=*/true);
+  }();
   if (BufferOrErr.getError())
     ExitOnErr(errorCodeToError(BufferOrErr.getError()));
   auto Buffer = std::move(*BufferOrErr);
@@ -246,6 +249,8 @@ static void stubifyDirectory(const StringRef InputPath, Context &Ctx) {
   StringMap<std::unique_ptr<InterfaceFile>> Dylibs;
   StringMap<std::string> OriginalNames;
   std::set<std::pair<std::string, bool>> LibsToDelete;
+
+  auto BypassSandbox = sys::sandbox::scopedDisable();
 
   std::error_code EC;
   for (sys::fs::recursive_directory_iterator IT(InputPath, EC), IE; IT != IE;
@@ -377,7 +382,10 @@ static void stubifyDirectory(const StringRef InputPath, Context &Ctx) {
     auto &Dylib = Lib.second;
     // Get the original file name.
     SmallString<PATH_MAX> NormalizedPath(Dylib->getPath());
-    stubifyImpl(std::move(Dylib), Ctx);
+    {
+      auto ReenableSandbox = sys::sandbox::scopedEnable();
+      stubifyImpl(std::move(Dylib), Ctx);
+    }
 
     replace_extension(NormalizedPath, "");
     auto Found = OriginalNames.find(NormalizedPath.c_str());
@@ -444,8 +452,11 @@ static bool handleStubifyAction(Context &Ctx) {
 
   for (StringRef PathName : Ctx.Inputs) {
     bool IsDirectory = false;
-    if (auto EC = sys::fs::is_directory(PathName, IsDirectory))
-      reportError(PathName + ": " + EC.message());
+    {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      if (auto EC = sys::fs::is_directory(PathName, IsDirectory))
+        reportError(PathName + ": " + EC.message());
+    }
 
     if (IsDirectory) {
       if (Ctx.OutStream != nullptr)
@@ -456,9 +467,11 @@ static bool handleStubifyAction(Context &Ctx) {
     }
 
     stubifyImpl(getInterfaceFile(PathName), Ctx);
-    if (Ctx.StubOpt.DeleteInput)
+    if (Ctx.StubOpt.DeleteInput) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
       if (auto ec = sys::fs::remove(PathName))
         reportError("deleting file '" + PathName + ": " + ec.message());
+    }
   }
   return EXIT_SUCCESS;
 }

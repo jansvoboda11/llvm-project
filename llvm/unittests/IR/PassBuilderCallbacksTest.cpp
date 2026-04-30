@@ -428,7 +428,15 @@ protected:
 
   MockPassInstrumentationCallbacks CallbacksHandle;
 
-  PassBuilder PB;
+  PassBuilder PB{
+    /*TM=*/nullptr,
+                   /*PTO=*/PipelineTuningOptions(),
+                   /*PGOOpt=*/std::nullopt,
+                   /*PIC=*/nullptr,
+                   /*FS=*/[] {
+                     auto BypassSandbox = sys::sandbox::scopedDisable();
+                     return vfs::getRealFileSystem();
+    }()};
   ModulePassManager PM;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
@@ -463,7 +471,10 @@ protected:
                   "  ret void\n"
                   "}\n")),
         CallbacksHandle(), PB(nullptr, PipelineTuningOptions(), std::nullopt,
-                              &CallbacksHandle.Callbacks),
+                              &CallbacksHandle.Callbacks, [] {
+                                auto BypassSandbox = sys::sandbox::scopedDisable();
+                                return vfs::getRealFileSystem();
+                              }()),
         PM(), LAM(), FAM(), CGAM(), AM() {
 
     EXPECT_TRUE(&CallbacksHandle.Callbacks ==

@@ -22,6 +22,7 @@
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/TargetParser/Triple.h"
 #include <cstddef>
@@ -251,6 +252,8 @@ loadYAML(sys::fs::file_t Fd, size_t FileSize, StringRef Filename,
 // StringError instances contain.
 Expected<InstrumentationMap>
 llvm::xray::loadInstrumentationMap(StringRef Filename) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // At this point we assume the file is an object file -- and if that doesn't
   // work, we treat it as YAML.
   // FIXME: Extend to support non-ELF and non-x86_64 binaries.

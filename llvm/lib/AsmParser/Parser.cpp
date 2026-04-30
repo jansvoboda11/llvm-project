@@ -15,6 +15,7 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ModuleSummaryIndex.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include <system_error>
@@ -65,8 +66,10 @@ std::unique_ptr<Module> llvm::parseAssemblyFile(StringRef Filename,
                                                 SMDiagnostic &Err,
                                                 LLVMContext &Context,
                                                 SlotMapping *Slots) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Filename);
+  }();
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());
@@ -108,8 +111,10 @@ parseAssemblyFileWithIndex(StringRef Filename, SMDiagnostic &Err,
                            LLVMContext &Context, SlotMapping *Slots,
                            bool UpgradeDebugInfo,
                            DataLayoutCallbackTy DataLayoutCallback) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/true);
+  }();
   if (std::error_code EC = FileOrErr.getError()) {
     Err = SMDiagnostic(Filename, SourceMgr::DK_Error,
                        "Could not open input file: " + EC.message());

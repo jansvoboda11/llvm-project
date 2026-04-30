@@ -17,6 +17,7 @@
 
 #include "llvm/FileCheck/FileCheck.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
@@ -807,8 +808,10 @@ int main(int argc, char **argv) {
   SourceMgr SM;
 
   // Read the expected strings from the check file.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> CheckFileOrErr =
-      MemoryBuffer::getFileOrSTDIN(CheckFilename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> CheckFileOrErr = [] {
+    [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(CheckFilename, /*IsText=*/true);
+  }();
   if (std::error_code EC = CheckFileOrErr.getError()) {
     errs() << "Could not open check file '" << CheckFilename
            << "': " << EC.message() << '\n';
@@ -829,8 +832,10 @@ int main(int argc, char **argv) {
     return 2;
 
   // Open the file to check and add it to SourceMgr.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> InputFileOrErr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> InputFileOrErr = [] {
+    [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  }();
   if (InputFilename == "-")
     InputFilename = "<stdin>"; // Overwrite for improved diagnostic messages
   if (std::error_code EC = InputFileOrErr.getError()) {

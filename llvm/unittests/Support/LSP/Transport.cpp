@@ -8,6 +8,7 @@
 
 #include "llvm/Support/LSP/Transport.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LSP/Logging.h"
 #include "llvm/Support/LSP/Protocol.h"
 #include "gmock/gmock.h"
@@ -56,6 +57,7 @@ protected:
   void TearDown() override {
     EXPECT_EQ(std::fclose(in), 0)
         << "Could not close temporary file FD: " << std::strerror(errno);
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     std::error_code ec =
         llvm::sys::fs::remove(inputPath, /*IgnoreNonExisting=*/false);
     EXPECT_FALSE(ec) << "Could not remove temporary file '" << inputPath.data()

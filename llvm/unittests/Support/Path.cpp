@@ -683,10 +683,15 @@ protected:
     sys::path::append(NonExistantFile, "1B28B495C16344CB9822E588CD4C3EF0");
   }
 
-  void TearDown() override { ASSERT_NO_ERROR(fs::remove(TestDirectory.str())); }
+  void TearDown() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    ASSERT_NO_ERROR(fs::remove(TestDirectory.str()));
+  }
 };
 
 TEST_F(FileSystemTest, Unique) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   int FileDescriptor;
   SmallString<64> TempPath;
@@ -744,6 +749,8 @@ TEST_F(FileSystemTest, Unique) {
 }
 
 TEST_F(FileSystemTest, RealPath) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   ASSERT_NO_ERROR(
       fs::create_directories(Twine(TestDirectory) + "/test1/test2/test3"));
   ASSERT_TRUE(fs::exists(Twine(TestDirectory) + "/test1/test2/test3"));
@@ -957,6 +964,8 @@ TEST_F(FileSystemTest, ExpandTilde) {
 
 #ifdef LLVM_ON_UNIX
 TEST_F(FileSystemTest, RealPathNoReadPerm) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   SmallString<64> Expanded;
 
   ASSERT_NO_ERROR(
@@ -972,6 +981,8 @@ TEST_F(FileSystemTest, RealPathNoReadPerm) {
   ASSERT_NO_ERROR(fs::remove_directories(Twine(TestDirectory) + "/noreadperm"));
 }
 TEST_F(FileSystemTest, RemoveDirectoriesNoExePerm) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   ASSERT_NO_ERROR(
       fs::create_directories(Twine(TestDirectory) + "/noexeperm/foo"));
   ASSERT_TRUE(fs::exists(Twine(TestDirectory) + "/noexeperm/foo"));
@@ -994,6 +1005,8 @@ TEST_F(FileSystemTest, RemoveDirectoriesNoExePerm) {
 
 
 TEST_F(FileSystemTest, TempFileKeepDiscard) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // We can keep then discard.
   auto TempFileOrError = fs::TempFile::create(TestDirectory + "/test-%%%%");
   ASSERT_TRUE((bool)TempFileOrError);
@@ -1006,6 +1019,8 @@ TEST_F(FileSystemTest, TempFileKeepDiscard) {
 }
 
 TEST_F(FileSystemTest, TempFileDiscardDiscard) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // We can discard twice.
   auto TempFileOrError = fs::TempFile::create(TestDirectory + "/test-%%%%");
   ASSERT_TRUE((bool)TempFileOrError);
@@ -1017,6 +1032,8 @@ TEST_F(FileSystemTest, TempFileDiscardDiscard) {
 }
 
 TEST_F(FileSystemTest, TempFiles) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   int FileDescriptor;
   SmallString<64> TempPath;
@@ -1105,6 +1122,8 @@ TEST_F(FileSystemTest, TempFiles) {
 }
 
 TEST_F(FileSystemTest, TempFileCollisions) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   SmallString<128> TestDirectory;
   ASSERT_NO_ERROR(
       fs::createUniqueDirectory("CreateUniqueFileTest", TestDirectory));
@@ -1143,6 +1162,8 @@ TEST_F(FileSystemTest, TempFileCollisions) {
 }
 
 TEST_F(FileSystemTest, CreateDir) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   ASSERT_NO_ERROR(fs::create_directory(Twine(TestDirectory) + "foo"));
   ASSERT_NO_ERROR(fs::create_directory(Twine(TestDirectory) + "foo"));
   ASSERT_EQ(fs::create_directory(Twine(TestDirectory) + "foo", false),
@@ -1232,6 +1253,8 @@ TEST_F(FileSystemTest, CreateDir) {
 }
 
 TEST_F(FileSystemTest, DirectoryIteration) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::error_code ec;
   for (fs::directory_iterator i(".", ec), e; i != e; i.increment(ec))
     ASSERT_NO_ERROR(ec);
@@ -1316,12 +1339,16 @@ TEST_F(FileSystemTest, DirectoryIteration) {
 }
 
 TEST_F(FileSystemTest, DirectoryNotExecutable) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   ASSERT_EQ(fs::access(TestDirectory, sys::fs::AccessMode::Execute),
             errc::permission_denied);
 }
 
 #ifdef LLVM_ON_UNIX
 TEST_F(FileSystemTest, BrokenSymlinkDirectoryIteration) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a known hierarchy to recurse over.
   ASSERT_NO_ERROR(fs::create_directories(Twine(TestDirectory) + "/symlink"));
   ASSERT_NO_ERROR(
@@ -1441,6 +1468,8 @@ TEST_F(FileSystemTest, UTF8ToUTF16DirectoryIteration) {
 #endif
 
 TEST_F(FileSystemTest, Remove) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   SmallString<64> BaseDir;
   SmallString<64> Paths[4];
   int fds[4];
@@ -1508,6 +1537,8 @@ TEST_F(FileSystemTest, CarriageReturn) {
 #endif
 
 TEST_F(FileSystemTest, Resize) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   int FD;
   SmallString<64> TempPath;
   ASSERT_NO_ERROR(fs::createTemporaryFile("prefix", "temp", FD, TempPath));
@@ -1520,6 +1551,8 @@ TEST_F(FileSystemTest, Resize) {
 }
 
 TEST_F(FileSystemTest, ResizeBeforeMapping) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   int FD;
   SmallString<64> TempPath;
@@ -1545,6 +1578,8 @@ TEST_F(FileSystemTest, ResizeBeforeMapping) {
 }
 
 TEST_F(FileSystemTest, MD5) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   int FD;
   SmallString<64> TempPath;
   ASSERT_NO_ERROR(fs::createTemporaryFile("prefix", "temp", FD, TempPath));
@@ -1559,6 +1594,8 @@ TEST_F(FileSystemTest, MD5) {
 }
 
 TEST_F(FileSystemTest, FileMapping) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   int FileDescriptor;
   SmallString<64> TempPath;
@@ -1621,6 +1658,8 @@ TEST_F(FileSystemTest, FileMapping) {
 }
 
 TEST_F(FileSystemTest, FileMappingSync) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   SmallString<0> TempPath(TestDirectory);
   sys::path::append(TempPath, "test-%%%%");
@@ -1944,6 +1983,8 @@ TEST(Support, ReplacePathPrefix) {
 }
 
 TEST_F(FileSystemTest, OpenFileForRead) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Create a temp file.
   int FileDescriptor;
   SmallString<64> TempPath;
@@ -2004,6 +2045,8 @@ TEST_F(FileSystemTest, OpenFileForRead) {
 }
 
 TEST_F(FileSystemTest, OpenDirectoryAsFileForRead) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::string Buf(5, '?');
   Expected<fs::file_t> FD = fs::openNativeFileForRead(TestDirectory);
 #ifdef _WIN32
@@ -2018,6 +2061,8 @@ TEST_F(FileSystemTest, OpenDirectoryAsFileForRead) {
 }
 
 TEST_F(FileSystemTest, OpenDirectoryAsFileForWrite) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   int FD;
   std::error_code EC = fs::openFileForWrite(Twine(TestDirectory), FD);
   if (!EC)
@@ -2027,6 +2072,7 @@ TEST_F(FileSystemTest, OpenDirectoryAsFileForWrite) {
 
 static void createFileWithData(const Twine &Path, bool ShouldExistBefore,
                                fs::CreationDisposition Disp, StringRef Data) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   ASSERT_EQ(ShouldExistBefore, fs::exists(Path));
   ASSERT_NO_ERROR(fs::openFileForWrite(Path, FD, Disp));
@@ -2037,6 +2083,7 @@ static void createFileWithData(const Twine &Path, bool ShouldExistBefore,
 }
 
 static void verifyFileContents(const Twine &Path, StringRef Contents) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   auto Buffer = MemoryBuffer::getFile(Path);
   ASSERT_TRUE((bool)Buffer);
   StringRef Data = Buffer.get()->getBuffer();
@@ -2044,6 +2091,7 @@ static void verifyFileContents(const Twine &Path, StringRef Contents) {
 }
 
 TEST_F(FileSystemTest, CreateNew) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   std::optional<FileDescriptorCloser> Closer;
 
@@ -2068,6 +2116,7 @@ TEST_F(FileSystemTest, CreateNew) {
 }
 
 TEST_F(FileSystemTest, CreateAlways) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   std::optional<FileDescriptorCloser> Closer;
 
@@ -2104,6 +2153,7 @@ TEST_F(FileSystemTest, CreateAlways) {
 }
 
 TEST_F(FileSystemTest, OpenExisting) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
 
   // Fails if the file does not exist.
@@ -2125,6 +2175,7 @@ TEST_F(FileSystemTest, OpenExisting) {
 }
 
 TEST_F(FileSystemTest, OpenAlways) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   // Succeeds if the file does not exist.
   createFileWithData(NonExistantFile, false, fs::CD_OpenAlways, "Fizz");
   FileRemover Cleanup(NonExistantFile);
@@ -2138,6 +2189,7 @@ TEST_F(FileSystemTest, OpenAlways) {
 }
 
 TEST_F(FileSystemTest, AppendSetsCorrectFileOffset) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   fs::CreationDisposition Disps[] = {fs::CD_CreateAlways, fs::CD_OpenAlways,
                                      fs::CD_OpenExisting};
 
@@ -2193,6 +2245,7 @@ static void verifyWrite(int FD, StringRef Data, bool ShouldSucceed) {
 }
 
 TEST_F(FileSystemTest, ReadOnlyFileCantWrite) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, "Fizz");
   FileRemover Cleanup(NonExistantFile);
 
@@ -2205,6 +2258,7 @@ TEST_F(FileSystemTest, ReadOnlyFileCantWrite) {
 }
 
 TEST_F(FileSystemTest, WriteOnlyFileCantRead) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, "Fizz");
   FileRemover Cleanup(NonExistantFile);
 
@@ -2217,6 +2271,7 @@ TEST_F(FileSystemTest, WriteOnlyFileCantRead) {
 }
 
 TEST_F(FileSystemTest, ReadWriteFileCanReadOrWrite) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, "Fizz");
   FileRemover Cleanup(NonExistantFile);
 
@@ -2229,6 +2284,7 @@ TEST_F(FileSystemTest, ReadWriteFileCanReadOrWrite) {
 }
 
 TEST_F(FileSystemTest, readNativeFile) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, "01234");
   FileRemover Cleanup(NonExistantFile);
   const auto &Read = [&](size_t ToRead) -> Expected<std::string> {
@@ -2249,6 +2305,7 @@ TEST_F(FileSystemTest, readNativeFile) {
 }
 
 TEST_F(FileSystemTest, readNativeFileToEOF) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   constexpr StringLiteral Content = "0123456789";
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, Content);
   FileRemover Cleanup(NonExistantFile);
@@ -2296,6 +2353,7 @@ TEST_F(FileSystemTest, readNativeFileToEOF) {
 }
 
 TEST_F(FileSystemTest, readNativeFileSlice) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   createFileWithData(NonExistantFile, false, fs::CD_CreateNew, "01234");
   FileRemover Cleanup(NonExistantFile);
   Expected<fs::file_t> FD = fs::openNativeFileForRead(NonExistantFile);
@@ -2319,6 +2377,7 @@ TEST_F(FileSystemTest, readNativeFileSlice) {
 }
 
 TEST_F(FileSystemTest, is_local) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   bool TestDirectoryIsLocal;
   ASSERT_NO_ERROR(fs::is_local(TestDirectory, TestDirectoryIsLocal));
   EXPECT_EQ(TestDirectoryIsLocal, fs::is_local(TestDirectory));
@@ -2343,6 +2402,7 @@ TEST_F(FileSystemTest, is_local) {
 }
 
 TEST_F(FileSystemTest, getUmask) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
 #ifdef _WIN32
   EXPECT_EQ(fs::getUmask(), 0U) << "Should always be 0 on Windows.";
 #else
@@ -2356,6 +2416,7 @@ TEST_F(FileSystemTest, getUmask) {
 }
 
 TEST_F(FileSystemTest, RespectUmask) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
 #ifndef _WIN32
   unsigned OldMask = ::umask(0022);
 
@@ -2399,6 +2460,7 @@ TEST_F(FileSystemTest, RespectUmask) {
 }
 
 TEST_F(FileSystemTest, set_current_path) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<128> path;
 
   ASSERT_NO_ERROR(fs::current_path(path));
@@ -2421,6 +2483,7 @@ TEST_F(FileSystemTest, set_current_path) {
 }
 
 TEST_F(FileSystemTest, permissions) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   SmallString<64> TempPath;
   ASSERT_NO_ERROR(fs::createTemporaryFile("prefix", "temp", FD, TempPath));
@@ -2915,6 +2978,7 @@ TEST_F(FileSystemTest, FileLocker) {
 #endif
 
 TEST_F(FileSystemTest, CopyFile) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
   unittest::TempDir RootTestDirectory("CopyFileTest", /*Unique=*/true);
 
   SmallVector<std::string> Data;

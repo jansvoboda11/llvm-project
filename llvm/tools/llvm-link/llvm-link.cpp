@@ -27,6 +27,7 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
@@ -209,7 +210,7 @@ static std::unique_ptr<Module> loadArFile(const char *Argv0,
     if (DisableLazyLoad)
       M = parseIR(MemBuf.get(), ParseErr, Context);
     else
-      M = getLazyIRModule(MemoryBuffer::getMemBuffer(MemBuf.get(), false),
+      M = getLazyIRModule([&] { auto BypassSandbox = sys::sandbox::scopedDisable(); return MemoryBuffer::getMemBuffer(MemBuf.get(), false); }(),
                           ParseErr, Context);
 
     if (!M) {
@@ -312,7 +313,10 @@ static bool importFunctions(const char *argv0, Module &DestModule) {
   auto ModuleLoader = [&DestModule](const char *argv0,
                                     const std::string &Identifier) {
     std::unique_ptr<MemoryBuffer> Buffer = ExitOnErr(errorOrToExpected(
-        MemoryBuffer::getFileOrSTDIN(Identifier, /*IsText=*/true)));
+        [&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(Identifier, /*IsText=*/true);
+        }()));
     return loadFile(argv0, std::move(Buffer), DestModule.getContext(), false);
   };
 
@@ -383,7 +387,10 @@ static bool linkFiles(const char *argv0, LLVMContext &Context, Linker &L,
   // Similar to some flags, internalization doesn't apply to the first file.
   bool InternalizeLinkedSymbols = false;
   for (const auto &File : Files) {
-    auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+    auto BufferOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/true);
+    }();
 
     // When we encounter a missing file, make sure we expose its name.
     if (auto EC = BufferOrErr.getError())

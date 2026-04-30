@@ -22,7 +22,15 @@ namespace {
 struct ExtraRematTest : public testing::Test {
   LLVMContext Ctx;
   ModulePassManager MPM;
-  PassBuilder PB;
+  PassBuilder PB{
+    /*TM=*/nullptr,
+                     /*PTO=*/PipelineTuningOptions(),
+                     /*PGOOpt=*/std::nullopt,
+                     /*PIC=*/nullptr,
+                     /*FS=*/[] {
+                       auto BypassSandbox = sys::sandbox::scopedDisable();
+                       return vfs::getRealFileSystem();
+    }()};
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;

@@ -9,6 +9,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -68,6 +69,7 @@ bool FileHasContent(StringRef File, StringRef Content) {
 }
 
 TEST(rename, FileOpenedForReadingCanBeReplaced) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Create unique temporary directory for this test.
   SmallString<128> TestDirectory;
   ASSERT_NO_ERROR(fs::createUniqueDirectory(

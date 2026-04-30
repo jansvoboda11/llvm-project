@@ -19,6 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -613,9 +614,11 @@ public:
   LineConsumer(StringRef Filename) {
     // Open source files without requiring a NUL terminator. The concurrent
     // modification may nullify the NUL terminator condition.
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/false,
-                                     /*RequiresNullTerminator=*/false);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Filename, /*IsText=*/false,
+                                   /*RequiresNullTerminator=*/false);
+    }();
     if (std::error_code EC = BufferOrErr.getError()) {
       errs() << Filename << ": " << EC.message() << "\n";
       Remaining = "";

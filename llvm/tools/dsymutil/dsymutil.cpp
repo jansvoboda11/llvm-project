@@ -38,6 +38,7 @@
 #include "llvm/Support/FileCollector.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -322,6 +323,7 @@ static Expected<DWARFVerify> getVerifyKind(opt::InputArgList &Args) {
 /// Parses the command line options into the LinkOptions struct and performs
 /// some sanity checking. Returns an error in case the latter fails.
 static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   DsymutilOptions Options;
 
   Options.DumpDebugMap = Args.hasArg(OPT_dump_debug_map);

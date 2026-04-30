@@ -12,6 +12,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "gmock/gmock-matchers.h"
@@ -212,6 +213,7 @@ public:
   ///               llvm::sys::fs::createTemporaryFile.
   TempFile(StringRef Name, StringRef Suffix = "", StringRef Contents = "",
            bool Unique = false) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     std::error_code EC;
     int fd;
     if (Unique) {
@@ -234,6 +236,7 @@ public:
   }
   ~TempFile() {
     if (!Path.empty()) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
       EXPECT_FALSE(llvm::sys::fs::remove(Path.str()));
     }
   }

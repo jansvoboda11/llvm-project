@@ -20,8 +20,10 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -143,7 +145,11 @@ int main(int Argc, char **Argv) {
       Argc, Argv,
       "LLVM automatic testcase reducer.\n"
       "See https://llvm.org/docs/CommandGuide/llvm-reduce.html for more "
-      "information.\n");
+      "information.\n",
+      /*Errs=*/nullptr, /*VFS=*/[] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return vfs::getRealFileSystem().get();
+      }());
 
   if (Argc == 1) {
     cl::PrintHelpMessage();

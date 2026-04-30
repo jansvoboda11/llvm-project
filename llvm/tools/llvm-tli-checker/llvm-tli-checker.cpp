@@ -16,6 +16,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/WithColor.h"
@@ -219,6 +220,7 @@ void SDKNameMap::populateFromArchive(Archive *A) {
 
 // Unpack a library file and extract the global function names.
 void SDKNameMap::populateFromFile(StringRef LibDir, StringRef LibName) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Pick an arbitrary but reasonable default size.
   SmallString<255> Filepath(LibDir);
   sys::path::append(Filepath, LibName);

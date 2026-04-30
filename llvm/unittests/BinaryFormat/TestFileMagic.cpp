@@ -10,6 +10,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 
 #include "gtest/gtest.h"
@@ -138,6 +139,7 @@ TEST_F(MagicTest, Magic) {
   // Create some files filled with magic.
   for (type *i = types, *e = types + std::size(types); i != e;
        ++i) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     SmallString<128> file_pathname(TestDirectory);
     llvm::sys::path::append(file_pathname, i->filename);
     std::error_code EC;

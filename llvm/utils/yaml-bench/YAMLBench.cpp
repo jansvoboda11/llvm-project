@@ -11,14 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
 #include <system_error>
@@ -186,8 +186,10 @@ int main(int argc, char **argv) {
                         ? sys::Process::StandardOutHasColors()
                         : UseColor == cl::BOU_TRUE;
   if (Input.getNumOccurrences()) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFileOrSTDIN(Input);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Input);
+    }();
     if (!BufOrErr)
       return 1;
     MemoryBuffer &Buf = *BufOrErr.get();

@@ -42,6 +42,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ScopedPrinter.h"
@@ -624,9 +625,11 @@ static void dumpWindowsResourceFile(WindowsResource *WinRes,
 
 /// Opens \a File and dumps it.
 static void dumpInput(StringRef File, ScopedPrinter &Writer) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return reportError(errorCodeToError(EC), File);
 

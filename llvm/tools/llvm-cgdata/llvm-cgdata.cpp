@@ -21,6 +21,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -118,7 +119,10 @@ static int convert_main(int argc, const char *argv[]) {
   if (EC)
     exitWithErrorCode(EC, OutputFilename);
 
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = CodeGenDataReader::create(Filename, *FS);
   if (Error E = ReaderOrErr.takeError())
     exitWithError(std::move(E), Filename);
@@ -198,8 +202,10 @@ static bool handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
 static bool handleFile(StringRef Filename,
                        OutlinedHashTreeRecord &GlobalOutlineRecord,
                        StableFunctionMapRecord &GlobalFunctionMapRecord) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Filename);
+  }();
   if (std::error_code EC = BuffOrErr.getError())
     exitWithErrorCode(EC, Filename);
   return handleBuffer(Filename, *BuffOrErr.get(), GlobalOutlineRecord,
@@ -250,7 +256,10 @@ static int show_main(int argc, const char *argv[]) {
   if (EC)
     exitWithErrorCode(EC, OutputFilename);
 
-  auto FS = vfs::getRealFileSystem();
+  auto FS = [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }();
   auto ReaderOrErr = CodeGenDataReader::create(Filename, *FS);
   if (Error E = ReaderOrErr.takeError())
     exitWithError(std::move(E), Filename);

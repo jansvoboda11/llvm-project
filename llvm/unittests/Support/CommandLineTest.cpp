@@ -1435,7 +1435,10 @@ static std::string interceptStdout(std::function<void()> F) {
     F();
     outs().flush();
   }
-  auto Buffer = MemoryBuffer::getFile(File.FilePath);
+  auto Buffer = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(File.FilePath);
+  }();
   if (!Buffer)
     return "";
   return Buffer->get()->getBuffer().str();

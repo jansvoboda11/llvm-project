@@ -19,6 +19,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -65,7 +66,10 @@ private:
 
 /// Gets all of the blocks specified in the input file.
 void BlockExtractor::loadFile() {
-  auto ErrOrBuf = MemoryBuffer::getFile(BlockExtractorFile);
+  auto ErrOrBuf = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(BlockExtractorFile);
+  }();
   if (ErrOrBuf.getError())
     report_fatal_error("BlockExtractor couldn't load the file.");
   // Read the file.

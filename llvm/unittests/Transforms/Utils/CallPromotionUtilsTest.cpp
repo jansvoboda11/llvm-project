@@ -529,6 +529,7 @@ define i32 @f4() !guid !3 {
                   "Counters": [103]
                 }]]}]]}]}
     )json";
+  auto BypassSandbox = sys::sandbox::scopedDisable();
 
   llvm::unittest::TempFile ProfileFile("ctx_profile", "", "", /*Unique=*/true);
   {

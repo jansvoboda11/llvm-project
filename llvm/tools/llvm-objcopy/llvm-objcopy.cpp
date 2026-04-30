@@ -31,6 +31,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
@@ -126,8 +127,10 @@ static Error executeObjcopyOnRawBinary(ConfigManager &ConfigMgr,
 static Error executeObjcopy(ConfigManager &ConfigMgr) {
   CommonConfig &Config = ConfigMgr.Common;
 
-  Expected<FilePermissionsApplier> PermsApplierOrErr =
-      FilePermissionsApplier::create(Config.InputFilename);
+  Expected<FilePermissionsApplier> PermsApplierOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return FilePermissionsApplier::create(Config.InputFilename);
+  }();
   if (!PermsApplierOrErr)
     return PermsApplierOrErr.takeError();
 
@@ -138,8 +141,10 @@ static Error executeObjcopy(ConfigManager &ConfigMgr) {
 
   if (Config.InputFormat == FileFormat::Binary ||
       Config.InputFormat == FileFormat::IHex) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFileOrSTDIN(Config.InputFilename);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Config.InputFilename);
+    }();
     if (!BufOrErr)
       return createFileError(Config.InputFilename, BufOrErr.getError());
     MemoryBufferHolder = std::move(*BufOrErr);
@@ -198,15 +203,18 @@ static Error executeObjcopy(ConfigManager &ConfigMgr) {
     }
   }
 
-  if (Error E =
-          PermsApplierOrErr->apply(Config.OutputFilename, Config.PreserveDates))
-    return E;
-
-  if (!Config.SplitDWO.empty())
+  {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     if (Error E =
-            PermsApplierOrErr->apply(Config.SplitDWO, Config.PreserveDates,
-                                     static_cast<sys::fs::perms>(0666)))
+            PermsApplierOrErr->apply(Config.OutputFilename, Config.PreserveDates))
       return E;
+
+    if (!Config.SplitDWO.empty())
+      if (Error E =
+              PermsApplierOrErr->apply(Config.SplitDWO, Config.PreserveDates,
+                                       static_cast<sys::fs::perms>(0666)))
+        return E;
+  }
 
   return Error::success();
 }

@@ -15,6 +15,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileOutputBuffer.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <optional>
@@ -660,6 +661,8 @@ static Error writeELFBinaryToFile(StringRef FilePath, const IFSStub &Stub,
   // Write Stub to memory first.
   std::vector<uint8_t> Buf(Builder.getSize());
   Builder.write(Buf.data());
+
+      auto BypassSandbox = sys::sandbox::scopedDisable();
 
   if (WriteIfChanged) {
     if (ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError =

@@ -26,6 +26,7 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/StringSaver.h"
@@ -314,6 +315,8 @@ static void appendFile(std::vector<NewArchiveMember> &Members,
 }
 
 int llvm::libDriverMain(ArrayRef<const char *> ArgsArr) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   BumpPtrAllocator Alloc;
   StringSaver Saver(Alloc);
 

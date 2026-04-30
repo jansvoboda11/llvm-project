@@ -22,6 +22,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileOutputBuffer.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -131,8 +132,10 @@ static std::string getTypeName(IFSSymbolType Type) {
 static Expected<std::unique_ptr<IFSStub>>
 readInputFile(std::optional<FileFormat> &InputFormat, StringRef FilePath) {
   // Read in file.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError =
-      MemoryBuffer::getFileOrSTDIN(FilePath, /*IsText=*/true);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(FilePath, /*IsText=*/true);
+  }();
   if (!BufOrError)
     return createStringError(BufOrError.getError(), "Could not open `%s`",
                              FilePath.data());
@@ -261,8 +264,10 @@ static Error writeIFS(StringRef FilePath, IFSStub &Stub, bool WriteIfChanged) {
     return YAMLErr;
 
   if (WriteIfChanged) {
-    if (ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError =
-            MemoryBuffer::getFile(FilePath)) {
+    if (ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrError = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(FilePath);
+    }()) {
       // Compare IFS output with the existing IFS file. If unchanged, avoid
       // changing the file.
       if ((*BufOrError)->getBuffer() == IFSStr)

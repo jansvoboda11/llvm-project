@@ -39,6 +39,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -282,7 +283,10 @@ std::string getBuildIdString(const SegmentEntry &Entry) {
 Expected<std::unique_ptr<RawMemProfReader>>
 RawMemProfReader::create(const Twine &Path, const StringRef ProfiledBinary,
                          bool KeepName) {
-  auto BufferOr = MemoryBuffer::getFileOrSTDIN(Path);
+  auto BufferOr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Path);
+  }();
   if (std::error_code EC = BufferOr.getError())
     return report(errorCodeToError(EC), Path.getSingleStringRef());
 
@@ -336,7 +340,10 @@ RawMemProfReader::~RawMemProfReader() {
 }
 
 bool RawMemProfReader::hasFormat(const StringRef Path) {
-  auto BufferOr = MemoryBuffer::getFileOrSTDIN(Path);
+  auto BufferOr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Path);
+  }();
   if (!BufferOr)
     return false;
 

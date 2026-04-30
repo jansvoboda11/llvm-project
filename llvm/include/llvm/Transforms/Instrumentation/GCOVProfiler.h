@@ -14,6 +14,7 @@
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
@@ -23,7 +24,10 @@ class GCOVProfilerPass : public PassInfoMixin<GCOVProfilerPass> {
 public:
   GCOVProfilerPass(
       const GCOVOptions &Options = GCOVOptions::getDefault(),
-      IntrusiveRefCntPtr<vfs::FileSystem> VFS = vfs::getRealFileSystem())
+      IntrusiveRefCntPtr<vfs::FileSystem> VFS = [] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return vfs::getRealFileSystem();
+      }())
       : GCOVOpts(Options), VFS(std::move(VFS)) {}
   LLVM_ABI PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 

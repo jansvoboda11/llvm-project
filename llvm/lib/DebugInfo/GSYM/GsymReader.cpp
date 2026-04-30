@@ -19,6 +19,7 @@
 #include "llvm/DebugInfo/GSYM/HeaderV2.h"
 #include "llvm/DebugInfo/GSYM/InlineInfo.h"
 #include "llvm/DebugInfo/GSYM/LineTable.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace llvm;
@@ -66,8 +67,10 @@ checkMagicAndDetectVersionEndian(StringRef Bytes) {
 llvm::Expected<std::unique_ptr<GsymReader>>
 GsymReader::openFile(StringRef Filename) {
   // Open the input file and return an appropriate error if needed.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Filename);
+  }();
   auto Err = BuffOrErr.getError();
   if (Err)
     return llvm::errorCodeToError(Err);

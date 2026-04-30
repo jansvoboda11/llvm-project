@@ -26,6 +26,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileOutputBuffer.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/WithColor.h"
@@ -522,12 +523,14 @@ printInfo(LLVMContext &LLVMCtx, ArrayRef<OwningBinary<Binary>> InputBinaries) {
   else
     B = Ar->get();
 
-  Expected<std::unique_ptr<FileOutputBuffer>> OutFileOrError =
-      FileOutputBuffer::create(OutputFileName,
-                               B->getMemoryBufferRef().getBufferSize(),
-                               sys::fs::can_execute(UO->getFileName())
-                                   ? FileOutputBuffer::F_executable
-                                   : 0);
+  Expected<std::unique_ptr<FileOutputBuffer>> OutFileOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return FileOutputBuffer::create(OutputFileName,
+                             B->getMemoryBufferRef().getBufferSize(),
+                             sys::fs::can_execute(UO->getFileName())
+                                 ? FileOutputBuffer::F_executable
+                                 : 0);
+  }();
   if (!OutFileOrError)
     reportError(OutputFileName, OutFileOrError.takeError());
   std::copy(B->getMemoryBufferRef().getBufferStart(),

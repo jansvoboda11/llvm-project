@@ -32,6 +32,7 @@
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include <cassert>
@@ -434,6 +435,7 @@ ObjectFile *LLVMSymbolizer::lookUpBuildIDObject(const std::string &Path,
 bool LLVMSymbolizer::findDebugBinary(const std::string &OrigPath,
                                      const std::string &DebuglinkName,
                                      uint32_t CRCHash, std::string &Result) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<16> OrigDir(OrigPath);
   llvm::sys::path::remove_filename(OrigDir);
   SmallString<16> DebugPath = OrigDir;
@@ -506,6 +508,7 @@ std::string LLVMSymbolizer::lookUpGsymFile(const std::string &Path) {
     return {};
 
   auto CheckGsymFile = [](const llvm::StringRef &GsymPath) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::file_status Status;
     std::error_code EC = llvm::sys::fs::status(GsymPath, Status);
     return !EC && !llvm::sys::fs::is_directory(Status);

@@ -35,6 +35,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -1382,9 +1383,12 @@ bool cl::expandResponseFiles(int Argc, const char *const *Argv,
     if (std::optional<std::string> EnvValue = sys::Process::GetEnv(EnvVar))
       Tokenize(*EnvValue, Saver, NewArgv, /*MarkEOLs=*/false);
 
+  [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
+  auto VFS = vfs::getRealFileSystem();
+
   // Command line options can override the environment variable.
   NewArgv.append(Argv + 1, Argv + Argc);
-  ExpansionContext ECtx(Saver.getAllocator(), Tokenize);
+  ExpansionContext ECtx(Saver.getAllocator(), Tokenize, VFS.get());
   if (Error Err = ECtx.expandResponseFiles(NewArgv)) {
     errs() << toString(std::move(Err)) << '\n';
     return false;
@@ -1394,7 +1398,10 @@ bool cl::expandResponseFiles(int Argc, const char *const *Argv,
 
 bool cl::ExpandResponseFiles(StringSaver &Saver, TokenizerCallback Tokenizer,
                              SmallVectorImpl<const char *> &Argv) {
-  ExpansionContext ECtx(Saver.getAllocator(), Tokenizer);
+  ExpansionContext ECtx(Saver.getAllocator(), Tokenizer, [] {
+    [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem().get();
+  }());
   if (Error Err = ECtx.expandResponseFiles(Argv)) {
     errs() << toString(std::move(Err)) << '\n';
     return false;
@@ -1514,8 +1521,10 @@ bool CommandLineParser::ParseCommandLineOptions(
   bool IgnoreErrors = Errs;
   if (!Errs)
     Errs = &errs();
-  if (!VFS)
+  if (!VFS) {
+    [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
     VFS = vfs::getRealFileSystem().get();
+  }
   bool ErrorParsing = false;
 
   // Expand response files.

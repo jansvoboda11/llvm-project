@@ -65,6 +65,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
@@ -2346,8 +2347,12 @@ PreservedAnalyses SampleProfileLoaderPass::run(Module &M,
     return FAM.getResult<TargetLibraryAnalysis>(F);
   };
 
-  if (!FS)
+  if (!FS) {
+    // TODO: This requires `PassBuilder::parsePassPipeline()` and
+    //       PassRegistry.def to use MODULE_PASS_WITH_PARAMS for this pass.
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     FS = vfs::getRealFileSystem();
+  }
   LazyCallGraph &CG = AM.getResult<LazyCallGraphAnalysis>(M);
 
   SampleProfileLoader SampleLoader(

@@ -26,6 +26,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GlobPattern.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -83,8 +84,10 @@ private:
 
   void LoadFile(StringRef Filename) {
     // Load the APIFile...
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-        MemoryBuffer::getFile(Filename);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(Filename);
+    }();
     if (!BufOrErr) {
       errs() << "WARNING: Internalize couldn't load file '" << Filename
              << "'! Continuing as if it's empty.\n";

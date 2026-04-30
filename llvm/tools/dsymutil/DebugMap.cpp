@@ -16,6 +16,7 @@
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/WithColor.h"
@@ -147,7 +148,10 @@ DebugMap::DebugMap(const Triple &BinaryTriple, StringRef BinaryPath,
 ErrorOr<std::vector<std::unique_ptr<DebugMap>>>
 DebugMap::parseYAMLDebugMap(BinaryHolder &BinHolder, StringRef InputFile,
                             StringRef PrependPath, bool Verbose) {
-  auto ErrOrFile = MemoryBuffer::getFileOrSTDIN(InputFile);
+  auto ErrOrFile = [&] {
+            auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFile);
+  }();
   if (auto Err = ErrOrFile.getError())
     return Err;
 

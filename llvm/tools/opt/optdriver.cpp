@@ -44,6 +44,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/SourceMgr.h"
@@ -638,6 +639,7 @@ optMain(int argc, char **argv,
       /*IsVisibleToRegularObj=*/[](StringRef) { return true; });
 
   // Figure out what stream we are supposed to write to...
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   std::unique_ptr<ToolOutputFile> Out;
   std::unique_ptr<ToolOutputFile> ThinLinkOut;
   if (NoOutput) {
@@ -667,6 +669,8 @@ optMain(int argc, char **argv,
       }
     }
   }
+
+  auto ReenableSandbox = sys::sandbox::scopedEnable();
 
   Triple ModuleTriple(M->getTargetTriple());
   // Avoid setting target function attributes if no arch is found, by resetting

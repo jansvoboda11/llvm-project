@@ -20,6 +20,7 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Support/BinaryStreamError.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -173,8 +174,11 @@ int main(int Argc, const char **Argv) {
 
   for (const auto &File : InputFiles) {
     std::unique_ptr<MemoryBuffer> Buffer = error(
-        File, MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                           /*RequiresNullTerminator=*/false));
+        File, [&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
+                                           /*RequiresNullTerminator=*/false);
+        }());
     file_magic Type = identify_magic(Buffer->getMemBufferRef().getBuffer());
     if (Type != file_magic::windows_resource)
       reportError(File + ": unrecognized file format.\n");
@@ -208,8 +212,10 @@ int main(int Argc, const char **Argv) {
   std::unique_ptr<MemoryBuffer> OutputBuffer =
       error(llvm::object::writeWindowsResourceCOFF(MachineType, Parser,
                                                    DateTimeStamp));
-  auto FileOrErr =
-      FileOutputBuffer::create(OutputFile, OutputBuffer->getBufferSize());
+  auto FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return FileOutputBuffer::create(OutputFile, OutputBuffer->getBufferSize());
+  }();
   if (!FileOrErr)
     reportError(OutputFile, errorToErrorCode(FileOrErr.takeError()));
   std::unique_ptr<FileOutputBuffer> FileBuffer = std::move(*FileOrErr);
@@ -219,9 +225,11 @@ int main(int Argc, const char **Argv) {
 
   if (Verbose) {
     std::unique_ptr<MemoryBuffer> Buffer =
-        error(OutputFile,
-              MemoryBuffer::getFileOrSTDIN(OutputFile, /*IsText=*/false,
-                                           /*RequiresNullTerminator=*/false));
+        error(OutputFile, [&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(OutputFile, /*IsText=*/false,
+                                       /*RequiresNullTerminator=*/false);
+        }());
 
     ScopedPrinter W(errs());
     W.printBinaryBlock("Output File Raw Data",

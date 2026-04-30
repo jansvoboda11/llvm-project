@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "Reproducer.h"
+
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 
@@ -14,6 +16,7 @@ using namespace llvm;
 using namespace llvm::dsymutil;
 
 static std::string createReproducerDir(std::error_code &EC) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<128> Root;
   if (const char *Path = getenv("DSYMUTIL_REPRODUCER_PATH")) {
     Root.assign(Path);
@@ -30,13 +33,17 @@ static std::string createReproducerDir(std::error_code &EC) {
   return EC ? "" : std::string(Root);
 }
 
-Reproducer::Reproducer() : VFS(vfs::getRealFileSystem()) {}
+Reproducer::Reproducer() : VFS([] {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+  return vfs::getRealFileSystem();
+}()) {}
 Reproducer::~Reproducer() = default;
 
 ReproducerGenerate::ReproducerGenerate(std::error_code &EC, int Argc,
                                        char **Argv, bool GenerateOnExit)
     : Root(createReproducerDir(EC)), GenerateOnExit(GenerateOnExit) {
   llvm::append_range(Args, ArrayRef(Argv, Argc));
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   auto RealFS = vfs::getRealFileSystem();
   if (!Root.empty())
     FC = std::make_shared<FileCollector>(Root, Root, RealFS);
@@ -46,8 +53,10 @@ ReproducerGenerate::ReproducerGenerate(std::error_code &EC, int Argc,
 ReproducerGenerate::~ReproducerGenerate() {
   if (GenerateOnExit && !Generated)
     generate();
-  else if (!Generated && !Root.empty())
+  else if (!Generated && !Root.empty()) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::remove_directories(Root, /* IgnoreErrors */ true);
+  }
 }
 
 void ReproducerGenerate::generate() {

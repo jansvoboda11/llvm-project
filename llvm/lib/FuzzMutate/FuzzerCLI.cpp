@@ -9,6 +9,7 @@
 #include "llvm/FuzzMutate/FuzzerCLI.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
@@ -156,8 +157,11 @@ int llvm::runFuzzerOnInputs(int ArgC, char *ArgV[], FuzzerTestFun TestOne,
       continue;
     }
 
-    auto BufOrErr = MemoryBuffer::getFile(Arg, /*IsText=*/false,
-                                          /*RequiresNullTerminator=*/false);
+    auto BufOrErr = [&] {
+      auto BypassSanbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(Arg, /*IsText=*/false,
+                       /*RequiresNullTerminator=*/false);
+    }();
     if (std::error_code EC = BufOrErr.getError()) {
       errs() << "Error reading file: " << Arg << ": " << EC.message() << "\n";
       return 1;

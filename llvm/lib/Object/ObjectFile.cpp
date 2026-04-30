@@ -23,6 +23,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
@@ -209,8 +210,10 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, file_magic Type,
 
 Expected<OwningBinary<ObjectFile>>
 ObjectFile::createObjectFile(StringRef ObjectPath) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFile(ObjectPath);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(ObjectPath);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return errorCodeToError(EC);
   std::unique_ptr<MemoryBuffer> Buffer = std::move(FileOrErr.get());

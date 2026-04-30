@@ -61,6 +61,7 @@
 #include "llvm/Object/TapiUniversal.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -409,6 +410,7 @@ private:
 };
 
 Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &FileName) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   if (auto F = MemoryBuffer::getFile(FileName))
     return std::move(*F);
   else
@@ -2284,6 +2286,7 @@ static Error addLibraries(Session &S,
         LibrarySearchPaths.getPosition(LSPItr - LibrarySearchPaths.begin());
     auto &JD = *std::prev(IdxToJD.lower_bound(LibrarySearchPathIdx))->second;
 
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     StringRef LibrarySearchPath = *LSPItr;
     if (sys::fs::get_file_type(LibrarySearchPath) !=
         sys::fs::file_type::directory_file)
@@ -2531,9 +2534,12 @@ static Error addLibraries(Session &S,
         LibPath.push_back('\0');
 
         // Skip missing or non-regular paths.
-        if (sys::fs::get_file_type(LibPath.data()) !=
-            sys::fs::file_type::regular_file) {
-          continue;
+        {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          if (sys::fs::get_file_type(LibPath.data()) !=
+              sys::fs::file_type::regular_file) {
+            continue;
+              }
         }
 
         file_magic Magic;

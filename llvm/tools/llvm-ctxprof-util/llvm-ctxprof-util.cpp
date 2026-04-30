@@ -18,6 +18,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -47,8 +48,10 @@ static cl::opt<std::string> OutputFilename("output", cl::value_desc("output"),
 namespace {
 // Save the bitstream profile from the JSON representation.
 Error convertFromYaml() {
-  auto BufOrError =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  auto BufOrError = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFilename, /*IsText=*/true);
+  }();
   if (!BufOrError)
     return createFileError(InputFilename, BufOrError.getError());
 

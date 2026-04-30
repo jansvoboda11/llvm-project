@@ -16,6 +16,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
@@ -179,6 +180,8 @@ int llvm::DiffFilesWithTolerance(StringRef NameA,
                                  StringRef NameB,
                                  double AbsTol, double RelTol,
                                  std::string *Error) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Now its safe to mmap the files into memory because both files
   // have a non-zero size.
   ErrorOr<std::unique_ptr<MemoryBuffer>> F1OrErr = MemoryBuffer::getFile(NameA);

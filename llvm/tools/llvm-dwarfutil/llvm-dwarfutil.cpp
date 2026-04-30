@@ -21,6 +21,7 @@
 #include "llvm/Support/CRC.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
@@ -506,8 +507,10 @@ int main(int Argc, char const *Argv[]) {
   InitializeAllTargetInfos();
   InitializeAllAsmPrinters();
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
-      MemoryBuffer::getFileOrSTDIN(Opts.InputFileName);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Opts.InputFileName);
+  }();
   if (BuffOrErr.getError())
     error(createFileError(Opts.InputFileName, BuffOrErr.getError()));
 
@@ -516,28 +519,32 @@ int main(int Argc, char const *Argv[]) {
   if (!BinOrErr)
     error(createFileError(Opts.InputFileName, BinOrErr.takeError()));
 
-  Expected<FilePermissionsApplier> PermsApplierOrErr =
-      FilePermissionsApplier::create(Opts.InputFileName);
-  if (!PermsApplierOrErr)
-    error(createFileError(Opts.InputFileName, PermsApplierOrErr.takeError()));
+  {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
 
-  if (!(*BinOrErr)->isObject())
-    error(createFileError(Opts.InputFileName,
-                          createError("unsupported input file")));
+    Expected<FilePermissionsApplier> PermsApplierOrErr =
+        FilePermissionsApplier::create(Opts.InputFileName);
+    if (!PermsApplierOrErr)
+      error(createFileError(Opts.InputFileName, PermsApplierOrErr.takeError()));
 
-  if (Error Err =
-          applyCLOptions(Opts, *static_cast<ObjectFile *>((*BinOrErr).get())))
-    error(createFileError(Opts.InputFileName, std::move(Err)));
+    if (!(*BinOrErr)->isObject())
+      error(createFileError(Opts.InputFileName,
+                            createError("unsupported input file")));
 
-  BinOrErr->reset();
-  BuffOrErr->reset();
+    if (Error Err =
+            applyCLOptions(Opts, *static_cast<ObjectFile *>((*BinOrErr).get())))
+      error(createFileError(Opts.InputFileName, std::move(Err)));
 
-  if (Error Err = PermsApplierOrErr->apply(Opts.OutputFileName))
-    error(std::move(Err));
+    BinOrErr->reset();
+    BuffOrErr->reset();
 
-  if (Opts.BuildSeparateDebugFile)
-    if (Error Err = PermsApplierOrErr->apply(Opts.getSeparateDebugFileName()))
+    if (Error Err = PermsApplierOrErr->apply(Opts.OutputFileName))
       error(std::move(Err));
+
+    if (Opts.BuildSeparateDebugFile)
+      if (Error Err = PermsApplierOrErr->apply(Opts.getSeparateDebugFileName()))
+        error(std::move(Err));
+  }
 
   if (Opts.Verify) {
     if (Error Err = verifyOutput(Opts))

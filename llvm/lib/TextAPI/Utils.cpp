@@ -12,6 +12,7 @@
 
 #include "llvm/TextAPI/Utils.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/TextAPI/TextAPIError.h"
 
 using namespace llvm;
@@ -43,6 +44,8 @@ void llvm::MachO::replace_extension(SmallVectorImpl<char> &Path,
 
 std::error_code llvm::MachO::shouldSkipSymLink(const Twine &Path,
                                                bool &Result) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   Result = false;
   SmallString<PATH_MAX> Storage;
   auto P = Path.toNullTerminatedStringRef(Storage);
@@ -75,6 +78,8 @@ std::error_code llvm::MachO::shouldSkipSymLink(const Twine &Path,
 std::error_code
 llvm::MachO::make_relative(StringRef From, StringRef To,
                            SmallVectorImpl<char> &RelativePath) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   SmallString<PATH_MAX> Src = From;
   SmallString<PATH_MAX> Dst = To;
   if (auto EC = sys::fs::make_absolute(Src))

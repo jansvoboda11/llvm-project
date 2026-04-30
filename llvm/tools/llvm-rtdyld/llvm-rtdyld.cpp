@@ -29,6 +29,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MSVCErrorWorkarounds.h"
 #include "llvm/Support/Memory.h"
@@ -422,8 +423,10 @@ static int printLineInfoForInput(bool LoadObjects, bool UseDebugObj) {
 
     // Load the input memory buffer.
 
-    ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-        MemoryBuffer::getFileOrSTDIN(File);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(File);
+    }();
     if (std::error_code EC = InputBuffer.getError())
       ErrorAndExit("unable to read input: '" + EC.message() + "'");
 
@@ -558,8 +561,10 @@ static int executeInput() {
     TimeRegion TR(Timers ? &Timers->LoadObjectsTimer : nullptr);
     for (auto &File : InputFileList) {
       // Load the input memory buffer.
-      ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-          MemoryBuffer::getFileOrSTDIN(File);
+      ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFileOrSTDIN(File);
+      }();
       if (std::error_code EC = InputBuffer.getError())
         ErrorAndExit("unable to read input: '" + EC.message() + "'");
       Expected<std::unique_ptr<ObjectFile>> MaybeObj(
@@ -630,8 +635,10 @@ static int executeInput() {
 
 static int checkAllExpressions(RuntimeDyldChecker &Checker) {
   for (const auto& CheckerFileName : CheckFiles) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> CheckerFileBuf =
-        MemoryBuffer::getFileOrSTDIN(CheckerFileName);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> CheckerFileBuf = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(CheckerFileName);
+    }();
     if (std::error_code EC = CheckerFileBuf.getError())
       ErrorAndExit("unable to read input '" + CheckerFileName + "': " +
                    EC.message());
@@ -961,8 +968,10 @@ static int linkAndVerify() {
     InputFileList.push_back("-");
   for (auto &InputFile : InputFileList) {
     // Load the input memory buffer.
-    ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer =
-        MemoryBuffer::getFileOrSTDIN(InputFile);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> InputBuffer = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(InputFile);
+    }();
 
     if (std::error_code EC = InputBuffer.getError())
       ErrorAndExit("unable to read input: '" + EC.message() + "'");

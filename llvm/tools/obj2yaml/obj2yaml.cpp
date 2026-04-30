@@ -13,8 +13,10 @@
 #include "llvm/Object/Minidump.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace llvm;
@@ -52,9 +54,11 @@ static Error dumpObject(const ObjectFile &Obj, raw_ostream &OS) {
 }
 
 static Error dumpInput(StringRef File, raw_ostream &OS) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(File, /*IsText=*/false,
+                                        /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return errorCodeToError(EC);
   std::unique_ptr<MemoryBuffer> &Buffer = FileOrErr.get();
@@ -99,6 +103,7 @@ static void reportError(StringRef Input, Error Err) {
 }
 
 int main(int argc, char *argv[]) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   InitLLVM X(argc, argv);
   cl::HideUnrelatedOptions(Cat);
   cl::ParseCommandLineOptions(
@@ -113,7 +118,10 @@ int main(int argc, char *argv[]) {
         << "failed to open '" + OutputFilename + "': " + EC.message() << '\n';
     return 1;
   }
-  if (Error Err = dumpInput(InputFilename, Out->os())) {
+  if (Error Err = [&] {
+        auto ReenableSandbox = sys::sandbox::scopedEnable();
+    return dumpInput(InputFilename, Out->os());
+  }()) {
     reportError(InputFilename, std::move(Err));
     return 1;
   }

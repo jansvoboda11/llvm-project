@@ -176,6 +176,7 @@ copyAccessAndModificationTime(StringRef Filename,
 }
 
 std::error_code FileCollector::copyFiles(bool StopOnError) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   auto Err = sys::fs::create_directories(Root, /*IgnoreExisting=*/true);
   if (Err) {
     return Err;

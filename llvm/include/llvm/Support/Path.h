@@ -451,6 +451,7 @@ LLVM_ABI bool home_directory(SmallVectorImpl<char> &result);
 ///
 /// @param result Holds the resulting path name.
 /// @result True if the appropriate path was determined, it need not exist.
+// FIXME: Move to llvm::sys::fs.
 LLVM_ABI bool user_config_directory(SmallVectorImpl<char> &result);
 
 /// Get the directory where installed packages should put their

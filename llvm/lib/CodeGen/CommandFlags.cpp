@@ -24,6 +24,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/WithColor.h"
@@ -574,8 +575,10 @@ codegen::getBBSectionsMode(llvm::TargetOptions &Options) {
   else if (getBBSections() == "none")
     return BasicBlockSection::None;
   else {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr =
-        MemoryBuffer::getFile(getBBSections());
+    ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr = [] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(getBBSections());
+    }();
     if (!MBOrErr) {
       errs() << "Error loading basic block sections function list file: "
              << MBOrErr.getError().message() << "\n";

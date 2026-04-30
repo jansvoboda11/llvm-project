@@ -10,6 +10,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -31,6 +32,7 @@ using namespace llvm::sys;
 
 namespace {
 TEST(FileOutputBuffer, Test) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Create unique temporary directory for these tests
   SmallString<128> TestDirectory;
   {

@@ -25,6 +25,7 @@
 #include "llvm/Support/Caching.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/TargetSelect.h"
@@ -470,7 +471,10 @@ static int run(int argc, char **argv) {
   LTO Lto(std::move(Conf), std::move(Backend), 1, LTOMode);
 
   for (std::string F : InputFilenames) {
-    std::unique_ptr<MemoryBuffer> MB = check(MemoryBuffer::getFile(F), F);
+    std::unique_ptr<MemoryBuffer> MB = check([&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(F);
+    }(), F);
     std::unique_ptr<InputFile> Input =
         check(InputFile::create(MB->getMemBufferRef()), F);
 
@@ -526,7 +530,10 @@ static int run(int argc, char **argv) {
 static int dumpSymtab(int argc, char **argv) {
   for (StringRef F : make_range(argv + 1, argv + argc)) {
     std::unique_ptr<MemoryBuffer> MB =
-        check(MemoryBuffer::getFile(F), std::string(F));
+        check([&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFile(F);
+        }(), std::string(F));
     BitcodeFileContents BFC =
         check(getBitcodeFileContents(*MB), std::string(F));
 

@@ -39,6 +39,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -350,8 +351,10 @@ static void maybeVerifyModule(const Module &Mod) {
 static std::unique_ptr<LTOModule>
 getLocalLTOModule(StringRef Path, std::unique_ptr<MemoryBuffer> &Buffer,
                   const TargetOptions &Options) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(Path);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Path);
+  }();
   error(BufferOrErr, "error loading file '" + Path + "'");
   Buffer = std::move(BufferOrErr.get());
   CurrentActivity = ("loading file '" + Path + "'").str();
@@ -485,6 +488,7 @@ static void testLTOModule(const TargetOptions &Options) {
 }
 
 static std::unique_ptr<MemoryBuffer> loadFile(StringRef Filename) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     ExitOnError ExitOnErr("llvm-lto: error loading file '" + Filename.str() +
         "': ");
     return ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Filename)));
@@ -545,7 +549,10 @@ static void createCombinedModuleSummaryIndex() {
   for (auto &Filename : InputFilenames) {
     ExitOnError ExitOnErr("llvm-lto: error loading file '" + Filename + "': ");
     std::unique_ptr<MemoryBuffer> MB =
-        ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Filename)));
+        ExitOnErr(errorOrToExpected([&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(Filename);
+        }()));
     ExitOnErr(readModuleSummaryIndex(*MB, CombinedIndex));
   }
   // In order to use this index for testing, specifically import testing, we
@@ -595,6 +602,8 @@ namespace thinlto {
 
 std::vector<std::unique_ptr<MemoryBuffer>>
 loadAllFilesForIndex(const ModuleSummaryIndex &Index) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::vector<std::unique_ptr<MemoryBuffer>> InputBuffers;
 
   for (auto &ModPath : Index.modulePaths()) {
@@ -706,7 +715,10 @@ private:
     for (unsigned i = 0; i < InputFilenames.size(); ++i) {
       auto &Filename = InputFilenames[i];
       std::string CurrentActivity = "loading file '" + Filename + "'";
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFile(Filename);
+      }();
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -920,7 +932,10 @@ private:
     std::vector<std::unique_ptr<MemoryBuffer>> InputBuffers;
     for (auto &Filename : InputFilenames) {
       LLVMContext Ctx;
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFile(Filename);
+      }();
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -959,7 +974,10 @@ private:
     for (unsigned i = 0; i < InputFilenames.size(); ++i) {
       auto &Filename = InputFilenames[i];
       std::string CurrentActivity = "loading file '" + Filename + "'";
-      auto InputOrErr = MemoryBuffer::getFile(Filename);
+      auto InputOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFile(Filename);
+      }();
       error(InputOrErr, "error " + CurrentActivity);
       InputBuffers.push_back(std::move(*InputOrErr));
       ThinGenerator.addModule(Filename, InputBuffers.back()->getBuffer());
@@ -1032,7 +1050,10 @@ int main(int argc, char **argv) {
       ExitOnError ExitOnErr(std::string(*argv) + ": error loading file '" +
                             Filename + "': ");
       std::unique_ptr<MemoryBuffer> BufferOrErr =
-          ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(Filename)));
+          ExitOnErr(errorOrToExpected([&] {
+            auto BypassSandbox = sys::sandbox::scopedDisable();
+            return MemoryBuffer::getFile(Filename);
+          }()));
       auto Buffer = std::move(BufferOrErr.get());
       if (ExitOnErr(isBitcodeContainingObjCCategory(*Buffer)))
         outs() << "Bitcode " << Filename << " contains ObjC\n";

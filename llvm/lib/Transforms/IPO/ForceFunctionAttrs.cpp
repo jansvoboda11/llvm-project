@@ -11,6 +11,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -137,7 +138,10 @@ PreservedAnalyses ForceFunctionAttrsPass::run(Module &M,
                                               ModuleAnalysisManager &) {
   bool Changed = false;
   if (!CSVFilePath.empty()) {
-    auto BufferOrError = MemoryBuffer::getFileOrSTDIN(CSVFilePath);
+    auto BufferOrError = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(CSVFilePath);
+    }();
     if (!BufferOrError) {
       std::error_code EC = BufferOrError.getError();
       M.getContext().emitError("cannot open CSV file: " + EC.message());

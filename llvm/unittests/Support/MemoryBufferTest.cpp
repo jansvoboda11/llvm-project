@@ -98,6 +98,7 @@ TEST_F(MemoryBufferTest, get) {
 }
 
 TEST_F(MemoryBufferTest, getOpenFile) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   SmallString<64> TestPath;
   ASSERT_EQ(sys::fs::createTemporaryFile("MemoryBufferTest_getOpenFile", "temp",
@@ -129,6 +130,7 @@ TEST_F(MemoryBufferTest, getOpenFile) {
 }
 
 TEST_F(MemoryBufferTest, NullTerminator4K) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Test that a file with size that is a multiple of the page size can be null
   // terminated correctly by MemoryBuffer.
   int TestFD;
@@ -248,6 +250,7 @@ TEST_F(MemoryBufferTest, getNewAligned) {
 }
 
 void MemoryBufferTest::testGetOpenFileSlice(bool Reopen) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Test that MemoryBuffer::getOpenFile works properly when no null
   // terminator is requested and the size is large enough to trigger
   // the usage of memory mapping.
@@ -293,6 +296,7 @@ TEST_F(MemoryBufferTest, getOpenFileReopened) {
 }
 
 TEST_F(MemoryBufferTest, slice) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Create a file that is six pages long with different data on each page.
   int FD;
   SmallString<64> TestPath;
@@ -340,6 +344,7 @@ TEST_F(MemoryBufferTest, slice) {
 }
 
 TEST_F(MemoryBufferTest, writableSlice) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Create a file initialized with some data
   int FD;
   SmallString<64> TestPath;
@@ -373,6 +378,7 @@ TEST_F(MemoryBufferTest, writableSlice) {
 }
 
 TEST_F(MemoryBufferTest, writeThroughFile) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Create a file initialized with some data
   int FD;
   SmallString<64> TestPath;
@@ -402,6 +408,7 @@ TEST_F(MemoryBufferTest, writeThroughFile) {
 }
 
 TEST_F(MemoryBufferTest, mmapVolatileNoNull) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   // Verify that `MemoryBuffer::getOpenFile` will use mmap when
   // `RequiresNullTerminator = false`, `IsVolatile = true`, and the file is
   // large enough to use mmap.

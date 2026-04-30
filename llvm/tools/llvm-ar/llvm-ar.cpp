@@ -26,6 +26,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -293,8 +294,11 @@ static void getArchive() {
 }
 
 static object::Archive &readLibrary(const Twine &Library) {
-  auto BufOrErr = MemoryBuffer::getFile(Library, /*IsText=*/false,
+  auto BufOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Library, /*IsText=*/false,
                                         /*RequiresNullTerminator=*/false);
+  }();
   failIfError(BufOrErr.getError(), "could not open library " + Library);
   ArchiveBuffers.push_back(std::move(*BufOrErr));
   auto LibOrErr =
@@ -476,6 +480,7 @@ static ArchiveOperation parseCommandLine() {
     // If OutputDir is not a directory, create_directories may still succeed if
     // all components of the path prefix are directories. Test is_directory as
     // well.
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     if (!sys::fs::create_directories(OutputDir))
       sys::fs::is_directory(OutputDir, IsDir);
     if (!IsDir)
@@ -784,8 +789,10 @@ static void addChildMember(std::vector<NewArchiveMember> &Members,
 }
 
 static NewArchiveMember getArchiveMember(StringRef FileName) {
-  Expected<NewArchiveMember> NMOrErr =
-      NewArchiveMember::getFile(FileName, Deterministic);
+  Expected<NewArchiveMember> NMOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return NewArchiveMember::getFile(FileName, Deterministic);
+  }();
   failIfError(NMOrErr.takeError(), FileName);
   StringSaver Saver(Alloc);
   // For regular archives, use the basename of the object path for the member
@@ -888,6 +895,7 @@ static InsertAction computeInsertAction(ArchiveOperation Operation,
     // We could try to optimize this to a fstat, but it is not a common
     // operation.
     sys::fs::file_status Status;
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     failIfError(sys::fs::status(*MI, Status), *MI);
     auto ModTimeOrErr = Member.getLastModified();
     failIfError(ModTimeOrErr.takeError());
@@ -1145,8 +1153,11 @@ static void performOperation(ArchiveOperation Operation,
 
 static int performOperation(ArchiveOperation Operation) {
   // Create or open the archive object.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = MemoryBuffer::getFile(
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(
       ArchiveName, /*IsText=*/false, /*RequiresNullTerminator=*/false);
+  }();
   std::error_code EC = Buf.getError();
   if (EC && EC != errc::no_such_file_or_directory)
     fail("unable to open '" + ArchiveName + "': " + EC.message());

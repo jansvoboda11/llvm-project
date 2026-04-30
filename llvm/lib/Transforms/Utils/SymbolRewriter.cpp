@@ -72,6 +72,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SourceMgr.h"
@@ -249,8 +250,10 @@ using PatternRewriteNamedAliasDescriptor =
 
 bool RewriteMapParser::parse(const std::string &MapFile,
                              RewriteDescriptorList *DL) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Mapping =
-      MemoryBuffer::getFile(MapFile);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Mapping = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(MapFile);
+  }();
 
   if (!Mapping)
     report_fatal_error(Twine("unable to read rewrite map '") + MapFile +

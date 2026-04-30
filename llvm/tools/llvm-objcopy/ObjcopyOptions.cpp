@@ -23,6 +23,7 @@
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace llvm;
@@ -364,7 +365,10 @@ static Error addSymbolsFromFile(NameMatcher &Symbols, BumpPtrAllocator &Alloc,
                                 function_ref<Error(Error)> ErrorCallback) {
   StringSaver Saver(Alloc);
   SmallVector<StringRef, 16> Lines;
-  auto BufOrErr = MemoryBuffer::getFile(Filename);
+  auto BufOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Filename);
+  }();
   if (!BufOrErr)
     return createFileError(Filename, BufOrErr.getError());
 
@@ -387,7 +391,10 @@ static Error addSymbolsToRenameFromFile(StringMap<StringRef> &SymbolsToRename,
                                         StringRef Filename) {
   StringSaver Saver(Alloc);
   SmallVector<StringRef, 16> Lines;
-  auto BufOrErr = MemoryBuffer::getFile(Filename);
+  auto BufOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(Filename);
+  }();
   if (!BufOrErr)
     return createFileError(Filename, BufOrErr.getError());
 
@@ -588,8 +595,10 @@ static Error loadNewSectionData(StringRef ArgValue, StringRef OptionName,
                                                          OptionName +
                                                          ": missing file name");
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr =
-      MemoryBuffer::getFile(SecPair.second);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(SecPair.second);
+  }();
   if (!BufOrErr)
     return createFileError(SecPair.second,
                            errorCodeToError(BufOrErr.getError()));
@@ -921,7 +930,10 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
   // checksum for every target file inside an archive by precomputing the CRC
   // here. This prevents a significant amount of I/O.
   if (!Config.AddGnuDebugLink.empty()) {
-    auto DebugOrErr = MemoryBuffer::getFile(Config.AddGnuDebugLink);
+    auto DebugOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(Config.AddGnuDebugLink);
+    }();
     if (!DebugOrErr)
       return createFileError(Config.AddGnuDebugLink, DebugOrErr.getError());
     auto Debug = std::move(*DebugOrErr);

@@ -20,6 +20,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
@@ -29,6 +30,7 @@ namespace dsymutil {
 namespace MachOUtils {
 
 llvm::Error ArchAndFile::createTempFile() {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<256> SS;
   std::error_code EC = sys::fs::createTemporaryFile("dsym", "dwarf", FD, SS);
 
@@ -51,6 +53,7 @@ int ArchAndFile::getFD() const {
 }
 
 ArchAndFile::~ArchAndFile() {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   if (!Path.empty())
     sys::fs::remove(Path);
 }
@@ -62,6 +65,7 @@ std::string getArchName(StringRef Arch) {
 }
 
 static bool runLipo(StringRef SDKPath, SmallVectorImpl<StringRef> &Args) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   auto Path = sys::findProgramByName("lipo", ArrayRef(SDKPath));
   if (!Path)
     Path = sys::findProgramByName("lipo");
@@ -88,6 +92,7 @@ bool generateUniversalBinary(SmallVectorImpl<ArchAndFile> &ArchFiles,
                              bool Fat64) {
   // No need to merge one file into a universal fat binary.
   if (ArchFiles.size() == 1) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     llvm::StringRef TmpPath = ArchFiles.front().getPath();
     if (auto EC = sys::fs::rename(TmpPath, OutputFileName)) {
       // If we can't rename, try to copy to work around cross-device link

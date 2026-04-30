@@ -69,6 +69,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -1902,8 +1903,10 @@ bool LowerTypeTestsModule::runForTesting(Module &M, ModuleAnalysisManager &AM) {
   if (!ClReadSummary.empty()) {
     ExitOnError ExitOnErr("-lowertypetests-read-summary: " + ClReadSummary +
                           ": ");
-    auto ReadSummaryFile = ExitOnErr(errorOrToExpected(
-        MemoryBuffer::getFile(ClReadSummary, /*IsText=*/true)));
+    auto ReadSummaryFile = ExitOnErr(errorOrToExpected( [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(ClReadSummary, /*IsText=*/true);
+    }()));
 
     yaml::Input In(ReadSummaryFile->getBuffer());
     In >> Summary;

@@ -8,6 +8,7 @@
 
 #include "llvm/LineEditor/LineEditor.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "gtest/gtest.h"
 
@@ -30,6 +31,7 @@ public:
 
   ~LineEditorTest() override {
     delete LE;
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::remove(HistPath.str());
   }
 };

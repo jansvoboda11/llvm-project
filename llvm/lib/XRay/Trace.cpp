@@ -14,6 +14,7 @@
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/XRay/BlockIndexer.h"
 #include "llvm/XRay/BlockVerifier.h"
 #include "llvm/XRay/FDRRecordConsumer.h"
@@ -377,6 +378,7 @@ static Error loadYAMLLog(StringRef Data, XRayFileHeader &FileHeader,
 }
 
 Expected<Trace> llvm::xray::loadTraceFile(StringRef Filename, bool Sort) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   Expected<sys::fs::file_t> FdOrErr = sys::fs::openNativeFileForRead(Filename);
   if (!FdOrErr)
     return FdOrErr.takeError();

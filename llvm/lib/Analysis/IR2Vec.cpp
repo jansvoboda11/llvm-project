@@ -25,6 +25,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace llvm;
@@ -484,7 +485,10 @@ using VocabMap = std::map<std::string, Embedding>;
 Error readVocabularyFromFile(StringRef VocabFilePath, VocabMap &OpcVocab,
                              VocabMap &TypeVocab, VocabMap &ArgVocab) {
   auto BufOrError =
-      MemoryBuffer::getFileOrSTDIN(VocabFilePath, /*IsText=*/true);
+     [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(VocabFilePath, /*IsText=*/true);
+  }();
   if (!BufOrError)
     return createFileError(VocabFilePath, BufOrError.getError());
 

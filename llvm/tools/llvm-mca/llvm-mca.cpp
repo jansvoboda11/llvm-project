@@ -54,6 +54,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -396,8 +397,10 @@ int main(int argc, char **argv) {
 
   std::unique_ptr<MemoryBuffer> InputBuffer;
   if (!WantsCPUHelp) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(InputFilename);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+       auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(InputFilename);
+  }();
     if (!BufferOrErr) {
       std::error_code EC = BufferOrErr.getError();
       WithColor::error() << InputFilename << ": " << EC.message() << '\n';

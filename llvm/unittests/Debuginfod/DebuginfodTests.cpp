@@ -9,6 +9,7 @@
 #include "llvm/Debuginfod/Debuginfod.h"
 #include "llvm/HTTP/HTTPClient.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gtest/gtest.h"
@@ -32,6 +33,7 @@ using namespace llvm;
 
 // Check that the Debuginfod client can find locally cached artifacts.
 TEST(DebuginfodClient, CacheHit) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   int FD;
   SmallString<64> CachedFilePath;
   sys::fs::createTemporaryFile("llvmcache-key", "temp", FD, CachedFilePath);
@@ -51,6 +53,7 @@ TEST(DebuginfodClient, CacheHit) {
 // Check that the Debuginfod client returns an Error when it fails to find an
 // artifact.
 TEST(DebuginfodClient, CacheMiss) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<32> CacheDir;
   ASSERT_NO_ERROR(
       sys::fs::createUniqueDirectory("debuginfod-unittest", CacheDir));

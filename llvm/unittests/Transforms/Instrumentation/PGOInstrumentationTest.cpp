@@ -11,6 +11,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/ProfileData/InstrProf.h"
+#include "llvm/Support/IOSandbox.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -107,7 +108,14 @@ struct PGOInstrumentationGenTest
     : public Test,
       WithParamInterface<std::tuple<StringRef, StringRef>> {
   ModulePassManager MPM;
-  PassBuilder PB;
+  PassBuilder PB{/*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+                 }()};
   MockModuleAnalysisHandle MMAHandle;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;

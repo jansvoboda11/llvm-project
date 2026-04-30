@@ -14,6 +14,7 @@
 #include "TableGen.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Main.h"
@@ -70,6 +71,7 @@ static TableGen::Emitter::Opt X[] = {
 };
 
 int tblgen_main(int argc, char **argv) {
+  [[maybe_unused]] auto BypassSandbox = sys::sandbox::scopedDisable();
   InitLLVM X(argc, argv);
   cl::ParseCommandLineOptions(argc, argv);
 

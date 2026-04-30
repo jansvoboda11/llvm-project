@@ -18,6 +18,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
@@ -58,7 +59,10 @@ struct SampleProfTest : ::testing::Test {
 
   void readProfile(const Module &M, StringRef Profile,
                    StringRef RemapFile = "") {
-    auto FS = vfs::getRealFileSystem();
+    auto FS = [] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return vfs::getRealFileSystem();
+    }();
     auto ReaderOrErr = SampleProfileReader::create(
         std::string(Profile), Context, *FS, FSDiscriminatorPass::Base,
         std::string(RemapFile));
@@ -370,6 +374,7 @@ struct SampleProfTest : ::testing::Test {
 
   void testSuffixElisionPolicy(SampleProfileFormat Format, StringRef Policy,
                                const StringMap<uint64_t> &Expected) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     TempFile ProfileFile("profile", "", "", /*Unique*/ true);
 
     Module M("my_module", Context);

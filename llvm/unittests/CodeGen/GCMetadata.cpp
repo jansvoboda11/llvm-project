@@ -15,6 +15,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
 
@@ -57,7 +58,14 @@ TEST_F(GCMetadataTest, Basic) {
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
-  PassBuilder PB;
+  PassBuilder PB{/*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+                 }()};
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
   PB.registerFunctionAnalyses(FAM);

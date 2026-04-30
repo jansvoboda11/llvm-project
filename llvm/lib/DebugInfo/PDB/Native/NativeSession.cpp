@@ -35,6 +35,7 @@
 #include "llvm/Support/BinaryStreamArray.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -103,8 +104,11 @@ static Error validatePdbMagic(StringRef PdbPath) {
 static Expected<std::unique_ptr<PDBFile>>
 loadPdbFile(StringRef PdbPath, std::unique_ptr<BumpPtrAllocator> &Allocator) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> ErrorOrBuffer =
-      MemoryBuffer::getFile(PdbPath, /*IsText=*/false,
+      [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return MemoryBuffer::getFile(PdbPath, /*IsText=*/false,
                             /*RequiresNullTerminator=*/false);
+      }();
   if (!ErrorOrBuffer)
     return make_error<RawError>(ErrorOrBuffer.getError());
   std::unique_ptr<llvm::MemoryBuffer> Buffer = std::move(*ErrorOrBuffer);

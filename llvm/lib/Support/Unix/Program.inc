@@ -24,6 +24,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
@@ -61,6 +62,8 @@ ProcessInfo::ProcessInfo() : Pid(0), ReturnCode(0) {}
 
 ErrorOr<std::string> sys::findProgramByName(StringRef Name,
                                             ArrayRef<StringRef> Paths) {
+  auto BypassSandbox = sandbox::scopedDisable();
+
   assert(!Name.empty() && "Must have a name!");
   // Use the given path verbatim if it contains any slashes; this matches
   // the behavior of sh(1) and friends.

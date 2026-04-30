@@ -31,6 +31,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -228,6 +229,7 @@ void CodeCoverageTool::addCollectedPath(const std::string &Path) {
 }
 
 void CodeCoverageTool::collectPaths(const std::string &Path) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   llvm::sys::fs::file_status Status;
   llvm::sys::fs::status(Path, Status);
   if (!llvm::sys::fs::exists(Status)) {
@@ -267,6 +269,7 @@ CodeCoverageTool::getFileStatus(StringRef FilePath) {
   if (!It.second)
     return CachedStatus;
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   sys::fs::file_status Status;
   if (!sys::fs::status(FilePath, Status))
     CachedStatus = Status;
@@ -292,7 +295,10 @@ CodeCoverageTool::getSourceFile(StringRef SourceFile) {
   for (const auto &Files : LoadedSourceFiles)
     if (isEquivalentFile(SourceFile, Files.first))
       return *Files.second;
-  auto Buffer = MemoryBuffer::getFile(SourceFile);
+  auto Buffer = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(SourceFile);
+  }();
   if (auto EC = Buffer.getError()) {
     error(EC.message(), SourceFile);
     return EC;
@@ -455,6 +461,8 @@ static bool modifiedTimeGT(StringRef LHS, StringRef RHS) {
 }
 
 std::unique_ptr<CoverageMapping> CodeCoverageTool::load() {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   if (PGOFilename) {
     for (StringRef ObjectFilename : ObjectFilenames)
       if (modifiedTimeGT(ObjectFilename, PGOFilename.value()))
@@ -812,7 +820,10 @@ int CodeCoverageTool::run(Command Cmd, int argc, const char **argv) {
                                    "binary ID in the profile"));
 
   auto commandLineParser = [&, this](int argc, const char **argv) -> int {
-    cl::ParseCommandLineOptions(argc, argv, "LLVM code coverage tool\n");
+    cl::ParseCommandLineOptions(argc, argv, "LLVM code coverage tool\n", /*Errs=*/nullptr, /*VFS=*/[] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return vfs::getRealFileSystem().get();
+    }());
     ViewOpts.Debug = DebugDump;
     if (Debuginfod) {
       HTTPClient::initialize();
@@ -886,6 +897,7 @@ int CodeCoverageTool::run(Command Cmd, int argc, const char **argv) {
 
     // If a demangler is supplied, check if it exists and register it.
     if (!DemanglerOpts.empty()) {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
       auto DemanglerPathOrErr = sys::findProgramByName(DemanglerOpts[0]);
       if (!DemanglerPathOrErr) {
         error("could not find the demangler!",
@@ -900,7 +912,10 @@ int CodeCoverageTool::run(Command Cmd, int argc, const char **argv) {
     if (!NameFilterFiles.empty()) {
       std::string SpecialCaseListErr;
       NameAllowlist = SpecialCaseList::create(
-          NameFilterFiles, *vfs::getRealFileSystem(), SpecialCaseListErr);
+          NameFilterFiles, *[] {
+            auto BypassSandbox = sys::sandbox::scopedDisable();
+            return vfs::getRealFileSystem();
+          }(), SpecialCaseListErr);
       if (!NameAllowlist)
         error(SpecialCaseListErr);
     }
@@ -1153,6 +1168,7 @@ int CodeCoverageTool::doShow(int argc, const char **argv,
   }
 
   if (PGOFilename) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::file_status Status;
     if (std::error_code EC = sys::fs::status(PGOFilename.value(), Status)) {
       error("could not read profile data!" + EC.message(), PGOFilename.value());
@@ -1242,6 +1258,8 @@ int CodeCoverageTool::doShow(int argc, const char **argv,
     S.Limit = true;
   }
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   if (!ViewOpts.hasOutputDirectory() || S.ThreadsRequested == 1) {
     for (const std::string &SourceFile : SourceFiles)
       writeSourceFileView(SourceFile, Coverage.get(), Printer.get(),
@@ -1277,6 +1295,7 @@ int CodeCoverageTool::doReport(int argc, const char **argv,
   }
 
   if (PGOFilename) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::file_status Status;
     if (std::error_code EC = sys::fs::status(PGOFilename.value(), Status)) {
       error("could not read profile data!" + EC.message(), PGOFilename.value());
@@ -1351,6 +1370,7 @@ int CodeCoverageTool::doExport(int argc, const char **argv,
   }
 
   if (PGOFilename) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     sys::fs::file_status Status;
     if (std::error_code EC = sys::fs::status(PGOFilename.value(), Status)) {
       error("could not read profile data!" + EC.message(), PGOFilename.value());

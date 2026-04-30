@@ -36,6 +36,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ThreadPool.h"
@@ -215,6 +216,7 @@ static SmallVector<std::string, 0> getHeaders() {
 Expected<std::string> getCachedOrDownloadArtifact(
     StringRef UniqueKey, StringRef UrlPath, StringRef CacheDirectoryPath,
     ArrayRef<StringRef> DebuginfodUrls, std::chrono::milliseconds Timeout) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<64> AbsCachedArtifactPath;
   sys::path::append(AbsCachedArtifactPath, CacheDirectoryPath,
                     "llvmcache-" + UniqueKey);

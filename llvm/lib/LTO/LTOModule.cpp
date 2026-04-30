@@ -28,6 +28,7 @@
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
@@ -106,8 +107,10 @@ std::string LTOModule::getProducerString(MemoryBuffer *Buffer) {
 ErrorOr<std::unique_ptr<LTOModule>>
 LTOModule::createFromFile(LLVMContext &Context, StringRef path,
                           const TargetOptions &options) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFile(path);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(path);
+  }();
   if (std::error_code EC = BufferOrErr.getError()) {
     Context.emitError(EC.message());
     return EC;

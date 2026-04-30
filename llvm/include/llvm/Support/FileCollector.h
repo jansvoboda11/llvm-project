@@ -9,6 +9,8 @@
 #ifndef LLVM_SUPPORT_FILECOLLECTOR_H
 #define LLVM_SUPPORT_FILECOLLECTOR_H
 
+#include "IOSandbox.h"
+
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Compiler.h"
@@ -124,6 +126,7 @@ private:
   friend FileCollectorFileSystem;
 
   void addFileToMapping(StringRef VirtualPath, StringRef RealPath) {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     if (sys::fs::is_directory(VirtualPath))
       VFSWriter.addDirectoryMapping(VirtualPath, RealPath);
     else

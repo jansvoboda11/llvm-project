@@ -23,6 +23,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/TargetSelect.h"
@@ -112,6 +113,7 @@ static Expected<std::string> searchForFile(const Twine &FileName) {
       SmallString<128> Path;
       sys::path::append(Path, Dir, FileName);
 
+      auto BypassSandbox = sys::sandbox::scopedDisable();
       if (sys::fs::exists(Path))
         return std::string(Path);
 
@@ -146,9 +148,11 @@ static Error processFileList() {
   StringRef FileName, DirName;
   std::tie(FileName, DirName) = StringRef(FileList).rsplit(",");
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(FileName, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(FileName, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = FileOrErr.getError())
     return createFileError(FileName, errorCodeToError(EC));
   const MemoryBuffer &Ref = *FileOrErr.get();
@@ -291,8 +295,10 @@ private:
         : Builder(Builder), FileName(FileName) {}
 
     Error operator()() {
-      Expected<NewArchiveMember> NewMemberOrErr =
-          NewArchiveMember::getFile(FileName, Builder.C.Deterministic);
+      Expected<NewArchiveMember> NewMemberOrErr = [&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return NewArchiveMember::getFile(FileName, Builder.C.Deterministic);
+      }();
       if (!NewMemberOrErr)
         return createFileError(FileName, NewMemberOrErr.takeError());
       auto &NewMember = *NewMemberOrErr;

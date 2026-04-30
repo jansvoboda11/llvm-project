@@ -10,6 +10,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Testing/Support/Error.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gtest/gtest.h"
@@ -29,10 +30,14 @@ struct OnDiskTrieRawHashMapTestFixture
   size_t NumHashBytes;
 
   void SetUp() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     Temp.emplace("trie-raw-hash-map", /*Unique=*/true);
     NumHashBytes = GetParam();
   }
-  void TearDown() override { Temp.reset(); }
+  void TearDown() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    Temp.reset();
+  }
 
   Expected<OnDiskTrieRawHashMap> createTrie() {
     size_t NumHashBits = NumHashBytes * 8;
@@ -45,6 +50,8 @@ struct OnDiskTrieRawHashMapTestFixture
 
 // Create tries with various sizes of hash and with data.
 TEST_P(OnDiskTrieRawHashMapTestFixture, General) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   std::optional<OnDiskTrieRawHashMap> Trie1;
   ASSERT_THAT_ERROR(createTrie().moveInto(Trie1), Succeeded());
   std::optional<OnDiskTrieRawHashMap> Trie2;
@@ -187,6 +194,8 @@ INSTANTIATE_TEST_SUITE_P(OnDiskTrieRawHashMapTest,
                          ::testing::Values(1, 2, 4, 8));
 
 TEST(OnDiskTrieRawHashMapTest, OutOfSpace) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   unittest::TempDir Temp("trie-raw-hash-map", /*Unique=*/true);
   std::optional<OnDiskTrieRawHashMap> Trie;
 

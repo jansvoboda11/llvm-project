@@ -17,6 +17,7 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileOutputBuffer.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -128,8 +129,10 @@ int llvm_mt_main(int Argc, char **Argv, const llvm::ToolContext &) {
   windows_manifest::WindowsManifestMerger Merger;
 
   for (const auto &File : InputFiles) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> ManifestOrErr =
-        MemoryBuffer::getFile(File);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> ManifestOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(File);
+    }();
     if (!ManifestOrErr)
       reportError(File, ManifestOrErr.getError());
     error(Merger.merge(*ManifestOrErr.get()));
@@ -141,8 +144,10 @@ int llvm_mt_main(int Argc, char **Argv, const llvm::ToolContext &) {
 
   int ExitCode = 0;
   if (InputArgs.hasArg(OPT_notify_update)) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> OutBuffOrErr =
-        MemoryBuffer::getFile(OutputFile);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> OutBuffOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(OutputFile);
+    }();
     // Assume if we couldn't open the output file then it doesn't exist meaning
     // there was a change.
     bool Same = false;
@@ -161,6 +166,7 @@ int llvm_mt_main(int Argc, char **Argv, const llvm::ToolContext &) {
     }
   }
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   Expected<std::unique_ptr<FileOutputBuffer>> FileOrErr =
       FileOutputBuffer::create(OutputFile, OutputBuffer->getBufferSize());
   if (!FileOrErr)

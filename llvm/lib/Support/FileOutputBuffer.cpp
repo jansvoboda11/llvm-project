@@ -13,6 +13,7 @@
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/TimeProfiler.h"
 #include <system_error>
@@ -44,6 +45,7 @@ public:
   size_t getBufferSize() const override { return Buffer.size(); }
 
   Error commit() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     llvm::TimeTraceScope timeScope("Commit buffer to disk");
 
     // Unmap buffer, letting OS flush dirty pages to file on disk.
@@ -54,6 +56,7 @@ public:
   }
 
   ~OnDiskBuffer() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     // Close the mapping before deleting the temp file, so that the removal
     // succeeds.
     Buffer.unmap();
@@ -61,6 +64,7 @@ public:
   }
 
   void discard() override {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     // Delete the temp file if it still was open, but keeping the mapping
     // active.
     consumeError(Temp.discard());
@@ -95,6 +99,7 @@ public:
       return Error::success();
     }
 
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     using namespace sys::fs;
     int FD;
     std::error_code EC;
@@ -157,6 +162,8 @@ createOnDiskBuffer(StringRef Path, size_t Size, unsigned Mode) {
 // Create an instance of FileOutputBuffer.
 Expected<std::unique_ptr<FileOutputBuffer>>
 FileOutputBuffer::create(StringRef Path, size_t Size, unsigned Flags) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   // Handle "-" as stdout just like llvm::raw_ostream does.
   if (Path == "-")
     return createInMemoryBuffer("-", Size, /*Mode=*/0);

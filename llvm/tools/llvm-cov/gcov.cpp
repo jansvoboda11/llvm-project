@@ -15,6 +15,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 #include <system_error>
 using namespace llvm;
@@ -24,6 +25,8 @@ static void reportCoverage(StringRef SourceFile, StringRef ObjectDir,
                            const std::string &InputGCDA, bool DumpGCOV,
                            const GCOV::Options &Options) {
   SmallString<128> CoverageFileStem(ObjectDir);
+  {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   if (CoverageFileStem.empty()) {
     // If no directory was specified with -o, look next to the source file.
     CoverageFileStem = sys::path::parent_path(SourceFile);
@@ -34,6 +37,7 @@ static void reportCoverage(StringRef SourceFile, StringRef ObjectDir,
   else
     // A file was given. Ignore the source file and look next to this file.
     sys::path::replace_extension(CoverageFileStem, "");
+  }
 
   std::string GCNO =
       InputGCNO.empty() ? std::string(CoverageFileStem) + ".gcno" : InputGCNO;
@@ -43,9 +47,11 @@ static void reportCoverage(StringRef SourceFile, StringRef ObjectDir,
 
   // Open .gcda and .gcda without requiring a NUL terminator. The concurrent
   // modification may nullify the NUL terminator condition.
-  ErrorOr<std::unique_ptr<MemoryBuffer>> GCNO_Buff =
-      MemoryBuffer::getFileOrSTDIN(GCNO, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> GCNO_Buff = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(GCNO, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = GCNO_Buff.getError()) {
     errs() << GCNO << ": " << EC.message() << "\n";
     return;
@@ -56,9 +62,11 @@ static void reportCoverage(StringRef SourceFile, StringRef ObjectDir,
     return;
   }
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> GCDA_Buff =
-      MemoryBuffer::getFileOrSTDIN(GCDA, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> GCDA_Buff = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(GCDA, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
   if (std::error_code EC = GCDA_Buff.getError()) {
     if (EC != errc::no_such_file_or_directory) {
       errs() << GCDA << ": " << EC.message() << "\n";

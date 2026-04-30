@@ -83,6 +83,7 @@
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -784,9 +785,11 @@ static ExitOnError ExitOnErr;
 
 static void yamlToPdb(StringRef Path) {
   BumpPtrAllocator Allocator;
-  ErrorOr<std::unique_ptr<MemoryBuffer>> ErrorOrBuffer =
-      MemoryBuffer::getFileOrSTDIN(Path, /*IsText=*/false,
-                                   /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> ErrorOrBuffer = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Path, /*IsText=*/false,
+                                 /*RequiresNullTerminator=*/false);
+  }();
 
   if (ErrorOrBuffer.getError()) {
     ExitOnErr(createFileError(Path, errorCodeToError(ErrorOrBuffer.getError())));
@@ -923,6 +926,7 @@ static void yamlToPdb(StringRef Path) {
 
   Builder.getStringTableBuilder().setStrings(*Strings.strings());
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   codeview::GUID IgnoredOutGuid;
   ExitOnErr(Builder.commit(opts::yaml2pdb::YamlPdbOutputFile, &IgnoredOutGuid));
 }
@@ -944,7 +948,10 @@ static void pdb2Yaml(StringRef Path) {
 }
 
 static void dumpRaw(StringRef Path) {
-  InputFile IF = ExitOnErr(InputFile::open(Path));
+  InputFile IF =       ExitOnErr([&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return InputFile::open(Path);
+      }());
 
   auto O = std::make_unique<DumpOutputStyle>(IF);
   ExitOnErr(O->dump());
@@ -1153,10 +1160,13 @@ static void dumpPretty(StringRef Path) {
 
   Printer.NewLine();
   WithColor(Printer, PDB_ColorItem::Identifier).get() << "Size";
-  if (!sys::fs::file_size(FileName, FileSize)) {
-    Printer << ": " << FileSize << " bytes";
-  } else {
-    Printer << ": (Unable to obtain file size)";
+  {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+    if (!sys::fs::file_size(FileName, FileSize)) {
+      Printer << ": " << FileSize << " bytes";
+    } else {
+      Printer << ": (Unable to obtain file size)";
+    }
   }
 
   Printer.NewLine();
@@ -1414,12 +1424,16 @@ static void mergePdbs() {
   }
 
   codeview::GUID IgnoredOutGuid;
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   ExitOnErr(Builder.commit(OutFile, &IgnoredOutGuid));
 }
 
 static void explain() {
   InputFile IF =
-      ExitOnErr(InputFile::open(opts::explain::InputFilename.front(), true));
+      ExitOnErr([&] {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+        return InputFile::open(opts::explain::InputFilename.front(), true);
+      }());
 
   for (uint64_t Off : opts::explain::Offsets) {
     auto O = std::make_unique<ExplainOutputStyle>(IF, Off);
@@ -1458,6 +1472,7 @@ static void exportStream() {
            << "' (index " << Index << ") to file " << OutFileName << ".\n";
   }
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SourceStream = File.createIndexedStream(Index);
   auto OutFile = ExitOnErr(
       FileOutputBuffer::create(OutFileName, SourceStream->getLength()));

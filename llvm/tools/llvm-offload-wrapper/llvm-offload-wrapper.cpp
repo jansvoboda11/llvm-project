@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -122,8 +123,10 @@ int main(int argc, char **argv) {
   SmallVector<std::unique_ptr<MemoryBuffer>> Buffers;
   SmallVector<ArrayRef<char>> BuffersToWrap;
   for (StringRef Input : InputFiles) {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(Input);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFileOrSTDIN(Input);
+    }();
     if (std::error_code EC = BufferOrErr.getError())
       ReportError(createFileError(Input, EC));
     std::unique_ptr<MemoryBuffer> &Buffer =

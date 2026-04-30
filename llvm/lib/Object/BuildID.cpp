@@ -16,6 +16,7 @@
 
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Path.h"
 
 using namespace llvm;
@@ -80,6 +81,7 @@ BuildIDRef llvm::object::getBuildID(const ObjectFile *Obj) {
 }
 
 std::optional<std::string> BuildIDFetcher::fetch(BuildIDRef BuildID) const {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   auto GetDebugPath = [&](StringRef Directory) {
     SmallString<128> Path{Directory};
     sys::path::append(Path, ".build-id",

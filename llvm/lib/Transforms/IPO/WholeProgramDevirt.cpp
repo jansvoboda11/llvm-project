@@ -104,6 +104,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/GlobPattern.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO.h"
@@ -1041,7 +1042,10 @@ bool DevirtModule::runForTesting(Module &M, ModuleAnalysisManager &MAM,
     ExitOnError ExitOnErr("-wholeprogramdevirt-read-summary: " + ClReadSummary +
                           ": ");
     auto ReadSummaryFile =
-        ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(ClReadSummary)));
+        ExitOnErr(errorOrToExpected([] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFile(ClReadSummary);
+        }()));
     if (Expected<std::unique_ptr<ModuleSummaryIndex>> SummaryOrErr =
             getModuleSummaryIndex(*ReadSummaryFile)) {
       Summary = std::move(*SummaryOrErr);

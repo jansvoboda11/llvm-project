@@ -51,6 +51,7 @@ public:
 struct BackendTest
     : public ::testing::TestWithParam<OutputBackendProvider::Generator> {
   std::unique_ptr<OutputBackendProvider> Provider;
+  sys::sandbox::ScopedOverride BypassSandbox = sys::sandbox::scopedDisable();
 
   void SetUp() override { Provider = GetParam()(); }
   void TearDown() override { Provider = nullptr; }
@@ -164,6 +165,8 @@ TEST_P(BackendTest, KeepEmpty) {
 }
 
 TEST_P(BackendTest, KeepMissingDirectory) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   auto Backend = createBackend();
   std::string FilePath = Provider->getFilePathToCreateUnder("missing");
   StringRef Data = "some data";

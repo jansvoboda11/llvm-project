@@ -4,6 +4,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -33,6 +34,7 @@ static std::pair<bool, SmallString<128>> findSrcDirMap(StringRef Argv0) {
 }
 
 SmallString<128> llvm::unittest::getInputFileDirectory(const char *Argv0) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   bool Found = false;
   SmallString<128> InputFilePath;
   std::tie(Found, InputFilePath) = findSrcDirMap(Argv0);

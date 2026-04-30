@@ -24,6 +24,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -153,8 +154,10 @@ typedef std::map<std::string, std::map<int, std::map<std::string, std::map<int,
 } // anonymous namespace
 
 static bool readLocationInfo(LocationInfoTy &LocationInfo) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-      MemoryBuffer::getFile(InputFileName.c_str());
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFile(InputFileName.c_str());
+  }();
   if (std::error_code EC = Buf.getError()) {
     WithColor::error() << "Can't open file " << InputFileName << ": "
                        << EC.message() << "\n";
@@ -278,8 +281,10 @@ static bool writeReport(LocationInfoTy &LocationInfo) {
 
     const auto &FileInfo = FI.second;
 
-    ErrorOr<std::unique_ptr<MemoryBuffer>> Buf =
-        MemoryBuffer::getFile(FileName);
+    ErrorOr<std::unique_ptr<MemoryBuffer>> Buf = [&] {
+      auto BypassSandbox = sys::sandbox::scopedDisable();
+      return MemoryBuffer::getFile(FileName);
+    }();
     if (std::error_code EC = Buf.getError()) {
       WithColor::error() << "Can't open file " << FileName << ": "
                          << EC.message() << "\n";

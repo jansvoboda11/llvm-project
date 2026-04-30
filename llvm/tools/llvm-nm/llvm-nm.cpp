@@ -43,6 +43,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
@@ -2352,8 +2353,10 @@ static void dumpSymbolicFile(SymbolicFile *O, std::vector<NMSymbol> &SymbolList,
 
 static std::vector<NMSymbol> dumpSymbolNamesFromFile(StringRef Filename) {
   std::vector<NMSymbol> SymbolList;
-  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-      MemoryBuffer::getFileOrSTDIN(Filename);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(Filename);
+  }();
   if (error(BufferOrErr.getError(), Filename))
     return SymbolList;
 

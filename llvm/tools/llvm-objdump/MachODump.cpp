@@ -41,6 +41,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/WithColor.h"
@@ -7151,6 +7152,8 @@ const MachOObjectFile *
 objdump::getMachODSymObject(const MachOObjectFile *MachOOF, StringRef Filename,
                             std::unique_ptr<Binary> &DSYMBinary,
                             std::unique_ptr<MemoryBuffer> &DSYMBuf) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
   const MachOObjectFile *DbgObj = MachOOF;
   std::string DSYMPath;
 

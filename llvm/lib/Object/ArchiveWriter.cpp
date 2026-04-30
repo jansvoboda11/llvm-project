@@ -30,6 +30,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
@@ -985,6 +986,7 @@ computeMemberData(raw_ostream &StringTable, raw_ostream &SymNames,
 namespace llvm {
 
 static ErrorOr<SmallString<128>> canonicalizePath(StringRef P) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   SmallString<128> Ret = P;
   std::error_code Err = sys::fs::make_absolute(Ret);
   if (Err)
@@ -1320,14 +1322,17 @@ Error writeArchive(StringRef ArcName, ArrayRef<NewArchiveMember> NewMembers,
                    bool Deterministic, bool Thin,
                    std::unique_ptr<MemoryBuffer> OldArchiveBuf,
                    std::optional<bool> IsEC, function_ref<void(Error)> Warn) {
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   Expected<sys::fs::TempFile> Temp =
       sys::fs::TempFile::create(ArcName + ".temp-archive-%%%%%%%.a");
   if (!Temp)
     return Temp.takeError();
   raw_fd_ostream Out(Temp->FD, false);
 
+  auto ReenableSandbox = sys::sandbox::scopedEnable();
   if (Error E = writeArchiveToStream(Out, NewMembers, WriteSymtab, Kind,
                                      Deterministic, Thin, IsEC, Warn)) {
+    auto BypassSandbox2 = sys::sandbox::scopedDisable();
     if (Error DiscardError = Temp->discard())
       return joinErrors(std::move(E), std::move(DiscardError));
     return E;
@@ -1345,6 +1350,7 @@ Error writeArchive(StringRef ArcName, ArrayRef<NewArchiveMember> NewMembers,
   // closed before we attempt to rename.
   OldArchiveBuf.reset();
 
+  auto BypassSandbox2 = sys::sandbox::scopedDisable();
   return Temp->keep(ArcName);
 }
 

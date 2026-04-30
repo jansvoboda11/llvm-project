@@ -39,6 +39,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
@@ -1555,6 +1556,7 @@ Error OverlapStats::accumulateCounts(const std::string &BaseFilename,
                               CountSumOrPercent &Sum) -> Error {
     // This function is only used from llvm-profdata that doesn't use any kind
     // of VFS. Just create a default RealFileSystem to read profiles.
+    auto BypassSandbox = sys::sandbox::scopedDisable();
     auto FS = vfs::getRealFileSystem();
     auto ReaderOrErr = InstrProfReader::create(Filename, *FS);
     if (Error E = ReaderOrErr.takeError()) {

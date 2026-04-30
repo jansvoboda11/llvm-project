@@ -33,6 +33,7 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -459,7 +460,10 @@ bool llvm::runPassPipeline(
   PTO.LoopUnrolling = !DisableLoopUnrolling;
   PTO.UnifiedLTO = UnifiedLTO;
   PTO.LoopFusion = EnableLoopFusion;
-  PassBuilder PB(TM, PTO, P, &PIC);
+  PassBuilder PB(TM, PTO, P, &PIC, [] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return vfs::getRealFileSystem();
+  }());
   registerEPCallbacks(PB);
 
   // For any loaded plugins, let them register pass builder callbacks.
@@ -593,6 +597,13 @@ bool llvm::runPassPipeline(
 }
 
 void llvm::printPasses(raw_ostream &OS) {
-  PassBuilder PB;
+  PassBuilder PB{/*TM=*/nullptr,
+                 /*PTO=*/PipelineTuningOptions(),
+                 /*PGOOpt=*/std::nullopt,
+                 /*PIC=*/nullptr,
+                 /*FS=*/[] {
+                   auto BypassSandbox = sys::sandbox::scopedDisable();
+                   return vfs::getRealFileSystem();
+  }()};
   PB.printPassNames(OS);
 }

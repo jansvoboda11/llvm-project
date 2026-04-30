@@ -15,6 +15,7 @@
 #include "llvm/Support/Caching.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -39,6 +40,8 @@ Expected<FileCache> llvm::localCache(const Twine &CacheNameRef,
 
   auto Func = [=](unsigned Task, StringRef Key,
                   const Twine &ModuleName) -> Expected<AddStreamFn> {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+
     // This choice of file name allows the cache to be pruned (see pruneCache()
     // in include/llvm/Support/CachePruning.h).
     SmallString<64> EntryPath;
@@ -89,6 +92,8 @@ Expected<FileCache> llvm::localCache(const Twine &CacheNameRef,
             ModuleName(ModuleName), Task(Task) {}
 
       Error commit() override {
+        auto BypassSandbox = sys::sandbox::scopedDisable();
+
         Error E = CachedFileStream::commit();
         if (E)
           return E;

@@ -45,6 +45,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -194,7 +195,10 @@ int main(int argc, char **argv) {
         std::make_unique<LLVMDisDiagnosticHandler>(argv[0]));
 
     ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrErr =
-        MemoryBuffer::getFileOrSTDIN(InputFilename);
+        [&] {
+          auto BypassSandbox = sys::sandbox::scopedDisable();
+          return MemoryBuffer::getFileOrSTDIN(InputFilename);
+        }();
     if (std::error_code EC = BufferOrErr.getError()) {
       WithColor::error() << InputFilename << ": " << EC.message() << '\n';
       return 1;

@@ -1017,6 +1017,7 @@ Error llvm::writeToOutput(StringRef OutputFileName,
     return Write(Out);
   }
 
+  auto BypassSandbox = sys::sandbox::scopedDisable();
   unsigned Mode = sys::fs::all_read | sys::fs::all_write;
   Expected<sys::fs::TempFile> Temp =
       sys::fs::TempFile::create(OutputFileName + ".temp-stream-%%%%%%", Mode);

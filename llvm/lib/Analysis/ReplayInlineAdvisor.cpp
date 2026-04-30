@@ -15,6 +15,7 @@
 
 #include "llvm/Analysis/ReplayInlineAdvisor.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <memory>
@@ -31,7 +32,10 @@ ReplayInlineAdvisor::ReplayInlineAdvisor(
     : InlineAdvisor(M, FAM, IC), OriginalAdvisor(std::move(OriginalAdvisor)),
       ReplaySettings(ReplaySettings), EmitRemarks(EmitRemarks) {
 
-  auto BufferOrErr = MemoryBuffer::getFileOrSTDIN(ReplaySettings.ReplayFile);
+  auto BufferOrErr = [&] {
+    auto BypassSandbox = sys::sandbox::scopedDisable();
+    return MemoryBuffer::getFileOrSTDIN(ReplaySettings.ReplayFile);
+  }();
   std::error_code EC = BufferOrErr.getError();
   if (EC) {
     Context.emitError("Could not open remarks file: " + EC.message());
