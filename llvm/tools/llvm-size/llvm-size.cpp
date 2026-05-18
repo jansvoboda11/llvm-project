@@ -889,7 +889,7 @@ int llvm_size_main(int argc, char **argv, const llvm::ToolContext &) {
   SizeOptTable Tbl;
   ToolName = argv[0];
   opt::InputArgList Args =
-      Tbl.parseArgs(argc, argv, OPT_UNKNOWN, Saver, [&](StringRef Msg) {
+      Tbl.parseArgs({argc, argv}, OPT_UNKNOWN, Saver, [&](StringRef Msg) {
         error(Msg);
         exit(1);
       });

@@ -274,7 +274,7 @@ public:
   }
 
   /// getArgString - Return the input argument string at \p Index.
-  virtual const char *getArgString(unsigned Index) const = 0;
+  virtual StringRef getArgString(unsigned Index) const = 0;
 
   /// getNumInputArgStrings - Return the number of original argument strings,
   /// which are guaranteed to be the first strings in the argument string
@@ -396,16 +396,16 @@ public:
 
   /// Construct a constant string pointer whose
   /// lifetime will match that of the ArgList.
-  virtual const char *MakeArgStringRef(StringRef Str) const = 0;
-  const char *MakeArgString(const Twine &Str) const {
+  virtual StringRef MakeArgStringRef(StringRef Str) const = 0;
+  StringRef MakeArgString(const Twine &Str) const {
     SmallString<256> Buf;
     return MakeArgStringRef(Str.toStringRef(Buf));
   }
 
   /// Create an arg string for (\p LHS + \p RHS), reusing the
   /// string at \p Index if possible.
-  LLVM_ABI const char *GetOrMakeJoinedArgString(unsigned Index, StringRef LHS,
-                                                StringRef RHS) const;
+  LLVM_ABI StringRef GetOrMakeJoinedArgString(unsigned Index, StringRef LHS,
+                                              StringRef RHS) const;
 
   LLVM_ABI void print(raw_ostream &O) const;
   LLVM_ABI void dump() const;
@@ -438,6 +438,8 @@ private:
 public:
   InputArgList() : NumInputArgStrings(0) {}
 
+  InputArgList(ArrayRefOfStringRef Args);
+
   InputArgList(const char* const *ArgBegin, const char* const *ArgEnd);
 
   InputArgList(InputArgList &&RHS)
@@ -458,7 +460,7 @@ public:
 
   ~InputArgList() { releaseMemory(); }
 
-  const char *getArgString(unsigned Index) const override {
+  StringRef getArgString(unsigned Index) const override {
     return ArgStrings[Index];
   }
 
@@ -479,7 +481,7 @@ public:
   unsigned MakeIndex(StringRef String0, StringRef String1) const;
 
   using ArgList::MakeArgString;
-  const char *MakeArgStringRef(StringRef Str) const override;
+  StringRef MakeArgStringRef(StringRef Str) const override;
 
   /// @}
 };
@@ -496,7 +498,7 @@ public:
   /// Construct a new derived arg list from \p BaseArgs.
   DerivedArgList(const InputArgList &BaseArgs);
 
-  const char *getArgString(unsigned Index) const override {
+  StringRef getArgString(unsigned Index) const override {
     return BaseArgs.getArgString(Index);
   }
 
@@ -516,7 +518,7 @@ public:
   void AddSynthesizedArg(Arg *A);
 
   using ArgList::MakeArgString;
-  const char *MakeArgStringRef(StringRef Str) const override;
+  StringRef MakeArgStringRef(StringRef Str) const override;
 
   /// AddFlagArg - Construct a new FlagArg for the given option \p Id and
   /// append it to the argument list.

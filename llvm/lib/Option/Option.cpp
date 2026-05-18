@@ -121,34 +121,21 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
     return std::make_unique<Arg>(*this, CurArg, Index++);
   }
   case JoinedClass: {
-    const char *Value = Args.getArgString(Index) + SpellingSize;
+    StringRef Value = Args.getArgString(Index).drop_front(SpellingSize);
     return std::make_unique<Arg>(*this, CurArg, Index++, Value);
   }
   case CommaJoinedClass: {
     // Always matches.
-    const char *Str = Args.getArgString(Index) + SpellingSize;
+    StringRef Value = Args.getArgString(Index).drop_front(SpellingSize);
     auto A = std::make_unique<Arg>(*this, CurArg, Index++);
 
     // Parse out the comma separated values.
-    const char *Prev = Str;
-    for (;; ++Str) {
-      char c = *Str;
-
-      if (!c || c == ',') {
-        if (Prev != Str) {
-          char *Value = new char[Str - Prev + 1];
-          memcpy(Value, Prev, Str - Prev);
-          Value[Str - Prev] = '\0';
-          A->getValues().push_back(Value);
-        }
-
-        if (!c)
-          break;
-
-        Prev = Str + 1;
-      }
+    while (!Value.empty()) {
+      auto [Head, Tail] = Value.split(',');
+      if (!Head.empty())
+        A->getValues().push_back(Head);
+      Value = Tail;
     }
-    A->setOwnsValues(true);
 
     return A;
   }
@@ -158,8 +145,7 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
       return nullptr;
 
     Index += 2;
-    if (Index > Args.getNumInputArgStrings() ||
-        Args.getArgString(Index - 1) == nullptr)
+    if (Index > Args.getNumInputArgStrings())
       return nullptr;
 
     return std::make_unique<Arg>(*this, CurArg, Index - 2,
@@ -182,14 +168,13 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
   case JoinedOrSeparateClass: {
     // If this is not an exact match, it is a joined arg.
     if (SpellingSize != ArgStringSize) {
-      const char *Value = Args.getArgString(Index) + SpellingSize;
+      StringRef Value = Args.getArgString(Index).drop_front(SpellingSize);
       return std::make_unique<Arg>(*this, CurArg, Index++, Value);
     }
 
     // Otherwise it must be separate.
     Index += 2;
-    if (Index > Args.getNumInputArgStrings() ||
-        Args.getArgString(Index - 1) == nullptr)
+    if (Index > Args.getNumInputArgStrings())
       return nullptr;
 
     return std::make_unique<Arg>(*this, CurArg, Index - 2,
@@ -198,20 +183,19 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
   case JoinedAndSeparateClass:
     // Always matches.
     Index += 2;
-    if (Index > Args.getNumInputArgStrings() ||
-        Args.getArgString(Index - 1) == nullptr)
+    if (Index > Args.getNumInputArgStrings())
       return nullptr;
 
-    return std::make_unique<Arg>(*this, CurArg, Index - 2,
-                                 Args.getArgString(Index - 2) + SpellingSize,
-                                 Args.getArgString(Index - 1));
+    return std::make_unique<Arg>(
+        *this, CurArg, Index - 2,
+        Args.getArgString(Index - 2).drop_front(SpellingSize),
+        Args.getArgString(Index - 1));
   case RemainingArgsClass: {
     // Matches iff this is an exact match.
     if (SpellingSize != ArgStringSize)
       return nullptr;
     auto A = std::make_unique<Arg>(*this, CurArg, Index++);
-    while (Index < Args.getNumInputArgStrings() &&
-           Args.getArgString(Index) != nullptr)
+    while (Index < Args.getNumInputArgStrings())
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }
@@ -219,11 +203,11 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
     auto A = std::make_unique<Arg>(*this, CurArg, Index);
     if (SpellingSize != ArgStringSize) {
       // An inexact match means there is a joined arg.
-      A->getValues().push_back(Args.getArgString(Index) + SpellingSize);
+      A->getValues().push_back(
+          Args.getArgString(Index).drop_front(SpellingSize));
     }
     Index++;
-    while (Index < Args.getNumInputArgStrings() &&
-           Args.getArgString(Index) != nullptr)
+    while (Index < Args.getNumInputArgStrings())
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }
@@ -275,8 +259,6 @@ std::unique_ptr<Arg> Option::accept(const ArgList &Args, StringRef CurArg,
     // FIXME: There aren't many uses of CommaJoined -- try removing
     // CommaJoined in favor of just calling StringRef::split(',') instead.
     UnaliasedA->getValues() = RawA->getValues();
-    UnaliasedA->setOwnsValues(RawA->getOwnsValues());
-    RawA->setOwnsValues(false);
     return UnaliasedA;
   }
 

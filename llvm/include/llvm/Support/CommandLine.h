@@ -20,6 +20,7 @@
 #define LLVM_SUPPORT_COMMANDLINE_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -65,12 +66,19 @@ namespace cl {
 // that give precedence to later occurrences.  If your program supports options
 // that give precedence to earlier occurrences, you will need to extend this
 // function to support it correctly.
-LLVM_ABI bool ParseCommandLineOptions(int argc, const char *const *argv,
+LLVM_ABI bool ParseCommandLineOptions(ArrayRefOfStringRef Argv,
                                       StringRef Overview = "",
                                       raw_ostream *Errs = nullptr,
                                       vfs::FileSystem *VFS = nullptr,
                                       const char *EnvVar = nullptr,
                                       bool LongOptionsUseDoubleDash = false);
+LLVM_ABI inline bool ParseCommandLineOptions(
+    int argc, const char *const *argv, StringRef Overview = "",
+    raw_ostream *Errs = nullptr, vfs::FileSystem *VFS = nullptr,
+    const char *EnvVar = nullptr, bool LongOptionsUseDoubleDash = false) {
+  return ParseCommandLineOptions({argc, argv}, Overview, Errs, VFS, EnvVar,
+                                 LongOptionsUseDoubleDash);
+}
 
 // Function pointer type for printing version information.
 using VersionPrinterTy = std::function<void(raw_ostream &)>;
@@ -2117,12 +2125,13 @@ getRegisteredSubcommands();
 ///
 /// \param [in] Source The string to be split on whitespace with quotes.
 /// \param [in] Saver Delegates back to the caller for saving parsed strings.
-/// \param [in] MarkEOLs true if tokenizing a response file and you want end of
-/// lines and end of the response file to be marked with a nullptr string.
 /// \param [out] NewArgv All parsed strings are appended to NewArgv.
-LLVM_ABI void TokenizeGNUCommandLine(StringRef Source, StringSaver &Saver,
-                                     SmallVectorImpl<const char *> &NewArgv,
-                                     bool MarkEOLs = false);
+/// \param [out] EOLIndices If non-null, filled with indices into \c NewArgv
+/// that denote the last argument in a response file before a newline.
+LLVM_ABI void
+TokenizeGNUCommandLine(StringRef Source, StringSaver &Saver,
+                       SmallVectorImpl<StringRef> &NewArgv,
+                       SmallVectorImpl<size_t> *EOLIndices = nullptr);
 
 /// Tokenizes a string of Windows command line arguments, which may contain
 /// quotes and escaped quotes.
@@ -2135,12 +2144,13 @@ LLVM_ABI void TokenizeGNUCommandLine(StringRef Source, StringSaver &Saver,
 ///
 /// \param [in] Source The string to be split on whitespace with quotes.
 /// \param [in] Saver Delegates back to the caller for saving parsed strings.
-/// \param [in] MarkEOLs true if tokenizing a response file and you want end of
-/// lines and end of the response file to be marked with a nullptr string.
 /// \param [out] NewArgv All parsed strings are appended to NewArgv.
-LLVM_ABI void TokenizeWindowsCommandLine(StringRef Source, StringSaver &Saver,
-                                         SmallVectorImpl<const char *> &NewArgv,
-                                         bool MarkEOLs = false);
+/// \param [out] EOLIndices If non-null, filled with indices into \c NewArgv
+/// that denote the last argument in a response file before a newline.
+LLVM_ABI void
+TokenizeWindowsCommandLine(StringRef Source, StringSaver &Saver,
+                           SmallVectorImpl<StringRef> &NewArgv,
+                           SmallVectorImpl<size_t> *EOLIndices = nullptr);
 
 /// Tokenizes a Windows command line while attempting to avoid copies. If no
 /// quoting or escaping was used, this produces substrings of the original
@@ -2160,32 +2170,33 @@ TokenizeWindowsCommandLineNoCopy(StringRef Source, StringSaver &Saver,
 /// hence there's never a need to escape it to be used literally).
 ///
 /// Parameters are the same as for TokenizeWindowsCommandLine. In particular,
-/// if you set MarkEOLs = true, then the first word of every line will be
+/// if you pass non-null EOLIndices, then the first word of every line will be
 /// parsed using the special rules for command names, making this function
 /// suitable for parsing a file full of commands to execute.
 LLVM_ABI void
 TokenizeWindowsCommandLineFull(StringRef Source, StringSaver &Saver,
-                               SmallVectorImpl<const char *> &NewArgv,
-                               bool MarkEOLs = false);
+                               SmallVectorImpl<StringRef> &NewArgv,
+                               SmallVectorImpl<size_t> *EOLIndices = nullptr);
 
 /// String tokenization function type.  Should be compatible with either
 /// Windows or Unix command line tokenizers.
 using TokenizerCallback = void (*)(StringRef Source, StringSaver &Saver,
-                                   SmallVectorImpl<const char *> &NewArgv,
-                                   bool MarkEOLs);
+                                   SmallVectorImpl<StringRef> &NewArgv,
+                                   SmallVectorImpl<size_t> *EOLIndices);
 
 /// Tokenizes content of configuration file.
 ///
 /// \param [in] Source The string representing content of config file.
 /// \param [in] Saver Delegates back to the caller for saving parsed strings.
 /// \param [out] NewArgv All parsed strings are appended to NewArgv.
-/// \param [in] MarkEOLs Added for compatibility with TokenizerCallback.
+/// \param [out] EOLIndices If non-null, filled with indices into \c NewArgv
+/// that denote the last argument in a response file before a newline.
 ///
 /// It works like TokenizeGNUCommandLine with ability to skip comment lines.
 ///
 LLVM_ABI void tokenizeConfigFile(StringRef Source, StringSaver &Saver,
-                                 SmallVectorImpl<const char *> &NewArgv,
-                                 bool MarkEOLs = false);
+                                 SmallVectorImpl<StringRef> &NewArgv,
+                                 SmallVectorImpl<size_t> *EOLIndices = nullptr);
 
 /// Contains options that control response file expansion.
 class ExpansionContext {
@@ -2209,24 +2220,15 @@ class ExpansionContext {
   /// including file.
   bool RelativeNames = false;
 
-  /// If true, mark end of lines and the end of the response file with nullptrs
-  /// in the Argv vector.
-  bool MarkEOLs = false;
-
   /// If true, body of config file is expanded.
   bool InConfigFile = false;
 
-  llvm::Error expandResponseFile(StringRef FName,
-                                 SmallVectorImpl<const char *> &NewArgv);
+  Error expandResponseFile(StringRef FName, SmallVectorImpl<StringRef> &NewArgv,
+                           SmallVectorImpl<size_t> *EOLIndices = nullptr);
 
 public:
   LLVM_ABI ExpansionContext(BumpPtrAllocator &A, TokenizerCallback T,
                             vfs::FileSystem *FS = nullptr);
-
-  ExpansionContext &setMarkEOLs(bool X) {
-    MarkEOLs = X;
-    return *this;
-  }
 
   ExpansionContext &setRelativeNames(bool X) {
     RelativeNames = X;
@@ -2271,33 +2273,32 @@ public:
   /// CfgFilename resides. It also expands "<CFGDIR>" to the base path of the
   /// current config file.
   LLVM_ABI Error readConfigFile(StringRef CfgFile,
-                                SmallVectorImpl<const char *> &Argv);
+                                SmallVectorImpl<StringRef> &Argv);
 
   /// Expands constructs "@file" in the provided array of arguments recursively.
-  LLVM_ABI Error expandResponseFiles(SmallVectorImpl<const char *> &Argv);
+  LLVM_ABI Error expandResponseFiles(SmallVectorImpl<StringRef> &Argv);
 };
 
 /// A convenience helper which concatenates the options specified by the
 /// environment variable EnvVar and command line options, then expands
 /// response files recursively.
 /// \return true if all @files were expanded successfully or there were none.
-LLVM_ABI bool expandResponseFiles(int Argc, const char *const *Argv,
-                                  const char *EnvVar,
+LLVM_ABI bool expandResponseFiles(ArrayRefOfStringRef Argv, const char *EnvVar,
                                   SmallVectorImpl<const char *> &NewArgv);
 
 /// A convenience helper which supports the typical use case of expansion
 /// function call.
 LLVM_ABI bool ExpandResponseFiles(StringSaver &Saver,
                                   TokenizerCallback Tokenizer,
-                                  SmallVectorImpl<const char *> &Argv);
+                                  SmallVectorImpl<StringRef> &Argv);
 
 /// A convenience helper which concatenates the options specified by the
 /// environment variable EnvVar and command line options, then expands response
 /// files recursively. The tokenizer is a predefined GNU or Windows one.
 /// \return true if all @files were expanded successfully or there were none.
-LLVM_ABI bool expandResponseFiles(int Argc, const char *const *Argv,
-                                  const char *EnvVar, StringSaver &Saver,
-                                  SmallVectorImpl<const char *> &NewArgv);
+LLVM_ABI bool expandResponseFiles(ArrayRefOfStringRef Argv, const char *EnvVar,
+                                  StringSaver &Saver,
+                                  SmallVectorImpl<StringRef> &NewArgv);
 
 /// Mark all options not part of this category as cl::ReallyHidden.
 ///

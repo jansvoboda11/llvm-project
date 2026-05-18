@@ -98,7 +98,7 @@ static Error validateAndSetOptions(opt::InputArgList &Args, Options &Options) {
   Options.Verify = Args.hasArg(OPT_verify);
 
   if (opt::Arg *NumThreads = Args.getLastArg(OPT_threads))
-    Options.NumThreads = atoi(NumThreads->getValue());
+    NumThreads->getValue().getAsInteger(10, Options.NumThreads);
   else
     Options.NumThreads = 0; // Use all available hardware threads
 

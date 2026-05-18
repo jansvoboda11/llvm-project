@@ -137,7 +137,7 @@ static Expected<std::vector<std::string>> getInputs(opt::InputArgList &Args,
                                                     bool DsymAsInput) {
   std::vector<std::string> InputFiles;
   for (auto *File : Args.filtered(OPT_INPUT))
-    InputFiles.push_back(File->getValue());
+    InputFiles.emplace_back(File->getValue());
 
   if (!DsymAsInput)
     return InputFiles;
@@ -383,7 +383,7 @@ static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
   }
 
   for (auto *Arch : Args.filtered(OPT_arch))
-    Options.Archs.push_back(Arch->getValue());
+    Options.Archs.emplace_back(Arch->getValue());
 
   if (opt::Arg *OsoPrependPath = Args.getLastArg(OPT_oso_prepend_path))
     Options.LinkOpts.PrependPath = OsoPrependPath->getValue();
@@ -407,7 +407,7 @@ static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
     Options.LinkOpts.FileType = DWARFLinkerBase::OutputFileType::Assembly;
 
   if (opt::Arg *NumThreads = Args.getLastArg(OPT_threads))
-    Options.LinkOpts.Threads = atoi(NumThreads->getValue());
+    NumThreads->getValue().getAsInteger<unsigned>(10, Options.LinkOpts.Threads);
   else
     Options.LinkOpts.Threads = 0; // Use all available hardware threads
 
@@ -457,7 +457,7 @@ static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
   }
 
   for (auto *SearchPath : Args.filtered(OPT_dsym_search_path))
-    Options.LinkOpts.DSYMSearchPaths.push_back(SearchPath->getValue());
+    Options.LinkOpts.DSYMSearchPaths.emplace_back(SearchPath->getValue());
 
   if (opt::Arg *AllowArg = Args.getLastArg(OPT_allow))
     Options.AllowFile = AllowArg->getValue();

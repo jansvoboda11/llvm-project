@@ -23,7 +23,7 @@ TEST(DebugLogTest, Basic) {
   static const char *DT[] = {"A", "B"};
 
   // Clear debug types.
-  setCurrentDebugTypes(DT, 0);
+  setCurrentDebugTypes({});
   {
     std::string str;
     raw_string_ostream os(str);
@@ -32,7 +32,7 @@ TEST(DebugLogTest, Basic) {
     EXPECT_TRUE(StringRef(os.str()).ends_with("NoType\n"));
   }
 
-  setCurrentDebugTypes(DT, 2);
+  setCurrentDebugTypes(DT);
   {
     std::string str;
     raw_string_ostream os(str);
@@ -70,7 +70,7 @@ TEST(DebugLogTest, BasicWithLevel) {
   // below, and C to be printed only when level is 0 or below.
   static const char *DT[] = {"A", "B:1", "C:"};
 
-  setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+  setCurrentDebugTypes(DT);
   std::string str;
   raw_string_ostream os(str);
   for (auto type : {"A", "B", "C", "D"})
@@ -87,7 +87,7 @@ TEST(DebugLogTest, NegativeLevel) {
   // In this case we expect all the debug types to be printed.
   static const char *DT[] = {"A:"};
 
-  setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+  setCurrentDebugTypes(DT);
   std::string str;
   raw_string_ostream os(str);
   for (auto type : {"A", "B"})
@@ -101,7 +101,7 @@ TEST(DebugLogTest, NegativeLevel) {
 TEST(DebugLogTest, StreamPrefix) {
   llvm::DebugFlag = true;
   static const char *DT[] = {"A", "B"};
-  setCurrentDebugTypes(DT, 2);
+  setCurrentDebugTypes(DT);
 
   std::string str;
   raw_string_ostream os(str);
@@ -133,7 +133,7 @@ TEST(DebugLogTest, DestructorPrefix) {
 TEST(DebugLogTest, LDBG_MACROS) {
   llvm::DebugFlag = true;
   static const char *DT[] = {"A:3", "B:2"};
-  setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+  setCurrentDebugTypes(DT);
   std::string Str;
   raw_string_ostream DebugOs(Str);
   std::string StrExpected;
@@ -176,7 +176,7 @@ TEST(DebugLogTest, LDBG_MACROS) {
   // Now enable the debug types that match the file name.
   auto fileNameAndLevel = std::string(__LLVM_FILE_NAME__) + ":3";
   static const char *DT2[] = {fileNameAndLevel.c_str(), "B:2"};
-  setCurrentDebugTypes(DT2, sizeof(DT2) / sizeof(DT2[0]));
+  setCurrentDebugTypes(DT2);
 
   // Repeat the tests above, they should match now.
 
@@ -225,7 +225,7 @@ TEST(DebugLogTest, LDBG_MACROS) {
 TEST(DebugLogTest, LDBG_OS_MACROS) {
   llvm::DebugFlag = true;
   static const char *DT[] = {"A:3", "B:2"};
-  setCurrentDebugTypes(DT, sizeof(DT) / sizeof(DT[0]));
+  setCurrentDebugTypes(DT);
   std::string Str;
   raw_string_ostream DebugOs(Str);
   std::string StrExpected;
@@ -268,7 +268,7 @@ TEST(DebugLogTest, LDBG_OS_MACROS) {
   // Now enable the debug types that match the file name.
   auto fileNameAndLevel = std::string(__LLVM_FILE_NAME__) + ":3";
   static const char *DT2[] = {fileNameAndLevel.c_str(), "B:2"};
-  setCurrentDebugTypes(DT2, sizeof(DT2) / sizeof(DT2[0]));
+  setCurrentDebugTypes(DT2);
 
   // Repeat the tests above, they should match now.
   LDBG_OS([](raw_ostream &Os) { Os << "Hello, world!"; });

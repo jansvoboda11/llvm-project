@@ -295,7 +295,7 @@ public:
   /// \param [in] CommandLineArgs - Array of argument strings, this must not
   /// contain "-cc1".
   static bool CreateFromArgs(CompilerInvocation &Res,
-                             ArrayRef<const char *> CommandLineArgs,
+                             llvm::ArrayRefOfStringRef CommandLineArgs,
                              DiagnosticsEngine &Diags,
                              const char *Argv0 = nullptr);
 

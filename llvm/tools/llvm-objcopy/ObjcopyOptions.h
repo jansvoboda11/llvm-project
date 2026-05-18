@@ -9,6 +9,7 @@
 #ifndef LLVM_TOOLS_LLVM_OBJCOPY_OBJCOPYOPTIONS_H
 #define LLVM_TOOLS_LLVM_OBJCOPY_OBJCOPYOPTIONS_H
 
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ObjCopy/ConfigManager.h"
 #include "llvm/Support/Allocator.h"
 
@@ -28,20 +29,20 @@ struct DriverConfig {
 // exit. ErrorCallback is used to handle recoverable errors. An Error returned
 // by the callback aborts the parsing and is then returned by this function.
 Expected<DriverConfig>
-parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
+parseObjcopyOptions(ArrayRefOfStringRef ArgsArr,
                     llvm::function_ref<Error(Error)> ErrorCallback);
 
 // ParseInstallNameToolOptions returns the config and sets the input arguments.
 // If a help flag is set then ParseInstallNameToolOptions will print the help
 // messege and exit.
 Expected<DriverConfig>
-parseInstallNameToolOptions(ArrayRef<const char *> ArgsArr);
+parseInstallNameToolOptions(ArrayRefOfStringRef ArgsArr);
 
 // ParseBitcodeStripOptions returns the config and sets the input arguments.
 // If a help flag is set then ParseBitcodeStripOptions will print the help
 // messege and exit.
 Expected<DriverConfig>
-parseBitcodeStripOptions(ArrayRef<const char *> ArgsArr,
+parseBitcodeStripOptions(ArrayRefOfStringRef ArgsArr,
                          llvm::function_ref<Error(Error)> ErrorCallback);
 
 // ParseStripOptions returns the config and sets the input arguments. If a
@@ -49,7 +50,7 @@ parseBitcodeStripOptions(ArrayRef<const char *> ArgsArr,
 // exit. ErrorCallback is used to handle recoverable errors. An Error returned
 // by the callback aborts the parsing and is then returned by this function.
 Expected<DriverConfig>
-parseStripOptions(ArrayRef<const char *> ArgsArr,
+parseStripOptions(ArrayRefOfStringRef ArgsArr,
                   llvm::function_ref<Error(Error)> ErrorCallback);
 
 // ParseExtractBundleEntryOptions sets the input arguments. If a help flag is

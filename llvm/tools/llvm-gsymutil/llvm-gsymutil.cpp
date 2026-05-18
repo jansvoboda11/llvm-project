@@ -209,7 +209,7 @@ static void parseArgs(int argc, char **argv) {
 
   for (const llvm::opt::Arg *A :
        Args.filtered(OPT_merged_functions_filter_EQ)) {
-    MergedFunctionsFilters.push_back(A->getValue());
+    MergedFunctionsFilters.emplace_back(A->getValue());
     // Validate the filter is only used with correct flags
     if (LookupAddresses.empty() && !LookupAddressesFromStdin) {
       llvm::errs() << ToolName

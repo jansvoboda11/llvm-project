@@ -734,7 +734,7 @@ static void GenerateArg(ArgumentConsumer Consumer,
 
 // Parse command line arguments into CompilerInvocation.
 using ParseFn =
-    llvm::function_ref<bool(CompilerInvocation &, ArrayRef<const char *>,
+    llvm::function_ref<bool(CompilerInvocation &, llvm::ArrayRefOfStringRef,
                             DiagnosticsEngine &, const char *)>;
 
 // Generate command line arguments from CompilerInvocation.
@@ -763,7 +763,7 @@ using GenerateFn = llvm::function_ref<void(
 static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
                       CompilerInvocation &RealInvocation,
                       CompilerInvocation &DummyInvocation,
-                      ArrayRef<const char *> CommandLineArgs,
+                      ArrayRef<StringRef> CommandLineArgs,
                       DiagnosticsEngine &Diags, const char *Argv0,
                       bool CheckAgainstOriginalInvocation = false,
                       bool ForceRoundTrip = false) {
@@ -777,10 +777,10 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
   if (ForceRoundTrip) {
     DoRoundTrip = true;
   } else {
-    for (const auto *Arg : CommandLineArgs) {
-      if (Arg == StringRef("-round-trip-args"))
+    for (StringRef Arg : CommandLineArgs) {
+      if (Arg == "-round-trip-args")
         DoRoundTrip = true;
-      if (Arg == StringRef("-no-round-trip-args"))
+      if (Arg == "-no-round-trip-args")
         DoRoundTrip = false;
     }
   }
@@ -791,10 +791,10 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
     return Parse(RealInvocation, CommandLineArgs, Diags, Argv0);
 
   // Serializes quoted (and potentially escaped) arguments.
-  auto SerializeArgs = [](ArrayRef<const char *> Args) {
+  auto SerializeArgs = [](llvm::ArrayRefOfStringRef Args) {
     std::string Buffer;
     llvm::raw_string_ostream OS(Buffer);
-    for (const char *Arg : Args) {
+    for (StringRef Arg : Args) {
       llvm::sys::printArg(OS, Arg, /*Quote=*/true);
       OS << ' ';
     }
@@ -897,7 +897,7 @@ bool CompilerInvocation::checkCC1RoundTrip(ArrayRef<const char *> Args,
                                            const char *Argv0) {
   CompilerInvocation DummyInvocation1, DummyInvocation2;
   return RoundTrip(
-      [](CompilerInvocation &Invocation, ArrayRef<const char *> CommandLineArgs,
+      [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
          DiagnosticsEngine &Diags, const char *Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
@@ -926,7 +926,7 @@ static void addDiagnosticArgs(ArgList &Args, OptSpecifier Group,
           std::string(A->getOption().getName().drop_front(1).rtrim("=-")));
     } else {
       // Otherwise, add its value (for OPT_W_Joined and similar).
-      Diagnostics.push_back(A->getValue());
+      Diagnostics.emplace_back(A->getValue());
     }
   }
 }
@@ -5173,13 +5173,13 @@ bool CompilerInvocation::CreateFromArgsImpl(
 }
 
 bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
-                                        ArrayRef<const char *> CommandLineArgs,
+                                        llvm::ArrayRefOfStringRef CommandLineArgs,
                                         DiagnosticsEngine &Diags,
                                         const char *Argv0) {
   CompilerInvocation DummyInvocation;
 
   return RoundTrip(
-      [](CompilerInvocation &Invocation, ArrayRef<const char *> CommandLineArgs,
+      [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
          DiagnosticsEngine &Diags, const char *Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },

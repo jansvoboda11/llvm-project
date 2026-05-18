@@ -249,7 +249,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     DebugFlag = true;
   }
   for (auto *Arg : InputArgs.filtered(OPT_debug_only)) {
-    setCurrentDebugTypes(Arg->getValues().data(), Arg->getNumValues());
+    setCurrentDebugTypes(Arg->getValues());
   }
 
   if (InputArgs.hasArg(OPT_help)) {

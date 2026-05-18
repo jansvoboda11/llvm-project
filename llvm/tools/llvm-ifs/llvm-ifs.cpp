@@ -302,7 +302,7 @@ static DriverConfig parseArgs(int argc, char *const *argv) {
 
   DriverConfig Config;
   for (const opt::Arg *A : Args.filtered(OPT_INPUT))
-    Config.InputFilePaths.push_back(A->getValue());
+    Config.InputFilePaths.emplace_back(A->getValue());
   if (const opt::Arg *A = Args.getLastArg(OPT_input_format_EQ)) {
     Config.InputFormat = StringSwitch<std::optional<FileFormat>>(A->getValue())
                              .Case("IFS", FileFormat::IFS)
@@ -364,7 +364,7 @@ static DriverConfig parseArgs(int argc, char *const *argv) {
   Config.StripSize = Args.hasArg(OPT_strip_size);
 
   for (const opt::Arg *A : Args.filtered(OPT_exclude_EQ))
-    Config.Exclude.push_back(A->getValue());
+    Config.Exclude.emplace_back(A->getValue());
   if (const opt::Arg *A = Args.getLastArg(OPT_soname_EQ))
     Config.SoName = A->getValue();
   if (const opt::Arg *A = Args.getLastArg(OPT_output_EQ))

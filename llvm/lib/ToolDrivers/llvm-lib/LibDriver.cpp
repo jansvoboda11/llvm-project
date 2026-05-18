@@ -313,14 +313,14 @@ static void appendFile(std::vector<NewArchiveMember> &Members,
   Members.emplace_back(MB);
 }
 
-int llvm::libDriverMain(ArrayRef<const char *> ArgsArr) {
+int llvm::libDriverMain(ArrayRef<const char *> ArgsArrIn) {
   BumpPtrAllocator Alloc;
   StringSaver Saver(Alloc);
 
   // Parse command line arguments.
-  SmallVector<const char *, 20> NewArgs(ArgsArr);
+  SmallVector<StringRef, 20> NewArgs(ArgsArrIn);
   cl::ExpandResponseFiles(Saver, cl::TokenizeWindowsCommandLine, NewArgs);
-  ArgsArr = NewArgs;
+  ArrayRefOfStringRef ArgsArr = NewArgs;
 
   LibOptTable Table;
   unsigned MissingIndex;
@@ -364,7 +364,7 @@ int llvm::libDriverMain(ArrayRef<const char *> ArgsArr) {
       return 1;
     }
     LibMachineSource =
-        std::string(" (from '/machine:") + Arg->getValue() + "' flag)";
+        (" (from '/machine:" + Arg->getValue() + "' flag)").str();
   }
 
   // create an import library

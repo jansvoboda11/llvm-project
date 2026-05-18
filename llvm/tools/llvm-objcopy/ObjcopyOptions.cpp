@@ -742,7 +742,7 @@ parseChangeSectionAddr(StringRef ArgValue, StringRef OptionName,
 // help flag is set then parseObjcopyOptions will print the help messege and
 // exit.
 Expected<DriverConfig>
-objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
+objcopy::parseObjcopyOptions(ArrayRefOfStringRef ArgsArr,
                              function_ref<Error(Error)> ErrorCallback) {
   DriverConfig DC;
   ObjcopyOptTable T;
@@ -755,7 +755,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
     return createStringError(
         errc::invalid_argument,
         "argument to '%s' is missing (expected %d value(s))",
-        InputArgs.getArgString(MissingArgumentIndex), MissingArgumentCount);
+        std::string(InputArgs.getArgString(MissingArgumentIndex)).c_str(), MissingArgumentCount);
 
   if (InputArgs.size() == 0) {
     printHelp(T, errs(), ToolType::Objcopy);
@@ -773,7 +773,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
     exit(0);
   }
 
-  SmallVector<const char *, 2> Positional;
+  SmallVector<StringRef, 2> Positional;
 
   for (auto *Arg : InputArgs.filtered(OBJCOPY_UNKNOWN))
     return createStringError(errc::invalid_argument, "unknown argument '%s'",
@@ -917,8 +917,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
     if (Config.CompressionType == DebugCompressionType::None) {
       return createStringError(
           errc::invalid_argument,
-          "invalid or unsupported --compress-debug-sections format: %s",
-          A->getValue());
+          "invalid or unsupported --compress-debug-sections format: " + A->getValue());
     }
     if (const char *Reason = compression::getReasonIfUnsupported(
             compression::formatFor(Config.CompressionType)))
@@ -942,8 +941,8 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
     if (Type == DebugCompressionType::None && Fields[1] != "none") {
       return createStringError(
           errc::invalid_argument,
-          "invalid or unsupported --compress-sections format: %s",
-          A->getValue());
+          "invalid or unsupported --compress-sections format: " +
+              A->getValue());
     }
 
     auto &P = Config.compressSections.emplace_back();
@@ -992,13 +991,13 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
           "'--gap-fill' is only supported for binary output");
     ErrorOr<uint64_t> Val = getAsInteger<uint64_t>(A->getValue());
     if (!Val)
-      return createStringError(Val.getError(), "--gap-fill: bad number: %s",
-                               A->getValue());
+      return createStringError(Val.getError(),
+                               "--gap-fill: bad number: " + A->getValue());
     uint8_t ByteVal = Val.get();
     if (ByteVal != Val.get())
       return createStringError(std::errc::value_too_large,
                                "gap-fill value %s is out of range (0 to 0xff)",
-                               A->getValue());
+                               std::string(A->getValue()).c_str());
     Config.GapFill = ByteVal;
   }
 
@@ -1009,8 +1008,8 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
           "'--pad-to' is only supported for binary output");
     ErrorOr<uint64_t> Addr = getAsInteger<uint64_t>(A->getValue());
     if (!Addr)
-      return createStringError(Addr.getError(), "--pad-to: bad number: %s",
-                               A->getValue());
+      return createStringError(Addr.getError(),
+                               "--pad-to: bad number: " + A->getValue());
     Config.PadTo = *Addr;
   }
 
@@ -1294,7 +1293,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
       auto EAddr = getAsInteger<uint64_t>(Arg->getValue());
       if (!EAddr)
         return createStringError(
-            EAddr.getError(), "bad entry point address: '%s'", Arg->getValue());
+            EAddr.getError(), "bad entry point address: '%s'", std::string(Arg->getValue()).c_str());
 
       ELFConfig.EntryExpr = [EAddr](uint64_t) { return *EAddr; };
     } else if (Arg->getOption().matches(OBJCOPY_change_start)) {
@@ -1302,7 +1301,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
       if (!EIncr)
         return createStringError(EIncr.getError(),
                                  "bad entry point increment: '%s'",
-                                 Arg->getValue());
+                                 std::string(Arg->getValue()).c_str());
       auto Expr = ELFConfig.EntryExpr ? std::move(ELFConfig.EntryExpr)
                                       : [](uint64_t A) { return A; };
       ELFConfig.EntryExpr = [Expr, EIncr](uint64_t EAddr) {
@@ -1354,7 +1353,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> ArgsArr,
 // If a help flag is set then parseInstallNameToolOptions will print the help
 // messege and exit.
 Expected<DriverConfig>
-objcopy::parseInstallNameToolOptions(ArrayRef<const char *> ArgsArr) {
+objcopy::parseInstallNameToolOptions(ArrayRefOfStringRef ArgsArr) {
   DriverConfig DC;
   ConfigManager ConfigMgr;
   CommonConfig &Config = ConfigMgr.Common;
@@ -1498,7 +1497,7 @@ objcopy::parseInstallNameToolOptions(ArrayRef<const char *> ArgsArr) {
 }
 
 Expected<DriverConfig>
-objcopy::parseBitcodeStripOptions(ArrayRef<const char *> ArgsArr,
+objcopy::parseBitcodeStripOptions(ArrayRefOfStringRef ArgsArr,
                                   function_ref<Error(Error)> ErrorCallback) {
   DriverConfig DC;
   ConfigManager ConfigMgr;
@@ -1570,11 +1569,11 @@ objcopy::parseBitcodeStripOptions(ArrayRef<const char *> ArgsArr,
 // help flag is set then parseStripOptions will print the help messege and
 // exit.
 Expected<DriverConfig>
-objcopy::parseStripOptions(ArrayRef<const char *> RawArgsArr,
+objcopy::parseStripOptions(ArrayRefOfStringRef RawArgsArr,
                            function_ref<Error(Error)> ErrorCallback) {
-  const char *const *DashDash =
+  auto DashDash =
       llvm::find_if(RawArgsArr, [](StringRef Str) { return Str == "--"; });
-  ArrayRef<const char *> ArgsArr = ArrayRef(RawArgsArr.begin(), DashDash);
+  ArrayRefOfStringRef ArgsArr = RawArgsArr.slice(0, DashDash - RawArgsArr.begin());
   if (DashDash != RawArgsArr.end())
     DashDash = std::next(DashDash);
 

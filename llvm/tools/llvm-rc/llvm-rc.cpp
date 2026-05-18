@@ -454,7 +454,7 @@ RcOptions parseWindresOptions(ArrayRef<const char *> ArgsArr,
     // popen() to invoke the preprocessor, but uses another function which
     // actually preserves tricky characters better. To mimic this behaviour,
     // don't unescape arguments here.
-    std::string Value = Arg->getValue();
+    std::string Value(Arg->getValue());
     if (!InputArgs.hasArg(WINDRES_use_temp_file))
       Value = unescape(Value);
     switch (Arg->getOption().getID()) {
@@ -464,9 +464,9 @@ RcOptions parseWindresOptions(ArrayRef<const char *> ArgsArr,
       // with single backslashes. Alternatively, our unescape function would
       // need to mimic the platform specific command line parsing/unescaping
       // logic.
-      Opts.Params.Include.push_back(Arg->getValue());
+      Opts.Params.Include.emplace_back(Arg->getValue());
       Opts.PreprocessArgs.push_back("-I");
-      Opts.PreprocessArgs.push_back(Arg->getValue());
+      Opts.PreprocessArgs.emplace_back(Arg->getValue());
       break;
     case WINDRES_define:
       Opts.PreprocessArgs.push_back("-D");
@@ -539,7 +539,7 @@ RcOptions parseRcOptions(ArrayRef<const char *> ArgsArr,
       Opts.PreprocessArgs.push_back("-U");
       break;
     }
-    Opts.PreprocessArgs.push_back(Arg->getValue());
+    Opts.PreprocessArgs.emplace_back(Arg->getValue());
   }
 
   Opts.InputFile = InArgsInfo[0];

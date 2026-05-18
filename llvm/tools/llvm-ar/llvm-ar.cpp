@@ -190,7 +190,7 @@ static void warn(Twine Message) {
   WithColor::warning(errs(), ToolName) << Message << "\n";
 }
 
-static SmallVector<const char *, 256> PositionalArgs;
+static SmallVector<StringRef, 256> PositionalArgs;
 
 static bool MRI;
 
@@ -1284,7 +1284,7 @@ static bool handleGenericOption(StringRef arg) {
   return false;
 }
 
-static BitModeTy getBitMode(const char *RawBitMode) {
+static BitModeTy getBitMode(StringRef RawBitMode) {
   return StringSwitch<BitModeTy>(RawBitMode)
       .Case("32", BitModeTy::Bit32)
       .Case("64", BitModeTy::Bit64)
@@ -1293,9 +1293,9 @@ static BitModeTy getBitMode(const char *RawBitMode) {
       .Default(BitModeTy::Unknown);
 }
 
-static const char *matchFlagWithArg(StringRef Expected,
-                                    ArrayRef<const char *>::iterator &ArgIt,
-                                    ArrayRef<const char *> Args) {
+static std::optional<StringRef>
+matchFlagWithArg(StringRef Expected, ArrayRefOfStringRef::iterator &ArgIt,
+                 ArrayRefOfStringRef Args) {
   StringRef Arg = *ArgIt;
 
   Arg.consume_front("--");
@@ -1310,25 +1310,25 @@ static const char *matchFlagWithArg(StringRef Expected,
   if (Arg.starts_with(Expected) && Arg.size() > len && Arg[len] == '=')
     return Arg.data() + len + 1;
 
-  return nullptr;
+  return std::nullopt;
 }
 
-static cl::TokenizerCallback getRspQuoting(ArrayRef<const char *> ArgsArr) {
+static cl::TokenizerCallback getRspQuoting(ArrayRefOfStringRef ArgsArr) {
   cl::TokenizerCallback Ret =
       Triple(sys::getProcessTriple()).getOS() == Triple::Win32
           ? cl::TokenizeWindowsCommandLine
           : cl::TokenizeGNUCommandLine;
 
-  for (ArrayRef<const char *>::iterator ArgIt = ArgsArr.begin();
+  for (ArrayRefOfStringRef::iterator ArgIt = ArgsArr.begin();
        ArgIt != ArgsArr.end(); ++ArgIt) {
-    if (const char *Match = matchFlagWithArg("rsp-quoting", ArgIt, ArgsArr)) {
-      StringRef MatchRef = Match;
+    if (auto Match = matchFlagWithArg("rsp-quoting", ArgIt, ArgsArr)) {
+      StringRef MatchRef = *Match;
       if (MatchRef == "posix")
         Ret = cl::TokenizeGNUCommandLine;
       else if (MatchRef == "windows")
         Ret = cl::TokenizeWindowsCommandLine;
       else
-        fail(std::string("Invalid response file quoting style ") + Match);
+        fail(std::string("Invalid response file quoting style ") + MatchRef);
     }
   }
 
@@ -1336,10 +1336,12 @@ static cl::TokenizerCallback getRspQuoting(ArrayRef<const char *> ArgsArr) {
 }
 
 static int ar_main(int argc, char **argv) {
-  SmallVector<const char *, 0> Argv(argv + 1, argv + argc);
+  SmallVector<StringRef, 0> OwnedArgv(argv + 1, argv + argc);
   StringSaver Saver(Alloc);
 
-  cl::ExpandResponseFiles(Saver, getRspQuoting(ArrayRef(argv, argc)), Argv);
+  cl::ExpandResponseFiles(Saver, getRspQuoting(ArrayRefOfStringRef(argc, argv)),
+                          OwnedArgv);
+  ArrayRefOfStringRef Argv = OwnedArgv;
 
   // Get BitMode from enviorment variable "OBJECT_MODE" for AIX OS, if
   // specified.
@@ -1349,20 +1351,20 @@ static int ar_main(int argc, char **argv) {
       BitMode = BitModeTy::Bit32;
   }
 
-  for (ArrayRef<const char *>::iterator ArgIt = Argv.begin();
-       ArgIt != Argv.end(); ++ArgIt) {
-    const char *Match = nullptr;
+  for (ArrayRefOfStringRef::iterator ArgIt = Argv.begin(); ArgIt != Argv.end();
+       ++ArgIt) {
+    std::optional<StringRef> Match = std::nullopt;
 
     if (handleGenericOption(*ArgIt))
       return 0;
-    if (strcmp(*ArgIt, "--") == 0) {
+    if (*ArgIt == "--") {
       ++ArgIt;
       for (; ArgIt != Argv.end(); ++ArgIt)
         PositionalArgs.push_back(*ArgIt);
       break;
     }
 
-    if (*ArgIt[0] != '-') {
+    if (!(*ArgIt).starts_with('-')) {
       if (Options.empty())
         Options += *ArgIt;
       else
@@ -1370,19 +1372,19 @@ static int ar_main(int argc, char **argv) {
       continue;
     }
 
-    if (strcmp(*ArgIt, "-M") == 0) {
+    if (*ArgIt == "-M") {
       MRI = true;
       continue;
     }
 
-    if (strcmp(*ArgIt, "--thin") == 0) {
+    if (*ArgIt == "--thin") {
       Thin = true;
       continue;
     }
 
     Match = matchFlagWithArg("format", ArgIt, Argv);
     if (Match) {
-      FormatType = StringSwitch<Format>(Match)
+      FormatType = StringSwitch<Format>(*Match)
                        .Case("default", Default)
                        .Case("gnu", GNU)
                        .Case("darwin", DARWIN)
@@ -1391,12 +1393,12 @@ static int ar_main(int argc, char **argv) {
                        .Case("coff", COFF)
                        .Default(Unknown);
       if (FormatType == Unknown)
-        fail(std::string("Invalid format ") + Match);
+        fail(std::string("Invalid format ") + *Match);
       continue;
     }
 
     if ((Match = matchFlagWithArg("output", ArgIt, Argv))) {
-      OutputDir = Match;
+      OutputDir = *Match;
       continue;
     }
 
@@ -1404,19 +1406,20 @@ static int ar_main(int argc, char **argv) {
         matchFlagWithArg("rsp-quoting", ArgIt, Argv))
       continue;
 
-    if (strncmp(*ArgIt, "-X", 2) == 0) {
+    if ((*ArgIt).starts_with("-X")) {
       if (object::Archive::getDefaultKind() == object::Archive::K_AIXBIG) {
-        Match = *(*ArgIt + 2) != '\0' ? *ArgIt + 2 : *(++ArgIt);
-        BitMode = getBitMode(Match);
+        Match = !(*ArgIt).drop_front(2).empty() ? (*ArgIt).drop_front(2)
+                                                : *(++ArgIt);
+        BitMode = getBitMode(*Match);
         if (BitMode == BitModeTy::Unknown)
-          fail(Twine("invalid bit mode: ") + Match);
+          fail(Twine("invalid bit mode: ") + *Match);
         continue;
       } else {
         fail(Twine(*ArgIt) + " option not supported on non AIX OS");
       }
     }
 
-    Options += *ArgIt + 1;
+    Options += (*ArgIt).drop_front();
   }
 
   return performOperation(parseCommandLine());

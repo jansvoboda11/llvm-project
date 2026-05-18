@@ -57,7 +57,7 @@ static ErrorSuccess reportWarning(Error E) {
   return Error::success();
 }
 
-static Expected<DriverConfig> getDriverConfig(ArrayRef<const char *> Args) {
+static Expected<DriverConfig> getDriverConfig(ArrayRefOfStringRef Args) {
   StringRef Stem = sys::path::stem(ToolName);
   auto Is = [=](StringRef Tool) {
     // We need to recognize the following filenames:
@@ -230,7 +230,7 @@ int llvm_objcopy_main(int argc, char **argv, const llvm::ToolContext &) {
   // TODO: Move these lines, which are copied from lib/Support/CommandLine.cpp,
   // into a separate function in the CommandLine library and call that function
   // here. This is duplicated code.
-  SmallVector<const char *, 20> NewArgv(argv, argv + argc);
+  SmallVector<StringRef, 20> NewArgv(argv, argv + argc);
   BumpPtrAllocator A;
   StringSaver Saver(A);
   cl::ExpandResponseFiles(Saver,

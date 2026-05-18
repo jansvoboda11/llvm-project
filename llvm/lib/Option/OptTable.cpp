@@ -352,10 +352,9 @@ std::unique_ptr<Arg> OptTable::parseOneArgGrouped(InputArgList &Args,
                                                   unsigned &Index) const {
   // Anything that doesn't start with PrefixesUnion is an input, as is '-'
   // itself.
-  const char *CStr = Args.getArgString(Index);
-  StringRef Str(CStr);
+  StringRef Str = Args.getArgString(Index);
   if (isInput(PrefixesUnion, Str))
-    return std::make_unique<Arg>(getOption(InputOptionID), Str, Index++, CStr);
+    return std::make_unique<Arg>(getOption(InputOptionID), Str, Index++, Str);
 
   const Info *End = OptionInfos.data() + OptionInfos.size();
   StringRef Name = Str.ltrim(PrefixChars);
@@ -374,7 +373,7 @@ std::unique_ptr<Arg> OptTable::parseOneArgGrouped(InputArgList &Args,
 
     Option Opt(Start, this);
     if (std::unique_ptr<Arg> A =
-            Opt.accept(Args, StringRef(Args.getArgString(Index), ArgSize),
+            Opt.accept(Args, Args.getArgString(Index).take_front(ArgSize),
                        /*GroupedShortOption=*/false, Index))
       return A;
 
@@ -393,7 +392,7 @@ std::unique_ptr<Arg> OptTable::parseOneArgGrouped(InputArgList &Args,
     // Check that the last option isn't a flag wrongly given an argument.
     if (Str[2] == '=')
       return std::make_unique<Arg>(getOption(UnknownOptionID), Str, Index++,
-                                   CStr);
+                                   Str);
 
     if (std::unique_ptr<Arg> A = Opt.accept(
             Args, Str.substr(0, 2), /*GroupedShortOption=*/true, Index)) {
@@ -405,12 +404,12 @@ std::unique_ptr<Arg> OptTable::parseOneArgGrouped(InputArgList &Args,
   // In the case of an incorrect short option extract the character and move to
   // the next one.
   if (Str[1] != '-') {
-    CStr = Args.MakeArgString(Str.substr(0, 2));
     Args.replaceArgString(Index, Twine('-') + Str.substr(2));
-    return std::make_unique<Arg>(getOption(UnknownOptionID), CStr, Index, CStr);
+    Str = Args.MakeArgString(Str.substr(0, 2));
+    return std::make_unique<Arg>(getOption(UnknownOptionID), Str, Index, Str);
   }
 
-  return std::make_unique<Arg>(getOption(UnknownOptionID), Str, Index++, CStr);
+  return std::make_unique<Arg>(getOption(UnknownOptionID), Str, Index++, Str);
 }
 
 std::unique_ptr<Arg> OptTable::ParseOneArg(const ArgList &Args, unsigned &Index,
@@ -478,7 +477,7 @@ std::unique_ptr<Arg> OptTable::internalParseOneArg(
 
     // See if this option matches.
     if (std::unique_ptr<Arg> A =
-            Opt.accept(Args, StringRef(Args.getArgString(Index), ArgSize),
+            Opt.accept(Args, Args.getArgString(Index).take_front(ArgSize),
                        /*GroupedShortOption=*/false, Index))
       return A;
 
@@ -497,7 +496,7 @@ std::unique_ptr<Arg> OptTable::internalParseOneArg(
                                Str.data());
 }
 
-InputArgList OptTable::ParseArgs(ArrayRef<const char *> Args,
+InputArgList OptTable::ParseArgs(ArrayRefOfStringRef Args,
                                  unsigned &MissingArgIndex,
                                  unsigned &MissingArgCount,
                                  Visibility VisibilityMask) const {
@@ -525,21 +524,16 @@ InputArgList OptTable::ParseArgs(ArrayRef<const char *> Args,
 }
 
 InputArgList OptTable::internalParseArgs(
-    ArrayRef<const char *> ArgArr, unsigned &MissingArgIndex,
+    ArrayRefOfStringRef ArgArr, unsigned &MissingArgIndex,
     unsigned &MissingArgCount,
     std::function<bool(const Option &)> ExcludeOption) const {
-  InputArgList Args(ArgArr.begin(), ArgArr.end());
+  InputArgList Args(ArgArr);
 
   // FIXME: Handle '@' args (or at least error on them).
 
   MissingArgIndex = MissingArgCount = 0;
   unsigned Index = 0, End = ArgArr.size();
   while (Index < End) {
-    // Ingore nullptrs, they are response file's EOL markers
-    if (Args.getArgString(Index) == nullptr) {
-      ++Index;
-      continue;
-    }
     // Ignore empty arguments (other things may still take them as arguments).
     StringRef Str = Args.getArgString(Index);
     if (Str == "") {
@@ -579,13 +573,13 @@ InputArgList OptTable::internalParseArgs(
   return Args;
 }
 
-InputArgList OptTable::parseArgs(int Argc, char *const *Argv,
-                                 OptSpecifier Unknown, StringSaver &Saver,
+InputArgList OptTable::parseArgs(ArrayRefOfStringRef Argv, OptSpecifier Unknown,
+                                 StringSaver &Saver,
                                  std::function<void(StringRef)> ErrorFn) const {
-  SmallVector<const char *, 0> NewArgv;
+  SmallVector<StringRef, 0> NewArgv;
   // The environment variable specifies initial options which can be overridden
   // by commnad line options.
-  cl::expandResponseFiles(Argc, Argv, EnvVar, Saver, NewArgv);
+  cl::expandResponseFiles(Argv, EnvVar, Saver, NewArgv);
 
   unsigned MAI, MAC;
   opt::InputArgList Args = ParseArgs(ArrayRef(NewArgv), MAI, MAC);
@@ -604,6 +598,12 @@ InputArgList OptTable::parseArgs(int Argc, char *const *Argv,
               "'?");
   }
   return Args;
+}
+
+InputArgList OptTable::parseArgs(int Argc, char *const *Argv, OptSpecifier Unknown,
+                       StringSaver &Saver,
+                       std::function<void(StringRef)> ErrorFn) const {
+  return parseArgs({Argc, Argv}, Unknown, Saver, std::move(ErrorFn));
 }
 
 static std::string getOptionHelpName(const OptTable &Opts, OptSpecifier Id) {

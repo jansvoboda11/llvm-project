@@ -3964,13 +3964,13 @@ static void parseObjdumpOptions(const llvm::opt::InputArgList &InputArgs) {
         DisassemblerOptions.push_back(V.str());
     }
   }
-  SmallVector<const char *> Args = {"llvm-objdump"};
+  SmallVector<StringRef> Args = {"llvm-objdump"};
   for (const opt::Arg *A : InputArgs.filtered(OBJDUMP_mllvm))
     Args.push_back(A->getValue());
   if (AsmSyntax)
     Args.push_back(AsmSyntax);
   if (Args.size() > 1)
-    llvm::cl::ParseCommandLineOptions(Args.size(), Args.data());
+    llvm::cl::ParseCommandLineOptions(Args);
 
   // Look up any provided build IDs, then append them to the input filenames.
   for (const opt::Arg *A : InputArgs.filtered(OBJDUMP_build_id)) {
@@ -4024,7 +4024,7 @@ int llvm_objdump_main(int argc, char **argv, const llvm::ToolContext &) {
   BumpPtrAllocator A;
   StringSaver Saver(A);
   opt::InputArgList InputArgs =
-      T->parseArgs(argc, argv, Unknown, Saver,
+      T->parseArgs({argc, argv}, Unknown, Saver,
                    [&](StringRef Msg) { reportCmdLineError(Msg); });
 
   if (InputArgs.size() == 0 || InputArgs.hasArg(HelpFlag)) {

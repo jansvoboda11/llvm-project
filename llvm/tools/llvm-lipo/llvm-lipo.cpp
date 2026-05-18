@@ -186,7 +186,7 @@ static Config parseLipoOptions(ArrayRef<const char *> ArgsArr) {
     C.InputFiles.push_back({std::nullopt, Arg->getValue()});
   for (auto *Arg : InputArgs.filtered(LIPO_arch)) {
     validateArchitectureName(Arg->getValue(0));
-    assert(Arg->getValue(1) && "file_name is missing");
+    assert(Arg->getNumValues() >= 2 && "file_name is missing");
     C.InputFiles.push_back({StringRef(Arg->getValue(0)), Arg->getValue(1)});
   }
 
@@ -197,7 +197,7 @@ static Config parseLipoOptions(ArrayRef<const char *> ArgsArr) {
     C.OutputFile = std::string(InputArgs.getLastArgValue(LIPO_output));
 
   for (auto *Segalign : InputArgs.filtered(LIPO_segalign)) {
-    if (!Segalign->getValue(1))
+    if (Segalign->getNumValues() < 2)
       reportError("segalign is missing an argument: expects -segalign "
                   "arch_type alignment_value");
 
@@ -314,7 +314,7 @@ static Config parseLipoOptions(ArrayRef<const char *> ArgsArr) {
 
   case LIPO_replace:
     for (auto *Action : ActionArgs) {
-      assert(Action->getValue(1) && "file_name is missing");
+      assert(Action->getNumValues() >= 2 && "file_name is missing");
       validateArchitectureName(Action->getValue(0));
       C.ReplacementFiles.push_back(
           {StringRef(Action->getValue(0)), Action->getValue(1)});
