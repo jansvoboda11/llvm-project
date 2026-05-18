@@ -40,8 +40,8 @@ public:
     PrebuiltModuleDeps.emplace_back(std::move(PMD));
   }
 
-  void handleModuleDependency(ModuleDeps MD) override {
-    ClangModuleDeps[MD.ID] = std::move(MD);
+  void handleModuleDependency(const ModuleDeps &MD) override {
+    ClangModuleDeps.insert({MD.ID, &MD});
   }
 
   void handleDirectModuleDependency(ModuleID ID) override {
@@ -69,7 +69,7 @@ public:
 private:
   std::vector<std::string> Dependencies;
   std::vector<PrebuiltModuleDep> PrebuiltModuleDeps;
-  llvm::MapVector<ModuleID, ModuleDeps> ClangModuleDeps;
+  llvm::MapVector<ModuleID, const ModuleDeps *> ClangModuleDeps;
   std::string ModuleName;
   std::vector<std::string> NamedModuleDeps;
   std::vector<ModuleID> DirectModuleDeps;

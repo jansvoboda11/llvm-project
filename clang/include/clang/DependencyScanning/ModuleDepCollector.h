@@ -122,11 +122,10 @@ private:
   /// textually included header files.
   std::vector<std::string> FileDeps;
   /// Direct and transitive modular dependencies of the main source file.
-  llvm::MapVector<serialization::ModuleFile *, std::unique_ptr<ModuleDeps>>
-      ModularDeps;
+  llvm::MapVector<serialization::ModuleFile *, const ModuleDeps *> ModularDeps;
   /// Secondary mapping for \c ModularDeps allowing lookup by ModuleID without
-  /// a preprocessor. Storage owned by \c ModularDeps.
-  llvm::DenseMap<ModuleID, ModuleDeps *> ModuleDepsByID;
+  /// a preprocessor. Storage owned by the \c DependencyScanningService.
+  llvm::DenseMap<ModuleID, const ModuleDeps *> ModuleDepsByID;
   /// Direct modular dependencies that have already been built.
   llvm::MapVector<serialization::ModuleFile *, PrebuiltModuleDep>
       DirectPrebuiltModularDeps;

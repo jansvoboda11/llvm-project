@@ -370,7 +370,7 @@ llvm::DenseSet<const FileEntry *> ModuleDepCollector::collectModuleMapFiles(
     ArrayRef<ModuleID> ClangModuleDeps) const {
   llvm::DenseSet<const FileEntry *> ModuleMapFiles;
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
     // TODO: Track ClangModuleMapFile as `FileEntryRef`.
     auto FE = ScanInstance.getFileManager().getOptionalFileRef(
@@ -387,7 +387,7 @@ void ModuleDepCollector::addModuleMapFiles(
     return; // Only pcm is needed for eager load.
 
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
     CI.getFrontendOpts().ModuleMapFiles.push_back(MD->ClangModuleMapFile);
   }
@@ -396,7 +396,7 @@ void ModuleDepCollector::addModuleMapFiles(
 void ModuleDepCollector::addModuleFiles(
     CompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     std::string PCMPath =
         Controller.lookupModuleOutput(*MD, ModuleOutputKind::ModuleFile);
 
@@ -411,7 +411,7 @@ void ModuleDepCollector::addModuleFiles(
 void ModuleDepCollector::addModuleFiles(
     CowCompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     std::string PCMPath =
         Controller.lookupModuleOutput(*MD, ModuleOutputKind::ModuleFile);
 
@@ -822,16 +822,21 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
         areOptionsInStableDir(MDC.StableDirs, CI.getHeaderSearchOpts());
 
   MD.IgnoreCWD = IgnoreCWD;
-  MDC.associateWithContextHash(CI, MD);
+  MD.ID.ContextHash =
+      getModuleContextHash(MD, CI, Service.getOpts().EagerLoadModules,
+                           ScanInstance.getVirtualFileSystem());
 
   // Finish the compiler invocation. Requires dependencies and the context hash.
   MDC.addOutputPaths(CI, MD);
 
   MD.BuildInfo = std::move(CI);
 
-  MDC.ModularDeps.insert({MF, std::move(OwnedMD)});
+  const ModuleDeps *GlobalMD = MDC.Service.takeOwnership(std::move(OwnedMD));
 
-  return MD.ID;
+  MDC.ModuleDepsByID.insert({GlobalMD->ID, GlobalMD});
+  MDC.ModularDeps.insert({MF, GlobalMD});
+
+  return GlobalMD->ID;
 }
 
 void ModuleDepCollector::addAllModuleDeps(serialization::ModuleFile &MF,

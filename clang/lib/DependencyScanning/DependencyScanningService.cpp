@@ -8,6 +8,7 @@
 
 #include "clang/DependencyScanning/DependencyScanningService.h"
 
+#include "clang/DependencyScanning/DependencyGraph.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Process.h"
 
@@ -42,3 +43,19 @@ DependencyScanningServiceOptions::DependencyScanningServiceOptions()
     : MakeVFS([] { return llvm::vfs::createPhysicalFileSystem(); }),
       BuildSessionTimestamp(
           llvm::sys::toTimeT(std::chrono::system_clock::now())) {}
+
+DependencyScanningService::DependencyScanningService(
+    DependencyScanningServiceOptions Opts)
+    : Opts(std::move(Opts)) {}
+
+DependencyScanningService::~DependencyScanningService() {
+  if (Opts.FlushModuleCache)
+    ModCacheEntries.flush();
+}
+
+const ModuleDeps *
+DependencyScanningService::takeOwnership(std::unique_ptr<ModuleDeps> MD) {
+  std::lock_guard<std::mutex> Lock(OwnedModuleDepsMutex);
+  auto [It, New] = OwnedModuleDeps.insert({MD->ID, std::move(MD)});
+  return It->second.get();
+}

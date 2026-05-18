@@ -152,7 +152,7 @@ struct Command {
 };
 
 /// Graph of modular dependencies.
-using ModuleDepsGraph = std::vector<ModuleDeps>;
+using ModuleDepsGraph = std::vector<const ModuleDeps *>;
 
 /// The full dependencies and module graph for a specific input.
 struct TranslationUnitDeps {

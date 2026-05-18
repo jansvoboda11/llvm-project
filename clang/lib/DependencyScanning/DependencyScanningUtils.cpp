@@ -22,13 +22,12 @@ TranslationUnitDeps FullDependencyConsumer::takeTranslationUnitDeps() {
   TU.VisibleModules = std::move(VisibleModules);
   TU.Commands = std::move(Commands);
 
-  for (auto &&M : ClangModuleDeps) {
-    auto &MD = M.second;
+  for (const auto &[ID, MD] : ClangModuleDeps) {
     // TODO: Avoid handleModuleDependency even being called for modules
     //   we've already seen.
-    if (AlreadySeen.count(M.first))
+    if (AlreadySeen.count(ID))
       continue;
-    TU.ModuleGraph.push_back(std::move(MD));
+    TU.ModuleGraph.push_back(MD);
   }
   TU.ClangModuleDeps = std::move(DirectModuleDeps);
 

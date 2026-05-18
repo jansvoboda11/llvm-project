@@ -12,9 +12,15 @@
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
 #include "clang/DependencyScanning/InProcessModuleCache.h"
 #include "llvm/ADT/BitmaskEnum.h"
+#include <memory>
+#include <mutex>
+#include <vector>
 
 namespace clang {
 namespace dependencies {
+
+struct ModuleDeps;
+struct ModuleID;
 
 /// The mode in which the dependency scanner will operate to find the
 /// dependencies.
@@ -104,13 +110,9 @@ struct DependencyScanningServiceOptions {
 /// is used by the individual dependency scanning workers.
 class DependencyScanningService {
 public:
-  explicit DependencyScanningService(DependencyScanningServiceOptions Opts)
-      : Opts(std::move(Opts)) {}
+  explicit DependencyScanningService(DependencyScanningServiceOptions Opts);
 
-  ~DependencyScanningService() {
-    if (Opts.FlushModuleCache)
-      ModCacheEntries.flush();
-  }
+  ~DependencyScanningService();
 
   const DependencyScanningServiceOptions &getOpts() const { return Opts; }
 
@@ -120,6 +122,10 @@ public:
 
   ModuleCacheEntries &getModuleCacheEntries() { return ModCacheEntries; }
 
+  /// Take ownership of \p MD so it outlives any individual scan. Returns a
+  /// stable pointer to the stored object. Thread-safe.
+  const ModuleDeps *takeOwnership(std::unique_ptr<ModuleDeps> MD);
+
 private:
   /// The options customizing dependency scanning behavior.
   DependencyScanningServiceOptions Opts;
@@ -127,6 +133,9 @@ private:
   DependencyScanningFilesystemSharedCache SharedCache;
   /// The global module cache entries.
   ModuleCacheEntries ModCacheEntries;
+  /// Storage for \c ModuleDeps that must outlive individual scans.
+  std::mutex OwnedModuleDepsMutex;
+  llvm::DenseMap<ModuleID, std::unique_ptr<ModuleDeps>> OwnedModuleDeps;
 };
 
 } // end namespace dependencies

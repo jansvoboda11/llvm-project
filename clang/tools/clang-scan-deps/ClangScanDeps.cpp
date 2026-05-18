@@ -432,23 +432,23 @@ public:
   }
 
   void mergeDeps(ModuleDepsGraph Graph, size_t InputIndex) {
-    std::vector<ModuleDeps *> NewMDs;
+    std::vector<const ModuleDeps *> NewMDs;
     {
       std::unique_lock<std::mutex> ul(Lock);
-      for (ModuleDeps &MD : Graph) {
-        auto I = Modules.find({MD.ID, 0});
+      for (const ModuleDeps *MD : Graph) {
+        auto I = Modules.find({MD->ID, 0});
         if (I != Modules.end()) {
           I->first.InputIndex = std::min(I->first.InputIndex, InputIndex);
           continue;
         }
-        auto Res = Modules.insert(I, {{MD.ID, InputIndex}, std::move(MD)});
-        NewMDs.push_back(&Res->second);
+        auto Res = Modules.insert(I, {{MD->ID, InputIndex}, MD});
+        NewMDs.push_back(Res->second);
       }
     }
     // First call to \c getBuildArguments is somewhat expensive. Let's call it
     // on the current thread (instead of the main one), and outside the
     // critical section.
-    for (ModuleDeps *MD : NewMDs)
+    for (const ModuleDeps *MD : NewMDs)
       (void)MD->getBuildArguments();
   }
 
@@ -473,7 +473,7 @@ public:
                                             /*ShouldOwnClient=*/false);
 
     for (auto &&M : Modules)
-      if (roundTripCommand(M.second.getBuildArguments(), *Diags))
+      if (roundTripCommand(M.second->getBuildArguments(), *Diags))
         return true;
 
     for (auto &&I : Inputs)
@@ -501,7 +501,9 @@ public:
     JOS.object([&] {
       JOS.attributeArray("modules", [&] {
         for (auto &&ModID : ModuleIDs) {
-          auto &MD = Modules[ModID];
+          auto It = Modules.find(ModID);
+          assert(It != Modules.end());
+          const auto &MD = *It->second;
           JOS.object([&] {
             if (MD.IsInStableDirectories)
               JOS.attribute("is-in-stable-directories",
@@ -635,7 +637,8 @@ private:
   };
 
   std::mutex Lock;
-  std::unordered_map<IndexedModuleID, ModuleDeps, IndexedModuleID::Hasher>
+  std::unordered_map<IndexedModuleID, const ModuleDeps *,
+                     IndexedModuleID::Hasher>
       Modules;
   std::vector<InputDeps> Inputs;
 };
@@ -1192,25 +1195,23 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   llvm::Timer T;
   T.startTimer();
 
-  {
-    DependencyScanningService Service(std::move(Opts));
+  DependencyScanningService Service(std::move(Opts));
 
-    if (Inputs.size() == 1) {
-      ScanningTask(Service);
-    } else {
-      llvm::DefaultThreadPool Pool(llvm::hardware_concurrency(NumThreads));
+  if (Inputs.size() == 1) {
+    ScanningTask(Service);
+  } else {
+    llvm::DefaultThreadPool Pool(llvm::hardware_concurrency(NumThreads));
 
-      if (Verbose) {
-        llvm::outs() << "Running clang-scan-deps on " << Inputs.size()
-                     << " files using " << Pool.getMaxConcurrency()
-                     << " workers\n";
-      }
-
-      for (unsigned I = 0; I < Pool.getMaxConcurrency(); ++I)
-        Pool.async([ScanningTask, &Service]() { ScanningTask(Service); });
-
-      Pool.wait();
+    if (Verbose) {
+      llvm::outs() << "Running clang-scan-deps on " << Inputs.size()
+                   << " files using " << Pool.getMaxConcurrency()
+                   << " workers\n";
     }
+
+    for (unsigned I = 0; I < Pool.getMaxConcurrency(); ++I)
+      Pool.async([ScanningTask, &Service]() { ScanningTask(Service); });
+
+    Pool.wait();
   }
 
   T.stopTimer();

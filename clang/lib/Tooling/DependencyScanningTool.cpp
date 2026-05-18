@@ -47,7 +47,7 @@ public:
   // set of deps, and handleFileDependency handles enough for implicitly
   // built modules to work.
   void handlePrebuiltModuleDependency(PrebuiltModuleDep PMD) override {}
-  void handleModuleDependency(ModuleDeps MD) override {
+  void handleModuleDependency(const ModuleDeps &MD) override {
     MD.forEachFileDep([this](StringRef File) {
       DependenciesFromModules.push_back(std::string(File));
     });

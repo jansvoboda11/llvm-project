@@ -606,6 +606,7 @@ struct DependencyScanResult {
 static std::optional<DependencyScanResult> scanDependencies(
     ArrayRef<std::unique_ptr<Command>> Jobs,
     llvm::DenseMap<StringRef, const StdModuleManifest::Module *> ManifestLookup,
+    dependencies::DependencyScanningService &ScanningService,
     StringRef ModuleCachePath, StringRef WorkingDirectory,
     DiagnosticsEngine &Diags) {
   llvm::PrettyStackTraceString CrashInfo("Performing module dependency scan.");
@@ -643,9 +644,6 @@ static std::optional<DependencyScanResult> scanDependencies(
   // Initialize the scan context.
   const size_t NumScanInputs = ScannableJobIndices.size();
   const bool HasStdlibModuleInputs = !StdlibModuleScanIndexByID.empty();
-
-  deps::DependencyScanningServiceOptions Opts;
-  deps::DependencyScanningService ScanningService(std::move(Opts));
 
   std::unique_ptr<llvm::ThreadPoolInterface> ThreadPool;
   std::unique_ptr<ScanningWorkerPool> WorkerPool;
@@ -806,12 +804,11 @@ JobNode::~JobNode() = default;
 /// Subclass of CGNode representing a -cc1 job which produces a Clang module.
 class ClangModuleJobNode : public JobNode {
 public:
-  ClangModuleJobNode(std::unique_ptr<Command> &&Job, deps::ModuleDeps &&MD)
-      : JobNode(std::move(Job), NodeKind::ClangModuleCC1Job),
-        MD(std::move(MD)) {}
+  ClangModuleJobNode(std::unique_ptr<Command> &&Job, const deps::ModuleDeps *MD)
+      : JobNode(std::move(Job), NodeKind::ClangModuleCC1Job), MD(MD) {}
   ~ClangModuleJobNode() override = default;
 
-  deps::ModuleDeps MD;
+  const deps::ModuleDeps *MD;
 
   static bool classof(const CGNode *N) {
     return N->getKind() == NodeKind::ClangModuleCC1Job;
@@ -1085,7 +1082,7 @@ struct DOTGraphTraits<const CompilationGraph *> : DefaultDOTGraphTraits {
   static std::string getNodeIdentifier(NodeRef N, GraphRef) {
     return llvm::TypeSwitch<NodeRef, std::string>(N)
         .Case([](const ClangModuleJobNode *ClangModuleNode) {
-          const auto &ID = ClangModuleNode->MD.ID;
+          const auto &ID = ClangModuleNode->MD->ID;
           return llvm::formatv("{0}-{1}", ID.ModuleName, ID.ContextHash).str();
         })
         .Case([](const NamedModuleJobNode *NamedModuleNode) {
@@ -1105,7 +1102,7 @@ struct DOTGraphTraits<const CompilationGraph *> : DefaultDOTGraphTraits {
   static std::string getNodeLabel(NodeRef N, GraphRef) {
     return llvm::TypeSwitch<NodeRef, std::string>(N)
         .Case([](const ClangModuleJobNode *ClangModuleNode) {
-          const auto &ID = ClangModuleNode->MD.ID;
+          const auto &ID = ClangModuleNode->MD->ID;
           return llvm::formatv("Module type: Clang module \\| Module name: {0} "
                                "\\| Hash: {1}",
                                ID.ModuleName, ID.ContextHash)
@@ -1313,14 +1310,13 @@ static void createClangModuleJobsAndNodes(
   for (auto &&[ImportingJob, ModuleDepsGraph] :
        llvm::zip_equal(llvm::make_pointee_range(ImportingJobs),
                        ModuleDepGraphsForScannedJobs)) {
-    for (auto &MD : ModuleDepsGraph) {
-      const auto Inserted = AlreadySeen.insert(MD.ID).second;
+    for (const dependencies::ModuleDeps *MD : ModuleDepsGraph) {
+      const auto Inserted = AlreadySeen.insert(MD->ID).second;
       if (!Inserted)
         continue;
 
-      auto ClangModuleJob = createClangModulePrecompileJob(C, ImportingJob, MD);
-      Graph.createJobNode<ClangModuleJobNode>(std::move(ClangModuleJob),
-                                              std::move(MD));
+      auto ClangModuleJob = createClangModulePrecompileJob(C, ImportingJob, *MD);
+      Graph.createJobNode<ClangModuleJobNode>(std::move(ClangModuleJob), MD);
     }
   }
 }
@@ -1416,7 +1412,7 @@ static bool createModuleDependencyEdges(CompilationGraph &Graph,
     llvm::TypeSwitch<CGNode *>(Node)
         .Case([&](ClangModuleJobNode *ClangModuleNode) {
           [[maybe_unused]] const bool Inserted =
-              ClangModuleNodeByID.try_emplace(ClangModuleNode->MD.ID, Node)
+              ClangModuleNodeByID.try_emplace(ClangModuleNode->MD->ID, Node)
                   .second;
           assert(Inserted &&
                  "Multiple Clang module nodes with the same module ID!");
@@ -1448,7 +1444,7 @@ static bool createModuleDependencyEdges(CompilationGraph &Graph,
     llvm::TypeSwitch<CGNode *>(Node)
         .Case([&](ClangModuleJobNode *ClangModuleNode) {
           connectEdgesViaLookup(Graph, *ClangModuleNode, ClangModuleNodeByID,
-                                ClangModuleNode->MD.ClangModuleDeps,
+                                ClangModuleNode->MD->ClangModuleDeps,
                                 CGEdge::EdgeKind::ModuleDependency);
         })
         .Case([&](ScannedJobNode *NodeWithInputDeps) {
@@ -1655,8 +1651,12 @@ void driver::modules::runModulesDriver(
   auto MaybeCWD = C.getDriver().getVFS().getCurrentWorkingDirectory();
   const auto CWD = MaybeCWD ? std::move(*MaybeCWD) : ".";
 
-  auto MaybeScanResults = scanDependencies(Jobs, ManifestEntryBySource,
-                                           *MaybeModuleCachePath, CWD, Diags);
+  deps::DependencyScanningServiceOptions Opts;
+  deps::DependencyScanningService ScanningService(std::move(Opts));
+
+  auto MaybeScanResults =
+      scanDependencies(Jobs, ManifestEntryBySource, ScanningService,
+                       *MaybeModuleCachePath, CWD, Diags);
   if (!MaybeScanResults) {
     Diags.Report(diag::err_dependency_scan_failed);
     return;
