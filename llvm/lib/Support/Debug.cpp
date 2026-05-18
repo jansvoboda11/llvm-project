@@ -102,16 +102,16 @@ bool isCurrentDebugType(const char *DebugType, int Level) {
 /// option were specified.  Note that DebugFlag also needs to be set to true for
 /// debug output to be produced.
 ///
-void setCurrentDebugTypes(const char **Types, unsigned Count);
+void setCurrentDebugTypes(ArrayRefOfStringRef Types);
 
 void setCurrentDebugType(const char *Type) {
-  setCurrentDebugTypes(&Type, 1);
+  setCurrentDebugTypes({1, &Type});
 }
 
-void setCurrentDebugTypes(const char **Types, unsigned Count) {
+void setCurrentDebugTypes(ArrayRefOfStringRef Types) {
   CurrentDebugType->clear();
-  CurrentDebugType->reserve(Count);
-  for (const char *Type : ArrayRef(Types, Count))
+  CurrentDebugType->reserve(Types.size());
+  for (StringRef Type : Types)
     CurrentDebugType->push_back(parseDebugType(Type));
 }
 

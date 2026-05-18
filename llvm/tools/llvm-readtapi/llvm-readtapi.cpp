@@ -498,10 +498,10 @@ int llvm_readtapi_main(int Argc, char **Argv, const llvm::ToolContext &) {
   }
 
   for (opt::Arg *A : Args.filtered(OPT_INPUT))
-    Ctx.Inputs.push_back(A->getValue());
+    Ctx.Inputs.push_back(A->getValue().str());
 
   if (opt::Arg *A = Args.getLastArg(OPT_output_EQ)) {
-    std::string OutputLoc = std::move(A->getValue());
+    std::string OutputLoc = A->getValue().str();
     std::error_code EC;
     Ctx.OutStream = std::make_unique<llvm::raw_fd_stream>(OutputLoc, EC);
     if (EC)

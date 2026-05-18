@@ -249,7 +249,7 @@ static void parseOptions(const opt::InputArgList &Args) {
   opts::DynamicTable = Args.hasArg(OPT_dynamic_table);
   opts::ELFLinkerOptions = Args.hasArg(OPT_elf_linker_options);
   if (Arg *A = Args.getLastArg(OPT_elf_output_style_EQ)) {
-    std::string OutputStyleChoice = A->getValue();
+    StringRef OutputStyleChoice = A->getValue();
     opts::Output = StringSwitch<opts::OutputStyleTy>(OutputStyleChoice)
                        .Case("LLVM", opts::OutputStyleTy::LLVM)
                        .Case("GNU", opts::OutputStyleTy::GNU)

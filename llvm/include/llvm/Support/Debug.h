@@ -28,6 +28,7 @@
 #ifndef LLVM_SUPPORT_DEBUG_H
 #define LLVM_SUPPORT_DEBUG_H
 
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
@@ -58,7 +59,7 @@ LLVM_ABI void setCurrentDebugType(const char *Type);
 /// -debug-only=X,Y,Z option were specified. Note that DebugFlag
 /// also needs to be set to true for debug output to be produced.
 ///
-LLVM_ABI void setCurrentDebugTypes(const char **Types, unsigned Count);
+LLVM_ABI void setCurrentDebugTypes(ArrayRefOfStringRef Types);
 
 /// DEBUG_WITH_TYPE macro - This macro should be used by passes to emit debug
 /// information.  If the '-debug' option is specified on the commandline, and if

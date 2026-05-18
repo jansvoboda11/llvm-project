@@ -532,9 +532,9 @@ int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
 
   auto Style = IsAddr2Line ? OutputStyle::GNU : OutputStyle::LLVM;
   if (const opt::Arg *A = Args.getLastArg(OPT_output_style_EQ)) {
-    if (strcmp(A->getValue(), "GNU") == 0)
+    if (A->getValue() == "GNU")
       Style = OutputStyle::GNU;
-    else if (strcmp(A->getValue(), "JSON") == 0)
+    else if (A->getValue() == "JSON")
       Style = OutputStyle::JSON;
     else
       Style = OutputStyle::LLVM;

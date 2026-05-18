@@ -133,8 +133,8 @@ static int prune(cas::ObjectStore &CAS);
 static Expected<CommandOptions> parseOptions(int Argc, char **Argv) {
   BumpPtrAllocator Alloc;
   StringSaver Saver(Alloc);
-  SmallVector<const char *> ExpanedArgs;
-  if (!cl::expandResponseFiles(Argc, Argv, nullptr, Saver, ExpanedArgs))
+  SmallVector<StringRef> ExpanedArgs;
+  if (!cl::expandResponseFiles({Argc, Argv}, nullptr, Saver, ExpanedArgs))
     return createStringError("cannot expand response file");
 
   LLVMCASOptTable T;
@@ -161,7 +161,7 @@ static Expected<CommandOptions> parseOptions(int Argc, char **Argv) {
     return createStringError("no command action is specified");
 
   for (auto *File : Args.filtered(OPT_INPUT))
-    Opts.Inputs.push_back(File->getValue());
+    Opts.Inputs.push_back(File->getValue().str());
   Opts.CASPath = Args.getLastArgValue(OPT_cas_path);
   Opts.CASPluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
   for (StringRef PluginOpt : Args.getAllArgValues(OPT_cas_plugin_option)) {

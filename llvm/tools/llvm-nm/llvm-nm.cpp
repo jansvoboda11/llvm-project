@@ -2604,7 +2604,7 @@ int llvm_nm_main(int argc, char **argv, const llvm::ToolContext &) {
     } else if (A->getOption().matches(OPT_s)) {
       SegSectArgs = 2;
     } else {
-      InputFilenames.push_back(A->getValue());
+      InputFilenames.push_back(A->getValue().str());
     }
   }
   if (!SegSect.empty() && SegSect.size() != 2)

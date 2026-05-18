@@ -59,11 +59,8 @@ private:
   /// an "argument unused" warning instead of an "unsupported option" error.
   unsigned IgnoredTargetSpecific : 1;
 
-  /// Does this argument own its values?
-  mutable unsigned OwnsValues : 1;
-
   /// The argument values, as C strings.
-  SmallVector<const char *, 2> Values;
+  SmallVector<StringRef, 2> Values;
 
   /// If this arg was created through an alias, this is the original alias arg.
   /// For example, *this might be "-finput-charset=utf-8" and Alias might
@@ -74,13 +71,12 @@ public:
   LLVM_ABI Arg(const Option Opt, StringRef Spelling, unsigned Index,
                const Arg *BaseArg = nullptr);
   LLVM_ABI Arg(const Option Opt, StringRef Spelling, unsigned Index,
-               const char *Value0, const Arg *BaseArg = nullptr);
+               StringRef Value0, const Arg *BaseArg = nullptr);
   LLVM_ABI Arg(const Option Opt, StringRef Spelling, unsigned Index,
-               const char *Value0, const char *Value1,
+               StringRef Value0, StringRef Value1,
                const Arg *BaseArg = nullptr);
   Arg(const Arg &) = delete;
   Arg &operator=(const Arg &) = delete;
-  LLVM_ABI ~Arg();
 
   const Option &getOption() const { return Opt; }
 
@@ -109,9 +105,6 @@ public:
   const Arg* getAlias() const { return Alias.get(); }
   void setAlias(std::unique_ptr<Arg> Alias) { this->Alias = std::move(Alias); }
 
-  bool getOwnsValues() const { return OwnsValues; }
-  void setOwnsValues(bool Value) const { OwnsValues = Value; }
-
   bool isClaimed() const { return getBaseArg().Claimed; }
   void claim() const { getBaseArg().Claimed = true; }
 
@@ -124,12 +117,10 @@ public:
 
   unsigned getNumValues() const { return Values.size(); }
 
-  const char *getValue(unsigned N = 0) const {
-    return Values[N];
-  }
+  StringRef getValue(unsigned N = 0) const { return Values[N]; }
 
-  SmallVectorImpl<const char *> &getValues() { return Values; }
-  const SmallVectorImpl<const char *> &getValues() const { return Values; }
+  SmallVectorImpl<StringRef> &getValues() { return Values; }
+  ArrayRefOfStringRef getValues() const { return Values; }
 
   bool containsValue(StringRef Value) const {
     return llvm::is_contained(Values, Value);
