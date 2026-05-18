@@ -196,22 +196,25 @@ TEST(CommandLineTest, UseMultipleCategories) {
 }
 
 typedef void ParserFunction(StringRef Source, StringSaver &Saver,
-                            SmallVectorImpl<const char *> &NewArgv,
-                            bool MarkEOLs);
+                            SmallVectorImpl<StringRef> &NewArgv,
+                            SmallVectorImpl<size_t> *EOLIndices);
 
 void testCommandLineTokenizer(ParserFunction *parse, StringRef Input,
-                              ArrayRef<const char *> Output,
-                              bool MarkEOLs = false) {
-  SmallVector<const char *, 0> Actual;
+                              ArrayRefOfStringRef Output,
+                              ArrayRef<size_t> EOLIndices = {}) {
+  SmallVector<StringRef, 0> Actual;
   BumpPtrAllocator A;
   StringSaver Saver(A);
-  parse(Input, Saver, Actual, MarkEOLs);
+  SmallVector<size_t> ActualEOLIndices;
+  parse(Input, Saver, Actual, &ActualEOLIndices);
   EXPECT_EQ(Output.size(), Actual.size());
-  for (unsigned I = 0, E = Actual.size(); I != E; ++I) {
-    if (I < Output.size()) {
-      EXPECT_STREQ(Output[I], Actual[I]);
-    }
-  }
+  for (unsigned I = 0, E = Actual.size(); I != E; ++I)
+    if (I < Output.size())
+      EXPECT_EQ(Output[I], Actual[I]);
+  EXPECT_EQ(EOLIndices.size(), ActualEOLIndices.size());
+  for (unsigned I = 0, E = EOLIndices.size(); I != E; ++I)
+    if (I < EOLIndices.size())
+      EXPECT_EQ(EOLIndices[I], ActualEOLIndices[I]);
 }
 
 TEST(CommandLineTest, TokenizeGNUCommandLine) {
@@ -332,10 +335,10 @@ TEST(CommandLineTest, TokenizeWindowsCommandLineExeName) {
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLineFull, Input1, Output1);
 
   const char Input2[] = "\"a\\\"b c\\\"d\n\"e\\\"f g\\\"h\n";
-  const char *const Output2[] = {"a\\b", "c\"d", nullptr,
-                                 "e\\f", "g\"h", nullptr};
+  const char *const Output2[] = {"a\\b", "c\"d", "e\\f", "g\"h"};
+  const size_t EOLIndices2[] = {2, 4};
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLineFull, Input2, Output2,
-                           /*MarkEOLs=*/true);
+                           EOLIndices2);
 
   const char Input3[] = R"(\\server\share\subdir\clang.exe)";
   const char *const Output3[] = {"\\\\server\\share\\subdir\\clang.exe"};
@@ -354,13 +357,13 @@ TEST(CommandLineTest, TokenizeAndMarkEOLs) {
   // else as compiler flags. The tokenizer inserts nullptr sentinels into the
   // output so that clang-cl can find the end of the current line.
   const char Input[] = "clang -Xclang foo\n\nfoo\"bar\"baz\n x.cpp\n";
-  const char *const Output[] = {"clang", "-Xclang", "foo",
-                                nullptr, nullptr,   "foobarbaz",
-                                nullptr, "x.cpp",   nullptr};
+  const char *const Output[] = {"clang", "-Xclang", "foo", "foobarbaz",
+                                "x.cpp"};
+  size_t EOLIndices[] = {3, 3, 4, 5};
   testCommandLineTokenizer(cl::TokenizeWindowsCommandLine, Input, Output,
-                           /*MarkEOLs=*/true);
+                           EOLIndices);
   testCommandLineTokenizer(cl::TokenizeGNUCommandLine, Input, Output,
-                           /*MarkEOLs=*/true);
+                           EOLIndices);
 }
 
 TEST(CommandLineTest, TokenizeConfigFile1) {
@@ -406,18 +409,18 @@ TEST(CommandLineTest, TokenizeConfigFile7) {
 }
 
 TEST(CommandLineTest, TokenizeConfigFile8) {
-  SmallVector<const char *, 0> Actual;
+  SmallVector<StringRef, 0> Actual;
   BumpPtrAllocator A;
   StringSaver Saver(A);
-  cl::tokenizeConfigFile("\\\n", Saver, Actual, /*MarkEOLs=*/false);
+  cl::tokenizeConfigFile("\\\n", Saver, Actual, /*EOLIndices=*/nullptr);
   EXPECT_TRUE(Actual.empty());
 }
 
 TEST(CommandLineTest, TokenizeConfigFile9) {
-  SmallVector<const char *, 0> Actual;
+  SmallVector<StringRef, 0> Actual;
   BumpPtrAllocator A;
   StringSaver Saver(A);
-  cl::tokenizeConfigFile("\\\r\n", Saver, Actual, /*MarkEOLs=*/false);
+  cl::tokenizeConfigFile("\\\r\n", Saver, Actual, /*EOLIndices=*/nullptr);
   EXPECT_TRUE(Actual.empty());
 }
 
@@ -996,7 +999,7 @@ TEST(CommandLineTest, ResponseFiles) {
   SmallString<128> IncRef;
   IncRef.append(1, '@');
   IncRef.append(IncludedFileName);
-  llvm::SmallVector<const char *, 4> Argv = {"test/test", "-flag_1",
+  llvm::SmallVector<StringRef, 4> Argv = {"test/test", "-flag_1",
                                              IncRef.c_str(), "-flag_2"};
 
   // Expand response files.
@@ -1055,7 +1058,7 @@ TEST(CommandLineTest, RecursiveResponseFiles) {
   // Recursive expansion terminates
   // Recursive files never expand
   // Non-recursive repeats are allowed
-  SmallVector<const char *, 4> Argv = {"test/test", SelfFileRef.c_str(),
+  SmallVector<StringRef, 4> Argv = {"test/test", SelfFileRef.c_str(),
                                        "-option_3"};
   BumpPtrAllocator A;
 #ifdef _WIN32
@@ -1102,7 +1105,7 @@ TEST(CommandLineTest, ResponseFilesAtArguments) {
 
   // Ensure we expand rsp files after lots of non-rsp arguments starting with @.
   constexpr size_t NON_RSP_AT_ARGS = 64;
-  SmallVector<const char *, 4> Argv = {"test/test"};
+  SmallVector<StringRef, 4> Argv = {"test/test"};
   Argv.append(NON_RSP_AT_ARGS, "@non_rsp_at_arg");
   std::string ResponseFileRef = ("@" + ResponseFilePath).str();
   Argv.push_back(ResponseFileRef.c_str());
@@ -1115,11 +1118,11 @@ TEST(CommandLineTest, ResponseFilesAtArguments) {
   // ASSERT instead of EXPECT to prevent potential out-of-bounds access.
   ASSERT_EQ(Argv.size(), 1 + NON_RSP_AT_ARGS + 2);
   size_t i = 0;
-  EXPECT_STREQ(Argv[i++], "test/test");
+  EXPECT_EQ(Argv[i++], "test/test");
   for (; i < 1 + NON_RSP_AT_ARGS; ++i)
-    EXPECT_STREQ(Argv[i], "@non_rsp_at_arg");
-  EXPECT_STREQ(Argv[i++], "-foo");
-  EXPECT_STREQ(Argv[i++], "-bar");
+    EXPECT_EQ(Argv[i], "@non_rsp_at_arg");
+  EXPECT_EQ(Argv[i++], "-foo");
+  EXPECT_EQ(Argv[i++], "-bar");
 }
 
 TEST(CommandLineTest, ResponseFileRelativePath) {
@@ -1139,7 +1142,7 @@ TEST(CommandLineTest, ResponseFileRelativePath) {
   StringRef InnerFileContents = "-flag";
   FS.addFile(InnerFile, 0, MemoryBuffer::getMemBuffer(InnerFileContents));
 
-  SmallVector<const char *, 2> Argv = {"test/test", "@dir/outer.rsp"};
+  SmallVector<StringRef, 2> Argv = {"test/test", "@dir/outer.rsp"};
 
   BumpPtrAllocator A;
   llvm::cl::ExpansionContext ECtx(A, cl::TokenizeGNUCommandLine);
@@ -1159,22 +1162,17 @@ TEST(CommandLineTest, ResponseFileEOLs) {
   FS.setCurrentWorkingDirectory(TestRoot);
   FS.addFile("eols.rsp", 0,
              MemoryBuffer::getMemBuffer("-Xclang -Wno-whatever\n input.cpp"));
-  SmallVector<const char *, 2> Argv = {"clang", "@eols.rsp"};
+  SmallVector<StringRef, 2> Argv = {"clang", "@eols.rsp"};
   BumpPtrAllocator A;
   llvm::cl::ExpansionContext ECtx(A, cl::TokenizeWindowsCommandLine);
-  ECtx.setVFS(&FS).setCurrentDir(TestRoot).setMarkEOLs(true).setRelativeNames(
+  ECtx.setVFS(&FS).setCurrentDir(TestRoot).setRelativeNames(
       true);
   ASSERT_FALSE((bool)ECtx.expandResponseFiles(Argv));
-  const char *Expected[] = {"clang", "-Xclang", "-Wno-whatever", nullptr,
+  const char *Expected[] = {"clang", "-Xclang", "-Wno-whatever",
                             "input.cpp"};
   ASSERT_EQ(std::size(Expected), Argv.size());
-  for (size_t I = 0, E = std::size(Expected); I < E; ++I) {
-    if (Expected[I] == nullptr) {
-      ASSERT_EQ(Argv[I], nullptr);
-    } else {
-      ASSERT_STREQ(Expected[I], Argv[I]);
-    }
-  }
+  for (size_t I = 0, E = std::size(Expected); I < E; ++I)
+    ASSERT_EQ(Expected[I], Argv[I]);
 }
 
 TEST(CommandLineTest, BadResponseFile) {
@@ -1184,21 +1182,21 @@ TEST(CommandLineTest, BadResponseFile) {
   SmallString<128> AFilePath = ADir.path();
   llvm::sys::path::append(AFilePath, "file.rsp");
   std::string AFileExp = std::string("@") + std::string(AFilePath.str());
-  SmallVector<const char *, 2> Argv = {"clang", AFileExp.c_str()};
+  SmallVector<StringRef, 2> Argv = {"clang", AFileExp};
 
   bool Res = cl::ExpandResponseFiles(Saver, cl::TokenizeGNUCommandLine, Argv);
   ASSERT_TRUE(Res);
   ASSERT_EQ(2U, Argv.size());
-  ASSERT_STREQ(Argv[0], "clang");
-  ASSERT_STREQ(Argv[1], AFileExp.c_str());
+  ASSERT_EQ(Argv[0], "clang");
+  ASSERT_EQ(Argv[1], AFileExp.c_str());
 
   std::string ADirExp = std::string("@") + std::string(ADir.path());
   Argv = {"clang", ADirExp.c_str()};
   Res = cl::ExpandResponseFiles(Saver, cl::TokenizeGNUCommandLine, Argv);
   ASSERT_FALSE(Res);
   ASSERT_EQ(2U, Argv.size());
-  ASSERT_STREQ(Argv[0], "clang");
-  ASSERT_STREQ(Argv[1], ADirExp.c_str());
+  ASSERT_EQ(Argv[0], "clang");
+  ASSERT_EQ(Argv[1], ADirExp.c_str());
 }
 
 TEST(CommandLineTest, SetDefaultValue) {
@@ -1261,7 +1259,7 @@ TEST(CommandLineTest, SetDefaultValue) {
 }
 
 TEST(CommandLineTest, ReadConfigFile) {
-  llvm::SmallVector<const char *, 1> Argv;
+  llvm::SmallVector<StringRef, 1> Argv;
 
   TempDir TestDir("unittest", /*Unique*/ true);
   TempDir TestSubDir(TestDir.path("subdir"), /*Unique*/ false);
@@ -1312,25 +1310,25 @@ TEST(CommandLineTest, ReadConfigFile) {
 
   EXPECT_FALSE((bool)Result);
   EXPECT_EQ(Argv.size(), 13U);
-  EXPECT_STREQ(Argv[0], "-option_1");
-  EXPECT_STREQ(Argv[1],
+  EXPECT_EQ(Argv[0], "-option_1");
+  EXPECT_EQ(Argv[1],
                ("-option_2=" + TestDir.path() + "/dir1").str().c_str());
-  EXPECT_STREQ(Argv[2], ("-option_3=" + TestDir.path()).str().c_str());
-  EXPECT_STREQ(Argv[3], "-option_4");
-  EXPECT_STREQ(Argv[4], TestDir.path().str().c_str());
-  EXPECT_STREQ(Argv[5], ("-option_5=" + TestDir.path()).str().c_str());
-  EXPECT_STREQ(Argv[6], ("-option_6=" + TestDir.path() + "/dir1," +
+  EXPECT_EQ(Argv[2], ("-option_3=" + TestDir.path()).str().c_str());
+  EXPECT_EQ(Argv[3], "-option_4");
+  EXPECT_EQ(Argv[4], TestDir.path().str().c_str());
+  EXPECT_EQ(Argv[5], ("-option_5=" + TestDir.path()).str().c_str());
+  EXPECT_EQ(Argv[6], ("-option_6=" + TestDir.path() + "/dir1," +
                          TestDir.path() + "/dir2")
                             .str()
                             .c_str());
-  EXPECT_STREQ(Argv[7], "-option_7");
-  EXPECT_STREQ(Argv[8],
+  EXPECT_EQ(Argv[7], "-option_7");
+  EXPECT_EQ(Argv[8],
                ("-option_8=" + TestDir.path() + "/dir2").str().c_str());
-  EXPECT_STREQ(Argv[9],
+  EXPECT_EQ(Argv[9],
                ("-option_9=" + TestSubDir.path() + "/dir3").str().c_str());
-  EXPECT_STREQ(Argv[10], "-option_10");
-  EXPECT_STREQ(Argv[11], "-option_11=abcd");
-  EXPECT_STREQ(Argv[12], "-option_12=cdef");
+  EXPECT_EQ(Argv[10], "-option_10");
+  EXPECT_EQ(Argv[11], "-option_11=abcd");
+  EXPECT_EQ(Argv[12], "-option_12=cdef");
 }
 
 TEST(CommandLineTest, PositionalEatArgsError) {

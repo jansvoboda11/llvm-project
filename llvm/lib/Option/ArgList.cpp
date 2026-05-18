@@ -96,7 +96,7 @@ StringRef ArgList::getLastArgValue(OptSpecifier Id, StringRef Default) const {
 }
 
 std::vector<std::string> ArgList::getAllArgValues(OptSpecifier Id) const {
-  SmallVector<const char *, 16> Values;
+  SmallVector<StringRef, 16> Values;
   AddAllArgValues(Values, Id);
   return std::vector<std::string>(Values.begin(), Values.end());
 }
@@ -181,9 +181,8 @@ void ArgList::ClaimAllArgs() const {
       Arg->claim();
 }
 
-const char *ArgList::GetOrMakeJoinedArgString(unsigned Index,
-                                              StringRef LHS,
-                                              StringRef RHS) const {
+StringRef ArgList::GetOrMakeJoinedArgString(unsigned Index, StringRef LHS,
+                                            StringRef RHS) const {
   StringRef Cur = getArgString(Index);
   if (Cur.size() == LHS.size() + RHS.size() && Cur.starts_with(LHS) &&
       Cur.ends_with(RHS))
@@ -243,6 +242,11 @@ void InputArgList::releaseMemory() {
     delete A;
 }
 
+InputArgList::InputArgList(ArrayRefOfStringRef Args)
+    : NumInputArgStrings(Args.size()) {
+  ArgStrings.append(Args.begin(), Args.end());
+}
+
 InputArgList::InputArgList(const char* const *ArgBegin,
                            const char* const *ArgEnd)
   : NumInputArgStrings(ArgEnd - ArgBegin) {
@@ -268,14 +272,14 @@ unsigned InputArgList::MakeIndex(StringRef String0,
   return Index0;
 }
 
-const char *InputArgList::MakeArgStringRef(StringRef Str) const {
+StringRef InputArgList::MakeArgStringRef(StringRef Str) const {
   return getArgString(MakeIndex(Str));
 }
 
 DerivedArgList::DerivedArgList(const InputArgList &BaseArgs)
     : BaseArgs(BaseArgs) {}
 
-const char *DerivedArgList::MakeArgStringRef(StringRef Str) const {
+StringRef DerivedArgList::MakeArgStringRef(StringRef Str) const {
   return BaseArgs.MakeArgString(Str);
 }
 
@@ -313,6 +317,6 @@ Arg *DerivedArgList::MakeJoinedArg(const Arg *BaseArg, const Option Opt,
   unsigned Index = BaseArgs.MakeIndex((Opt.getName() + Value).str());
   SynthesizedArgs.push_back(std::make_unique<Arg>(
       Opt, MakeArgString(Opt.getPrefix() + Opt.getName()), Index,
-      BaseArgs.getArgString(Index) + Opt.getName().size(), BaseArg));
+      BaseArgs.getArgString(Index).drop_front(Opt.getName().size()), BaseArg));
   return SynthesizedArgs.back().get();
 }

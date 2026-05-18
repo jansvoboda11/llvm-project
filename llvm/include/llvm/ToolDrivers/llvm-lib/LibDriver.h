@@ -17,9 +17,9 @@
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
-template <typename T> class ArrayRef;
+class ArrayRefOfStringRef;
 
-LLVM_ABI int libDriverMain(ArrayRef<const char *> ARgs);
+LLVM_ABI int libDriverMain(ArrayRefOfStringRef Args);
 }
 
 #endif

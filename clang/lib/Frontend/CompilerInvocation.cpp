@@ -926,7 +926,7 @@ static void addDiagnosticArgs(ArgList &Args, OptSpecifier Group,
           std::string(A->getOption().getName().drop_front(1).rtrim("=-")));
     } else {
       // Otherwise, add its value (for OPT_W_Joined and similar).
-      Diagnostics.push_back(A->getValue());
+      Diagnostics.push_back(A->getValue().str());
     }
   }
 }
@@ -3112,7 +3112,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ActionName = A->getValue();
   }
   for (const auto *AA : Args.filtered(OPT_plugin_arg))
-    Opts.PluginArgs[AA->getValue(0)].emplace_back(AA->getValue(1));
+    Opts.PluginArgs[AA->getValue(0).str()].emplace_back(AA->getValue(1).str());
 
   for (const std::string &Arg :
          Args.getAllArgValues(OPT_ftest_module_file_extension_EQ)) {
@@ -3424,7 +3424,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
 #undef HEADER_SEARCH_OPTION_WITH_MARSHALLING
 
   if (const Arg *A = Args.getLastArg(OPT_stdlib_EQ))
-    Opts.UseLibcxx = (strcmp(A->getValue(), "libc++") == 0);
+    Opts.UseLibcxx = A->getValue() == "libc++";
 
   // Only the -fmodule-file=<name>=<file> form.
   for (const auto *A : Args.filtered(OPT_fmodule_file)) {
@@ -3460,7 +3460,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
                               llvm::StringRef(A->getValue()).substr(1));
       return std::string(Buffer);
     }
-    return A->getValue();
+    return A->getValue().str();
   };
 
   for (const auto *A : Args.filtered(OPT_I, OPT_F)) {
