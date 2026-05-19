@@ -289,7 +289,7 @@ public:
   ///
   /// \param IssueErrors - Report failures as errors.
   /// \return Whether the file was removed successfully.
-  bool CleanupFile(const char *File, bool IssueErrors = false) const;
+  bool CleanupFile(StringRef File, bool IssueErrors = false) const;
 
   /// CleanupFileList - Remove the files in the given list.
   ///
