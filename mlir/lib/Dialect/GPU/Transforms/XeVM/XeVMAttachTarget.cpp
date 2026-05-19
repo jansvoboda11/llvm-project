@@ -46,13 +46,13 @@ DictionaryAttr XeVMAttachTarget::getFlags(OpBuilder &builder) const {
   SmallVector<NamedAttribute, 3> flags;
   // Tokenize and set the optional command line options.
   if (!cmdOptions.empty()) {
-    std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> options =
+    std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> options =
         gpu::TargetOptions::tokenizeCmdOptions(cmdOptions);
     if (!options.second.empty()) {
       llvm::SmallVector<mlir::Attribute> xevmOptionAttrs;
-      for (const char *opt : options.second) {
+      for (StringRef opt : options.second) {
         xevmOptionAttrs.emplace_back(
-            mlir::StringAttr::get(builder.getContext(), StringRef(opt)));
+            mlir::StringAttr::get(builder.getContext(), opt));
       }
       flags.push_back(builder.getNamedAttr(
           "cmd-options",

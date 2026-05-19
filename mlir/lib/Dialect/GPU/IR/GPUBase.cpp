@@ -445,9 +445,9 @@ CompilationTarget TargetOptions::getDefaultCompilationTarget() {
   return CompilationTarget::Fatbin;
 }
 
-std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
 TargetOptions::tokenizeCmdOptions(const std::string &cmdOptions) {
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> options;
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> options;
   llvm::StringSaver stringSaver(options.first);
   StringRef opts = cmdOptions;
   // For a correct tokenization of the command line options `opts` must be
@@ -459,25 +459,23 @@ TargetOptions::tokenizeCmdOptions(const std::string &cmdOptions) {
   if (!opts.empty() && opts.front() == '\'' && opts.back() == '\'')
     opts.consume_front("'"), opts.consume_back("'");
 #ifdef _WIN32
-  llvm::cl::TokenizeWindowsCommandLine(opts, stringSaver, options.second,
-                                       /*MarkEOLs=*/false);
+  llvm::cl::TokenizeWindowsCommandLine(opts, stringSaver, options.second);
 #else
-  llvm::cl::TokenizeGNUCommandLine(opts, stringSaver, options.second,
-                                   /*MarkEOLs=*/false);
+  llvm::cl::TokenizeGNUCommandLine(opts, stringSaver, options.second);
 #endif // _WIN32
   return options;
 }
 
-std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
 TargetOptions::tokenizeCmdOptions() const {
   return tokenizeCmdOptions(cmdOptions);
 }
 
-std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
 TargetOptions::tokenizeAndRemoveSuffixCmdOptions(llvm::StringRef startsWith) {
   size_t startPos = cmdOptions.find(startsWith);
   if (startPos == std::string::npos)
-    return {llvm::BumpPtrAllocator(), SmallVector<const char *>()};
+    return {llvm::BumpPtrAllocator(), SmallVector<StringRef>()};
 
   auto tokenized =
       tokenizeCmdOptions(cmdOptions.substr(startPos + startsWith.size()));

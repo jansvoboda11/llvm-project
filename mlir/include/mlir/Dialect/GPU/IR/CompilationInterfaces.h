@@ -77,13 +77,13 @@ public:
   StringRef getELFSection() const;
 
   /// Returns a tokenization of the command line options.
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
   tokenizeCmdOptions() const;
 
   /// Returns a tokenization of the substr of the command line options that
   /// starts with `startsWith` and ends with end of the command line options and
   /// consumes it.
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
   tokenizeAndRemoveSuffixCmdOptions(llvm::StringRef startsWith);
 
   /// Returns the compilation target.
@@ -116,7 +116,7 @@ public:
   static CompilationTarget getDefaultCompilationTarget();
 
   /// Returns a tokenization of the command line options.
-  static std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>>
+  static std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>>
   tokenizeCmdOptions(const std::string &cmdOptions);
 
 protected:

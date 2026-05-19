@@ -60,9 +60,9 @@ DictionaryAttr NVVMAttachTarget::getFlags(OpBuilder &builder) const {
     auto options = gpu::TargetOptions::tokenizeCmdOptions(cmdOptions);
     if (!options.second.empty()) {
       llvm::SmallVector<mlir::Attribute> nvvmOptionAttrs;
-      for (const char *opt : options.second) {
+      for (StringRef opt : options.second) {
         nvvmOptionAttrs.emplace_back(
-            mlir::StringAttr::get(builder.getContext(), StringRef(opt)));
+            mlir::StringAttr::get(builder.getContext(), opt));
       }
       flags.push_back(builder.getNamedAttr(
           "ptxas-cmd-options",

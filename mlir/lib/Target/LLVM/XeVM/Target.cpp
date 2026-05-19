@@ -206,7 +206,7 @@ SerializeGPUModuleBase::compileToBinaryViaLibocloc(StringRef asmStr,
       getTarget().getTriple(), getTarget().getChip());
 
   // Build command-line options.
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> cmdOpts =
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> cmdOpts =
       targetOptions.tokenizeCmdOptions();
   // Example: --gpu-module-to-binary="opts='opt1 opt2'"
   const std::string cmdOptsStr = "\"" + llvm::join(cmdOpts.second, " ") + "\"";
@@ -336,7 +336,7 @@ SerializeGPUModuleBase::compileToBinaryViaOclocTool(StringRef asmStr,
   }
 
   // Build command-line options.
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> cmdOpts =
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> cmdOpts =
       targetOptions.tokenizeCmdOptions();
   const std::string cmdOptsStr = "\"" + llvm::join(cmdOpts.second, " ") + "\"";
 

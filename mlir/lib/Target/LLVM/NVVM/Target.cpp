@@ -418,7 +418,7 @@ NVPTXSerializer::compileToBinary(StringRef ptxCode) {
   };
 
   // Get any extra args passed in `targetOptions`.
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> cmdOpts =
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> cmdOpts =
       targetOptions.tokenizeCmdOptions();
 
   // Create ptxas args.
@@ -429,11 +429,11 @@ NVPTXSerializer::compileToBinary(StringRef ptxCode) {
        "--opt-level", optLevel});
 
   bool useFatbin32 = false;
-  for (const auto *cArg : cmdOpts.second) {
+  for (StringRef arg : cmdOpts.second) {
     // All `cmdOpts` are for `ptxas` except `-32` which passes `-32` to
     // `fatbinary`, indicating a 32-bit target. By default a 64-bit target is
     // assumed.
-    if (StringRef arg(cArg); arg != "-32")
+    if (arg != "-32")
       ptxasArgs.push_back(arg);
     else
       useFatbin32 = true;
@@ -585,11 +585,11 @@ NVPTXSerializer::compileToBinaryNVPTX(StringRef ptxCode) {
 
   // Create the options.
   std::string optLevel = std::to_string(this->optLevel);
-  std::pair<llvm::BumpPtrAllocator, SmallVector<const char *>> cmdOpts =
+  std::pair<llvm::BumpPtrAllocator, SmallVector<StringRef>> cmdOpts =
       targetOptions.tokenizeCmdOptions();
   cmdOpts.second.insert(
       cmdOpts.second.begin(),
-      {"-arch", getTarget().getChip().data(), "--opt-level", optLevel.c_str()});
+      {"-arch", getTarget().getChip(), "--opt-level", optLevel});
 
   // Set optional command line arguments
   setOptionalCommandlineArguments(getTarget(), cmdOpts.second);
@@ -598,8 +598,12 @@ NVPTXSerializer::compileToBinaryNVPTX(StringRef ptxCode) {
       nvPTXCompilerCreate(&compiler, ptxCode.size(), ptxCode.str().c_str()));
 
   // Try to compile the binary.
-  status = nvPTXCompilerCompile(compiler, cmdOpts.second.size(),
-                                cmdOpts.second.data());
+  SmallVector<const char *> cmdOptsCStr;
+  cmdOptsCStr.reserve(cmdOpts.second.size());
+  for (StringRef opt : cmdOpts.second)
+    cmdOptsCStr.push_back(opt.data());
+  status = nvPTXCompilerCompile(compiler, cmdOptsCStr.size(),
+                                cmdOptsCStr.data());
 
   // Check if compilation failed.
   if (status != NVPTXCOMPILE_SUCCESS) {
@@ -656,9 +660,8 @@ NVPTXSerializer::compileToBinaryNVPTX(StringRef ptxCode) {
   RETURN_ON_NVPTXCOMPILER_ERROR(nvPTXCompilerDestroy(&compiler));
 
   if (targetOptions.getCompilationTarget() == gpu::CompilationTarget::Fatbin) {
-    bool useFatbin32 = llvm::any_of(cmdOpts.second, [](const char *option) {
-      return llvm::StringRef(option) == "-32";
-    });
+    bool useFatbin32 = llvm::any_of(
+        cmdOpts.second, [](StringRef option) { return option == "-32"; });
 
     const char *cubinOpts[1] = {useFatbin32 ? "-32" : "-64"};
     nvFatbinHandle handle;

@@ -357,7 +357,7 @@ createCompilerInvocation(ArrayRef<std::string> CommandLine,
                          DiagnosticsEngine &Diags) {
   llvm::opt::ArgStringList Argv;
   for (const std::string &Str : ArrayRef(CommandLine).drop_front())
-    Argv.push_back(Str.c_str());
+    Argv.push_back(Str);
 
   auto Invocation = std::make_unique<CompilerInvocation>();
   if (!CompilerInvocation::CreateFromArgs(*Invocation, Argv, Diags)) {
