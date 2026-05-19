@@ -318,9 +318,9 @@ public:
         AllowModuleMapSubdirectorySearch(false), LazyLoadModuleMaps(false) {}
 
   /// AddPath - Add the \p Path path to the specified \p Group list.
-  void AddPath(StringRef Path, frontend::IncludeDirGroup Group,
+  void AddPath(const Twine &Path, frontend::IncludeDirGroup Group,
                bool IsFramework, bool IgnoreSysRoot) {
-    UserEntries.emplace_back(Path, Group, IsFramework, IgnoreSysRoot);
+    UserEntries.emplace_back(Path.str(), Group, IsFramework, IgnoreSysRoot);
   }
 
   /// AddSystemHeaderPrefix - Override whether \#include directives naming a
