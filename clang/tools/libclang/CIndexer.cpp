@@ -123,7 +123,7 @@ const std::string &CIndexer::getClangResourcesPath() {
 #endif
   std::string Path;
   if (!PathFound) {
-    if (!(Path = llvm::sys::fs::getMainExecutable(nullptr, nullptr)).empty()) {
+    if (!(Path = llvm::sys::fs::getMainExecutable("", nullptr)).empty()) {
       // If we can't get the path using dladdr, try to get the main executable
       // path. This may be needed when we're statically linking libclang with
       // musl libc, for example.

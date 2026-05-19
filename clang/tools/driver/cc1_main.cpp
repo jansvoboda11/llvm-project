@@ -216,7 +216,7 @@ static int PrintEnabledExtensions(const TargetOptions& TargetOpts) {
   return 0;
 }
 
-int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
+int cc1_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0, void *MainAddr) {
   ensureSufficientStack();
 
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID = DiagnosticIDs::create();

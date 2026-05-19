@@ -29,7 +29,7 @@ void openbsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                       const InputInfo &Output,
                                       const InputInfoList &Inputs,
                                       const ArgList &Args,
-                                      const char *LinkingOutput) const {
+                                      StringRef LinkingOutput) const {
   const auto &ToolChain = static_cast<const OpenBSD &>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   const llvm::Triple &Triple = ToolChain.getTriple();
@@ -98,7 +98,7 @@ void openbsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   for (const auto &II : Inputs)
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(ToolChain.GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -108,7 +108,7 @@ void openbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                    const InputInfo &Output,
                                    const InputInfoList &Inputs,
                                    const ArgList &Args,
-                                   const char *LinkingOutput) const {
+                                   StringRef LinkingOutput) const {
   const auto &ToolChain = static_cast<const OpenBSD &>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   const llvm::Triple &Triple = ToolChain.getTriple();
@@ -281,7 +281,7 @@ void openbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   ToolChain.addProfileRTLibs(Args, CmdArgs);
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));

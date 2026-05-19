@@ -64,7 +64,7 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                         const InputInfo &Output,
                                         const InputInfoList &Inputs,
                                         const ArgList &Args,
-                                        const char *LinkingOutput) const {
+                                        StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   auto &TC = static_cast<const toolchains::MSVCToolChain &>(getToolChain());
@@ -364,7 +364,7 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     // Render -l options differently for the MSVC linker.
     if (A.getOption().matches(options::OPT_l)) {
       StringRef Lib = A.getValue();
-      const char *LinkLibArg;
+      StringRef LinkLibArg;
       if (Lib.ends_with(".lib"))
         LinkLibArg = Args.MakeArgString(Lib);
       else
@@ -461,9 +461,9 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
               (EnvVar.size() > PrefixLen
                    ? llvm::Twine(llvm::sys::EnvPathSeparator) +
                          EnvVar.substr(PrefixLen)
-                   : "")));
+                   : "")).data());
         } else {
-          Environment.push_back(Args.MakeArgString(EnvVar));
+          Environment.push_back(Args.MakeArgString(EnvVar).data());
         }
         Cursor += EnvVar.size() + 1 /*null-terminator*/;
       }
@@ -471,7 +471,7 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   SkipSettingEnvironment:;
 #endif
   } else {
-    linkPath = TC.GetProgramPath(Linker.str().c_str());
+    linkPath = TC.GetProgramPath(Linker);
   }
 
   auto LinkCmd = std::make_unique<Command>(

@@ -113,7 +113,7 @@ void darwin::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                      const InputInfo &Output,
                                      const InputInfoList &Inputs,
                                      const ArgList &Args,
-                                     const char *LinkingOutput) const {
+                                     StringRef LinkingOutput) const {
   const llvm::Triple &T(getToolChain().getTriple());
 
   ArgStringList CmdArgs;
@@ -172,7 +172,7 @@ void darwin::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
 
   // asm_final spec is empty.
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -264,7 +264,7 @@ void darwin::Linker::AddLinkArgs(Compilation &C, const ArgList &Args,
       TmpPathName = D.GetTemporaryDirectory("thinlto");
 
     if (!TmpPathName.empty()) {
-      auto *TmpPath = C.getArgs().MakeArgString(TmpPathName);
+      StringRef TmpPath = C.getArgs().MakeArgString(TmpPathName);
       C.addTempFile(TmpPath);
       CmdArgs.push_back("-object_path_lto");
       CmdArgs.push_back(TmpPath);
@@ -572,7 +572,7 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
           Args.getLastArg(options::OPT_foptimization_record_passes_EQ)) {
     CmdArgs.push_back("-mllvm");
     std::string Passes =
-        std::string("-lto-pass-remarks-filter=") + A->getValue();
+        ("-lto-pass-remarks-filter=" + A->getValue()).str();
     CmdArgs.push_back(Args.MakeArgString(Passes));
   }
 
@@ -590,7 +590,7 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
             Args.getLastArg(options::OPT_fdiagnostics_hotness_threshold_EQ)) {
       CmdArgs.push_back("-mllvm");
       std::string Opt =
-          std::string("-lto-pass-remarks-hotness-threshold=") + A->getValue();
+          ("-lto-pass-remarks-hotness-threshold=" + A->getValue()).str();
       CmdArgs.push_back(Args.MakeArgString(Opt));
     }
   }
@@ -600,7 +600,7 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   assert((Output.getType() == types::TY_Image ||
           Output.getType() == types::TY_Object) &&
          "Invalid linker output type.");
@@ -619,7 +619,7 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   VersionTuple Version = getMachOToolChain().getLinkerVersion(Args);
 
   bool LinkerIsLLD;
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(getToolChain().GetLinkerPath(&LinkerIsLLD));
 
   // Newer triples always use -platform-version.
@@ -761,7 +761,7 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-lobjc");
   }
 
-  if (LinkingOutput) {
+  if (!LinkingOutput.empty()) {
     CmdArgs.push_back("-arch_multiple");
     CmdArgs.push_back("-final_output");
     CmdArgs.push_back(LinkingOutput);
@@ -874,7 +874,7 @@ void darwin::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
                                          const InputInfo &Output,
                                          const InputInfoList &Inputs,
                                          const ArgList &Args,
-                                         const char *LinkingOutput) const {
+                                         StringRef LinkingOutput) const {
   const Driver &D = getToolChain().getDriver();
 
   // Silence warning for "clang -g foo.o -o foo"
@@ -904,7 +904,7 @@ void darwin::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Delete old output archive file if it already exists before generating a new
   // archive file.
-  const auto *OutputFileName = Output.getFilename();
+  StringRef OutputFileName = Output.getFilename();
   if (Output.isFilename() && llvm::sys::fs::exists(OutputFileName)) {
     if (std::error_code EC = llvm::sys::fs::remove(OutputFileName)) {
       D.Diag(diag::err_drv_unable_to_remove_file) << EC.message();
@@ -912,7 +912,7 @@ void darwin::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
+  StringRef Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -922,7 +922,7 @@ void darwin::Lipo::ConstructJob(Compilation &C, const JobAction &JA,
                                 const InputInfo &Output,
                                 const InputInfoList &Inputs,
                                 const ArgList &Args,
-                                const char *LinkingOutput) const {
+                                StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   CmdArgs.push_back("-create");
@@ -937,8 +937,8 @@ void darwin::Lipo::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   StringRef LipoName = Args.getLastArgValue(options::OPT_fuse_lipo_EQ, "lipo");
-  const char *Exec =
-      Args.MakeArgString(getToolChain().GetProgramPath(LipoName.data()));
+  StringRef Exec =
+      Args.MakeArgString(getToolChain().GetProgramPath(LipoName));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -947,7 +947,7 @@ void darwin::Dsymutil::ConstructJob(Compilation &C, const JobAction &JA,
                                     const InputInfo &Output,
                                     const InputInfoList &Inputs,
                                     const ArgList &Args,
-                                    const char *LinkingOutput) const {
+                                    StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   CmdArgs.push_back("-o");
@@ -958,7 +958,7 @@ void darwin::Dsymutil::ConstructJob(Compilation &C, const JobAction &JA,
   assert(Input.isFilename() && "Unexpected dsymutil input.");
   CmdArgs.push_back(Input.getFilename());
 
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(getToolChain().GetProgramPath("dsymutil"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -968,7 +968,7 @@ void darwin::VerifyDebug::ConstructJob(Compilation &C, const JobAction &JA,
                                        const InputInfo &Output,
                                        const InputInfoList &Inputs,
                                        const ArgList &Args,
-                                       const char *LinkingOutput) const {
+                                       StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
   CmdArgs.push_back("--verify");
   CmdArgs.push_back("--debug-info");
@@ -982,7 +982,7 @@ void darwin::VerifyDebug::ConstructJob(Compilation &C, const JobAction &JA,
   // Grabbing the output of the earlier dsymutil run.
   CmdArgs.push_back(Input.getFilename());
 
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(getToolChain().GetProgramPath("dwarfdump"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -1222,7 +1222,7 @@ void Darwin::VerifyTripleForSDK(const llvm::opt::ArgList &Args,
   } else if (const Arg *A = Args.getLastArg(options::OPT_isysroot)) {
     // If there is no SDK info, assume this is building against an SDK that
     // predates SDKSettings.json. Try to match the triple to the SDK path.
-    const char *isysroot = A->getValue();
+    StringRef isysroot = A->getValue();
     StringRef SDKName = getSDKName(isysroot);
     if (!SDKName.empty()) {
       bool supported = true;
@@ -1478,7 +1478,7 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
   // not have compiler-rt checked out or integrated into their build (unless
   // we explicitly force linking with this library).
   if ((Opts & RLO_AlwaysLink) || getVFS().exists(P)) {
-    const char *LibArg = Args.MakeArgString(P);
+    StringRef LibArg = Args.MakeArgString(P);
     CmdArgs.push_back(LibArg);
   }
 
@@ -1611,8 +1611,8 @@ static void addExportedSymbol(ArgStringList &CmdArgs, const char *Symbol) {
 /// macOS if it proves important.
 static void addSectalignToPage(const ArgList &Args, ArgStringList &CmdArgs,
                                StringRef Segment, StringRef Section) {
-  for (const char *A : {"-sectalign", Args.MakeArgString(Segment),
-                        Args.MakeArgString(Section), "0x4000"})
+  for (StringRef A : {StringRef("-sectalign"), Args.MakeArgString(Segment),
+                      Args.MakeArgString(Section), StringRef("0x4000")})
     CmdArgs.push_back(A);
 }
 
@@ -4025,7 +4025,7 @@ void Darwin::addStartObjectFileArgs(const ArgList &Args,
 
   if (isTargetMacOS() && Args.hasArg(options::OPT_shared_libgcc) &&
       isMacosxVersionLT(10, 5)) {
-    const char *Str = Args.MakeArgString(GetFilePath("crt3.o"));
+    StringRef Str = Args.MakeArgString(GetFilePath("crt3.o"));
     CmdArgs.push_back(Str);
   }
 }

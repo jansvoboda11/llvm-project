@@ -326,7 +326,7 @@ MATCHER_P(jobHasArgs, Substr, "") {
   const driver::Command &C = arg;
   std::string Args = "";
   llvm::ListSeparator Sep(" ");
-  for (const char *Arg : C.getArguments()) {
+  for (StringRef Arg : C.getArguments()) {
     Args += Sep;
     Args += Arg;
   }
@@ -533,7 +533,7 @@ TEST(ToolChainTest, CommandOutput) {
 
   const auto &CmdCompile = Jobs.getJobs().front();
   const auto &InFile = CmdCompile->getInputInfos().front().getFilename();
-  EXPECT_STREQ(InFile, "foo.cpp");
+  EXPECT_EQ(InFile, "foo.cpp");
   auto ObjFile = CmdCompile->getOutputFilenames().front();
   EXPECT_TRUE(StringRef(ObjFile).ends_with(".o"));
 

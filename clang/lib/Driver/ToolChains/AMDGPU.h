@@ -33,7 +33,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 void getAMDGPUTargetFeatures(const Driver &D, const llvm::Triple &Triple,
@@ -159,12 +159,12 @@ public:
   bool diagnoseUnsupportedOption(const llvm::opt::Arg *A,
                                  const llvm::opt::DerivedArgList &DAL,
                                  const llvm::opt::ArgList &DriverArgs,
-                                 const char *Value = nullptr) const {
+                                 StringRef Value = {}) const {
     auto &Diags = getDriver().getDiags();
     bool IsExplicitDevice =
         A->getBaseArg().getOption().matches(options::OPT_Xarch_device);
 
-    if (Value) {
+    if (!Value.empty()) {
       unsigned DiagID =
           IsExplicitDevice
               ? clang::diag::err_drv_unsupported_option_part_for_target
@@ -200,12 +200,12 @@ public:
     if (!Opt.matches(options::OPT_fsanitize_EQ))
       return false;
 
-    SmallVector<const char *, 4> SupportedSanitizers;
-    SmallVector<const char *, 4> UnSupportedSanitizers;
+    SmallVector<StringRef, 4> SupportedSanitizers;
+    SmallVector<StringRef, 4> UnSupportedSanitizers;
 
     SanitizerMask Supported = ROCMToolChain::getSupportedSanitizers();
     SanitizerMask SupportedMask;
-    for (const char *Value : A->getValues()) {
+    for (StringRef Value : A->getValues()) {
       SanitizerMask K = parseSanitizerValue(Value, /*Allow Groups*/ true);
       if (K & Supported) {
         SupportedSanitizers.push_back(Value);
@@ -222,7 +222,7 @@ public:
     }
     // If only some sanitizers are unsupported, report each one individually.
     if (!UnSupportedSanitizers.empty()) {
-      for (const char *Value : UnSupportedSanitizers) {
+      for (StringRef Value : UnSupportedSanitizers) {
         diagnoseUnsupportedOption(A, DAL, DriverArgs, Value);
       }
     }

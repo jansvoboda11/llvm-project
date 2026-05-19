@@ -6,6 +6,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator.h"
 
+#include <initializer_list>
 #include <string>
 
 namespace llvm {
@@ -82,6 +83,9 @@ public:
 
   ArrayRefOfStringRef(const SmallVectorImpl<StringRef> &Args)
       : DataAndKind(Args.data(), Kind::StringRef), Length(Args.size()) {}
+
+  ArrayRefOfStringRef(std::initializer_list<const char *> Args)
+      : DataAndKind(Args.begin(), Kind::CharPtr), Length(Args.size()) {}
 
   size_t size() const { return Length; }
 

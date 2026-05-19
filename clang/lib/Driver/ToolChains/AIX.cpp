@@ -31,7 +31,7 @@ void aix::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   const Driver &D = getToolChain().getDriver();
   ArgStringList CmdArgs;
 
@@ -79,7 +79,7 @@ void aix::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   if (II.isFilename())
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -110,7 +110,7 @@ static bool hasExportListLinkerOpts(const ArgStringList &CmdArgs) {
 void aix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                const InputInfo &Output,
                                const InputInfoList &Inputs, const ArgList &Args,
-                               const char *LinkingOutput) const {
+                               StringRef LinkingOutput) const {
   const AIX &ToolChain = static_cast<const AIX &>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   ArgStringList CmdArgs;
@@ -249,14 +249,14 @@ void aix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (Args.hasArg(options::OPT_shared) && !hasExportListLinkerOpts(CmdArgs)) {
 
-    const char *CreateExportListExec = Args.MakeArgString(
+    StringRef CreateExportListExec = Args.MakeArgString(
         path::parent_path(ToolChain.getDriver().ClangExecutable) +
         "/llvm-nm");
     ArgStringList CreateExportCmdArgs;
 
     std::string CreateExportListPath =
         C.getDriver().GetTemporaryPath("CreateExportList", "exp");
-    const char *ExportList =
+    StringRef ExportList =
         C.addTempFile(C.getArgs().MakeArgString(CreateExportListPath));
 
     for (const auto &II : Inputs)
@@ -276,7 +276,7 @@ void aix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         JA, *this, ResponseFileSupport::None(), CreateExportListExec,
         CreateExportCmdArgs, Inputs, Output);
     ExpCommand->setRedirectFiles(
-        {std::nullopt, std::string(ExportList), std::nullopt});
+        {std::nullopt, ExportList.str(), std::nullopt});
     C.addCommand(std::move(ExpCommand));
     CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-bE:") + ExportList));
   }
@@ -339,7 +339,7 @@ void aix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-lm");
     CmdArgs.push_back("-lpthread");
   }
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -520,10 +520,10 @@ static void addTocDataOptions(const llvm::opt::ArgList &Args,
                                                            : AddressInTOC;
 
     if (ArgTocDataSetting != DefaultTocDataSetting)
-      for (const char *Val : Arg->getValues())
+      for (StringRef Val : Arg->getValues())
         ExplicitlySpecifiedGlobals.insert(Val);
     else
-      for (const char *Val : Arg->getValues())
+      for (StringRef Val : Arg->getValues())
         ExplicitlySpecifiedGlobals.erase(Val);
   }
 

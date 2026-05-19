@@ -263,7 +263,7 @@ void msp430::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   const ToolChain &ToolChain = getToolChain();
   const Driver &D = ToolChain.getDriver();
   std::string Linker = ToolChain.GetProgramPath(getShortName());

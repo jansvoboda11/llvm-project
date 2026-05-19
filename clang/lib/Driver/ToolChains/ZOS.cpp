@@ -55,7 +55,7 @@ void zos::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   Args.AddAllArgValues(CmdArgs, options::OPT_Wa_COMMA, options::OPT_Xassembler);
@@ -77,7 +77,7 @@ void zos::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   if (II.isFilename())
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -115,7 +115,7 @@ static std::string getCSSHLQ(const ArgList &Args) {
 void zos::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                const InputInfo &Output,
                                const InputInfoList &Inputs, const ArgList &Args,
-                               const char *LinkingOutput) const {
+                               StringRef LinkingOutput) const {
   const ZOS &ToolChain = static_cast<const ZOS &>(getToolChain());
   ArgStringList CmdArgs;
 
@@ -215,7 +215,7 @@ void zos::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs))
     AddRunTimeLibs(ToolChain, ToolChain.getDriver(), CmdArgs, Args);
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }

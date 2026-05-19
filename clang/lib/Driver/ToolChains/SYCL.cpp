@@ -154,7 +154,7 @@ SYCLToolChain::TranslateArgs(const llvm::opt::DerivedArgList &Args,
       if (Opt.matches(UnsupportedOpt)) {
         if (Opt.getID() == options::OPT_fsanitize_EQ &&
             A->getValues().size() == 1) {
-          std::string SanitizeVal = A->getValue();
+          StringRef SanitizeVal = A->getValue();
           if (SanitizeVal == "address") {
             if (IsNewDAL)
               DAL->append(A);

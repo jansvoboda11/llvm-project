@@ -69,12 +69,12 @@ void AddStaticDeviceLibs(Compilation *C, const Tool *T, const JobAction *JA,
                          llvm::opt::ArgStringList &CmdArgs, StringRef Arch,
                          StringRef Target, bool isBitCodeSDL);
 
-const char *SplitDebugName(const JobAction &JA, const llvm::opt::ArgList &Args,
-                           const InputInfo &Input, const InputInfo &Output);
+StringRef SplitDebugName(const JobAction &JA, const llvm::opt::ArgList &Args,
+                         const InputInfo &Input, const InputInfo &Output);
 
 void SplitDebugInfo(const ToolChain &TC, Compilation &C, const Tool &T,
                     const JobAction &JA, const llvm::opt::ArgList &Args,
-                    const InputInfo &Output, const char *OutFile);
+                    const InputInfo &Output, StringRef OutFile);
 
 void addDTLTOOptions(const ToolChain &ToolChain, const llvm::opt::ArgList &Args,
                      llvm::opt::ArgStringList &CmdArgs);
@@ -256,7 +256,7 @@ void handleColorDiagnosticsArgs(const Driver &D, const llvm::opt::ArgList &Args,
 /// Add backslashes to escape spaces and other backslashes.
 /// This is used for the space-separated argument list specified with
 /// the -dwarf-debug-flags option.
-void escapeSpacesAndBackslashes(const char *Arg,
+void escapeSpacesAndBackslashes(StringRef Arg,
                                 llvm::SmallVectorImpl<char> &Res);
 
 /// Join the args in the given ArgList, escape spaces and backslashes and
@@ -264,8 +264,8 @@ void escapeSpacesAndBackslashes(const char *Arg,
 /// result of using either the -frecord-command-line or -grecord-command-line
 /// options. The lifetime of the returned c-string will match that of the Args
 /// argument.
-const char *renderEscapedCommandLine(const ToolChain &TC,
-                                     const llvm::opt::ArgList &Args);
+StringRef renderEscapedCommandLine(const ToolChain &TC,
+                                   const llvm::opt::ArgList &Args);
 
 /// Check if the command line should be recorded in the object file. This is
 /// done if either -frecord-command-line or -grecord-command-line options have

@@ -735,11 +735,11 @@ static void GenerateArg(ArgumentConsumer Consumer,
 // Parse command line arguments into CompilerInvocation.
 using ParseFn =
     llvm::function_ref<bool(CompilerInvocation &, llvm::ArrayRefOfStringRef,
-                            DiagnosticsEngine &, const char *)>;
+                            DiagnosticsEngine &, StringRef)>;
 
 // Generate command line arguments from CompilerInvocation.
 using GenerateFn = llvm::function_ref<void(
-    CompilerInvocation &, SmallVectorImpl<const char *> &,
+    CompilerInvocation &, SmallVectorImpl<StringRef> &,
     CompilerInvocation::StringAllocator)>;
 
 /// May perform round-trip of command line arguments. By default, the round-trip
@@ -763,8 +763,8 @@ using GenerateFn = llvm::function_ref<void(
 static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
                       CompilerInvocation &RealInvocation,
                       CompilerInvocation &DummyInvocation,
-                      ArrayRef<StringRef> CommandLineArgs,
-                      DiagnosticsEngine &Diags, const char *Argv0,
+                      llvm::ArrayRefOfStringRef CommandLineArgs,
+                      DiagnosticsEngine &Diags, StringRef Argv0,
                       bool CheckAgainstOriginalInvocation = false,
                       bool ForceRoundTrip = false) {
 #ifndef NDEBUG
@@ -837,7 +837,7 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
   // Generate arguments from the dummy invocation. If Generate is the
   // inverse of Parse, the newly generated arguments must have the same
   // semantics as the original.
-  SmallVector<const char *> GeneratedArgs;
+  SmallVector<StringRef> GeneratedArgs;
   Generate(DummyInvocation, GeneratedArgs, SA);
 
   // Run the second parse, now on the generated arguments, and with the real
@@ -855,27 +855,21 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
     return false;
   }
 
-  SmallVector<const char *> ComparisonArgs;
-  if (CheckAgainstOriginalInvocation)
+  SmallVector<StringRef> ComparisonArgs;
+  if (CheckAgainstOriginalInvocation) {
     // Compare against original arguments.
-    ComparisonArgs.assign(CommandLineArgs.begin(), CommandLineArgs.end());
-  else
+    ComparisonArgs.reserve(CommandLineArgs.size());
+    for (StringRef A : CommandLineArgs)
+      ComparisonArgs.push_back(A);
+  } else
     // Generate arguments again, this time from the options we will end up using
     // for the rest of the compilation.
     Generate(RealInvocation, ComparisonArgs, SA);
 
-  // Compares two lists of arguments.
-  auto Equal = [](const ArrayRef<const char *> A,
-                  const ArrayRef<const char *> B) {
-    return llvm::equal(A, B, [](const char *AElem, const char *BElem) {
-      return StringRef(AElem) == StringRef(BElem);
-    });
-  };
-
   // If we generated different arguments from what we assume are two
   // semantically equivalent CompilerInvocations, the Generate function may
   // be non-deterministic.
-  if (!Equal(GeneratedArgs, ComparisonArgs)) {
+  if (GeneratedArgs != ComparisonArgs) {
     Diags.Report(diag::err_cc1_round_trip_mismatch);
     Diags.Report(diag::note_cc1_round_trip_generated)
         << 1 << SerializeArgs(GeneratedArgs);
@@ -894,14 +888,14 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
 
 bool CompilerInvocation::checkCC1RoundTrip(ArrayRef<const char *> Args,
                                            DiagnosticsEngine &Diags,
-                                           const char *Argv0) {
+                                           StringRef Argv0) {
   CompilerInvocation DummyInvocation1, DummyInvocation2;
   return RoundTrip(
       [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
-         DiagnosticsEngine &Diags, const char *Argv0) {
+         DiagnosticsEngine &Diags, StringRef Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
-      [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
+      [](CompilerInvocation &Invocation, SmallVectorImpl<StringRef> &Args,
          StringAllocator SA) {
         Args.push_back("-cc1");
         Invocation.generateCC1CommandLine(Args, SA);
@@ -2606,7 +2600,7 @@ void CompilerInvocationBase::GenerateDiagnosticArgs(
 }
 
 std::unique_ptr<DiagnosticOptions>
-clang::CreateAndPopulateDiagOpts(ArrayRef<const char *> Argv) {
+clang::CreateAndPopulateDiagOpts(llvm::ArrayRefOfStringRef Argv) {
   auto DiagOpts = std::make_unique<DiagnosticOptions>();
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList Args = getDriverOptTable().ParseArgs(
@@ -3112,7 +3106,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ActionName = A->getValue();
   }
   for (const auto *AA : Args.filtered(OPT_plugin_arg))
-    Opts.PluginArgs[AA->getValue(0)].emplace_back(AA->getValue(1));
+    Opts.PluginArgs[AA->getValue(0).str()].emplace_back(AA->getValue(1));
 
   for (const std::string &Arg :
          Args.getAllArgValues(OPT_ftest_module_file_extension_EQ)) {
@@ -3424,7 +3418,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
 #undef HEADER_SEARCH_OPTION_WITH_MARSHALLING
 
   if (const Arg *A = Args.getLastArg(OPT_stdlib_EQ))
-    Opts.UseLibcxx = (strcmp(A->getValue(), "libc++") == 0);
+    Opts.UseLibcxx = A->getValue() == "libc++";
 
   // Only the -fmodule-file=<name>=<file> form.
   for (const auto *A : Args.filtered(OPT_fmodule_file)) {
@@ -3460,7 +3454,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
                               llvm::StringRef(A->getValue()).substr(1));
       return std::string(Buffer);
     }
-    return A->getValue();
+    return A->getValue().str();
   };
 
   for (const auto *A : Args.filtered(OPT_I, OPT_F)) {
@@ -3476,9 +3470,9 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
     if (A->getOption().matches(OPT_iprefix))
       Prefix = A->getValue();
     else if (A->getOption().matches(OPT_iwithprefix))
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::After, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::After, false, true);
     else
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::Angled, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::Angled, false, true);
   }
 
   for (const auto *A : Args.filtered(OPT_idirafter))
@@ -3551,7 +3545,7 @@ static void ParseAPINotesArgs(APINotesOptions &Opts, ArgList &Args,
           << A->getAsString(Args) << A->getValue();
   }
   for (const Arg *A : Args.filtered(OPT_iapinotes_modules))
-    Opts.ModuleSearchPaths.push_back(A->getValue());
+    Opts.ModuleSearchPaths.emplace_back(A->getValue());
 }
 
 static void GeneratePointerAuthArgs(const LangOptions &Opts,
@@ -4568,7 +4562,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(OPT_frandomize_layout_seed_file_EQ)) {
-    std::ifstream SeedFile(A->getValue(0));
+    std::ifstream SeedFile(A->getValue(0).str());
 
     if (!SeedFile.is_open())
       Diags.Report(diag::err_drv_cannot_open_randomize_layout_seed_file)
@@ -4873,7 +4867,7 @@ static bool ParsePreprocessorArgs(PreprocessorOptions &Opts, ArgList &Args,
                         Args.hasArg(OPT_pch_through_hdrstop_use);
 
   for (const auto *A : Args.filtered(OPT_error_on_deserialized_pch_decl))
-    Opts.DeserializedPCHDeclsToErrorOn.insert(A->getValue());
+    Opts.DeserializedPCHDeclsToErrorOn.insert(A->getValue().str());
 
   if (const Arg *A = Args.getLastArg(OPT_preamble_bytes_EQ)) {
     StringRef Value(A->getValue());
@@ -5039,8 +5033,8 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
 }
 
 bool CompilerInvocation::CreateFromArgsImpl(
-    CompilerInvocation &Res, ArrayRef<const char *> CommandLineArgs,
-    DiagnosticsEngine &Diags, const char *Argv0) {
+    CompilerInvocation &Res, llvm::ArrayRefOfStringRef CommandLineArgs,
+    DiagnosticsEngine &Diags, StringRef Argv0) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
   // Parse the arguments.
@@ -5175,15 +5169,15 @@ bool CompilerInvocation::CreateFromArgsImpl(
 bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
                                         llvm::ArrayRefOfStringRef CommandLineArgs,
                                         DiagnosticsEngine &Diags,
-                                        const char *Argv0) {
+                                        StringRef Argv0) {
   CompilerInvocation DummyInvocation;
 
   return RoundTrip(
       [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
-         DiagnosticsEngine &Diags, const char *Argv0) {
+         DiagnosticsEngine &Diags, StringRef Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
-      [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
+      [](CompilerInvocation &Invocation, SmallVectorImpl<StringRef> &Args,
          StringAllocator SA) {
         Args.push_back("-cc1");
         Invocation.generateCC1CommandLine(Args, SA);

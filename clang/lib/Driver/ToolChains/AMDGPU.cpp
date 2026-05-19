@@ -552,20 +552,20 @@ void RocmInstallationDetector::AddHIPIncludeArgs(const ArgList &DriverArgs,
       D.Diag(diag::err_drv_no_hipstdpar_prim_lib);
       return;
     }
-    const char *ThrustPath;
+    StringRef ThrustPath;
     if (HasRocThrustLibrary)
       ThrustPath = DriverArgs.MakeArgString(HIPRocThrustPathArg);
     else
       ThrustPath = DriverArgs.MakeArgString(Inc + "/thrust");
 
-    const char *HIPStdParPath;
+    StringRef HIPStdParPath;
     if (hasHIPStdParLibrary())
       HIPStdParPath = DriverArgs.MakeArgString(HIPStdParPathArg);
     else
-      HIPStdParPath = DriverArgs.MakeArgString(StringRef(ThrustPath) +
+      HIPStdParPath = DriverArgs.MakeArgString(ThrustPath +
                                                "/system/hip/hipstdpar");
 
-    const char *PrimPath;
+    StringRef PrimPath;
     if (HasRocPrimLibrary)
       PrimPath = DriverArgs.MakeArgString(HIPRocPrimPathArg);
     else
@@ -601,7 +601,7 @@ void amdgpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   std::string Linker = getToolChain().GetLinkerPath();
   ArgStringList CmdArgs;
   if (!Args.hasArg(options::OPT_r)) {

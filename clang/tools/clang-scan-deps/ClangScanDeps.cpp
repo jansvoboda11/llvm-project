@@ -263,8 +263,11 @@ static void ParseArgs(int argc, char **argv) {
 
   VerbatimArgs = Args.hasArg(OPT_verbatim_args);
 
-  if (const llvm::opt::Arg *A = Args.getLastArgNoClaim(OPT_DASH_DASH))
-    CommandLine.assign(A->getValues().begin(), A->getValues().end());
+  if (const llvm::opt::Arg *A = Args.getLastArgNoClaim(OPT_DASH_DASH)) {
+    CommandLine.clear();
+    for (StringRef V : A->getValues())
+      CommandLine.push_back(V.data());
+  }
 }
 
 class SharedStream {

@@ -247,29 +247,29 @@ public:
 
   /// addTempFile - Add a file to remove on exit, and returns its
   /// argument.
-  const char *addTempFile(const char *Name) {
+  StringRef addTempFile(StringRef Name) {
     TempFiles.push_back(Name);
     return Name;
   }
 
   /// addResultFile - Add a file to remove on failure, and returns its
   /// argument.
-  const char *addResultFile(const char *Name, const JobAction *JA) {
+  StringRef addResultFile(StringRef Name, const JobAction *JA) {
     ResultFiles[JA] = Name;
     return Name;
   }
 
   /// addFailureResultFile - Add a file to remove if we crash, and returns its
   /// argument.
-  const char *addFailureResultFile(const char *Name, const JobAction *JA) {
+  StringRef addFailureResultFile(StringRef Name, const JobAction *JA) {
     FailureResultFiles[JA] = Name;
     return Name;
   }
 
-  const char *getTimeTraceFile(const JobAction *JA) const {
+  StringRef getTimeTraceFile(const JobAction *JA) const {
     return TimeTraceFiles.lookup(JA);
   }
-  void addTimeTraceFile(const char *Name, const JobAction *JA) {
+  void addTimeTraceFile(StringRef Name, const JobAction *JA) {
     assert(!TimeTraceFiles.contains(JA));
     TimeTraceFiles[JA] = Name;
   }
@@ -278,7 +278,7 @@ public:
   ///
   /// \param IssueErrors - Report failures as errors.
   /// \return Whether the file was removed successfully.
-  bool CleanupFile(const char *File, bool IssueErrors = false) const;
+  bool CleanupFile(StringRef File, bool IssueErrors = false) const;
 
   /// CleanupFileList - Remove the files in the given list.
   ///

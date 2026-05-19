@@ -36,7 +36,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 } // namespace PScpu
 
@@ -51,7 +51,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 } // namespace PS4cpu
 
@@ -66,7 +66,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 } // namespace PS5cpu
 

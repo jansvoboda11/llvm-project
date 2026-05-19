@@ -299,7 +299,7 @@ void tools::hlsl::Validator::ConstructJob(Compilation &C, const JobAction &JA,
                                           const InputInfo &Output,
                                           const InputInfoList &Inputs,
                                           const ArgList &Args,
-                                          const char *LinkingOutput) const {
+                                          StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
   assert(Inputs.size() == 1 && "Unable to handle multiple inputs.");
   const InputInfo &Input = Inputs[0];
@@ -325,7 +325,7 @@ void tools::hlsl::Validator::ConstructJob(Compilation &C, const JobAction &JA,
     llvm_unreachable("unexpected triple for HLSL validation");
   }
 
-  const char *Exec = Args.MakeArgString(ExecPath);
+  StringRef Exec = Args.MakeArgString(ExecPath);
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Input));
 }
@@ -333,7 +333,7 @@ void tools::hlsl::Validator::ConstructJob(Compilation &C, const JobAction &JA,
 void tools::hlsl::MetalConverter::ConstructJob(
     Compilation &C, const JobAction &JA, const InputInfo &Output,
     const InputInfoList &Inputs, const ArgList &Args,
-    const char *LinkingOutput) const {
+    StringRef LinkingOutput) const {
   std::string MSCPath = getToolChain().GetProgramPath("metal-shaderconverter");
   ArgStringList CmdArgs;
   assert(Inputs.size() == 1 && "Unable to handle multiple inputs.");
@@ -344,12 +344,12 @@ void tools::hlsl::MetalConverter::ConstructJob(
 
   StringRef Reflection = Args.getLastArgValue(options::OPT_dxc_Fre);
   if (!Reflection.empty()) {
-    const char *ReflectionStr =
+    StringRef ReflectionStr =
         Args.MakeArgString(StringRef("--output-reflection-file=") + Reflection);
     CmdArgs.push_back(ReflectionStr);
   }
 
-  const char *Exec = Args.MakeArgString(MSCPath);
+  StringRef Exec = Args.MakeArgString(MSCPath);
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Input));
 }
@@ -358,10 +358,10 @@ void tools::hlsl::LLVMObjcopy::ConstructJob(Compilation &C, const JobAction &JA,
                                             const InputInfo &Output,
                                             const InputInfoList &Inputs,
                                             const ArgList &Args,
-                                            const char *LinkingOutput) const {
+                                            StringRef LinkingOutput) const {
 
   std::string ObjcopyPath = getToolChain().GetProgramPath("llvm-objcopy");
-  const char *Exec = Args.MakeArgString(ObjcopyPath);
+  StringRef Exec = Args.MakeArgString(ObjcopyPath);
 
   ArgStringList CmdArgs;
   assert(Inputs.size() == 1 && "Unable to handle multiple inputs.");
@@ -370,19 +370,19 @@ void tools::hlsl::LLVMObjcopy::ConstructJob(Compilation &C, const JobAction &JA,
   CmdArgs.push_back(Output.getFilename());
 
   if (Args.hasArg(options::OPT_dxc_strip_rootsignature)) {
-    const char *StripRS = Args.MakeArgString("--remove-section=RTS0");
+    StringRef StripRS = Args.MakeArgString("--remove-section=RTS0");
     CmdArgs.push_back(StripRS);
   }
 
   if (Arg *Arg = Args.getLastArg(options::OPT_dxc_Frs)) {
-    const char *Frs =
+    StringRef Frs =
         Args.MakeArgString("--extract-section=RTS0=" + Twine(Arg->getValue()));
     CmdArgs.push_back(Frs);
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_target_profile))
     if (isRootSignatureTarget(A->getValue())) {
-      const char *Fos = Args.MakeArgString("--only-section=RTS0");
+      StringRef Fos = Args.MakeArgString("--only-section=RTS0");
       CmdArgs.push_back(Fos);
     }
 

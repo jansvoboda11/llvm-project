@@ -31,7 +31,7 @@ void tools::MinGW::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                            const InputInfo &Output,
                                            const InputInfoList &Inputs,
                                            const ArgList &Args,
-                                           const char *LinkingOutput) const {
+                                           StringRef LinkingOutput) const {
   claimNoWarnArgs(Args);
   ArgStringList CmdArgs;
 
@@ -49,7 +49,7 @@ void tools::MinGW::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   for (const auto &II : Inputs)
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 
@@ -108,7 +108,7 @@ void tools::MinGW::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                         const InputInfo &Output,
                                         const InputInfoList &Inputs,
                                         const ArgList &Args,
-                                        const char *LinkingOutput) const {
+                                        StringRef LinkingOutput) const {
   const ToolChain &TC = getToolChain();
   const Driver &D = TC.getDriver();
   const SanitizerArgs &Sanitize = TC.getSanitizerArgs(Args);
@@ -207,7 +207,7 @@ void tools::MinGW::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("--functionpadmin");
 
   CmdArgs.push_back("-o");
-  const char *OutputFile = Output.getFilename();
+  StringRef OutputFile = Output.getFilename();
   // GCC implicitly adds an .exe extension if it is given an output file name
   // that lacks an extension.
   // GCC used to do this only when the compiler itself runs on windows, but
@@ -382,7 +382,7 @@ void tools::MinGW::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back(Args.MakeArgString(TC.GetFilePath("crtend.o")));
     }
   }
-  const char *Exec = Args.MakeArgString(TC.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(TC.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
                                          Exec, CmdArgs, Inputs, Output));

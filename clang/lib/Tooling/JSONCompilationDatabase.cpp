@@ -141,9 +141,12 @@ std::vector<std::string> unescapeCommandLine(JSONCommandLineSyntax Syntax,
   if (Syntax == JSONCommandLineSyntax::Windows) {
     llvm::BumpPtrAllocator Alloc;
     llvm::StringSaver Saver(Alloc);
-    llvm::SmallVector<const char *, 64> T;
+    llvm::SmallVector<StringRef, 64> T;
     llvm::cl::TokenizeWindowsCommandLine(EscapedCommandLine, Saver, T);
-    std::vector<std::string> Result(T.begin(), T.end());
+    std::vector<std::string> Result;
+    Result.reserve(T.size());
+    for (StringRef S : T)
+      Result.emplace_back(S);
     return Result;
   }
   assert(Syntax == JSONCommandLineSyntax::Gnu);

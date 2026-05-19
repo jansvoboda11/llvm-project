@@ -136,7 +136,7 @@ TEST(DxcModeTest, ValidatorVersionValidation) {
         TranslatedArgs->getLastArg(clang::options::OPT_dxil_validator_version);
     EXPECT_NE(A, nullptr);
     if (A) {
-      EXPECT_STREQ(A->getValue(), "1.1");
+      EXPECT_EQ(A->getValue(), "1.1");
     }
   }
   EXPECT_EQ(Diags.getNumErrors(), 0u);

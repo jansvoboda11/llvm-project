@@ -31,7 +31,7 @@ void solaris::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                       const InputInfo &Output,
                                       const InputInfoList &Inputs,
                                       const ArgList &Args,
-                                      const char *LinkingOutput) const {
+                                      StringRef LinkingOutput) const {
   // Just call the Gnu version, which enforces gas on Solaris.
   gnutools::Assembler::ConstructJob(C, JA, Output, Inputs, Args, LinkingOutput);
 }
@@ -82,7 +82,7 @@ void solaris::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                    const InputInfo &Output,
                                    const InputInfoList &Inputs,
                                    const ArgList &Args,
-                                   const char *LinkingOutput) const {
+                                   StringRef LinkingOutput) const {
   const auto &ToolChain = static_cast<const Solaris &>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   const llvm::Triple::ArchType Arch = ToolChain.getArch();
@@ -281,7 +281,7 @@ void solaris::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   ToolChain.addProfileRTLibs(Args, CmdArgs);
 
-  const char *Exec = Args.MakeArgString(getLinkerPath(Args));
+  StringRef Exec = Args.MakeArgString(getLinkerPath(Args));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }

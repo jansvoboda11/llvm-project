@@ -101,8 +101,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
       Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getHeaderSearchOpts().ResourceDir =
-        GetResourcesPath(Argv[0], nullptr);
+    Clang->getHeaderSearchOpts().ResourceDir = GetResourcesPath(Argv[0]);
 
   Clang->createVirtualFileSystem();
 
@@ -149,7 +148,7 @@ IncrementalCompilerBuilder::create(std::string TT,
   // If we don't know ClangArgv0 or the address of main() at this point, try
   // to guess it anyway (it's possible on some platforms).
   std::string MainExecutableName =
-      llvm::sys::fs::getMainExecutable(nullptr, nullptr);
+      llvm::sys::fs::getMainExecutable("", nullptr);
 
   ClangArgv.insert(ClangArgv.begin(), MainExecutableName.c_str());
 

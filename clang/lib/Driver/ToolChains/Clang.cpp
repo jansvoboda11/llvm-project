@@ -233,7 +233,7 @@ static const char *addDebugCompDirArg(const ArgList &Args,
   std::string DebugCompDir;
   if (Arg *A = Args.getLastArg(options::OPT_ffile_compilation_dir_EQ,
                                options::OPT_fdebug_compilation_dir_EQ))
-    DebugCompDir = A->getValue();
+    DebugCompDir = A->getValue().str();
 
   if (DebugCompDir.empty()) {
     if (llvm::ErrorOr<std::string> CWD = VFS.getCurrentWorkingDirectory())
@@ -248,8 +248,8 @@ static const char *addDebugCompDirArg(const ArgList &Args,
 }
 
 static void addDebugObjectName(const ArgList &Args, ArgStringList &CmdArgs,
-                               const char *DebugCompilationDir,
-                               const char *OutputFileName) {
+                               StringRef DebugCompilationDir,
+                               StringRef OutputFileName) {
   // No need to generate a value for -object-file-name if it was provided.
   for (auto *Arg : Args.filtered(options::OPT_Xclang))
     if (StringRef(Arg->getValue()).starts_with("-object-file-name"))
@@ -261,7 +261,7 @@ static void addDebugObjectName(const ArgList &Args, ArgStringList &CmdArgs,
   SmallString<128> ObjFileNameForDebug(OutputFileName);
   if (ObjFileNameForDebug != "-" &&
       !llvm::sys::path::is_absolute(ObjFileNameForDebug) &&
-      (!DebugCompilationDir ||
+      (DebugCompilationDir.empty() ||
        llvm::sys::path::is_absolute(DebugCompilationDir))) {
     // Make the path absolute in the debug infos like MSVC does.
     llvm::sys::fs::make_absolute(ObjFileNameForDebug);
@@ -626,7 +626,7 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, Compilation &C,
                options::OPT_fprofile_instr_generate) ||
            (ProfileGenerateArg->getOption().matches(
                 options::OPT_fprofile_instr_generate_EQ) &&
-            strlen(ProfileGenerateArg->getValue()) == 0)))
+            ProfileGenerateArg->getValue().empty())))
         CmdArgs.push_back("-fprofile-instrument-path=default.profraw");
     }
   }
@@ -850,7 +850,7 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   if (ArgM) {
     if (!JA.isDeviceOffloading(Action::OFK_HIP)) {
       // Determine the output location.
-      const char *DepFile;
+      StringRef DepFile;
       if (Arg *MF = Args.getLastArg(options::OPT_MF)) {
         DepFile = MF->getValue();
         C.addFailureResultFile(DepFile, &JA);
@@ -889,7 +889,7 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
 
     // Add a default target if one wasn't specified.
     if (!HasTarget) {
-      const char *DepTarget;
+      StringRef DepTarget;
 
       // If user provided -o, that is the dependency target, except
       // when we are only generating a dependency file.
@@ -1368,11 +1368,11 @@ void RenderARMABI(const Driver &D, const llvm::Triple &Triple,
   // Select the ABI to use.
   // FIXME: Support -meabi.
   // FIXME: Parts of this are duplicated in the backend, unify this somehow.
-  const char *ABIName = nullptr;
+  StringRef ABIName;
   if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
     ABIName = A->getValue();
   else
-    ABIName = llvm::ARM::computeDefaultTargetABI(Triple).data();
+    ABIName = llvm::ARM::computeDefaultTargetABI(Triple);
 
   CmdArgs.push_back("-target-abi");
   CmdArgs.push_back(ABIName);
@@ -1432,7 +1432,7 @@ static void CollectARMPACBTIOptions(const ToolChain &TC, const ArgList &Args,
     // activated in the `march` argument. This information is stored within the
     // CmdArgs variable and can be found using a search.
     if (isAArch64) {
-      auto isPAuthLR = [](const char *member) {
+      auto isPAuthLR = [](StringRef member) {
         llvm::AArch64::ExtensionInfo pauthlr_extension =
             llvm::AArch64::getExtensionByID(llvm::AArch64::AEK_PAUTHLR);
         return pauthlr_extension.PosTargetFeature == member;
@@ -1624,7 +1624,7 @@ void Clang::RenderTargetOptions(const llvm::Triple &EffectiveTriple,
 namespace {
 void RenderAArch64ABI(const llvm::Triple &Triple, const ArgList &Args,
                       ArgStringList &CmdArgs) {
-  const char *ABIName = nullptr;
+  StringRef ABIName;
   if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
     ABIName = A->getValue();
   else if (Triple.isOSDarwin())
@@ -1772,7 +1772,7 @@ void Clang::AddLoongArchTargetArgs(const ArgList &Args,
 
   // Handle -mtune.
   if (const Arg *A = Args.getLastArg(options::OPT_mtune_EQ)) {
-    std::string TuneCPU = A->getValue();
+    std::string TuneCPU = A->getValue().str();
     TuneCPU = loongarch::postProcessTargetCPUString(TuneCPU, Triple);
     CmdArgs.push_back("-tune-cpu");
     CmdArgs.push_back(Args.MakeArgString(TuneCPU));
@@ -1946,7 +1946,7 @@ void Clang::AddPPCTargetArgs(const ArgList &Args,
   }
 
   // Select the ABI to use.
-  const char *ABIName = nullptr;
+  StringRef ABIName;
   if (T.isOSBinFormatELF()) {
     switch (getToolChain().getArch()) {
     case llvm::Triple::ppc64: {
@@ -2017,7 +2017,7 @@ void Clang::AddPPCTargetArgs(const ArgList &Args,
     CmdArgs.push_back("hard");
   }
 
-  if (ABIName) {
+  if (!ABIName.empty()) {
     CmdArgs.push_back("-target-abi");
     CmdArgs.push_back(ABIName);
   }
@@ -2042,7 +2042,7 @@ void Clang::AddRISCVTargetArgs(const ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_mtune_EQ)) {
     CmdArgs.push_back("-tune-cpu");
-    if (strcmp(A->getValue(), "native") == 0)
+    if (A->getValue() == "native")
       CmdArgs.push_back(Args.MakeArgString(llvm::sys::getHostCPUName()));
     else
       CmdArgs.push_back(A->getValue());
@@ -2124,7 +2124,7 @@ void Clang::AddSystemZTargetArgs(const ArgList &Args,
                                  ArgStringList &CmdArgs) const {
   if (const Arg *A = Args.getLastArg(options::OPT_mtune_EQ)) {
     CmdArgs.push_back("-tune-cpu");
-    if (strcmp(A->getValue(), "native") == 0)
+    if (A->getValue() == "native")
       CmdArgs.push_back(Args.MakeArgString(llvm::sys::getHostCPUName()));
     else
       CmdArgs.push_back(A->getValue());
@@ -2675,8 +2675,8 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
           D.Diag(diag::err_drv_defsym_invalid_format) << Value;
           break;
         }
-        const char *S = A->getValue(1);
-        auto Pair = StringRef(S).split('=');
+        StringRef S = A->getValue(1);
+        auto Pair = S.split('=');
         auto Sym = Pair.first;
         auto SVal = Pair.second;
 
@@ -3762,10 +3762,10 @@ static void RenderOpenCLOptions(const ArgList &Args, ArgStringList &CmdArgs,
   };
 
   if (Arg *A = Args.getLastArg(options::OPT_cl_std_EQ)) {
-    std::string CLStdStr = std::string("-cl-std=") + A->getValue();
+    std::string CLStdStr = ("-cl-std=" + A->getValue()).str();
     CmdArgs.push_back(Args.MakeArgString(CLStdStr));
   } else if (Arg *A = Args.getLastArg(options::OPT_cl_ext_EQ)) {
-    std::string CLExtStr = std::string("-cl-ext=") + A->getValue();
+    std::string CLExtStr = ("-cl-ext=" + A->getValue()).str();
     CmdArgs.push_back(Args.MakeArgString(CLExtStr));
   }
 
@@ -3866,7 +3866,7 @@ bool Driver::getDefaultModuleCachePath(SmallVectorImpl<char> &Result) {
 
 llvm::SmallString<256>
 clang::driver::tools::getCXX20NamedModuleOutputPath(const ArgList &Args,
-                                                    const char *BaseInput) {
+                                                    StringRef BaseInput) {
   if (Arg *ModuleOutputEQ = Args.getLastArg(options::OPT_fmodule_output_EQ))
     return StringRef(ModuleOutputEQ->getValue());
 
@@ -4365,14 +4365,14 @@ static void RenderDiagnosticsOptions(const Driver &D, const ArgList &Args,
   if (const Arg *A =
           Args.getLastArg(options::OPT_fdiagnostics_hotness_threshold_EQ)) {
     std::string Opt =
-        std::string("-fdiagnostics-hotness-threshold=") + A->getValue();
+        ("-fdiagnostics-hotness-threshold=" + A->getValue()).str();
     CmdArgs.push_back(Args.MakeArgString(Opt));
   }
 
   if (const Arg *A =
           Args.getLastArg(options::OPT_fdiagnostics_misexpect_tolerance_EQ)) {
     std::string Opt =
-        std::string("-fdiagnostics-misexpect-tolerance=") + A->getValue();
+        ("-fdiagnostics-misexpect-tolerance=" + A->getValue()).str();
     CmdArgs.push_back(Args.MakeArgString(Opt));
   }
 
@@ -4968,7 +4968,7 @@ static void ProcessVSRuntimeLibrary(const ToolChain &TC, const ArgList &Args,
 
 void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                          const InputInfo &Output, const InputInfoList &Inputs,
-                         const ArgList &Args, const char *LinkingOutput) const {
+                         const ArgList &Args, StringRef LinkingOutput) const {
   const auto &TC = getToolChain();
   const llvm::Triple &RawTriple = TC.getTriple();
   const llvm::Triple &Triple = TC.getEffectiveTriple();
@@ -6251,7 +6251,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     (isa<AssembleJobAction>(JA) || isa<CompileJobAction>(JA) ||
                      isa<BackendJobAction>(JA));
   if (SplitDWARF) {
-    const char *SplitDWARFOut = SplitDebugName(JA, Args, Input, Output);
+    StringRef SplitDWARFOut = SplitDebugName(JA, Args, Input, Output);
     CmdArgs.push_back("-split-dwarf-file");
     CmdArgs.push_back(SplitDWARFOut);
     if (DwarfFission == DwarfFissionKind::Split) {
@@ -7106,7 +7106,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_malign_double);
   Args.AddLastArg(CmdArgs, options::OPT_fno_temp_file);
 
-  if (const char *Name = C.getTimeTraceFile(&JA)) {
+  if (StringRef Name = C.getTimeTraceFile(&JA); !Name.empty()) {
     CmdArgs.push_back(Args.MakeArgString("-ftime-trace=" + Twine(Name)));
     Args.AddLastArg(CmdArgs, options::OPT_ftime_trace_granularity_EQ);
     Args.AddLastArg(CmdArgs, options::OPT_ftime_trace_verbose);
@@ -8047,7 +8047,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_undef);
 
-  const char *Exec = D.getClangProgramPath();
+  StringRef Exec = D.getClangProgramPath();
 
   // Optionally embed the -cc1 level arguments into the debug info or a
   // section, for build analysis.
@@ -8861,23 +8861,23 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
   }
 }
 
-const char *Clang::getBaseInputName(const ArgList &Args,
-                                    const InputInfo &Input) {
+StringRef Clang::getBaseInputName(const ArgList &Args,
+                                  const InputInfo &Input) {
   return Args.MakeArgString(llvm::sys::path::filename(Input.getBaseInput()));
 }
 
-const char *Clang::getBaseInputStem(const ArgList &Args,
-                                    const InputInfoList &Inputs) {
-  const char *Str = getBaseInputName(Args, Inputs[0]);
+StringRef Clang::getBaseInputStem(const ArgList &Args,
+                                  const InputInfoList &Inputs) {
+  StringRef Str = getBaseInputName(Args, Inputs[0]);
 
-  if (const char *End = strrchr(Str, '.'))
-    return Args.MakeArgString(std::string(Str, End));
+  if (size_t Pos = Str.rfind('.'); Pos != StringRef::npos)
+    return Args.MakeArgString(Str.substr(0, Pos));
 
   return Str;
 }
 
-const char *Clang::getDependencyFileName(const ArgList &Args,
-                                         const InputInfoList &Inputs) {
+StringRef Clang::getDependencyFileName(const ArgList &Args,
+                                       const InputInfoList &Inputs) {
   // FIXME: Think about this more.
 
   if (Arg *OutputOpt = Args.getLastArg(options::OPT_o)) {
@@ -8945,7 +8945,7 @@ void ClangAs::AddRISCVTargetArgs(const ArgList &Args,
 void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
                            const InputInfo &Output, const InputInfoList &Inputs,
                            const ArgList &Args,
-                           const char *LinkingOutput) const {
+                           StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   assert(Inputs.size() == 1 && "Unexpected number of inputs.");
@@ -9101,9 +9101,9 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
       Arg->render(Args, OriginalArgs);
 
     SmallString<256> Flags;
-    const char *Exec = getToolChain().getDriver().getClangProgramPath();
+    StringRef Exec = getToolChain().getDriver().getClangProgramPath();
     escapeSpacesAndBackslashes(Exec, Flags);
-    for (const char *OriginalArg : OriginalArgs) {
+    for (StringRef OriginalArg : OriginalArgs) {
       SmallString<128> EscapedArg;
       escapeSpacesAndBackslashes(OriginalArg, EscapedArg);
       Flags += " ";
@@ -9234,7 +9234,7 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
   assert(Input.isFilename() && "Invalid input.");
   CmdArgs.push_back(Input.getFilename());
 
-  const char *Exec = getToolChain().getDriver().getClangProgramPath();
+  StringRef Exec = getToolChain().getDriver().getClangProgramPath();
   if (D.CC1Main && !D.CCGenDiagnostics) {
     // Invoke cc1as directly in this process.
     C.addCommand(std::make_unique<CC1Command>(
@@ -9252,7 +9252,7 @@ void OffloadBundler::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const llvm::opt::ArgList &TCArgs,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   // The version with only one output is expected to refer to a bundling job.
   assert(isa<OffloadBundlingJobAction>(JA) && "Expecting bundling job!");
 
@@ -9357,7 +9357,7 @@ void OffloadBundler::ConstructJob(Compilation &C, const JobAction &JA,
 void OffloadBundler::ConstructJobMultipleOutputs(
     Compilation &C, const JobAction &JA, const InputInfoList &Outputs,
     const InputInfoList &Inputs, const llvm::opt::ArgList &TCArgs,
-    const char *LinkingOutput) const {
+    StringRef LinkingOutput) const {
   // The version with multiple outputs is expected to refer to a unbundling job.
   auto &UA = cast<OffloadUnbundlingJobAction>(JA);
 
@@ -9445,7 +9445,7 @@ void OffloadPackager::ConstructJob(Compilation &C, const JobAction &JA,
                                    const InputInfo &Output,
                                    const InputInfoList &Inputs,
                                    const llvm::opt::ArgList &Args,
-                                   const char *LinkingOutput) const {
+                                   StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   // Add the output file name.
@@ -9500,7 +9500,7 @@ void LinkerWrapper::ConstructJob(Compilation &C, const JobAction &JA,
                                  const InputInfo &Output,
                                  const InputInfoList &Inputs,
                                  const ArgList &Args,
-                                 const char *LinkingOutput) const {
+                                 StringRef LinkingOutput) const {
   using namespace options;
 
   // A list of permitted options that will be forwarded to the embedded device
@@ -9775,7 +9775,7 @@ void LinkerWrapper::ConstructJob(Compilation &C, const JobAction &JA,
     for (auto Input : Inputs)
       CmdArgs.push_back(Input.getFilename());
   } else
-    for (const char *LinkArg : LinkCommand->getArguments())
+    for (StringRef LinkArg : LinkCommand->getArguments())
       CmdArgs.push_back(LinkArg);
 
   addOffloadCompressArgs(Args, CmdArgs);
@@ -9801,7 +9801,7 @@ void LinkerWrapper::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasArg(options::OPT_no_canonical_prefixes))
     CmdArgs.push_back("--no-canonical-prefixes");
 
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(getToolChain().GetProgramPath("clang-linker-wrapper"));
 
   // Replace the executable and arguments of the link job with the

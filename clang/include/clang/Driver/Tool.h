@@ -74,7 +74,7 @@ public:
                             const InputInfo &Output,
                             const InputInfoList &Inputs,
                             const llvm::opt::ArgList &TCArgs,
-                            const char *LinkingOutput) const = 0;
+                            StringRef LinkingOutput) const = 0;
   /// Construct jobs to perform the action \p JA, writing to the \p Outputs and
   /// with \p Inputs, and add the jobs to \p C. The default implementation
   /// assumes a single output and is expected to be overloaded for the tools
@@ -88,7 +88,7 @@ public:
                                            const InputInfoList &Outputs,
                                            const InputInfoList &Inputs,
                                            const llvm::opt::ArgList &TCArgs,
-                                           const char *LinkingOutput) const;
+                                           StringRef LinkingOutput) const;
 };
 
 } // end namespace driver
