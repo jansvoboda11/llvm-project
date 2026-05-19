@@ -61,9 +61,25 @@ module X { header "X.h" }
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "[[HASH_Y_WITH_A:.*]]",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/Y.h",
+// CHECK-NEXT:         "[[PREFIX]]/begin/begin.h",
+// CHECK-NEXT:         "[[PREFIX]]/a/a.h",
+// CHECK-NEXT:         "[[PREFIX]]/end/end.h"
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "Y"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "[[HASH_Y_WITH_A:.*]]",
+// CHECK-NEXT:           "context-hash": "[[HASH_Y_WITH_A]]",
 // CHECK-NEXT:           "module-name": "Y"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
@@ -77,22 +93,6 @@ module X { header "X.h" }
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "X"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "[[HASH_Y_WITH_A]]",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/Y.h",
-// CHECK-NEXT:         "[[PREFIX]]/begin/begin.h",
-// CHECK-NEXT:         "[[PREFIX]]/a/a.h",
-// CHECK-NEXT:         "[[PREFIX]]/end/end.h"
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "Y"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
@@ -115,9 +115,24 @@ module X { header "X.h" }
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "[[HASH_Y_WITHOUT_A:.*]]",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/Y.h",
+// CHECK-NEXT:         "[[PREFIX]]/begin/begin.h",
+// CHECK-NEXT:         "[[PREFIX]]/end/end.h"
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "Y"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "[[HASH_Y_WITHOUT_A:.*]]",
+// CHECK-NEXT:           "context-hash": "[[HASH_Y_WITHOUT_A]]",
 // CHECK-NEXT:           "module-name": "Y"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
@@ -133,21 +148,6 @@ module X { header "X.h" }
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "X"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "[[HASH_Y_WITHOUT_A]]",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/Y.h",
-// CHECK-NEXT:         "[[PREFIX]]/begin/begin.h",
-// CHECK-NEXT:         "[[PREFIX]]/end/end.h"
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "Y"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

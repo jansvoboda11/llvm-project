@@ -34,6 +34,11 @@ module third {}
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/third/module.modulemap",
+// CHECK:            "name": "third"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",

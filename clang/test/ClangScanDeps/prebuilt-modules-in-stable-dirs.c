@@ -39,11 +39,12 @@
 // PCH_DEP-NOT: "is-in-stable-directories": true
 
 // Verify is-in-stable-directories is only assigned to the module that only depends on A.
+// CLIENT: "is-in-stable-directories": true
+// CLIENT: "name": "sys"
+
 // CLIENT-NOT: "is-in-stable-directories": true
 
 // CLIENT: "name": "D"
-// CLIENT: "is-in-stable-directories": true
-// CLIENT: "name": "sys"
 
 // CLIENT-NOT: "is-in-stable-directories": true
 

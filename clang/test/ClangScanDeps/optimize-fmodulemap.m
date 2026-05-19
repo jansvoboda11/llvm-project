@@ -9,6 +9,18 @@
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/modules/B/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK-NOT:          "-fmodule-map-file=
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "{{.*}}",
+// CHECK-NEXT:       "file-deps": [
+// CHECK:            ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "B"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
@@ -26,18 +38,6 @@
 // CHECK:            ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "A"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/modules/B/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK-NOT:          "-fmodule-map-file=
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "{{.*}}",
-// CHECK-NEXT:       "file-deps": [
-// CHECK:            ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "B"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

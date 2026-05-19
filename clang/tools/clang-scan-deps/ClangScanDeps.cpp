@@ -406,7 +406,7 @@ static auto toJSONSorted(llvm::json::OStream &JOS, std::vector<std::string> V) {
 // Thread safe.
 class FullDeps {
 public:
-  FullDeps(size_t NumInputs) : Deps(NumInputs), Inputs(NumInputs) {}
+  FullDeps(size_t NumInputs, size_t NumTUs) : Deps(NumInputs), Inputs(NumTUs) {}
 
   void mergeDeps(StringRef Input, TranslationUnitDeps TUDeps,
                  size_t InputIndex) {
@@ -429,7 +429,9 @@ public:
   }
 
   void mergeDeps(ModuleDepsGraph Graph, size_t InputIndex) {
-    Deps[InputIndex] = std::move(Graph);
+    auto &InputDeps = Deps[InputIndex];
+    InputDeps.insert(InputDeps.end(), std::make_move_iterator(Graph.begin()),
+                     std::make_move_iterator(Graph.end()));
   }
 
   bool roundTripCommand(ArrayRef<std::string> ArgStrs,
@@ -473,8 +475,8 @@ public:
 
     // Associate modules with the first TU that (transitively) depends on them.
     llvm::DenseMap<ModuleID, unsigned> ModuleIDs;
-    for (const auto &[InputIndex, Input] : llvm::enumerate(Inputs)) {
-      for (auto &&MD : Deps[InputIndex]) {
+    for (const auto &[InputIndex, InputDeps] : llvm::enumerate(Deps)) {
+      for (auto &&MD : InputDeps) {
         auto [It, New] = ModuleIDs.insert({MD.ID, InputIndex});
         if (!New && It->second > InputIndex)
           It->second = InputIndex;
@@ -485,12 +487,17 @@ public:
 
     JOS.object([&] {
       JOS.attributeArray("modules", [&] {
-        for (const auto &[InputIndex, Input] : llvm::enumerate(Inputs)) {
-          for (auto &&MD : Deps[InputIndex]) {
+        llvm::DenseSet<ModuleID> Printed;
+        for (const auto &[InputIndex, InputDeps] : llvm::enumerate(Deps)) {
+          for (auto &&MD : InputDeps) {
           auto It = ModuleIDs.find(MD.ID);
           assert(It != ModuleIDs.end());
           // Report a dependency only with one chosen input.
           if (It->second != InputIndex)
+            continue;
+          // A single input may also reach the same module multiple times when
+          // it scans by multiple module names; only print it once.
+          if (!Printed.insert(MD.ID).second)
             continue;
 
           JOS.object([&] {
@@ -951,7 +958,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   };
 
   if (Format == ScanningOutputFormat::Full)
-    FD.emplace(!ModuleNames ? Inputs.size() : 0);
+    FD.emplace(Inputs.size(), !ModuleNames ? Inputs.size() : 0);
 
   std::atomic<size_t> NumStatusCalls = 0;
   std::atomic<size_t> NumOpenFileForReadCalls = 0;

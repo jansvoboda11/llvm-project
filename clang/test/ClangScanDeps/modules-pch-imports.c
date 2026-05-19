@@ -32,6 +32,9 @@
 // CHECK:      {
 // CHECK-NEXT:  "modules": [
 // CHECK-NEXT:     {
+// CHECK:            "name": "E"
+// CHECK:          }
+// CHECK:          {
 // CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK:                "module-name": "E"

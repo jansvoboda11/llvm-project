@@ -52,30 +52,6 @@ module Dependency { header "dependency.h" }
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
-// CHECK-NEXT:           "module-name": "FW_Private"
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/frameworks/FW.framework/Modules/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "{{.*}}",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Modules/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Modules/module.private.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Headers/FW.h"
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           "isFramework": true,
-// CHECK-NEXT:           "link-name": "FW"
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "name": "FW"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "{{.*}}",
 // CHECK-NEXT:           "module-name": "Dependency"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
@@ -95,6 +71,30 @@ module Dependency { header "dependency.h" }
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "name": "FW_Private"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "context-hash": "{{.*}}",
+// CHECK-NEXT:           "module-name": "FW_Private"
+// CHECK-NEXT:         }
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/frameworks/FW.framework/Modules/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "{{.*}}",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Modules/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Modules/module.private.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/frameworks/FW.framework/Headers/FW.h"
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "link-libraries": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "isFramework": true,
+// CHECK-NEXT:           "link-name": "FW"
+// CHECK-NEXT:         }
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "name": "FW"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

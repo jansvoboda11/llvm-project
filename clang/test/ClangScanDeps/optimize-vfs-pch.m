@@ -51,6 +51,19 @@
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/modules/E/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK-NOT:          "-ivfsoverlay"
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "{{.*}}",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "{{.*}}"
+// CHECK-NEXT:         "{{.*}}"
+// CHECK-NEXT:       ],
+// CHECK:            "name": "E"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
@@ -70,19 +83,6 @@
 // CHECK-NEXT:         "{{.*}}"
 // CHECK-NEXT:       ],
 // CHECK:            "name": "D"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/modules/E/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK-NOT:          "-ivfsoverlay"
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "{{.*}}",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "{{.*}}"
-// CHECK-NEXT:         "{{.*}}"
-// CHECK-NEXT:       ],
-// CHECK:            "name": "E"
 // CHECK-NEXT:     }
 
 //--- build/compile-commands-pch.json.in

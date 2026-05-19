@@ -23,9 +23,28 @@
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/Inputs/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK-NEXT:         "-cc1",
+// CHECK:              "-emit-module",
+// CHECK:              "-fno-modules-prune-non-affecting-module-map-files"
+// CHECK:              "-fmodule-name=header2",
+// CHECK-NOT:          "-fimplicit-module-maps",
+// CHECK:              "-fno-implicit-modules",
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "[[HASH_H2_DINCLUDE:[A-Z0-9]+]]",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "[[PREFIX]]/Inputs/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/Inputs/header2.h"
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "header2"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "[[HASH_H2_DINCLUDE:[A-Z0-9]+]]",
+// CHECK-NEXT:           "context-hash": "[[HASH_H2_DINCLUDE]]",
 // CHECK-NEXT:           "module-name": "header2"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
@@ -65,25 +84,6 @@
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "header1"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/Inputs/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK-NEXT:         "-cc1",
-// CHECK:              "-emit-module",
-// CHECK:              "-fno-modules-prune-non-affecting-module-map-files"
-// CHECK:              "-fmodule-name=header2",
-// CHECK-NOT:          "-fimplicit-module-maps",
-// CHECK:              "-fno-implicit-modules",
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "[[HASH_H2_DINCLUDE]]",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/Inputs/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/Inputs/header2.h"
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "header2"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

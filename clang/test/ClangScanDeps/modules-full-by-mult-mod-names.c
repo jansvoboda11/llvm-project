@@ -47,6 +47,19 @@ module root1 { header "root1.h"}
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:       "command-line": [
+// CHECK:            ],
+// CHECK-NEXT:       "context-hash": "{{.*}}",
+// CHECK-NEXT:       "file-deps": [
+// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/transitive.h"
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "link-libraries": [],
+// CHECK-NEXT:       "name": "transitive"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
@@ -100,19 +113,6 @@ module root1 { header "root1.h"}
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "root1"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:       "command-line": [
-// CHECK:            ],
-// CHECK-NEXT:       "context-hash": "{{.*}}",
-// CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/transitive.h"
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "transitive"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": []

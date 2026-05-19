@@ -33,29 +33,19 @@ module third {}
 // CHECK:       {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           "context-hash": "{{.*}}",
-// CHECK-NEXT:           "module-name": "second"
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/first/first/module.modulemap",
+// CHECK-NEXT:       "clang-module-deps": [],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/third/module.modulemap",
 // CHECK-NEXT:       "command-line": [
 // CHECK-NEXT:         "-cc1",
-// CHECK:              "-fmodule-map-file=[[PREFIX]]/second/second/module.modulemap"
-// CHECK-NOT:          "-fmodule-map-file=[[PREFIX]]/second/second/sub.modulemap"
-// CHECK-NOT:          "-fmodule-map-file=[[PREFIX]]/third/module.modulemap"
-// CHECK:              "-fmodule-file=second=[[PREFIX]]/cache/{{.*}}/second-{{.*}}.pcm"
+// CHECK-NOT:          "-fmodule-map-file=
+// CHECK-NOT:          "-fmodule-file=third=
 // CHECK:            ],
 // CHECK-NEXT:       "context-hash": "{{.*}}",
 // CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/first/first/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/first/first/first.h",
-// CHECK-NEXT:         "[[PREFIX]]/second/second/module.modulemap",
-// CHECK-NEXT:         "[[PREFIX]]/second/second/sub.modulemap"
+// CHECK-NEXT:         "[[PREFIX]]/third/module.modulemap"
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "first"
+// CHECK-NEXT:       "name": "third"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "clang-module-deps": [
@@ -81,19 +71,29 @@ module third {}
 // CHECK-NEXT:       "name": "second"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "clang-module-deps": [],
-// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/third/module.modulemap",
+// CHECK-NEXT:       "clang-module-deps": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "context-hash": "{{.*}}",
+// CHECK-NEXT:           "module-name": "second"
+// CHECK-NEXT:         }
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "clang-modulemap-file": "[[PREFIX]]/first/first/module.modulemap",
 // CHECK-NEXT:       "command-line": [
 // CHECK-NEXT:         "-cc1",
-// CHECK-NOT:          "-fmodule-map-file=
-// CHECK-NOT:          "-fmodule-file=third=
+// CHECK:              "-fmodule-map-file=[[PREFIX]]/second/second/module.modulemap"
+// CHECK-NOT:          "-fmodule-map-file=[[PREFIX]]/second/second/sub.modulemap"
+// CHECK-NOT:          "-fmodule-map-file=[[PREFIX]]/third/module.modulemap"
+// CHECK:              "-fmodule-file=second=[[PREFIX]]/cache/{{.*}}/second-{{.*}}.pcm"
 // CHECK:            ],
 // CHECK-NEXT:       "context-hash": "{{.*}}",
 // CHECK-NEXT:       "file-deps": [
-// CHECK-NEXT:         "[[PREFIX]]/third/module.modulemap"
+// CHECK-NEXT:         "[[PREFIX]]/first/first/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/first/first/first.h",
+// CHECK-NEXT:         "[[PREFIX]]/second/second/module.modulemap",
+// CHECK-NEXT:         "[[PREFIX]]/second/second/sub.modulemap"
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "link-libraries": [],
-// CHECK-NEXT:       "name": "third"
+// CHECK-NEXT:       "name": "first"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [

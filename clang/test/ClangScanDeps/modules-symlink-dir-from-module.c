@@ -20,6 +20,9 @@
 
 // CHECK: "modules": [
 // CHECK:   {
+// CHECK:     "name": "Mod"
+// CHECK:   }
+// CHECK:   {
 // CHECK:     "command-line": [
 // CHECK-NOT: ]
 // CHECK:       "-fmodule-map-file=[[PREFIX]]/include/module/module.modulemap"

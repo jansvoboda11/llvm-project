@@ -113,6 +113,19 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // CHECK-TU-INCREMENTAL:      {
 // CHECK-TU-INCREMENTAL-NEXT:   "modules": [
 // CHECK-TU-INCREMENTAL-NEXT:     {
+// CHECK-TU-INCREMENTAL-NEXT:       "clang-module-deps": [],
+// CHECK-TU-INCREMENTAL-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
+// CHECK-TU-INCREMENTAL-NEXT:       "command-line": [
+// CHECK-TU-INCREMENTAL:            ],
+// CHECK-TU-INCREMENTAL-NEXT:       "context-hash": "{{.*}}",
+// CHECK-TU-INCREMENTAL-NEXT:       "file-deps": [
+// CHECK-TU-INCREMENTAL-NEXT:         "[[PREFIX]]/module.modulemap",
+// CHECK-TU-INCREMENTAL-NEXT:         "[[PREFIX]]/mod_tu_extra.h"
+// CHECK-TU-INCREMENTAL-NEXT:       ],
+// CHECK-TU-INCREMENTAL-NEXT:       "link-libraries": [],
+// CHECK-TU-INCREMENTAL-NEXT:       "name": "mod_tu_extra"
+// CHECK-TU-INCREMENTAL-NEXT:     },
+// CHECK-TU-INCREMENTAL-NEXT:     {
 // CHECK-TU-INCREMENTAL-NEXT:       "clang-module-deps": [
 // CHECK-TU-INCREMENTAL-NEXT:         {
 // CHECK-TU-INCREMENTAL-NEXT:           "context-hash": "{{.*}}",
@@ -129,19 +142,6 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // CHECK-TU-INCREMENTAL-NEXT:       ],
 // CHECK-TU-INCREMENTAL-NEXT:       "link-libraries": [],
 // CHECK-TU-INCREMENTAL-NEXT:       "name": "mod_tu"
-// CHECK-TU-INCREMENTAL-NEXT:     },
-// CHECK-TU-INCREMENTAL-NEXT:     {
-// CHECK-TU-INCREMENTAL-NEXT:       "clang-module-deps": [],
-// CHECK-TU-INCREMENTAL-NEXT:       "clang-modulemap-file": "[[PREFIX]]/module.modulemap",
-// CHECK-TU-INCREMENTAL-NEXT:       "command-line": [
-// CHECK-TU-INCREMENTAL:            ],
-// CHECK-TU-INCREMENTAL-NEXT:       "context-hash": "{{.*}}",
-// CHECK-TU-INCREMENTAL-NEXT:       "file-deps": [
-// CHECK-TU-INCREMENTAL-NEXT:         "[[PREFIX]]/module.modulemap",
-// CHECK-TU-INCREMENTAL-NEXT:         "[[PREFIX]]/mod_tu_extra.h"
-// CHECK-TU-INCREMENTAL-NEXT:       ],
-// CHECK-TU-INCREMENTAL-NEXT:       "link-libraries": [],
-// CHECK-TU-INCREMENTAL-NEXT:       "name": "mod_tu_extra"
 // CHECK-TU-INCREMENTAL-NEXT:     }
 // CHECK-TU-INCREMENTAL-NEXT:   ],
 // CHECK-TU-INCREMENTAL-NEXT:   "translation-units": [

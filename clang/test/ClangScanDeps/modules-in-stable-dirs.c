@@ -24,12 +24,16 @@
 // Verify that there are no more occurances of sysroot.
 // CHECK-NOT:            "is-in-stable-directories"
 
-// CHECK:            "name": "A"
-// CHECK:            "USE_VFS"
-// CHECK:            "name": "B"
-// CHECK:            "name": "C"
-// CHECK:            "name": "D"
 // CHECK:            "name": "NotInSDK"
+// CHECK:            "name": "D"
+// CHECK:            "name": "C"
+// CHECK:            "name": "B"
+// CHECK:            "USE_VFS"
+// CHECK:            "name": "A"
+// CHECK:            "name": "NotInSDK"
+// CHECK:            "name": "D"
+// CHECK:            "name": "C"
+// CHECK:            "name": "B"
 
 //--- compile-commands.json.in
 [
