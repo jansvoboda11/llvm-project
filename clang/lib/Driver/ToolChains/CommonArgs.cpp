@@ -746,7 +746,7 @@ static StringRef getAMDGPUTargetGPU(const llvm::Triple &T,
 
 static std::string getLanaiTargetCPU(const ArgList &Args) {
   if (Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
-    return A->getValue();
+    return A->getValue().str();
   }
   return "";
 }
@@ -794,7 +794,7 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
 
   case llvm::Triple::avr:
     if (const Arg *A = Args.getLastArg(options::OPT_mmcu_EQ))
-      return A->getValue();
+      return A->getValue().str();
     return "";
 
   case llvm::Triple::m68k:
@@ -813,7 +813,7 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
   case llvm::Triple::nvptx:
   case llvm::Triple::nvptx64:
     if (const Arg *A = Args.getLastArg(options::OPT_march_EQ))
-      return A->getValue();
+      return A->getValue().str();
     return "";
 
   case llvm::Triple::ppc:
@@ -827,9 +827,9 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
 
   case llvm::Triple::csky:
     if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ))
-      return A->getValue();
+      return A->getValue().str();
     else if (const Arg *A = Args.getLastArg(options::OPT_march_EQ))
-      return A->getValue();
+      return A->getValue().str();
     else
       return "ck810";
   case llvm::Triple::riscv32:
@@ -841,7 +841,7 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
   case llvm::Triple::bpfel:
   case llvm::Triple::bpfeb:
     if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ))
-      return A->getValue();
+      return A->getValue().str();
     return "";
 
   case llvm::Triple::sparc:
@@ -877,7 +877,7 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
 
   case llvm::Triple::xtensa:
     if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ))
-      return A->getValue();
+      return A->getValue().str();
     return "";
   }
 }
@@ -1059,7 +1059,7 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
   const bool IsOSAIX = Triple.isOSAIX();
   const bool IsAMDGCN = Triple.isAMDGCN();
   StringRef Linker = Args.getLastArgValue(options::OPT_fuse_ld_EQ);
-  const char *LinkerPath = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef LinkerPath = Args.MakeArgString(ToolChain.GetLinkerPath());
   const Driver &D = ToolChain.getDriver();
   const bool IsFatLTO = Args.hasFlag(options::OPT_ffat_lto_objects,
                                      options::OPT_fno_fat_lto_objects, false);
@@ -1976,9 +1976,9 @@ bool tools::areOptimizationsEnabled(const ArgList &Args) {
   return false;
 }
 
-const char *tools::SplitDebugName(const JobAction &JA, const ArgList &Args,
-                                  const InputInfo &Input,
-                                  const InputInfo &Output) {
+StringRef tools::SplitDebugName(const JobAction &JA, const ArgList &Args,
+                                const InputInfo &Input,
+                                const InputInfo &Output) {
   auto AddPostfix = [JA](auto &F) {
     if (JA.getOffloadingDeviceKind() == Action::OFK_HIP)
       F += (Twine("_") + JA.getOffloadingArch().ArchName).str();
@@ -2012,7 +2012,7 @@ const char *tools::SplitDebugName(const JobAction &JA, const ArgList &Args,
 
 void tools::SplitDebugInfo(const ToolChain &TC, Compilation &C, const Tool &T,
                            const JobAction &JA, const ArgList &Args,
-                           const InputInfo &Output, const char *OutFile) {
+                           const InputInfo &Output, StringRef OutFile) {
   ArgStringList ExtractArgs;
   ExtractArgs.push_back("--extract-dwo");
 
@@ -2024,7 +2024,7 @@ void tools::SplitDebugInfo(const ToolChain &TC, Compilation &C, const Tool &T,
   ExtractArgs.push_back(Output.getFilename());
   ExtractArgs.push_back(OutFile);
 
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(TC.GetProgramPath(CLANG_DEFAULT_OBJCOPY));
   InputInfo II(types::TY_Object, Output.getFilename(), Output.getFilename());
 
@@ -3159,10 +3159,10 @@ void tools::handleColorDiagnosticsArgs(const Driver &D, const ArgList &Args,
   }
 }
 
-void tools::escapeSpacesAndBackslashes(const char *Arg,
+void tools::escapeSpacesAndBackslashes(StringRef Arg,
                                        llvm::SmallVectorImpl<char> &Res) {
-  for (; *Arg; ++Arg) {
-    switch (*Arg) {
+  for (char C : Arg) {
+    switch (C) {
     default:
       break;
     case ' ':
@@ -3170,14 +3170,14 @@ void tools::escapeSpacesAndBackslashes(const char *Arg,
       Res.push_back('\\');
       break;
     }
-    Res.push_back(*Arg);
+    Res.push_back(C);
   }
 }
 
-const char *tools::renderEscapedCommandLine(const ToolChain &TC,
-                                            const llvm::opt::ArgList &Args) {
+StringRef tools::renderEscapedCommandLine(const ToolChain &TC,
+                                          const llvm::opt::ArgList &Args) {
   const Driver &D = TC.getDriver();
-  const char *Exec = D.getDriverProgramPath();
+  StringRef Exec = D.getDriverProgramPath();
 
   llvm::opt::ArgStringList OriginalArgs;
   for (const auto &Arg : Args)
@@ -3185,7 +3185,7 @@ const char *tools::renderEscapedCommandLine(const ToolChain &TC,
 
   llvm::SmallString<256> Flags;
   escapeSpacesAndBackslashes(Exec, Flags);
-  for (const char *OriginalArg : OriginalArgs) {
+  for (StringRef OriginalArg : OriginalArgs) {
     llvm::SmallString<128> EscapedArg;
     escapeSpacesAndBackslashes(OriginalArg, EscapedArg);
     Flags += " ";
@@ -3446,12 +3446,13 @@ void tools::constructLLVMLinkCommand(Compilation &C, const Tool &T,
          "Must have at least one input.");
 
   ArgStringList LlvmLinkArgs(
-      {"-o", OutputFilename ? OutputFilename : Output.getFilename()});
+      {StringRef("-o"),
+       OutputFilename ? StringRef(OutputFilename) : Output.getFilename()});
 
   LlvmLinkArgs.append(LinkerInputs);
 
   const ToolChain &TC = T.getToolChain();
-  const char *LlvmLink = Args.MakeArgString(TC.GetProgramPath("llvm-link"));
+  StringRef LlvmLink = Args.MakeArgString(TC.GetProgramPath("llvm-link"));
   C.addCommand(std::make_unique<Command>(JA, T, ResponseFileSupport::None(),
                                          LlvmLink, LlvmLinkArgs, JobInputs,
                                          Output));

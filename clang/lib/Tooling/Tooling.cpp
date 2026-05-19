@@ -168,7 +168,7 @@ getCC1Arguments(DiagnosticsEngine *Diagnostics,
 
 /// Returns a clang build invocation initialized from the CC1 flags.
 CompilerInvocation *newInvocation(DiagnosticsEngine *Diagnostics,
-                                  ArrayRef<const char *> CC1Args,
+                                  llvm::ArrayRefOfStringRef CC1Args,
                                   const char *const BinaryName) {
   assert(!CC1Args.empty() && "Must at least contain the program name!");
   CompilerInvocation *Invocation = new CompilerInvocation;
@@ -308,7 +308,7 @@ void addExpandedResponseFiles(std::vector<std::string> &CommandLine,
                               llvm::cl::TokenizerCallback Tokenizer,
                               llvm::vfs::FileSystem &FS) {
   bool SeenRSPFile = false;
-  llvm::SmallVector<const char *, 20> Argv;
+  llvm::SmallVector<StringRef, 20> Argv;
   Argv.reserve(CommandLine.size());
   for (auto &Arg : CommandLine) {
     Argv.push_back(Arg.c_str());
@@ -368,7 +368,7 @@ ToolInvocation::~ToolInvocation() {
 }
 
 bool ToolInvocation::run() {
-  llvm::opt::ArgStringList Argv;
+  SmallVector<const char *, 16> Argv;
   for (const std::string &Str : CommandLine)
     Argv.push_back(Str.c_str());
   const char *const BinaryName = Argv[0];

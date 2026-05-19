@@ -224,7 +224,7 @@ static void applyArgsForStdModuleManifestInputs(
 static std::optional<std::string>
 getModuleCachePath(llvm::opt::DerivedArgList &Args) {
   if (const Arg *A = Args.getLastArg(options::OPT_fmodules_cache_path))
-    return A->getValue();
+    return A->getValue().str();
 
   if (SmallString<128> Path; Driver::getDefaultModuleCachePath(Path))
     return std::string(Path);
@@ -545,7 +545,7 @@ static SmallVector<std::string, 0> buildCommandLine(const Command &Job) {
   SmallVector<std::string, 0> CommandLine;
   CommandLine.reserve(JobArgs.size() + 1);
   CommandLine.emplace_back(Job.getExecutable());
-  for (const char *Arg : JobArgs)
+  for (StringRef Arg : JobArgs)
     CommandLine.emplace_back(Arg);
   return CommandLine;
 }

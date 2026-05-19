@@ -201,7 +201,7 @@ void hexagon::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                       const InputInfo &Output,
                                       const InputInfoList &Inputs,
                                       const ArgList &Args,
-                                      const char *LinkingOutput) const {
+                                      StringRef LinkingOutput) const {
   claimNoWarnArgs(Args);
 
   auto &HTC = static_cast<const toolchains::HexagonToolChain&>(getToolChain());
@@ -271,7 +271,7 @@ void hexagon::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
       II.getInputArg().render(Args, CmdArgs);
   }
 
-  auto *Exec = Args.MakeArgString(HTC.GetProgramPath(AsName));
+  StringRef Exec = Args.MakeArgString(HTC.GetProgramPath(AsName));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -286,7 +286,7 @@ constructHexagonLinkArgs(Compilation &C, const JobAction &JA,
                          const toolchains::HexagonToolChain &HTC,
                          const InputInfo &Output, const InputInfoList &Inputs,
                          const ArgList &Args, ArgStringList &CmdArgs,
-                         const char *LinkingOutput) {
+                         StringRef LinkingOutput) {
 
   const Driver &D = HTC.getDriver();
 
@@ -301,7 +301,7 @@ constructHexagonLinkArgs(Compilation &C, const JobAction &JA,
   bool IncStartFiles = !Args.hasArg(options::OPT_nostartfiles);
   bool IncDefLibs = !Args.hasArg(options::OPT_nodefaultlibs);
   bool UseLLD = false;
-  const char *Exec = Args.MakeArgString(HTC.GetLinkerPath(&UseLLD));
+  StringRef Exec = Args.MakeArgString(HTC.GetLinkerPath(&UseLLD));
   StringRef LinkerName = llvm::sys::path::filename(Exec);
   UseLLD = UseLLD || LinkerName.starts_with("ld.lld") ||
            LinkerName.ends_with("ld.lld") ||
@@ -548,14 +548,14 @@ void hexagon::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                    const InputInfo &Output,
                                    const InputInfoList &Inputs,
                                    const ArgList &Args,
-                                   const char *LinkingOutput) const {
+                                   StringRef LinkingOutput) const {
   auto &HTC = static_cast<const toolchains::HexagonToolChain&>(getToolChain());
 
   ArgStringList CmdArgs;
   constructHexagonLinkArgs(C, JA, HTC, Output, Inputs, Args, CmdArgs,
                            LinkingOutput);
 
-  const char *Exec = Args.MakeArgString(HTC.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(HTC.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));

@@ -304,7 +304,7 @@ void Flang::addDebugOptions(const llvm::opt::ArgList &Args, const JobAction &JA,
         isa<BackendJobAction>(JA))
       return;
 
-    const char *SplitDWARFOut = SplitDebugName(JA, Args, Input, Output);
+    StringRef SplitDWARFOut = SplitDebugName(JA, Args, Input, Output);
     CmdArgs.push_back("-split-dwarf-file");
     CmdArgs.push_back(SplitDWARFOut);
     if (DwarfFission == DwarfFissionKind::Split) {
@@ -855,7 +855,7 @@ void Flang::addOffloadOptions(Compilation &C, const InputInfoList &Inputs,
           Args.MakeArgString("-fembed-offload-object=" +
                              getToolChain().getInputFilename(Inputs[i])));
     } else if (IsOpenMPDevice) {
-      if (Inputs[i].getFilename()) {
+      if (!Inputs[i].getFilename().empty()) {
         CmdArgs.push_back("-fopenmp-host-ir-file-path");
         CmdArgs.push_back(Args.MakeArgString(Inputs[i].getFilename()));
       } else {
@@ -1280,7 +1280,7 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, const JobAction &JA,
 
 void Flang::ConstructJob(Compilation &C, const JobAction &JA,
                          const InputInfo &Output, const InputInfoList &Inputs,
-                         const ArgList &Args, const char *LinkingOutput) const {
+                         const ArgList &Args, StringRef LinkingOutput) const {
   const auto &TC = getToolChain();
   const llvm::Triple &Triple = TC.getEffectiveTriple();
   const std::string &TripleStr = Triple.getTriple();
@@ -1580,7 +1580,7 @@ void Flang::ConstructJob(Compilation &C, const JobAction &JA,
   bool DXRecordCmdLine = false;
   if (shouldRecordCommandLine(TC, Args, FRecordCmdLine, GRecordCmdLine,
                               DXRecordCmdLine)) {
-    const char *CmdLine = renderEscapedCommandLine(TC, Args);
+    StringRef CmdLine = renderEscapedCommandLine(TC, Args);
     if (FRecordCmdLine) {
       CmdArgs.push_back("-record-command-line");
       CmdArgs.push_back(CmdLine);
@@ -1612,9 +1612,9 @@ void Flang::ConstructJob(Compilation &C, const JobAction &JA,
   if (DriverName.find("clang") != std::string::npos && D.IsFlangMode())
     isClangDriverWithFlangMode = true;
 
-  const char *Exec = isClangDriverWithFlangMode
-                         ? Args.MakeArgString(D.GetProgramPath("flang", TC))
-                         : D.getDriverProgramPath();
+  StringRef Exec = isClangDriverWithFlangMode
+                       ? Args.MakeArgString(D.GetProgramPath("flang", TC))
+                       : D.getDriverProgramPath();
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
                                          Exec, CmdArgs, Inputs, Output));

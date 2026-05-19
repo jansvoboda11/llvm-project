@@ -63,7 +63,7 @@ using namespace clang;
 using namespace clang::driver;
 using namespace llvm::opt;
 
-std::string GetExecutablePath(const char *Argv0, bool CanonicalPrefixes) {
+std::string GetExecutablePath(StringRef Argv0, bool CanonicalPrefixes) {
   if (!CanonicalPrefixes) {
     SmallString<128> ExecutablePath(Argv0);
     // Do a PATH lookup if Argv0 isn't a valid path.
@@ -84,16 +84,16 @@ static const char *GetStableCStr(llvm::StringSet<> &SavedStrings, StringRef S) {
   return SavedStrings.insert(S).first->getKeyData();
 }
 
-extern int cc1_main(ArrayRef<const char *> Argv, const char *Argv0,
+extern int cc1_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0,
                     void *MainAddr);
-extern int cc1as_main(ArrayRef<const char *> Argv, const char *Argv0,
+extern int cc1as_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0,
                       void *MainAddr);
-extern int cc1gen_reproducer_main(ArrayRef<const char *> Argv,
-                                  const char *Argv0, void *MainAddr,
+extern int cc1gen_reproducer_main(llvm::ArrayRefOfStringRef Argv,
+                                  StringRef Argv0, void *MainAddr,
                                   const llvm::ToolContext &);
 
 static void insertTargetAndModeArgs(const ParsedClangName &NameParts,
-                                    SmallVectorImpl<const char *> &ArgVector,
+                                    SmallVectorImpl<StringRef> &ArgVector,
                                     llvm::StringSet<> &SavedStrings) {
   // Put target and mode arguments at the start of argument list so that
   // arguments specified in command line could override them. Avoid putting
@@ -117,11 +117,11 @@ static void insertTargetAndModeArgs(const ParsedClangName &NameParts,
 }
 
 static void getCLEnvVarOptions(std::string &EnvValue, llvm::StringSaver &Saver,
-                               SmallVectorImpl<const char *> &Opts) {
+                               SmallVectorImpl<StringRef> &Opts) {
   llvm::cl::TokenizeWindowsCommandLine(EnvValue, Saver, Opts);
   // The first instance of '#' should be replaced with '=' in each option.
-  for (const char *Opt : Opts)
-    if (char *NumberSignPtr = const_cast<char *>(::strchr(Opt, '#')))
+  for (StringRef Opt : Opts)
+    if (char *NumberSignPtr = const_cast<char *>(::strchr(Opt.data(), '#')))
       *NumberSignPtr = '=';
 }
 
@@ -207,7 +207,7 @@ static void FixupDiagPrefixExeName(TextDiagnosticPrinter *DiagClient,
   DiagClient->setPrefix(std::string(ExeBasename));
 }
 
-static int ExecuteCC1Tool(SmallVectorImpl<const char *> &ArgV,
+static int ExecuteCC1Tool(SmallVectorImpl<StringRef> &ArgV,
                           const llvm::ToolContext &ToolContext,
                           IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
   // If we call the cc1 tool from the clangDriver library (through
@@ -223,6 +223,7 @@ static int ExecuteCC1Tool(SmallVectorImpl<const char *> &ArgV,
     llvm::errs() << toString(std::move(Err)) << '\n';
     return 1;
   }
+
   StringRef Tool = ArgV[1];
   void *GetExecutablePathVP = (void *)(intptr_t)GetExecutablePath;
   if (Tool == "-cc1")
@@ -242,9 +243,10 @@ static int ExecuteCC1Tool(SmallVectorImpl<const char *> &ArgV,
 int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
   noteBottomOfStack();
   llvm::setBugReportMsg("PLEASE submit a bug report to " BUG_REPORT_URL
+  llvm::setBugReportMsg("PLEASE submit a bug report to " BUG_REPORT_URL
                         " and include the crash backtrace and"
                         " dumped files.\n");
-  SmallVector<const char *, 256> Args(Argv, Argv + Argc);
+  SmallVector<StringRef, 256> Args(Argv, Argv + Argc);
 
   if (llvm::sys::Process::FixupStandardFileDescriptors())
     return 1;
@@ -281,9 +283,6 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
   // Driver::BuildCompilation()
   bool CanonicalPrefixes = true;
   for (int i = 1, size = Args.size(); i < size; ++i) {
-    // Skip end-of-line response file markers
-    if (Args[i] == nullptr)
-      continue;
     if (StringRef(Args[i]) == "-canonical-prefixes")
       CanonicalPrefixes = true;
     else if (StringRef(Args[i]) == "-no-canonical-prefixes")
@@ -296,8 +295,11 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
     // Arguments in "CL" are prepended.
     std::optional<std::string> OptCL = llvm::sys::Process::GetEnv("CL");
     if (OptCL) {
+      SmallVector<StringRef, 8> PrependedOptsRefs;
+      getCLEnvVarOptions(*OptCL, Saver, PrependedOptsRefs);
       SmallVector<const char *, 8> PrependedOpts;
-      getCLEnvVarOptions(*OptCL, Saver, PrependedOpts);
+      for (StringRef A : PrependedOptsRefs)
+        PrependedOpts.push_back(A.data());
 
       // Insert right after the program name to prepend to the argument list.
       Args.insert(Args.begin() + 1, PrependedOpts.begin(), PrependedOpts.end());
@@ -305,8 +307,11 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
     // Arguments in "_CL_" are appended.
     std::optional<std::string> Opt_CL_ = llvm::sys::Process::GetEnv("_CL_");
     if (Opt_CL_) {
+      SmallVector<StringRef, 8> AppendedOptsRefs;
+      getCLEnvVarOptions(*Opt_CL_, Saver, AppendedOptsRefs);
       SmallVector<const char *, 8> AppendedOpts;
-      getCLEnvVarOptions(*Opt_CL_, Saver, AppendedOpts);
+      for (StringRef A : AppendedOptsRefs)
+        AppendedOpts.push_back(A.data());
 
       // Insert at the end of the argument list to append.
       Args.append(AppendedOpts.begin(), AppendedOpts.end());
@@ -329,7 +334,7 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
   // Not having an additional process saves some execution time of Windows,
   // and makes debugging and profiling easier.
   bool UseNewCC1Process = CLANG_SPAWN_CC1;
-  for (const char *Arg : Args)
+  for (StringRef Arg : Args)
     UseNewCC1Process = llvm::StringSwitch<bool>(Arg)
                            .Case("-fno-integrated-cc1", true)
                            .Case("-fintegrated-cc1", false)
@@ -375,7 +380,7 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
     return 1;
 
   auto ExecuteCC1WithContext = [&ToolContext,
-                                &VFS](SmallVectorImpl<const char *> &ArgV) {
+                                &VFS](SmallVectorImpl<StringRef> &ArgV) {
     return ExecuteCC1Tool(ArgV, ToolContext, VFS);
   };
   if (!UseNewCC1Process) {

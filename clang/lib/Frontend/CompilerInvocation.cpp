@@ -738,12 +738,13 @@ static void GenerateArg(ArgumentConsumer Consumer,
 
 // Parse command line arguments into CompilerInvocation.
 using ParseFn =
-    llvm::function_ref<bool(CompilerInvocation &, ArrayRef<StringRef>,
-                            DiagnosticsEngine &, const char *)>;
+using ParseFn =
+    llvm::function_ref<bool(CompilerInvocation &, llvm::ArrayRefOfStringRef,
+                            DiagnosticsEngine &, StringRef)>;
 
 // Generate command line arguments from CompilerInvocation.
 using GenerateFn = llvm::function_ref<void(
-    CompilerInvocation &, SmallVectorImpl<const char *> &,
+    CompilerInvocation &, SmallVectorImpl<StringRef> &,
     CompilerInvocation::StringAllocator)>;
 
 /// May perform round-trip of command line arguments. By default, the round-trip
@@ -767,8 +768,8 @@ using GenerateFn = llvm::function_ref<void(
 static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
                       CompilerInvocation &RealInvocation,
                       CompilerInvocation &DummyInvocation,
-                      ArrayRef<StringRef> CommandLineArgs,
-                      DiagnosticsEngine &Diags, const char *Argv0,
+                      llvm::ArrayRefOfStringRef CommandLineArgs,
+                      DiagnosticsEngine &Diags, StringRef Argv0,
                       bool CheckAgainstOriginalInvocation = false,
                       bool ForceRoundTrip = false) {
 #ifndef NDEBUG
@@ -841,17 +842,14 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
   // Generate arguments from the dummy invocation. If Generate is the
   // inverse of Parse, the newly generated arguments must have the same
   // semantics as the original.
-  SmallVector<const char *> GeneratedArgs;
+  SmallVector<StringRef> GeneratedArgs;
   Generate(DummyInvocation, GeneratedArgs, SA);
 
   // Run the second parse, now on the generated arguments, and with the real
   // invocation and diagnostics. The result is what we will end up using for the
   // rest of compilation, so if Generate is not inverse of Parse, something down
   // the line will break.
-  bool Success2 = Parse(RealInvocation,
-                        SmallVector<StringRef>(GeneratedArgs.begin(),
-                                               GeneratedArgs.end()),
-                        Diags, Argv0);
+  bool Success2 = Parse(RealInvocation, GeneratedArgs, Diags, Argv0);
 
   // The first parse on original arguments succeeded, but second parse of
   // generated arguments failed. Something must be wrong with the generator.
@@ -862,28 +860,21 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
     return false;
   }
 
-  SmallVector<const char *> ComparisonArgs;
-  if (CheckAgainstOriginalInvocation)
+  SmallVector<StringRef> ComparisonArgs;
+  if (CheckAgainstOriginalInvocation) {
     // Compare against original arguments.
-    for (StringRef Arg : CommandLineArgs)
-      ComparisonArgs.push_back(Arg.data());
-  else
+    ComparisonArgs.reserve(CommandLineArgs.size());
+    for (StringRef A : CommandLineArgs)
+      ComparisonArgs.push_back(A);
+  } else
     // Generate arguments again, this time from the options we will end up using
     // for the rest of the compilation.
     Generate(RealInvocation, ComparisonArgs, SA);
 
-  // Compares two lists of arguments.
-  auto Equal = [](const ArrayRef<const char *> A,
-                  const ArrayRef<const char *> B) {
-    return llvm::equal(A, B, [](const char *AElem, const char *BElem) {
-      return StringRef(AElem) == StringRef(BElem);
-    });
-  };
-
   // If we generated different arguments from what we assume are two
   // semantically equivalent CompilerInvocations, the Generate function may
   // be non-deterministic.
-  if (!Equal(GeneratedArgs, ComparisonArgs)) {
+  if (GeneratedArgs != ComparisonArgs) {
     Diags.Report(diag::err_cc1_round_trip_mismatch);
     Diags.Report(diag::note_cc1_round_trip_generated)
         << 1 << SerializeArgs(GeneratedArgs);
@@ -902,14 +893,14 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
 
 bool CompilerInvocation::checkCC1RoundTrip(ArrayRef<StringRef> Args,
                                            DiagnosticsEngine &Diags,
-                                           const char *Argv0) {
+                                           StringRef Argv0) {
   CompilerInvocation DummyInvocation1, DummyInvocation2;
   return RoundTrip(
-      [](CompilerInvocation &Invocation, ArrayRef<StringRef> CommandLineArgs,
-         DiagnosticsEngine &Diags, const char *Argv0) {
+      [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
+         DiagnosticsEngine &Diags, StringRef Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
-      [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
+      [](CompilerInvocation &Invocation, SmallVectorImpl<StringRef> &Args,
          StringAllocator SA) {
         Args.push_back("-cc1");
         Invocation.generateCC1CommandLine(Args, SA);
@@ -2652,7 +2643,7 @@ void CompilerInvocationBase::GenerateDiagnosticArgs(
 }
 
 std::unique_ptr<DiagnosticOptions>
-clang::CreateAndPopulateDiagOpts(ArrayRef<const char *> Argv) {
+clang::CreateAndPopulateDiagOpts(llvm::ArrayRefOfStringRef Argv) {
   auto DiagOpts = std::make_unique<DiagnosticOptions>();
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList Args = getDriverOptTable().ParseArgs(
@@ -3542,9 +3533,9 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
     if (A->getOption().matches(OPT_iprefix))
       Prefix = A->getValue();
     else if (A->getOption().matches(OPT_iwithprefix))
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::After, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::After, false, true);
     else
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::Angled, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::Angled, false, true);
   }
 
   for (const auto *A : Args.filtered(OPT_idirafter))
@@ -3617,7 +3608,7 @@ static void ParseAPINotesArgs(APINotesOptions &Opts, ArgList &Args,
           << A->getAsString(Args) << A->getValue();
   }
   for (const Arg *A : Args.filtered(OPT_iapinotes_modules))
-    Opts.ModuleSearchPaths.push_back(A->getValue().str());
+    Opts.ModuleSearchPaths.emplace_back(A->getValue());
 }
 
 static void GeneratePointerAuthArgs(const LangOptions &Opts,
@@ -5138,8 +5129,9 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
 }
 
 bool CompilerInvocation::CreateFromArgsImpl(
-    CompilerInvocation &Res, ArrayRef<StringRef> CommandLineArgs,
-    DiagnosticsEngine &Diags, const char *Argv0) {
+bool CompilerInvocation::CreateFromArgsImpl(
+    CompilerInvocation &Res, llvm::ArrayRefOfStringRef CommandLineArgs,
+    DiagnosticsEngine &Diags, StringRef Argv0) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
   // Parse the arguments.
@@ -5281,17 +5273,18 @@ bool CompilerInvocation::CreateFromArgsImpl(
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
-bool CompilerInvocation::CreateFromArgs(
-    CompilerInvocation &Invocation, ArrayRef<StringRef> CommandLineArgs,
-    DiagnosticsEngine &Diags, const char *Argv0) {
+bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
+                                        llvm::ArrayRefOfStringRef CommandLineArgs,
+                                        DiagnosticsEngine &Diags,
+                                        StringRef Argv0) {
   CompilerInvocation DummyInvocation;
 
   return RoundTrip(
-      [](CompilerInvocation &Invocation, ArrayRef<StringRef> CommandLineArgs,
-         DiagnosticsEngine &Diags, const char *Argv0) {
+      [](CompilerInvocation &Invocation, llvm::ArrayRefOfStringRef CommandLineArgs,
+         DiagnosticsEngine &Diags, StringRef Argv0) {
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
-      [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
+      [](CompilerInvocation &Invocation, SmallVectorImpl<StringRef> &Args,
          StringAllocator SA) {
         Args.push_back("-cc1");
         Invocation.generateCC1CommandLine(Args, SA);

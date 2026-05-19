@@ -555,7 +555,8 @@ Expected<StringRef> clang(ArrayRef<StringRef> InputFiles, const ArgList &Args,
 
         file_magic Magic;
         if (auto EC = identify_magic(Arg->getValue(), Magic))
-          return createStringError("Failed to open %s", Arg->getValue());
+          return createStringError("Failed to open %s",
+                                   Arg->getValue().str().c_str());
         if (Magic != file_magic::archive &&
             Magic != file_magic::elf_shared_object)
           continue;
@@ -1404,7 +1405,8 @@ getDeviceInput(const ArgList &Args) {
             : searchInput(Arg->getValue(), Root, InputPaths);
 
     if (!Filename && Arg->getOption().matches(OPT_library))
-      return createStringError("unable to find library -l%s", Arg->getValue());
+      return createStringError("unable to find library -l%s",
+                               Arg->getValue().str().c_str());
 
     if (!Filename || !sys::fs::exists(*Filename) ||
         sys::fs::is_directory(*Filename))
@@ -1553,7 +1555,7 @@ int main(int Argc, char **Argv) {
   // This forwards '-mllvm' arguments to LLVM if present.
   SmallVector<const char *> NewArgv = {Argv[0]};
   for (const opt::Arg *Arg : Args.filtered(OPT_mllvm))
-    NewArgv.push_back(Arg->getValue());
+    NewArgv.push_back(Arg->getValue().data());
   for (const opt::Arg *Arg : Args.filtered(OPT_offload_opt_eq_minus))
     NewArgv.push_back(Arg->getValue());
   cl::LibraryOptionsContext LibraryOptions;

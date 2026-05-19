@@ -52,7 +52,7 @@ void tools::uefi::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                        const InputInfo &Output,
                                        const InputInfoList &Inputs,
                                        const ArgList &Args,
-                                       const char *LinkingOutput) const {
+                                       StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
   auto &TC = static_cast<const toolchains::UEFI &>(getToolChain());
 

@@ -1414,7 +1414,7 @@ public:
 /// Return the path to the main executable, given the value of argv[0] from
 /// program startup and the address of main itself. In extremis, this function
 /// may fail and return an empty path.
-LLVM_ABI std::string getMainExecutable(const char *argv0, void *MainExecAddr);
+LLVM_ABI std::string getMainExecutable(StringRef argv0, void *MainExecAddr);
 
 /// @}
 /// @name Iterators

@@ -277,7 +277,7 @@ static void parseSpecialCaseListArg(const Driver &D,
       Arg->claim();
       StringRef SCLPath = Arg->getValue();
       if (D.getVFS().exists(SCLPath)) {
-        SCLFiles.push_back(SCLPath.str());
+        SCLFiles.emplace_back(SCLPath);
       } else if (DiagnoseErrors) {
         D.Diag(clang::diag::err_drv_no_such_file) << SCLPath;
       }

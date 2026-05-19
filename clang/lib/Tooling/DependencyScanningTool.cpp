@@ -106,12 +106,16 @@ buildCompilation(ArrayRef<std::string> ArgStrs, DiagnosticsEngine &Diags,
   bool CLMode = driver::IsClangCL(
       driver::getDriverMode(Argv[0], ArrayRef(Argv).slice(1)));
 
+  SmallVector<StringRef, 256> ArgvRefs(Argv.begin(), Argv.end());
   if (llvm::Error E =
-          driver::expandResponseFiles(Argv, CLMode, Alloc, FS.get())) {
+          driver::expandResponseFiles(ArgvRefs, CLMode, Alloc, FS.get())) {
     Diags.Report(diag::err_drv_expand_response_file)
         << llvm::toString(std::move(E));
     return std::make_pair(nullptr, nullptr);
   }
+  Argv.clear();
+  for (StringRef A : ArgvRefs)
+    Argv.push_back(A.data());
 
   std::unique_ptr<driver::Compilation> Compilation(
       Driver->BuildCompilation(Argv));

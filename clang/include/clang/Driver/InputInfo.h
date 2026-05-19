@@ -11,6 +11,7 @@
 
 #include "clang/Driver/Action.h"
 #include "clang/Driver/Types.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Arg.h"
 #include <cassert>
 #include <string>
@@ -33,67 +34,63 @@ class InputInfo {
     Pipe
   };
 
-  union {
-    const char *Filename;
-    const llvm::opt::Arg *InputArg;
-  } Data;
+  llvm::StringRef FilenameStr;
+  const llvm::opt::Arg *Arg = nullptr;
   Class Kind;
   const Action* Act;
   types::ID Type;
-  const char *BaseInput;
+  llvm::StringRef BaseInput;
 
   static types::ID GetActionType(const Action *A) {
     return A != nullptr ? A->getType() : types::TY_Nothing;
   }
 
 public:
-  InputInfo() : InputInfo(nullptr, nullptr) {}
-  InputInfo(const Action *A, const char *_BaseInput)
+  InputInfo() : InputInfo(nullptr, llvm::StringRef()) {}
+  InputInfo(const Action *A, llvm::StringRef _BaseInput)
       : Kind(Nothing), Act(A), Type(GetActionType(A)), BaseInput(_BaseInput) {}
 
-  InputInfo(types::ID _Type, const char *_Filename, const char *_BaseInput)
-      : Kind(Filename), Act(nullptr), Type(_Type), BaseInput(_BaseInput) {
-    Data.Filename = _Filename;
-  }
-  InputInfo(const Action *A, const char *_Filename, const char *_BaseInput)
-      : Kind(Filename), Act(A), Type(GetActionType(A)), BaseInput(_BaseInput) {
-    Data.Filename = _Filename;
-  }
+  InputInfo(types::ID _Type, llvm::StringRef _Filename,
+            llvm::StringRef _BaseInput)
+      : FilenameStr(_Filename), Kind(Filename), Act(nullptr), Type(_Type),
+        BaseInput(_BaseInput) {}
+  InputInfo(const Action *A, llvm::StringRef _Filename,
+            llvm::StringRef _BaseInput)
+      : FilenameStr(_Filename), Kind(Filename), Act(A),
+        Type(GetActionType(A)), BaseInput(_BaseInput) {}
 
   InputInfo(types::ID _Type, const llvm::opt::Arg *_InputArg,
-            const char *_BaseInput)
-      : Kind(InputArg), Act(nullptr), Type(_Type), BaseInput(_BaseInput) {
-    Data.InputArg = _InputArg;
-  }
+            llvm::StringRef _BaseInput)
+      : Arg(_InputArg), Kind(InputArg), Act(nullptr), Type(_Type),
+        BaseInput(_BaseInput) {}
   InputInfo(const Action *A, const llvm::opt::Arg *_InputArg,
-            const char *_BaseInput)
-      : Kind(InputArg), Act(A), Type(GetActionType(A)), BaseInput(_BaseInput) {
-    Data.InputArg = _InputArg;
-  }
+            llvm::StringRef _BaseInput)
+      : Arg(_InputArg), Kind(InputArg), Act(A), Type(GetActionType(A)),
+        BaseInput(_BaseInput) {}
 
   bool isNothing() const { return Kind == Nothing; }
   bool isFilename() const { return Kind == Filename; }
   bool isInputArg() const { return Kind == InputArg; }
   types::ID getType() const { return Type; }
-  const char *getBaseInput() const { return BaseInput; }
+  llvm::StringRef getBaseInput() const { return BaseInput; }
   /// The action for which this InputInfo was created.  May be null.
   const Action *getAction() const { return Act; }
   void setAction(const Action *A) { Act = A; }
 
-  const char *getFilename() const {
+  llvm::StringRef getFilename() const {
     assert(isFilename() && "Invalid accessor.");
-    return Data.Filename;
+    return FilenameStr;
   }
   const llvm::opt::Arg &getInputArg() const {
     assert(isInputArg() && "Invalid accessor.");
-    return *Data.InputArg;
+    return *Arg;
   }
 
   /// getAsString - Return a string name for this input, for
   /// debugging.
   std::string getAsString() const {
     if (isFilename())
-      return std::string("\"") + getFilename() + '"';
+      return ("\"" + getFilename() + "\"").str();
     else if (isInputArg())
       return "(input arg)";
     else

@@ -32,7 +32,7 @@ class CommandLineTest : public ::testing::Test {
 public:
   DiagnosticOptions DiagOpts;
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
-  SmallVector<const char *, 32> GeneratedArgs;
+  SmallVector<StringRef, 32> GeneratedArgs;
   BumpPtrAllocator Alloc;
   StringSaver StringPool;
   CompilerInvocation Invocation;
@@ -394,7 +394,7 @@ TEST_F(CommandLineTest, BoolOptionDefaultFalsePresentNegReset) {
 // The flag with negative spelling can set the keypath to false.
 
 TEST_F(CommandLineTest, BoolOptionDefaultArbitraryTwoFlagsPresentNone) {
-  const char *Args = {""};
+  const char *Args[] = {""};
 
   ASSERT_TRUE(CompilerInvocation::CreateFromArgs(Invocation, Args, *Diags));
   ASSERT_EQ(Invocation.getCodeGenOpts().ClearASTBeforeBackend, false);

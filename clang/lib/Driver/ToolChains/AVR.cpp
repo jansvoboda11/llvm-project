@@ -512,7 +512,7 @@ std::string AVRToolChain::getCompilerRT(const llvm::opt::ArgList &Args,
 void AVR::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                const InputInfo &Output,
                                const InputInfoList &Inputs, const ArgList &Args,
-                               const char *LinkingOutput) const {
+                               StringRef LinkingOutput) const {
   const auto &TC = static_cast<const AVRToolChain &>(getToolChain());
   const Driver &D = getToolChain().getDriver();
 

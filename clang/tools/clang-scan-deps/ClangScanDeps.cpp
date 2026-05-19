@@ -271,8 +271,11 @@ static void ParseArgs(int argc, char **argv) {
   if (const llvm::opt::Arg *A = Args.getLastArg(OPT_log_path_EQ))
     LogPath = A->getValue();
 
-  if (const llvm::opt::Arg *A = Args.getLastArgNoClaim(OPT_DASH_DASH))
-    CommandLine.assign(A->getValues().begin(), A->getValues().end());
+  if (const llvm::opt::Arg *A = Args.getLastArgNoClaim(OPT_DASH_DASH)) {
+    CommandLine.clear();
+    for (StringRef V : A->getValues())
+      CommandLine.push_back(V.data());
+  }
 }
 
 class SharedStream {
@@ -461,9 +464,7 @@ public:
                         DiagnosticsEngine &Diags) {
     if (ArgStrs.empty() || ArgStrs[0] != "-cc1")
       return false;
-    SmallVector<const char *> Args;
-    for (const std::string &Arg : ArgStrs)
-      Args.push_back(Arg.c_str());
+    SmallVector<StringRef> Args(ArgStrs.begin(), ArgStrs.end());
     return !CompilerInvocation::checkCC1RoundTrip(Args, Diags);
   }
 

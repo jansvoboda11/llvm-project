@@ -128,12 +128,16 @@ using namespace llvm::opt;
 
 template <typename F> static bool usesInput(const ArgList &Args, F &&Fn) {
   return llvm::any_of(Args, [&](Arg *A) {
-    return (A->getOption().matches(options::OPT_x) &&
-            Fn(types::lookupTypeForTypeSpecifier(A->getValue()))) ||
-           (A->getOption().getKind() == Option::InputClass &&
-            StringRef(A->getValue()).rfind('.') != StringRef::npos &&
-            Fn(types::lookupTypeForExtension(
-                &A->getValue()[StringRef(A->getValue()).rfind('.') + 1])));
+    if (A->getOption().matches(options::OPT_x) &&
+        Fn(types::lookupTypeForTypeSpecifier(A->getValue())))
+      return true;
+    if (A->getOption().getKind() != Option::InputClass)
+      return false;
+    StringRef Value = A->getValue();
+    size_t DotPos = Value.rfind('.');
+    if (DotPos == StringRef::npos)
+      return false;
+    return Fn(types::lookupTypeForExtension(Value.substr(DotPos + 1)));
   });
 }
 
@@ -263,7 +267,7 @@ void Driver::setDriverMode(StringRef Value) {
     Diag(diag::err_drv_unsupported_option_argument) << OptName << Value;
 }
 
-InputArgList Driver::ParseArgStrings(ArrayRef<const char *> ArgStrings,
+InputArgList Driver::ParseArgStrings(llvm::ArrayRefOfStringRef ArgStrings,
                                      bool UseDriverMode,
                                      bool &ContainsError) const {
   llvm::PrettyStackTraceString CrashInfo("Command line argument parsing");
@@ -341,7 +345,7 @@ InputArgList Driver::ParseArgStrings(ArrayRef<const char *> ArgStrings,
       continue;
 
     // Warn on joined arguments that are similar to a long argument.
-    std::string ArgString = ArgStrings[A->getIndex()];
+    std::string ArgString = ArgStrings[A->getIndex()].str();
     std::string Nearest;
     if (getOpts().findExact("-" + ArgString, Nearest, VisibilityMask))
       Diags.Report(diag::warn_drv_potentially_misspelled_joined_argument)
@@ -1256,19 +1260,18 @@ static void appendOneArg(InputArgList &Args, const Arg *Opt) {
   // to the ownership of Args.
   unsigned Index = Args.MakeIndex(Opt->getSpelling());
   Arg *Copy = new Arg(Opt->getOption(), Args.getArgString(Index), Index);
-  Copy->getValues() = Opt->getValues();
+  for (StringRef Value : Opt->getValues())
+    Copy->getValues().push_back(Value);
   if (Opt->isClaimed())
     Copy->claim();
-  Copy->setOwnsValues(Opt->getOwnsValues());
-  Opt->setOwnsValues(false);
   Args.append(Copy);
   if (Opt->getAlias()) {
     const Arg *Alias = Opt->getAlias();
     unsigned Index = Args.MakeIndex(Alias->getSpelling());
     auto AliasCopy = std::make_unique<Arg>(Alias->getOption(),
                                            Args.getArgString(Index), Index);
-    AliasCopy->getValues() = Alias->getValues();
-    AliasCopy->setOwnsValues(false);
+    for (StringRef Value : Alias->getValues())
+      AliasCopy->getValues().push_back(Value);
     if (Alias->isClaimed())
       AliasCopy->claim();
     Copy->setAlias(std::move(AliasCopy));
@@ -1291,7 +1294,7 @@ bool Driver::readConfigFile(StringRef FileName,
   }
 
   // Try reading the given file.
-  SmallVector<const char *, 32> NewCfgFileArgs;
+  SmallVector<StringRef, 32> NewCfgFileArgs;
   if (llvm::Error Err = ExpCtx.readConfigFile(FileName, NewCfgFileArgs)) {
     Diag(diag::err_drv_cannot_read_config_file)
         << FileName << toString(std::move(Err));
@@ -1299,11 +1302,11 @@ bool Driver::readConfigFile(StringRef FileName,
   }
 
   // Populate head and tail lists. The tail list is used only when linking.
-  SmallVector<const char *, 32> NewCfgHeadArgs, NewCfgTailArgs;
-  for (const char *Opt : NewCfgFileArgs) {
+  SmallVector<StringRef, 32> NewCfgHeadArgs, NewCfgTailArgs;
+  for (StringRef Opt : NewCfgFileArgs) {
     // An $-prefixed option should go to the tail list.
-    if (Opt[0] == '$' && Opt[1])
-      NewCfgTailArgs.push_back(Opt + 1);
+    if (Opt.starts_with("$") && Opt.size() > 1)
+      NewCfgTailArgs.push_back(Opt.drop_front(1));
     else
       NewCfgHeadArgs.push_back(Opt);
   }
@@ -1528,7 +1531,7 @@ bool Driver::loadDefaultConfigFiles(llvm::cl::ExpansionContext &ExpCtx) {
   return false;
 }
 
-Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
+Compilation *Driver::BuildCompilation(llvm::ArrayRefOfStringRef ArgList) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   // FIXME: Handle environment options which affect driver behavior, somewhere
@@ -1565,7 +1568,7 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
 
   // In CL mode, look for any pass-through arguments
   if (IsCLMode() && !ContainsError) {
-    SmallVector<const char *, 16> CLModePassThroughArgList;
+    SmallVector<StringRef, 16> CLModePassThroughArgList;
     for (const auto *A : Args.filtered(options::OPT__SLASH_clang)) {
       A->claim();
       CLModePassThroughArgList.push_back(A->getValue());
@@ -1688,7 +1691,7 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
     Dir = A->getValue();
   for (const Arg *A : Args.filtered(options::OPT_B)) {
     A->claim();
-    PrefixDirs.push_back(A->getValue(0));
+    PrefixDirs.push_back(std::string(A->getValue(0)));
   }
   if (std::optional<std::string> CompilerPathValue =
           llvm::sys::Process::GetEnv("COMPILER_PATH")) {
@@ -1789,7 +1792,7 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
   {
     SmallVector<std::string> MultilibMacroDefinesStr =
         TC.getMultilibMacroDefinesStr(*UArgs);
-    SmallVector<const char *> MLMacroDefinesChar(
+    SmallVector<StringRef> MLMacroDefinesChar(
         llvm::map_range(MultilibMacroDefinesStr, [&UArgs](const auto &S) {
           return UArgs->MakeArgString(Twine("-D") + Twine(S));
         }));
@@ -2119,14 +2122,14 @@ void Driver::generateCompilationDiagnostics(
 
   // If lld failed, rerun it again with --reproduce.
   if (IsLLD) {
-    const char *TmpName = CreateTempFile(C, "linker-crash", "tar");
+    StringRef TmpName = CreateTempFile(C, "linker-crash", "tar");
     Command NewLLDInvocation = Cmd;
     llvm::opt::ArgStringList ArgList = NewLLDInvocation.getArguments();
     StringRef ReproduceOption =
         C.getDefaultToolChain().getTriple().isWindowsMSVCEnvironment()
             ? "/reproduce:"
             : "--reproduce=";
-    ArgList.push_back(Saver.save(Twine(ReproduceOption) + TmpName).data());
+    ArgList.push_back(Saver.save(Twine(ReproduceOption) + TmpName));
     NewLLDInvocation.replaceArguments(std::move(ArgList));
 
     // Redirect stdout/stderr to /dev/null.
@@ -2136,7 +2139,7 @@ void Driver::generateCompilationDiagnostics(
     Diag(clang::diag::note_drv_command_failed_diag_msg)
         << "\n\n********************";
     if (Report)
-      Report->TemporaryFiles.push_back(TmpName);
+      Report->TemporaryFiles.push_back(std::string(TmpName));
     return;
   }
 
@@ -2156,7 +2159,7 @@ void Driver::generateCompilationDiagnostics(
       IgnoreInput = true;
     } else if (types::getPreprocessedType(it->first) == types::TY_INVALID) {
       IgnoreInput = true;
-    } else if (!strcmp(it->second->getValue(), "-")) {
+    } else if (it->second->getValue() == "-") {
       Diag(clang::diag::note_drv_command_failed_diag_msg)
           << "Error generating preprocessed source(s) - "
              "ignoring input from stdin.";
@@ -2240,11 +2243,14 @@ void Driver::generateCompilationDiagnostics(
 
   // Copying filenames due to ownership.
   const ArgStringList &Files = C.getTempFiles();
-  SmallVector<std::string> TempFiles(Files.begin(), Files.end());
+  SmallVector<std::string> TempFiles;
+  TempFiles.reserve(Files.size());
+  for (StringRef File : Files)
+    TempFiles.emplace_back(File);
 
   // We'd like to copy the IR input file into our own temp file
   // because the build system might try to clean-up after itself.
-  for (auto const *Input : IRInputs) {
+  for (StringRef Input : IRInputs) {
     int FD;
     llvm::SmallVector<char, 64> Path;
 
@@ -2293,8 +2299,8 @@ void Driver::generateCompilationDiagnostics(
     }
   }
 
-  for (const char *TempFile : SavedTemps)
-    TempFiles.push_back(TempFile);
+  for (StringRef TempFile : SavedTemps)
+    TempFiles.emplace_back(TempFile);
 
   // Assume associated files are based off of the first temporary file.
   CrashReportInfo CrashInfo(TempFiles[0], VFS);
@@ -3013,7 +3019,7 @@ void Driver::BuildUniversalActions(Compilation &C, const ToolChain &TC,
   // Collect the list of architectures. Duplicates are allowed, but should only
   // be handled once (in the order seen).
   llvm::StringSet<> ArchNames;
-  SmallVector<const char *, 4> Archs;
+  SmallVector<StringRef, 4> Archs;
   for (Arg *A : Args) {
     if (A->getOption().matches(options::OPT_arch)) {
       // Validate the option here; we don't save the type here because its
@@ -3236,7 +3242,7 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
-      const char *Value = A->getValue();
+      StringRef Value = A->getValue();
       types::ID Ty = types::TY_INVALID;
 
       // Infer the input type if necessary.
@@ -3246,7 +3252,7 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
           InputTypeArg->claim();
 
         // stdin must be handled specially.
-        if (strcmp(Value, "-") == 0) {
+        if (Value == "-") {
           if (IsFlangMode()) {
             Ty = types::TY_Fortran;
           } else if (IsDXCMode()) {
@@ -3272,8 +3278,9 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
           // clang-cl /E, or Object otherwise.
           // We use a host hook here because Darwin at least has its own
           // idea of what .s is.
-          if (const char *Ext = strrchr(Value, '.'))
-            Ty = TC.LookupTypeForExtension(Ext + 1);
+          size_t DotPos = Value.rfind('.');
+          if (DotPos != StringRef::npos)
+            Ty = TC.LookupTypeForExtension(Value.substr(DotPos + 1));
 
           if (Ty == types::TY_INVALID) {
             if (IsCLMode() && (Args.hasArgNoClaim(options::OPT_E) || CCGenDiagnostics))
@@ -3330,8 +3337,10 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
         if (!InputTypeArg->getOption().matches(options::OPT_x)) {
           // If emulating cl.exe, make sure that /TC and /TP don't affect input
           // object files.
-          const char *Ext = strrchr(Value, '.');
-          if (Ext && TC.LookupTypeForExtension(Ext + 1) == types::TY_Object)
+          size_t DotPos = Value.rfind('.');
+          if (DotPos != StringRef::npos &&
+              TC.LookupTypeForExtension(Value.substr(DotPos + 1)) ==
+                  types::TY_Object)
             Ty = types::TY_Object;
         }
         if (Ty == types::TY_INVALID) {
@@ -3441,7 +3450,7 @@ void Driver::handleArguments(Compilation &C, DerivedArgList &Args,
   // Ignore /Yc/Yu if both /Yc and /Yu passed but with different filenames.
   Arg *YcArg = Args.getLastArg(options::OPT__SLASH_Yc);
   Arg *YuArg = Args.getLastArg(options::OPT__SLASH_Yu);
-  if (YcArg && YuArg && strcmp(YcArg->getValue(), YuArg->getValue()) != 0) {
+  if (YcArg && YuArg && YcArg->getValue() != YuArg->getValue()) {
     Diag(clang::diag::warn_drv_ycyu_different_arg_clang_cl);
     Args.eraseArg(options::OPT__SLASH_Yc);
     Args.eraseArg(options::OPT__SLASH_Yu);
@@ -4445,11 +4454,11 @@ Action *Driver::ConstructPhaseAction(
 
     // If we're given a module name, precompile header file inputs as a
     // module, not as a precompiled header.
-    const char *ModName = nullptr;
+    StringRef ModName;
     if (OutputTy == types::TY_PCH) {
       if (Arg *A = Args.getLastArg(options::OPT_fmodule_name_EQ))
         ModName = A->getValue();
-      if (ModName)
+      if (!ModName.empty())
         OutputTy = types::TY_ModuleFile;
     }
 
@@ -4682,7 +4691,7 @@ void Driver::BuildJobs(Compilation &C) const {
     //
     // FIXME: This is a hack; find a cleaner way to integrate this into the
     // process.
-    const char *LinkingOutput = nullptr;
+    StringRef LinkingOutput;
     if (isa<LipoJobAction>(A)) {
       if (FinalOutput)
         LinkingOutput = FinalOutput->getValue();
@@ -4716,11 +4725,11 @@ void Driver::BuildJobs(Compilation &C) const {
       if (!ProcStat)
         return;
 
-      const char *LinkingOutput = nullptr;
+      StringRef LinkingOutput;
       if (FinalOutput)
         LinkingOutput = FinalOutput->getValue();
       else if (!Cmd.getOutputFilenames().empty())
-        LinkingOutput = Cmd.getOutputFilenames().front().c_str();
+        LinkingOutput = Cmd.getOutputFilenames().front();
       else
         LinkingOutput = getDefaultImageName();
 
@@ -5159,7 +5168,7 @@ static std::string GetTriplePlusArchString(const ToolChain *TC, BoundArch BA,
 
 InputInfoList Driver::BuildJobsForAction(
     Compilation &C, const Action *A, const ToolChain *TC, BoundArch BA,
-    bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+    bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
     std::map<std::pair<const Action *, std::string>, InputInfoList>
         &CachedResults,
     Action::OffloadKind TargetDeviceOffloadKind) const {
@@ -5177,7 +5186,7 @@ InputInfoList Driver::BuildJobsForAction(
 }
 
 static void handleTimeTrace(Compilation &C, const ArgList &Args,
-                            const JobAction *JA, const char *BaseInput,
+                            const JobAction *JA, StringRef BaseInput,
                             const InputInfo &Result) {
   Arg *A =
       Args.getLastArg(options::OPT_ftime_trace, options::OPT_ftime_trace_EQ);
@@ -5245,14 +5254,14 @@ static void handleTimeTrace(Compilation &C, const ArgList &Args,
       llvm::sys::path::replace_extension(Path, DefaultExtNoDot);
     }
   }
-  const char *ResultFile = C.getArgs().MakeArgString(Path);
+  StringRef ResultFile = C.getArgs().MakeArgString(Path);
   C.addTimeTraceFile(ResultFile, JA);
   C.addResultFile(ResultFile, JA);
 }
 
 InputInfoList Driver::BuildJobsForActionNoCache(
     Compilation &C, const Action *A, const ToolChain *TC, BoundArch BA,
-    bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+    bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
     std::map<std::pair<const Action *, std::string>, InputInfoList>
         &CachedResults,
     Action::OffloadKind TargetDeviceOffloadKind) const {
@@ -5347,7 +5356,7 @@ InputInfoList Driver::BuildJobsForActionNoCache(
     const Arg &Input = IA->getInputArg();
     Input.claim();
     if (Input.getOption().matches(options::OPT_INPUT)) {
-      const char *Name = Input.getValue();
+      StringRef Name = Input.getValue();
       return {InputInfo(A, Name, /* _BaseInput = */ Name)};
     }
     return {InputInfo(A, &Input, /* _BaseInput = */ "")};
@@ -5410,7 +5419,7 @@ InputInfoList Driver::BuildJobsForActionNoCache(
   }
 
   // Always use the first file input as the base input.
-  const char *BaseInput = InputInfos[0].getBaseInput();
+  StringRef BaseInput = InputInfos[0].getBaseInput();
   for (auto &Info : InputInfos) {
     if (Info.isFilename()) {
       BaseInput = Info.getBaseInput();
@@ -5478,7 +5487,7 @@ InputInfoList Driver::BuildJobsForActionNoCache(
   return {Result};
 }
 
-const char *Driver::getDefaultImageName() const {
+StringRef Driver::getDefaultImageName() const {
   llvm::Triple Target(llvm::Triple::normalize(TargetTriple));
   return Target.isOSWindows() ? "a.exe" : "a.out";
 }
@@ -5487,9 +5496,9 @@ const char *Driver::getDefaultImageName() const {
 /// full filename, filename without extension, or a directory. If ArgValue
 /// does not provide a filename, then use BaseName, and use the extension
 /// suitable for FileType.
-static const char *MakeCLOutputFilename(const ArgList &Args, StringRef ArgValue,
-                                        StringRef BaseName,
-                                        types::ID FileType) {
+static StringRef MakeCLOutputFilename(const ArgList &Args, StringRef ArgValue,
+                                      StringRef BaseName,
+                                      types::ID FileType) {
   SmallString<128> Filename = ArgValue;
 
   if (ArgValue.empty()) {
@@ -5527,10 +5536,10 @@ static bool HasPreprocessOutput(const Action &JA) {
   return false;
 }
 
-const char *Driver::CreateTempFile(Compilation &C, StringRef Prefix,
-                                   StringRef Suffix, bool MultipleArchs,
-                                   StringRef BoundArchStr,
-                                   bool NeedUniqueDirectory) const {
+StringRef Driver::CreateTempFile(Compilation &C, StringRef Prefix,
+                                 StringRef Suffix, bool MultipleArchs,
+                                 StringRef BoundArchStr,
+                                 bool NeedUniqueDirectory) const {
   SmallString<128> TmpName;
   Arg *A = C.getArgs().getLastArg(options::OPT_fcrash_diagnostics_dir);
   std::optional<std::string> CrashDirectory =
@@ -5577,8 +5586,8 @@ const char *Driver::CreateTempFile(Compilation &C, StringRef Prefix,
 //   the corresponding suffix. This requires both `-o` and `-c` are specified.
 // - Otherwise, the output path of the module file will be the same with the
 //   input with the corresponding suffix.
-static const char *GetModuleOutputPath(Compilation &C, const JobAction &JA,
-                                       const char *BaseInput) {
+static StringRef GetModuleOutputPath(Compilation &C, const JobAction &JA,
+                                     StringRef BaseInput) {
   assert(isa<PrecompileJobAction>(JA) && JA.getType() == types::TY_ModuleFile &&
          (C.getArgs().hasArg(options::OPT_fmodule_output) ||
           C.getArgs().hasArg(options::OPT_fmodule_output_EQ)));
@@ -5589,10 +5598,10 @@ static const char *GetModuleOutputPath(Compilation &C, const JobAction &JA,
   return C.addResultFile(C.getArgs().MakeArgString(OutputPath.c_str()), &JA);
 }
 
-const char *Driver::GetNamedOutputPath(Compilation &C, const JobAction &JA,
-                                       const char *BaseInput, BoundArch BA,
-                                       bool AtTopLevel, bool MultipleArchs,
-                                       StringRef OffloadingPrefix) const {
+StringRef Driver::GetNamedOutputPath(Compilation &C, const JobAction &JA,
+                                     StringRef BaseInput, BoundArch BA,
+                                     bool AtTopLevel, bool MultipleArchs,
+                                     StringRef OffloadingPrefix) const {
   std::string BoundArchStr = sanitizeTargetIDInFileName(BA.ArchName);
 
   llvm::PrettyStackTraceString CrashInfo("Computing output path");
@@ -5742,7 +5751,7 @@ const char *Driver::GetNamedOutputPath(Compilation &C, const JobAction &JA,
     BaseName = llvm::sys::path::filename(BasePath);
 
   // Determine what the derived output name should be.
-  const char *NamedOutput;
+  StringRef NamedOutput;
 
   if ((JA.getType() == types::TY_Object || JA.getType() == types::TY_LTO_BC ||
        JA.getType() == types::TY_LLVM_BC ||
@@ -6572,7 +6581,7 @@ bool clang::driver::willEmitRemarks(const ArgList &Args) {
 }
 
 llvm::StringRef clang::driver::getDriverMode(StringRef ProgName,
-                                             ArrayRef<const char *> Args) {
+                                             llvm::ArrayRefOfStringRef Args) {
   static StringRef OptName =
       getDriverOptTable().getOption(options::OPT_driver_mode).getPrefixedName();
   llvm::StringRef Opt;
@@ -6588,7 +6597,7 @@ llvm::StringRef clang::driver::getDriverMode(StringRef ProgName,
 
 bool driver::IsClangCL(StringRef DriverMode) { return DriverMode == "cl"; }
 
-llvm::Error driver::expandResponseFiles(SmallVectorImpl<const char *> &Args,
+llvm::Error driver::expandResponseFiles(SmallVectorImpl<StringRef> &Args,
                                         bool ClangCLMode,
                                         llvm::BumpPtrAllocator &Alloc,
                                         llvm::vfs::FileSystem *FS) {
@@ -6600,10 +6609,10 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<const char *> &Args,
   // Finally, our -cc1 tools don't care which tokenization mode we use because
   // response files written by clang will tokenize the same way in either mode.
   enum { Default, POSIX, Windows } RSPQuoting = Default;
-  for (const char *F : Args) {
-    if (strcmp(F, "--rsp-quoting=posix") == 0)
+  for (StringRef F : Args) {
+    if (F == "--rsp-quoting=posix")
       RSPQuoting = POSIX;
-    else if (strcmp(F, "--rsp-quoting=windows") == 0)
+    else if (F == "--rsp-quoting=windows")
       RSPQuoting = Windows;
   }
 
@@ -6618,11 +6627,10 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<const char *> &Args,
   else
     Tokenizer = &llvm::cl::TokenizeGNUCommandLine;
 
-  if (MarkEOLs && Args.size() > 1 && StringRef(Args[1]).starts_with("-cc1"))
+  if (MarkEOLs && Args.size() > 1 && Args[1].starts_with("-cc1"))
     MarkEOLs = false;
 
   llvm::cl::ExpansionContext ECtx(Alloc, Tokenizer);
-  ECtx.setMarkEOLs(MarkEOLs);
   if (FS)
     ECtx.setVFS(FS);
 
@@ -6631,11 +6639,11 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<const char *> &Args,
 
   // If -cc1 came from a response file, remove the EOL sentinels.
   auto FirstArg = llvm::find_if(llvm::drop_begin(Args),
-                                [](const char *A) { return A != nullptr; });
-  if (FirstArg != Args.end() && StringRef(*FirstArg).starts_with("-cc1")) {
+                                [](StringRef A) { return !A.empty(); });
+  if (FirstArg != Args.end() && FirstArg->starts_with("-cc1")) {
     // If -cc1 came from a response file, remove the EOL sentinels.
     if (MarkEOLs) {
-      auto newEnd = std::remove(Args.begin(), Args.end(), nullptr);
+      auto newEnd = std::remove(Args.begin(), Args.end(), StringRef());
       Args.resize(newEnd - Args.begin());
     }
   }
@@ -6676,7 +6684,7 @@ static const char *GetStableCStr(llvm::StringSet<> &SavedStrings, StringRef S) {
 /// \param Edit - The override command to perform.
 /// \param SavedStrings - Set to use for storing string representations.
 static void applyOneOverrideOption(raw_ostream &OS,
-                                   SmallVectorImpl<const char *> &Args,
+                                   SmallVectorImpl<StringRef> &Args,
                                    StringRef Edit,
                                    llvm::StringSet<> &SavedStrings) {
   // This does not need to be efficient.
@@ -6696,9 +6704,6 @@ static void applyOneOverrideOption(raw_ostream &OS,
     ReplPattern = ReplPattern.slice(0, ReplPattern.size() - 1);
 
     for (unsigned i = 1, e = Args.size(); i != e; ++i) {
-      // Ignore end-of-line response file markers
-      if (Args[i] == nullptr)
-        continue;
       std::string Repl = llvm::Regex(MatchPattern).sub(ReplPattern, Args[i]);
 
       if (Repl != Args[i]) {
@@ -6724,10 +6729,7 @@ static void applyOneOverrideOption(raw_ostream &OS,
     }
   } else if (Edit[0] == 'O') {
     for (unsigned i = 1; i < Args.size();) {
-      const char *A = Args[i];
-      // Ignore end-of-line response file markers
-      if (A == nullptr)
-        continue;
+      StringRef A = Args[i];
       if (A[0] == '-' && A[1] == 'O' &&
           (A[2] == '\0' || (A[3] == '\0' && (A[2] == 's' || A[2] == 'z' ||
                                              ('0' <= A[2] && A[2] <= '9'))))) {
@@ -6743,7 +6745,7 @@ static void applyOneOverrideOption(raw_ostream &OS,
   }
 }
 
-void driver::applyOverrideOptions(SmallVectorImpl<const char *> &Args,
+void driver::applyOverrideOptions(SmallVectorImpl<StringRef> &Args,
                                   const char *OverrideStr,
                                   llvm::StringSet<> &SavedStrings,
                                   StringRef EnvVar, raw_ostream *OS) {

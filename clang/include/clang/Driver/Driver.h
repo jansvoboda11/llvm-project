@@ -22,6 +22,7 @@
 #include "clang/Driver/Util.h"
 #include "clang/Options/Options.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -284,8 +285,7 @@ public:
   /// When the clangDriver lib is used through clang.exe, this provides a
   /// shortcut for executing the -cc1 command-line directly, in the same
   /// process.
-  using CC1ToolFunc =
-      llvm::function_ref<int(SmallVectorImpl<const char *> &ArgV)>;
+  using CC1ToolFunc = llvm::function_ref<int(SmallVectorImpl<StringRef> &ArgV)>;
   CC1ToolFunc CC1Main = nullptr;
 
 private:
@@ -468,11 +468,11 @@ public:
   /// argument vector. A null return value does not necessarily
   /// indicate an error condition, the diagnostics should be queried
   /// to determine if an error occurred.
-  Compilation *BuildCompilation(ArrayRef<const char *> Args);
+  Compilation *BuildCompilation(llvm::ArrayRefOfStringRef Args);
 
   /// ParseArgStrings - Parse the given list of strings into an
   /// ArgList.
-  llvm::opt::InputArgList ParseArgStrings(ArrayRef<const char *> Args,
+  llvm::opt::InputArgList ParseArgStrings(llvm::ArrayRefOfStringRef Args,
                                           bool UseDriverMode,
                                           bool &ContainsError) const;
 
@@ -659,13 +659,13 @@ public:
   /// jobs for a given (Action, ToolChain, BoundArch, DeviceKind) tuple once.
   InputInfoList BuildJobsForAction(
       Compilation &C, const Action *A, const ToolChain *TC, BoundArch BA,
-      bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+      bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
       std::map<std::pair<const Action *, std::string>, InputInfoList>
           &CachedResults,
       Action::OffloadKind TargetDeviceOffloadKind) const;
 
   /// Returns the default name for linked images (e.g., "a.out").
-  const char *getDefaultImageName() const;
+  StringRef getDefaultImageName() const;
 
   /// Creates a temp file.
   /// 1. If \p MultipleArch is false or \p BA is empty, the temp file is
@@ -676,10 +676,10 @@ public:
   ///    2b. If \p NeedUniqueDirectory is true, the temp file is in a unique
   ///        subdiretory with random name under the temporary directory, and
   ///        the temp file itself has name $Prefix-$BA.$Suffix.
-  const char *CreateTempFile(Compilation &C, StringRef Prefix, StringRef Suffix,
-                             bool MultipleArchs = false,
-                             StringRef BoundArchStr = {},
-                             bool NeedUniqueDirectory = false) const;
+  StringRef CreateTempFile(Compilation &C, StringRef Prefix, StringRef Suffix,
+                           bool MultipleArchs = false,
+                           StringRef BoundArchStr = {},
+                           bool NeedUniqueDirectory = false) const;
 
   /// GetNamedOutputPath - Return the name to use for the output of
   /// the action \p JA. The result is appended to the compilation's
@@ -693,10 +693,10 @@ public:
   /// \param AtTopLevel - Whether this is a "top-level" action.
   /// \param MultipleArchs - Whether multiple -arch options were supplied.
   /// \param NormalizedTriple - The normalized triple of the relevant target.
-  const char *GetNamedOutputPath(Compilation &C, const JobAction &JA,
-                                 const char *BaseInput, BoundArch BA,
-                                 bool AtTopLevel, bool MultipleArchs,
-                                 StringRef NormalizedTriple) const;
+  StringRef GetNamedOutputPath(Compilation &C, const JobAction &JA,
+                               StringRef BaseInput, BoundArch BA,
+                               bool AtTopLevel, bool MultipleArchs,
+                               StringRef NormalizedTriple) const;
 
   /// GetTemporaryPath - Return the pathname of a temporary file to use
   /// as part of compilation; the file will have the given prefix and suffix.
@@ -786,7 +786,7 @@ private:
   /// building jobs for the Action's inputs.
   InputInfoList BuildJobsForActionNoCache(
       Compilation &C, const Action *A, const ToolChain *TC, BoundArch BA,
-      bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+      bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
       std::map<std::pair<const Action *, std::string>, InputInfoList>
           &CachedResults,
       Action::OffloadKind TargetDeviceOffloadKind) const;
@@ -830,7 +830,7 @@ bool willEmitRemarks(const llvm::opt::ArgList &Args);
 /// Returns empty on failure.
 /// Common values are "gcc", "g++", "cpp", "cl" and "flang". Returned value need
 /// not be one of these.
-llvm::StringRef getDriverMode(StringRef ProgName, ArrayRef<const char *> Args);
+StringRef getDriverMode(StringRef ProgName, llvm::ArrayRefOfStringRef Args);
 
 /// Checks whether the value produced by getDriverMode is for CL mode.
 bool IsClangCL(StringRef DriverMode);
@@ -841,13 +841,13 @@ bool IsClangCL(StringRef DriverMode);
 /// \param ClangCLMode Whether clang is in CL mode.
 /// \param Alloc Allocator for new arguments.
 /// \param FS Filesystem to use when expanding files.
-llvm::Error expandResponseFiles(SmallVectorImpl<const char *> &Args,
+llvm::Error expandResponseFiles(SmallVectorImpl<llvm::StringRef> &Args,
                                 bool ClangCLMode, llvm::BumpPtrAllocator &Alloc,
                                 llvm::vfs::FileSystem *FS = nullptr);
 
 /// Apply a space separated list of edits to the input argument lists.
 /// See applyOneOverrideOption.
-void applyOverrideOptions(SmallVectorImpl<const char *> &Args,
+void applyOverrideOptions(SmallVectorImpl<StringRef> &Args,
                           const char *OverrideOpts,
                           llvm::StringSet<> &SavedStrings, StringRef EnvVar,
                           raw_ostream *OS = nullptr);

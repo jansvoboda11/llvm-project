@@ -609,7 +609,7 @@ public:
 
   /// Executable and command-line used to create a given CompilerInvocation.
   /// Most of the time this will be the full -cc1 command.
-  const char *Argv0 = nullptr;
+  std::optional<StringRef> Argv0 = std::nullopt;
   std::vector<std::string> CommandLineArgs;
 
   /// The minimum hotness value a diagnostic needs in order to be included in

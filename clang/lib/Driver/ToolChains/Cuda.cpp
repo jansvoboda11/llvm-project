@@ -399,7 +399,7 @@ void NVPTX::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                     const InputInfo &Output,
                                     const InputInfoList &Inputs,
                                     const ArgList &Args,
-                                    const char *LinkingOutput) const {
+                                    StringRef LinkingOutput) const {
   const auto &TC =
       static_cast<const toolchains::NVPTXToolChain &>(getToolChain());
 
@@ -511,7 +511,7 @@ void NVPTX::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   if (Relocatable)
     CmdArgs.push_back("-c");
 
-  const char *Exec;
+  StringRef Exec;
   if (Arg *A = Args.getLastArg(options::OPT_ptxas_path_EQ))
     Exec = A->getValue();
   else
@@ -546,7 +546,7 @@ void NVPTX::FatBinary::ConstructJob(Compilation &C, const JobAction &JA,
                                     const InputInfo &Output,
                                     const InputInfoList &Inputs,
                                     const ArgList &Args,
-                                    const char *LinkingOutput) const {
+                                    StringRef LinkingOutput) const {
   const auto &TC =
       static_cast<const toolchains::CudaToolChain &>(getToolChain());
   [[maybe_unused]] bool UsesLLVMOffloading = Args.hasFlag(
@@ -582,7 +582,7 @@ void NVPTX::FatBinary::ConstructJob(Compilation &C, const JobAction &JA,
   for (const auto &A : Args.getAllArgValues(options::OPT_Xcuda_fatbinary))
     CmdArgs.push_back(Args.MakeArgString(A));
 
-  const char *Exec = Args.MakeArgString(TC.GetProgramPath("fatbinary"));
+  StringRef Exec = Args.MakeArgString(TC.GetProgramPath("fatbinary"));
   C.addCommand(std::make_unique<Command>(
       JA, *this,
       ResponseFileSupport{ResponseFileSupport::RF_Full, llvm::sys::WEM_UTF8,
@@ -594,7 +594,7 @@ void NVPTX::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                  const InputInfo &Output,
                                  const InputInfoList &Inputs,
                                  const ArgList &Args,
-                                 const char *LinkingOutput) const {
+                                 StringRef LinkingOutput) const {
   const auto &TC =
       static_cast<const toolchains::NVPTXToolChain &>(getToolChain());
   ArgStringList CmdArgs;

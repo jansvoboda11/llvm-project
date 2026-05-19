@@ -146,7 +146,7 @@ generateReproducerForInvocationArguments(
   return std::nullopt;
 }
 
-std::string GetExecutablePath(const char *Argv0, bool CanonicalPrefixes);
+std::string GetExecutablePath(StringRef Argv0, bool CanonicalPrefixes);
 
 static void printReproducerInformation(
     llvm::raw_ostream &OS, const ClangInvocationInfo &Info,
@@ -162,7 +162,7 @@ static void printReproducerInformation(
   OS << "]\n}\n";
 }
 
-int cc1gen_reproducer_main(ArrayRef<const char *> Argv, const char *Argv0,
+int cc1gen_reproducer_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0,
                            void *MainAddr,
                            const llvm::ToolContext &ToolContext) {
   if (Argv.size() < 1) {

@@ -701,7 +701,7 @@ StringRef ToolChain::getDefaultUniversalArchName() const {
 }
 
 std::string ToolChain::getInputFilename(const InputInfo &Input) const {
-  return Input.getFilename();
+  return Input.getFilename().str();
 }
 
 ToolChain::UnwindTableLevel
@@ -964,10 +964,9 @@ std::string ToolChain::getCompilerRT(const ArgList &Args, StringRef Component,
   return std::string(Path);
 }
 
-const char *ToolChain::getCompilerRTArgString(const llvm::opt::ArgList &Args,
-                                              StringRef Component,
-                                              FileType Type,
-                                              bool isFortran) const {
+StringRef ToolChain::getCompilerRTArgString(const llvm::opt::ArgList &Args,
+                                            StringRef Component, FileType Type,
+                                            bool isFortran) const {
   return Args.MakeArgString(getCompilerRT(Args, Component, Type, isFortran));
 }
 
@@ -1290,19 +1289,19 @@ Tool *ToolChain::SelectTool(const JobAction &JA) const {
   return getTool(AC);
 }
 
-std::string ToolChain::GetFilePath(const char *Name) const {
+std::string ToolChain::GetFilePath(StringRef Name) const {
   return D.GetFilePath(Name, *this);
 }
 
 std::optional<std::string>
-ToolChain::GetFilePathIfExists(const char *Name) const {
+ToolChain::GetFilePathIfExists(StringRef Name) const {
   std::string Path = D.GetFilePath(Name, *this);
   if (Path == Name)
     return std::nullopt;
   return Path;
 }
 
-std::string ToolChain::GetProgramPath(const char *Name) const {
+std::string ToolChain::GetProgramPath(StringRef Name) const {
   return D.GetProgramPath(Name, *this);
 }
 
@@ -2158,7 +2157,7 @@ void ToolChain::TranslateXarchArgs(
   if (A->getOption().hasFlag(options::LinkerInput)) {
     // Convert the argument into individual Zlinker_input_args. Need to do this
     // manually to avoid memory leaks with the allocated arguments.
-    for (const char *Value : A->getValues()) {
+    for (StringRef Value : A->getValues()) {
       auto Opt = Opts.getOption(options::OPT_Zlinker_input);
       unsigned Index = BaseArgs.MakeIndex(Opt.getName(), Value);
       auto NewArg =

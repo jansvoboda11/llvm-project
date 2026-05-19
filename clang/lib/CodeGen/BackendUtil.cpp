@@ -498,7 +498,7 @@ static bool initTargetOptions(const CompilerInstance &CI,
          Entry.Group == frontend::IncludeDirGroup::System))
       Options.MCOptions.IASSearchPaths.push_back(
           Entry.IgnoreSysRoot ? Entry.Path : HSOpts.Sysroot + Entry.Path);
-  Options.MCOptions.Argv0 = CodeGenOpts.Argv0 ? CodeGenOpts.Argv0 : "";
+  Options.MCOptions.Argv0 = CodeGenOpts.Argv0 ? CodeGenOpts.Argv0->str() : "";
   // Pass the resolved frontend inputs so flattenClangCommandLine can strip
   // the cc1 source positional even when the driver received an absolute path
   // (which won't match CodeGenOpts.MainFileName, that's just the basename).

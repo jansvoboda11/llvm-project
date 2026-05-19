@@ -74,7 +74,7 @@ public:
                             const InputInfo &Output,
                             const InputInfoList &Inputs,
                             const llvm::opt::ArgList &TCArgs,
-                            const char *LinkingOutput) const = 0;
+                            StringRef LinkingOutput) const = 0;
 };
 
 } // end namespace driver

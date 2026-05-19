@@ -282,7 +282,7 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
   // to guess it anyway (it's possible on some platforms).
   std::string MainExecutableName =
       sys::fs::exists(Argv0) ? std::string(Argv0)
-                             : sys::fs::getMainExecutable(nullptr, nullptr);
+                             : sys::fs::getMainExecutable("", nullptr);
 
   auto SymbolizedAddressesOpt = collectAddressSymbols(
       StackTrace, Depth, MainExecutableName.c_str(), LLVMSymbolizerPath);
@@ -348,7 +348,7 @@ static bool printMarkupStackTrace(StringRef Argv0, void **StackTrace, int Depth,
 
   std::string MainExecutableName =
       sys::fs::exists(Argv0) ? std::string(Argv0)
-                             : sys::fs::getMainExecutable(nullptr, nullptr);
+                             : sys::fs::getMainExecutable("", nullptr);
   if (!printMarkupContext(OS, MainExecutableName.c_str()))
     return false;
   for (int I = 0; I < Depth; I++)

@@ -21,6 +21,7 @@
 #include "clang/Frontend/MigratorOptions.h"
 #include "clang/Frontend/PreprocessorOutputOptions.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/VirtualFileSystemFwd.h"
@@ -55,7 +56,7 @@ class SSAFOptions;
 // This lets us create the DiagnosticsEngine with a properly-filled-out
 // DiagnosticOptions instance.
 std::unique_ptr<DiagnosticOptions>
-CreateAndPopulateDiagOpts(ArrayRef<const char *> Argv);
+CreateAndPopulateDiagOpts(llvm::ArrayRefOfStringRef Argv);
 
 /// Fill out Opts based on the options given in Args.
 ///
@@ -162,7 +163,7 @@ public:
 
   /// Command line generation.
   /// @{
-  using StringAllocator = llvm::function_ref<const char *(const Twine &)>;
+  using StringAllocator = llvm::function_ref<StringRef(const Twine &)>;
   /// Generate cc1-compatible command line arguments from this instance.
   ///
   /// \param [out] Args - The generated arguments. Note that the caller is
@@ -171,13 +172,12 @@ public:
   /// \param SA - A function that given a Twine can allocate storage for a given
   /// command line argument and return a pointer to the newly allocated string.
   /// The returned pointer is what gets appended to Args.
-  void generateCC1CommandLine(llvm::SmallVectorImpl<const char *> &Args,
+  void generateCC1CommandLine(SmallVectorImpl<StringRef> &Args,
                               StringAllocator SA) const {
     generateCC1CommandLine([&](const Twine &Arg) {
       // No need to allocate static string literals.
-      Args.push_back(Arg.isSingleStringLiteral()
-                         ? Arg.getSingleStringRef().data()
-                         : SA(Arg));
+      Args.push_back(Arg.isSingleStringLiteral() ? Arg.getSingleStringRef()
+                                                 : SA(Arg));
     });
   }
 
@@ -309,9 +309,9 @@ public:
   /// \param [in] CommandLineArgs - Array of argument strings, this must not
   /// contain "-cc1".
   static bool CreateFromArgs(CompilerInvocation &Res,
-                             ArrayRef<StringRef> CommandLineArgs,
+                             llvm::ArrayRefOfStringRef CommandLineArgs,
                              DiagnosticsEngine &Diags,
-                             const char *Argv0 = nullptr);
+                             StringRef Argv0 = "");
 
   /// Populate \p Opts with the default set of pointer authentication-related
   /// options given \p LangOpts and \p Triple.
@@ -337,7 +337,7 @@ public:
   /// \return false if there are any errors.
   static bool checkCC1RoundTrip(ArrayRef<StringRef> Args,
                                 DiagnosticsEngine &Diags,
-                                const char *Argv0 = nullptr);
+                                StringRef Argv0 = "");
 
   /// Reset all of the options that are not considered when building a
   /// module.
@@ -349,8 +349,9 @@ public:
 
 private:
   static bool CreateFromArgsImpl(CompilerInvocation &Res,
+  static bool CreateFromArgsImpl(CompilerInvocation &Res,
                                  ArrayRef<StringRef> CommandLineArgs,
-                                 DiagnosticsEngine &Diags, const char *Argv0);
+                                 DiagnosticsEngine &Diags, StringRef Argv0);
 
   /// Parse command line options that map to LangOptions.
   static bool ParseLangArgs(LangOptions &Opts, llvm::opt::ArgList &Args,

@@ -241,7 +241,7 @@ std::string clang::GetResourcesPath(StringRef BinaryPath) {
   return std::string(P);
 }
 
-std::string clang::GetResourcesPath(const char *Argv0, void *MainAddr) {
+std::string clang::GetResourcesPath(StringRef Argv0, void *MainAddr) {
   const std::string ClangExecutable =
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
   return GetResourcesPath(ClangExecutable);

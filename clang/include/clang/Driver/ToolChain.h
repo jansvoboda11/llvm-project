@@ -431,9 +431,9 @@ public:
 
   // Helper methods
 
-  std::string GetFilePath(const char *Name) const;
-  std::optional<std::string> GetFilePathIfExists(const char *Name) const;
-  std::string GetProgramPath(const char *Name) const;
+  std::string GetFilePath(StringRef Name) const;
+  std::optional<std::string> GetFilePathIfExists(StringRef Name) const;
+  std::string GetProgramPath(StringRef Name) const;
 
   /// Returns the linker path, respecting the -fuse-ld= argument to determine
   /// the linker suffix or name.
@@ -577,10 +577,10 @@ public:
   void addFlangRTLibPath(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &CmdArgs) const;
 
-  const char *getCompilerRTArgString(const llvm::opt::ArgList &Args,
-                                     StringRef Component,
-                                     FileType Type = ToolChain::FT_Static,
-                                     bool IsFortran = false) const;
+  StringRef getCompilerRTArgString(const llvm::opt::ArgList &Args,
+                                   StringRef Component,
+                                   FileType Type = ToolChain::FT_Static,
+                                   bool IsFortran = false) const;
 
   std::string getCompilerRTBasename(const llvm::opt::ArgList &Args,
                                     StringRef Component,

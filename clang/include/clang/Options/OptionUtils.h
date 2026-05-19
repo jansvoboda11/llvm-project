@@ -75,7 +75,7 @@ std::string GetResourcesPath(StringRef BinaryPath);
 /// compiler path.
 /// \param MainAddr The address of main (or some other function in the main
 /// executable), for finding the builtin compiler path.
-std::string GetResourcesPath(const char *Argv0, void *MainAddr);
+std::string GetResourcesPath(StringRef Argv0, void *MainAddr);
 
 /// Parse a space-separated command line with escaped spaces and backslashes.
 llvm::Expected<llvm::SmallVector<llvm::SmallString<8>>>

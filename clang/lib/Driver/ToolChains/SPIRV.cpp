@@ -40,7 +40,7 @@ void SPIRV::constructTranslateCommand(Compilation &C, const Tool &T,
   if (!llvm::sys::fs::can_execute(ExeCand))
     ExeCand = T.getToolChain().GetProgramPath("llvm-spirv");
 
-  const char *Exec = C.getArgs().MakeArgString(ExeCand);
+  StringRef Exec = C.getArgs().MakeArgString(ExeCand);
   C.addCommand(std::make_unique<Command>(JA, T, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Input, Output));
 }
@@ -70,7 +70,7 @@ void SPIRV::constructAssembleCommand(Compilation &C, const Tool &T,
     C.getDriver().Diag(clang::diag::err_drv_no_spv_tools) << "spirv-as";
     return;
   }
-  const char *Exec = C.getArgs().MakeArgString(ExeCand);
+  StringRef Exec = C.getArgs().MakeArgString(ExeCand);
   C.addCommand(std::make_unique<Command>(JA, T, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Input, Output));
 }
@@ -107,7 +107,7 @@ void SPIRV::Translator::ConstructJob(Compilation &C, const JobAction &JA,
                                      const InputInfo &Output,
                                      const InputInfoList &Inputs,
                                      const ArgList &Args,
-                                     const char *LinkingOutput) const {
+                                     StringRef LinkingOutput) const {
   claimNoWarnArgs(Args);
   if (Inputs.size() != 1)
     llvm_unreachable("Invalid number of input files.");
@@ -118,7 +118,7 @@ void SPIRV::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                     const InputInfo &Output,
                                     const InputInfoList &Inputs,
                                     const ArgList &Args,
-                                    const char *AssembleOutput) const {
+                                    StringRef AssembleOutput) const {
   claimNoWarnArgs(Args);
   if (Inputs.size() != 1)
     llvm_unreachable("Invalid number of input files.");
@@ -153,7 +153,7 @@ void SPIRV::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                  const InputInfo &Output,
                                  const InputInfoList &Inputs,
                                  const ArgList &Args,
-                                 const char *LinkingOutput) const {
+                                 StringRef LinkingOutput) const {
   if (JA.getType() == types::TY_LLVM_BC) {
     constructLLVMLinkCommand(C, *this, JA, Output, Inputs, Args);
     return;

@@ -26,7 +26,7 @@ void tools::XCore::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                            const InputInfo &Output,
                                            const InputInfoList &Inputs,
                                            const ArgList &Args,
-                                           const char *LinkingOutput) const {
+                                           StringRef LinkingOutput) const {
   claimNoWarnArgs(Args);
   ArgStringList CmdArgs;
 
@@ -51,7 +51,7 @@ void tools::XCore::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   for (const auto &II : Inputs)
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("xcc"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("xcc"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }
@@ -60,7 +60,7 @@ void tools::XCore::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                         const InputInfo &Output,
                                         const InputInfoList &Inputs,
                                         const ArgList &Args,
-                                        const char *LinkingOutput) const {
+                                        StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   assert((Output.isFilename() || Output.isNothing()) && "Invalid output.");
@@ -79,7 +79,7 @@ void tools::XCore::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath("xcc"));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath("xcc"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Output));
 }

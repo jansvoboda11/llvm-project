@@ -174,7 +174,7 @@ void HIPSPV::Linker::constructLinkAndEmitSpirvCommand(
     Cc1Args.push_back(Output.getFilename());
 
     const Driver &Drv = C.getDriver();
-    const char *Clang = Drv.getDriverProgramPath();
+    StringRef Clang = Drv.getDriverProgramPath();
     C.addCommand(std::make_unique<Command>(
         JA, *this, ResponseFileSupport::None(), Clang, Cc1Args, Inputs, Output,
         Drv.getPrependArg()));
@@ -224,7 +224,7 @@ void HIPSPV::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   if (JA.getType() == types::TY_HIP_FATBIN)
     return HIP::constructHIPFatbinCommand(C, JA, Output.getFilename(), Inputs,
                                           Args, *this);
@@ -376,7 +376,7 @@ HIPSPVToolChain::getDeviceLibs(
     bool Found = false;
     for (StringRef BCName : BCLibArgs) {
       StringRef FullName;
-      for (std::string LibraryPath : LibraryPaths) {
+      for (StringRef LibraryPath : LibraryPaths) {
         SmallString<128> Path(LibraryPath);
         llvm::sys::path::append(Path, BCName);
         FullName = Path;
@@ -393,7 +393,7 @@ HIPSPVToolChain::getDeviceLibs(
     // Search device library named as 'hipspv-<triple>.bc'.
     auto TT = getTriple().normalize();
     std::string BCName = "hipspv-" + TT + ".bc";
-    for (auto *LibPath : LibraryPaths) {
+    for (auto LibPath : LibraryPaths) {
       SmallString<128> Path(LibPath);
       llvm::sys::path::append(Path, BCName);
       if (llvm::sys::fs::exists(Path)) {

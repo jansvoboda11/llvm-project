@@ -229,15 +229,14 @@ public:
     X86Sse2Avx = 0;
   }
 
-  static bool CreateFromArgs(AssemblerInvocation &Res,
-                             ArrayRef<const char *> Argv,
+  static bool CreateFromArgs(AssemblerInvocation &Res, ArrayRefOfStringRef Argv,
                              DiagnosticsEngine &Diags);
 };
 
 }
 
 bool AssemblerInvocation::CreateFromArgs(AssemblerInvocation &Opts,
-                                         ArrayRef<const char *> Argv,
+                                         ArrayRefOfStringRef Argv,
                                          DiagnosticsEngine &Diags) {
   bool Success = true;
 
@@ -680,7 +679,7 @@ static void LLVMErrorHandler(void *UserData, const char *Message,
   sys::Process::Exit(1);
 }
 
-int cc1as_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
+int cc1as_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0, void *MainAddr) {
   // Initialize targets and assembly printers/parsers.
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();

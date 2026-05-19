@@ -269,7 +269,7 @@ bool DylibPathValidator::isSharedLibrary(StringRef Path) const {
 }
 
 void DylibSubstitutor::configure(StringRef LoaderPath) {
-  SmallString<512> ExecPath(sys::fs::getMainExecutable(nullptr, nullptr));
+  SmallString<512> ExecPath(sys::fs::getMainExecutable("", nullptr));
   sys::path::remove_filename(ExecPath);
 
   SmallString<512> LoaderDir;

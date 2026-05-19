@@ -24,8 +24,8 @@ using namespace clang;
 using namespace llvm::opt;
 
 // Helper to paste bits of an option together and return a saved string.
-static const char *makeArgString(const ArgList &Args, const char *Prefix,
-                                 const char *Base, const char *Suffix) {
+static StringRef makeArgString(const ArgList &Args, const char *Prefix,
+                               const char *Base, const char *Suffix) {
   // Basically "Prefix + Base + Suffix" all converted to Twine then saved.
   return Args.MakeArgString(Twine(StringRef(Prefix), Base) + Suffix);
 }
@@ -59,7 +59,7 @@ void tools::PScpu::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                            const InputInfo &Output,
                                            const InputInfoList &Inputs,
                                            const ArgList &Args,
-                                           const char *LinkingOutput) const {
+                                           StringRef LinkingOutput) const {
   auto &TC = static_cast<const toolchains::PS4PS5Base &>(getToolChain());
   claimNoWarnArgs(Args);
   ArgStringList CmdArgs;
@@ -75,7 +75,7 @@ void tools::PScpu::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   CmdArgs.push_back(Input.getFilename());
 
   std::string AsName = TC.qualifyPSCmdName("as");
-  const char *Exec = Args.MakeArgString(TC.GetProgramPath(AsName.c_str()));
+  StringRef Exec = Args.MakeArgString(TC.GetProgramPath(AsName.c_str()));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -92,7 +92,7 @@ void toolchains::PS4CPU::addSanitizerArgs(const ArgList &Args,
                                           ArgStringList &CmdArgs,
                                           const char *Prefix,
                                           const char *Suffix) const {
-  auto arg = [&](const char *Name) -> const char * {
+  auto arg = [&](const char *Name) -> StringRef {
     return makeArgString(Args, Prefix, Name, Suffix);
   };
   const SanitizerArgs &SanArgs = getSanitizerArgs(Args);
@@ -106,7 +106,7 @@ void toolchains::PS5CPU::addSanitizerArgs(const ArgList &Args,
                                           ArgStringList &CmdArgs,
                                           const char *Prefix,
                                           const char *Suffix) const {
-  auto arg = [&](const char *Name) -> const char * {
+  auto arg = [&](const char *Name) -> StringRef {
     return makeArgString(Args, Prefix, Name, Suffix);
   };
   const SanitizerArgs &SanArgs = getSanitizerArgs(Args);
@@ -122,7 +122,7 @@ void tools::PS4cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                          const InputInfo &Output,
                                          const InputInfoList &Inputs,
                                          const ArgList &Args,
-                                         const char *LinkingOutput) const {
+                                         StringRef LinkingOutput) const {
   auto &TC = static_cast<const toolchains::PS4PS5Base &>(getToolChain());
   const Driver &D = TC.getDriver();
   ArgStringList CmdArgs;
@@ -157,7 +157,7 @@ void tools::PS4cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   const bool UseJMC =
       Args.hasFlag(options::OPT_fjmc, options::OPT_fno_jmc, false);
 
-  const char *LTOArgs = "";
+  StringRef LTOArgs = "";
   auto AddLTOFlag = [&](Twine Flag) {
     LTOArgs = Args.MakeArgString(Twine(LTOArgs) + " " + Flag);
   };
@@ -179,7 +179,7 @@ void tools::PS4cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   if (StringRef Threads = getLTOParallelism(Args, D); !Threads.empty())
     AddLTOFlag(Twine("-threads=") + Threads);
 
-  if (*LTOArgs)
+  if (!LTOArgs.empty())
     CmdArgs.push_back(
         Args.MakeArgString(Twine("-lto-debug-options=") + LTOArgs));
 
@@ -214,7 +214,7 @@ void tools::PS4cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   std::string LdName = TC.qualifyPSCmdName(TC.getLinkerBaseName());
-  const char *Exec = Args.MakeArgString(TC.GetProgramPath(LdName.c_str()));
+  StringRef Exec = Args.MakeArgString(TC.GetProgramPath(LdName.c_str()));
 
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
@@ -225,7 +225,7 @@ void tools::PS5cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                          const InputInfo &Output,
                                          const InputInfoList &Inputs,
                                          const ArgList &Args,
-                                         const char *LinkingOutput) const {
+                                         StringRef LinkingOutput) const {
   auto &TC = static_cast<const toolchains::PS4PS5Base &>(getToolChain());
   const Driver &D = TC.getDriver();
   ArgStringList CmdArgs;
@@ -449,7 +449,7 @@ void tools::PS5cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   std::string LdName = TC.qualifyPSCmdName(TC.getLinkerBaseName());
-  const char *Exec = Args.MakeArgString(TC.GetProgramPath(LdName.c_str()));
+  StringRef Exec = Args.MakeArgString(TC.GetProgramPath(LdName.c_str()));
 
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileUTF8(),
@@ -478,7 +478,7 @@ toolchains::PS4PS5Base::PS4PS5Base(const Driver &D, const llvm::Triple &Triple,
   auto OverrideRoot = [&](const options::ID &Opt, std::string &Root,
                           StringRef Default) {
     if (const Arg *A = Args.getLastArg(Opt)) {
-      Root = A->getValue();
+      Root = A->getValue().str();
       if (!llvm::sys::fs::exists(Root))
         D.Diag(clang::diag::warn_missing_sysroot) << Root;
       return true;
