@@ -31,12 +31,12 @@ class LLVM_LIBRARY_VISIBILITY Clang : public Tool {
   bool HasBackend;
 
 public:
-  static const char *getBaseInputName(const llvm::opt::ArgList &Args,
-                                      const InputInfo &Input);
-  static const char *getBaseInputStem(const llvm::opt::ArgList &Args,
-                                      const InputInfoList &Inputs);
-  static const char *getDependencyFileName(const llvm::opt::ArgList &Args,
-                                           const InputInfoList &Inputs);
+  static llvm::StringRef getBaseInputName(const llvm::opt::ArgList &Args,
+                                          const InputInfo &Input);
+  static llvm::StringRef getBaseInputStem(const llvm::opt::ArgList &Args,
+                                          const InputInfoList &Inputs);
+  static llvm::StringRef getDependencyFileName(const llvm::opt::ArgList &Args,
+                                               const InputInfoList &Inputs);
 
 private:
   void AddPreprocessingOptions(Compilation &C, const JobAction &JA,
@@ -115,7 +115,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 /// Clang integrated assembler tool.
@@ -138,7 +138,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 /// Offload bundler tool.
@@ -151,12 +151,12 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
   void ConstructJobMultipleOutputs(Compilation &C, const JobAction &JA,
                                    const InputInfoList &Outputs,
                                    const InputInfoList &Inputs,
                                    const llvm::opt::ArgList &TCArgs,
-                                   const char *LinkingOutput) const override;
+                                   StringRef LinkingOutput) const override;
 };
 
 /// Offload binary tool.
@@ -169,7 +169,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 /// Linker wrapper tool.
@@ -184,7 +184,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 // Calculate the output path of the module file when compiling a module unit
@@ -200,7 +200,7 @@ public:
 //   input with the corresponding suffix.
 llvm::SmallString<256>
 getCXX20NamedModuleOutputPath(const llvm::opt::ArgList &Args,
-                              const char *BaseInput);
+                              llvm::StringRef BaseInput);
 
 } // end namespace tools
 

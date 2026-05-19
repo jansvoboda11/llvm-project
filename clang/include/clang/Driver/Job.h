@@ -114,10 +114,10 @@ class Command {
   ResponseFileSupport ResponseSupport;
 
   /// The executable to run.
-  const char *Executable;
+  StringRef Executable;
 
   /// Optional argument to prepend.
-  const char *PrependArg;
+  StringRef PrependArg;
 
   /// The list of program arguments (not including the implicit first
   /// argument, which will be the executable).
@@ -129,9 +129,9 @@ class Command {
   /// The list of program arguments which are outputs. May be empty.
   std::vector<std::string> OutputFilenames;
 
-  /// Response file name, if this command is set to use one, or nullptr
+  /// Response file name, if this command is set to use one, or empty
   /// otherwise
-  const char *ResponseFile = nullptr;
+  StringRef ResponseFile;
 
   /// The input file list in case we need to emit a file list instead of a
   /// proper response file
@@ -154,7 +154,7 @@ class Command {
   /// exclusive file, while others remains as regular command line arguments.
   /// This functions fills a vector with the regular command line arguments,
   /// argv, excluding the ones passed in a response file.
-  void buildArgvForResponseFile(llvm::SmallVectorImpl<const char *> &Out) const;
+  void buildArgvForResponseFile(llvm::SmallVectorImpl<StringRef> &Out) const;
 
   /// Encodes an array of C strings into a single string separated by whitespace.
   /// This function will also put in quotes arguments that have whitespaces and
@@ -170,9 +170,9 @@ public:
   bool InProcess = false;
 
   Command(const Action &Source, const Tool &Creator,
-          ResponseFileSupport ResponseSupport, const char *Executable,
+          ResponseFileSupport ResponseSupport, StringRef Executable,
           const llvm::opt::ArgStringList &Arguments, ArrayRef<InputInfo> Inputs,
-          ArrayRef<InputInfo> Outputs = {}, const char *PrependArg = nullptr);
+          ArrayRef<InputInfo> Outputs = {}, StringRef PrependArg = {});
   // FIXME: This really shouldn't be copyable, but is currently copied in some
   // error handling in Driver::generateCompilationDiagnostics.
   Command(const Command &) = default;
@@ -196,7 +196,7 @@ public:
   }
 
   /// Set to pass arguments via a response file when launching the command
-  void setResponseFile(const char *FileName);
+  void setResponseFile(StringRef FileName);
 
   /// Set an input file list, necessary if you specified an RF_FileList response
   /// file support.
@@ -217,9 +217,9 @@ public:
     Arguments = std::move(List);
   }
 
-  void replaceExecutable(const char *Exe) { Executable = Exe; }
+  void replaceExecutable(StringRef Exe) { Executable = Exe; }
 
-  const char *getExecutable() const { return Executable; }
+  StringRef getExecutable() const { return Executable; }
 
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
 
@@ -242,10 +242,10 @@ protected:
 class CC1Command : public Command {
 public:
   CC1Command(const Action &Source, const Tool &Creator,
-             ResponseFileSupport ResponseSupport, const char *Executable,
+             ResponseFileSupport ResponseSupport, StringRef Executable,
              const llvm::opt::ArgStringList &Arguments,
              ArrayRef<InputInfo> Inputs, ArrayRef<InputInfo> Outputs = {},
-             const char *PrependArg = nullptr);
+             StringRef PrependArg = {});
 
   void Print(llvm::raw_ostream &OS, const char *Terminator, bool Quote,
              CrashReportInfo *CrashInfo = nullptr) const override;

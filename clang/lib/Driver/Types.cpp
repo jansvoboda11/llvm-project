@@ -378,15 +378,14 @@ types::ID types::lookupTypeForExtension(llvm::StringRef Ext) {
       .Default(TY_INVALID);
 }
 
-types::ID types::lookupTypeForTypeSpecifier(const char *Name) {
+types::ID types::lookupTypeForTypeSpecifier(llvm::StringRef Name) {
   for (unsigned i=0; i<numTypes; ++i) {
     types::ID Id = (types::ID) (i + 1);
-    if (canTypeBeUserSpecified(Id) &&
-        strcmp(Name, getInfo(Id).Name) == 0)
+    if (canTypeBeUserSpecified(Id) && Name == getInfo(Id).Name)
       return Id;
   }
   // Accept "cu" as an alias for "cuda" for NVCC compatibility
-  if (strcmp(Name, "cu") == 0) {
+  if (Name == "cu") {
     return types::TY_CUDA;
   }
   return TY_INVALID;

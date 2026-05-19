@@ -92,10 +92,10 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                 const InputInfo &Output,
                                 const InputInfoList &Inputs,
                                 const ArgList &Args,
-                                const char *LinkingOutput) const {
+                                StringRef LinkingOutput) const {
 
   const ToolChain &ToolChain = getToolChain();
-  const char *Linker = Args.MakeArgString(getLinkerPath(Args));
+  StringRef Linker = Args.MakeArgString(getLinkerPath(Args));
   ArgStringList CmdArgs;
 
   CmdArgs.push_back("-m");
@@ -225,7 +225,7 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         OOpt = A->getValue();
 
       if (OOpt != "0") {
-        const char *WasmOpt = Args.MakeArgString(WasmOptPath);
+        StringRef WasmOpt = Args.MakeArgString(WasmOptPath);
         ArgStringList OptArgs;
         OptArgs.push_back(Output.getFilename());
         OptArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));

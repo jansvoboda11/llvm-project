@@ -68,7 +68,7 @@ void tools::gcc::Common::ConstructJob(Compilation &C, const JobAction &JA,
                                       const InputInfo &Output,
                                       const InputInfoList &Inputs,
                                       const ArgList &Args,
-                                      const char *LinkingOutput) const {
+                                      StringRef LinkingOutput) const {
   const Driver &D = getToolChain().getDriver();
   ArgStringList CmdArgs;
 
@@ -175,7 +175,7 @@ void tools::gcc::Common::ConstructJob(Compilation &C, const JobAction &JA,
   } else
     GCCName = "gcc";
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath(GCCName));
+  StringRef Exec = Args.MakeArgString(getToolChain().GetProgramPath(GCCName));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -227,7 +227,7 @@ static bool getStatic(const ArgList &Args) {
 void tools::gnutools::StaticLibTool::ConstructJob(
     Compilation &C, const JobAction &JA, const InputInfo &Output,
     const InputInfoList &Inputs, const ArgList &Args,
-    const char *LinkingOutput) const {
+    StringRef LinkingOutput) const {
   const Driver &D = getToolChain().getDriver();
 
   // Silence warning for "clang -g foo.o -o foo"
@@ -262,7 +262,7 @@ void tools::gnutools::StaticLibTool::ConstructJob(
     }
   }
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
+  StringRef Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -272,7 +272,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                            const InputInfo &Output,
                                            const InputInfoList &Inputs,
                                            const ArgList &Args,
-                                           const char *LinkingOutput) const {
+                                           StringRef LinkingOutput) const {
   // FIXME: The Linker class constructor takes a ToolChain and not a
   // Generic_ELF, so the static_cast might return a reference to a invalid
   // instance (see PR45061). Ideally, the Linker constructor needs to take a
@@ -583,7 +583,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   // ld.
   Args.addAllArgs(CmdArgs, {options::OPT_T});
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -594,7 +594,7 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
                                               const InputInfo &Output,
                                               const InputInfoList &Inputs,
                                               const ArgList &Args,
-                                              const char *LinkingOutput) const {
+                                              StringRef LinkingOutput) const {
   const auto &D = getToolChain().getDriver();
 
   claimNoWarnArgs(Args);
@@ -895,7 +895,7 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
       CmdArgs.push_back(Args.MakeArgString("-gdwarf-" + Twine(DwarfVersion)));
     }
 
-  const char *Exec =
+  StringRef Exec =
       Args.MakeArgString(getToolChain().GetProgramPath(DefaultAssembler));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),

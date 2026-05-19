@@ -21,7 +21,7 @@ void Tool::ConstructJobMultipleOutputs(Compilation &C, const JobAction &JA,
                                        const InputInfoList &Outputs,
                                        const InputInfoList &Inputs,
                                        const llvm::opt::ArgList &TCArgs,
-                                       const char *LinkingOutput) const {
+                                       StringRef LinkingOutput) const {
   assert(Outputs.size() == 1 && "Expected only one output by default!");
   ConstructJob(C, JA, Outputs.front(), Inputs, TCArgs, LinkingOutput);
 }

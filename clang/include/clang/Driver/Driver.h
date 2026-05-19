@@ -21,6 +21,7 @@
 #include "clang/Driver/Util.h"
 #include "clang/Options/Options.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -485,7 +486,7 @@ public:
 
   /// ParseArgStrings - Parse the given list of strings into an
   /// ArgList.
-  llvm::opt::InputArgList ParseArgStrings(ArrayRef<const char *> Args,
+  llvm::opt::InputArgList ParseArgStrings(llvm::ArrayRefOfStringRef Args,
                                           bool UseDriverMode,
                                           bool &ContainsError) const;
 
@@ -671,13 +672,13 @@ public:
   /// jobs for a given (Action, ToolChain, BoundArch, DeviceKind) tuple once.
   InputInfoList BuildJobsForAction(
       Compilation &C, const Action *A, const ToolChain *TC, StringRef BoundArch,
-      bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+      bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
       std::map<std::pair<const Action *, std::string>, InputInfoList>
           &CachedResults,
       Action::OffloadKind TargetDeviceOffloadKind) const;
 
   /// Returns the default name for linked images (e.g., "a.out").
-  const char *getDefaultImageName() const;
+  StringRef getDefaultImageName() const;
 
   /// Creates a temp file.
   /// 1. If \p MultipleArch is false or \p BoundArch is empty, the temp file is
@@ -688,10 +689,10 @@ public:
   ///    2b. If \p NeedUniqueDirectory is true, the temp file is in a unique
   ///        subdiretory with random name under the temporary directory, and
   ///        the temp file itself has name $Prefix-$BoundArch.$Suffix.
-  const char *CreateTempFile(Compilation &C, StringRef Prefix, StringRef Suffix,
-                             bool MultipleArchs = false,
-                             StringRef BoundArch = {},
-                             bool NeedUniqueDirectory = false) const;
+  StringRef CreateTempFile(Compilation &C, StringRef Prefix, StringRef Suffix,
+                           bool MultipleArchs = false,
+                           StringRef BoundArch = {},
+                           bool NeedUniqueDirectory = false) const;
 
   /// GetNamedOutputPath - Return the name to use for the output of
   /// the action \p JA. The result is appended to the compilation's
@@ -705,10 +706,10 @@ public:
   /// \param AtTopLevel - Whether this is a "top-level" action.
   /// \param MultipleArchs - Whether multiple -arch options were supplied.
   /// \param NormalizedTriple - The normalized triple of the relevant target.
-  const char *GetNamedOutputPath(Compilation &C, const JobAction &JA,
-                                 const char *BaseInput, StringRef BoundArch,
-                                 bool AtTopLevel, bool MultipleArchs,
-                                 StringRef NormalizedTriple) const;
+  StringRef GetNamedOutputPath(Compilation &C, const JobAction &JA,
+                               StringRef BaseInput, StringRef BoundArch,
+                               bool AtTopLevel, bool MultipleArchs,
+                               StringRef NormalizedTriple) const;
 
   /// GetTemporaryPath - Return the pathname of a temporary file to use
   /// as part of compilation; the file will have the given prefix and suffix.
@@ -814,7 +815,7 @@ private:
   /// building jobs for the Action's inputs.
   InputInfoList BuildJobsForActionNoCache(
       Compilation &C, const Action *A, const ToolChain *TC, StringRef BoundArch,
-      bool AtTopLevel, bool MultipleArchs, const char *LinkingOutput,
+      bool AtTopLevel, bool MultipleArchs, StringRef LinkingOutput,
       std::map<std::pair<const Action *, std::string>, InputInfoList>
           &CachedResults,
       Action::OffloadKind TargetDeviceOffloadKind) const;
@@ -869,7 +870,7 @@ bool IsClangCL(StringRef DriverMode);
 /// \param ClangCLMode Whether clang is in CL mode.
 /// \param Alloc Allocator for new arguments.
 /// \param FS Filesystem to use when expanding files.
-llvm::Error expandResponseFiles(SmallVectorImpl<const char *> &Args,
+llvm::Error expandResponseFiles(SmallVectorImpl<llvm::StringRef> &Args,
                                 bool ClangCLMode, llvm::BumpPtrAllocator &Alloc,
                                 llvm::vfs::FileSystem *FS = nullptr);
 

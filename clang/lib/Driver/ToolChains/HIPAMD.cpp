@@ -142,7 +142,7 @@ void AMDGCN::Linker::constructLldCommand(Compilation &C, const JobAction &JA,
 
   LldArgs.push_back("--no-whole-archive");
 
-  const char *Lld = Args.MakeArgStringRef(getToolChain().GetProgramPath("lld"));
+  StringRef Lld = Args.MakeArgStringRef(getToolChain().GetProgramPath("lld"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Lld, LldArgs, Inputs, Output));
 }
@@ -180,7 +180,7 @@ void AMDGCN::Linker::constructLinkAndEmitSpirvCommand(
                     Output.getFilename()});
 
     const Driver &Driver = getToolChain().getDriver();
-    const char *Exec = Driver.getClangProgramPath();
+    StringRef Exec = Driver.getClangProgramPath();
     C.addCommand(std::make_unique<Command>(
         JA, *this, ResponseFileSupport::None(), Exec, CmdArgs, LinkedBCFile,
         Output, Driver.getPrependArg()));
@@ -205,7 +205,7 @@ void AMDGCN::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   if (!Inputs.empty() && Inputs[0].getType() == types::TY_Image &&
       JA.getType() == types::TY_Object)
     return HIP::constructGenerateObjFileFromHIPFatBinary(C, Output, Inputs,

@@ -763,7 +763,7 @@ using GenerateFn = llvm::function_ref<void(
 static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
                       CompilerInvocation &RealInvocation,
                       CompilerInvocation &DummyInvocation,
-                      ArrayRef<StringRef> CommandLineArgs,
+                      llvm::ArrayRefOfStringRef CommandLineArgs,
                       DiagnosticsEngine &Diags, const char *Argv0,
                       bool CheckAgainstOriginalInvocation = false,
                       bool ForceRoundTrip = false) {
@@ -856,10 +856,12 @@ static bool RoundTrip(ParseFn Parse, GenerateFn Generate,
   }
 
   SmallVector<const char *> ComparisonArgs;
-  if (CheckAgainstOriginalInvocation)
+  if (CheckAgainstOriginalInvocation) {
     // Compare against original arguments.
-    ComparisonArgs.assign(CommandLineArgs.begin(), CommandLineArgs.end());
-  else
+    ComparisonArgs.reserve(CommandLineArgs.size());
+    for (StringRef A : CommandLineArgs)
+      ComparisonArgs.push_back(A.data());
+  } else
     // Generate arguments again, this time from the options we will end up using
     // for the rest of the compilation.
     Generate(RealInvocation, ComparisonArgs, SA);
@@ -3112,7 +3114,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ActionName = A->getValue();
   }
   for (const auto *AA : Args.filtered(OPT_plugin_arg))
-    Opts.PluginArgs[AA->getValue(0)].emplace_back(AA->getValue(1));
+    Opts.PluginArgs[AA->getValue(0).str()].emplace_back(AA->getValue(1));
 
   for (const std::string &Arg :
          Args.getAllArgValues(OPT_ftest_module_file_extension_EQ)) {
@@ -3424,7 +3426,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
 #undef HEADER_SEARCH_OPTION_WITH_MARSHALLING
 
   if (const Arg *A = Args.getLastArg(OPT_stdlib_EQ))
-    Opts.UseLibcxx = (strcmp(A->getValue(), "libc++") == 0);
+    Opts.UseLibcxx = A->getValue() == "libc++";
 
   // Only the -fmodule-file=<name>=<file> form.
   for (const auto *A : Args.filtered(OPT_fmodule_file)) {
@@ -3460,7 +3462,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
                               llvm::StringRef(A->getValue()).substr(1));
       return std::string(Buffer);
     }
-    return A->getValue();
+    return A->getValue().str();
   };
 
   for (const auto *A : Args.filtered(OPT_I, OPT_F)) {
@@ -3476,9 +3478,9 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
     if (A->getOption().matches(OPT_iprefix))
       Prefix = A->getValue();
     else if (A->getOption().matches(OPT_iwithprefix))
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::After, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::After, false, true);
     else
-      Opts.AddPath(Prefix.str() + A->getValue(), frontend::Angled, false, true);
+      Opts.AddPath((Prefix + A->getValue()).str(), frontend::Angled, false, true);
   }
 
   for (const auto *A : Args.filtered(OPT_idirafter))
@@ -3551,7 +3553,7 @@ static void ParseAPINotesArgs(APINotesOptions &Opts, ArgList &Args,
           << A->getAsString(Args) << A->getValue();
   }
   for (const Arg *A : Args.filtered(OPT_iapinotes_modules))
-    Opts.ModuleSearchPaths.push_back(A->getValue());
+    Opts.ModuleSearchPaths.emplace_back(A->getValue());
 }
 
 static void GeneratePointerAuthArgs(const LangOptions &Opts,
@@ -4568,7 +4570,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(OPT_frandomize_layout_seed_file_EQ)) {
-    std::ifstream SeedFile(A->getValue(0));
+    std::ifstream SeedFile(A->getValue(0).str());
 
     if (!SeedFile.is_open())
       Diags.Report(diag::err_drv_cannot_open_randomize_layout_seed_file)
@@ -4873,7 +4875,7 @@ static bool ParsePreprocessorArgs(PreprocessorOptions &Opts, ArgList &Args,
                         Args.hasArg(OPT_pch_through_hdrstop_use);
 
   for (const auto *A : Args.filtered(OPT_error_on_deserialized_pch_decl))
-    Opts.DeserializedPCHDeclsToErrorOn.insert(A->getValue());
+    Opts.DeserializedPCHDeclsToErrorOn.insert(A->getValue().str());
 
   if (const Arg *A = Args.getLastArg(OPT_preamble_bytes_EQ)) {
     StringRef Value(A->getValue());
@@ -5039,7 +5041,7 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
 }
 
 bool CompilerInvocation::CreateFromArgsImpl(
-    CompilerInvocation &Res, ArrayRef<const char *> CommandLineArgs,
+    CompilerInvocation &Res, llvm::ArrayRefOfStringRef CommandLineArgs,
     DiagnosticsEngine &Diags, const char *Argv0) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 

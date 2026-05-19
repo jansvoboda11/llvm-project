@@ -177,8 +177,8 @@ private:
         }
         if (IA->getInputArg().getNumValues() == 0)
           continue;
-        const char *Filename = IA->getInputArg().getValue();
-        if (!Filename)
+        StringRef Filename = IA->getInputArg().getValue();
+        if (Filename.empty())
           continue;
         auto BufferOrErr = llvm::MemoryBuffer::getFile(Filename);
         // Input action could be options to linker, therefore, ignore it
@@ -324,18 +324,18 @@ void HIP::constructHIPFatbinCommand(Compilation &C, const JobAction &JA,
   std::string BundlerInputArg = "-input=" NULL_FILE;
   BundlerArgs.push_back(Args.MakeArgString(BundlerInputArg));
   for (const auto &II : Inputs) {
-    BundlerInputArg = std::string("-input=") + II.getFilename();
+    BundlerInputArg = (Twine("-input=") + II.getFilename()).str();
     BundlerArgs.push_back(Args.MakeArgString(BundlerInputArg));
   }
 
   std::string Output = std::string(OutputFileName);
-  auto *BundlerOutputArg =
+  auto BundlerOutputArg =
       Args.MakeArgString(std::string("-output=").append(Output));
   BundlerArgs.push_back(BundlerOutputArg);
 
   addOffloadCompressArgs(Args, BundlerArgs);
 
-  const char *Bundler = Args.MakeArgString(
+  StringRef Bundler = Args.MakeArgString(
       T.getToolChain().GetProgramPath("clang-offload-bundler"));
   C.addCommand(std::make_unique<Command>(
       JA, T, ResponseFileSupport::None(), Bundler, BundlerArgs, Inputs,
@@ -355,8 +355,8 @@ void HIP::constructGenerateObjFileFromHIPFatBinary(
   // Create Temp Object File Generator,
   // Offload Bundled file and Bundled Object file.
   // Keep them if save-temps is enabled.
-  const char *ObjinFile;
-  const char *BundleFile;
+  StringRef ObjinFile;
+  StringRef BundleFile;
   if (D.isSaveTempsEnabled()) {
     ObjinFile = C.getArgs().MakeArgString(Name + ".mcin");
     BundleFile = C.getArgs().MakeArgString(Name + ".hipfb");
@@ -491,8 +491,8 @@ void HIP::constructGenerateObjFileFromHIPFatBinary(
 const char *HIP::getTempFile(Compilation &C, StringRef Prefix,
                              StringRef Extension) {
   if (C.getDriver().isSaveTempsEnabled()) {
-    return C.getArgs().MakeArgString(Prefix + "." + Extension);
+    return C.getArgs().MakeArgString(Prefix + "." + Extension).data();
   }
   auto TmpFile = C.getDriver().GetTemporaryPath(Prefix, Extension);
-  return C.addTempFile(C.getArgs().MakeArgString(TmpFile));
+  return C.addTempFile(C.getArgs().MakeArgString(TmpFile)).data();
 }

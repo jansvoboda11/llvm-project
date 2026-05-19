@@ -131,7 +131,7 @@ void CSKY::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                 const InputInfo &Output,
                                 const InputInfoList &Inputs,
                                 const ArgList &Args,
-                                const char *LinkingOutput) const {
+                                StringRef LinkingOutput) const {
   const ToolChain &ToolChain = getToolChain();
   const Driver &D = ToolChain.getDriver();
   ArgStringList CmdArgs;
@@ -147,7 +147,7 @@ void CSKY::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   bool WantCRTs =
       !Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles);
 
-  const char *crtbegin, *crtend;
+  StringRef crtbegin, crtend;
   auto RuntimeLib = ToolChain.GetRuntimeLibType(Args);
   if (RuntimeLib == ToolChain::RLT_Libgcc) {
     crtbegin = "crtbegin.o";

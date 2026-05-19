@@ -59,7 +59,7 @@ parseStripOptions(ArrayRefOfStringRef ArgsArr,
 // runExtractBundleEntry.
 Error runExtractBundleEntry(const SmallVectorImpl<StringRef> &Args);
 Expected<SmallVector<StringRef>>
-parseExtractBundleEntryOptions(ArrayRef<const char *> ArgsArr);
+parseExtractBundleEntryOptions(ArrayRefOfStringRef ArgsArr);
 } // namespace objcopy
 } // namespace llvm
 

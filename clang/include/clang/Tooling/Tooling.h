@@ -37,6 +37,7 @@
 #include "clang/Frontend/PCHContainerOperations.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -519,7 +520,7 @@ void addExpandedResponseFiles(std::vector<std::string> &CommandLine,
 
 /// Creates a \c CompilerInvocation.
 CompilerInvocation *newInvocation(DiagnosticsEngine *Diagnostics,
-                                  ArrayRef<const char *> CC1Args,
+                                  llvm::ArrayRefOfStringRef CC1Args,
                                   const char *const BinaryName);
 
 } // namespace tooling

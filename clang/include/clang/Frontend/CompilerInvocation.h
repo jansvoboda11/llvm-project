@@ -335,7 +335,7 @@ public:
 
 private:
   static bool CreateFromArgsImpl(CompilerInvocation &Res,
-                                 ArrayRef<const char *> CommandLineArgs,
+                                 llvm::ArrayRefOfStringRef CommandLineArgs,
                                  DiagnosticsEngine &Diags, const char *Argv0);
 
   /// Parse command line options that map to LangOptions.

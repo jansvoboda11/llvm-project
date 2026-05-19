@@ -59,7 +59,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Linker : public MachOTool {
@@ -78,7 +78,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY StaticLibTool : public MachOTool {
@@ -92,7 +92,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Lipo : public MachOTool {
@@ -104,7 +104,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Dsymutil : public MachOTool {
@@ -118,7 +118,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY VerifyDebug : public MachOTool {
@@ -131,7 +131,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 } // end namespace darwin
 } // end namespace tools

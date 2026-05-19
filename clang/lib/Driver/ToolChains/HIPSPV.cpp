@@ -79,12 +79,12 @@ void HIPSPV::Linker::constructLinkAndEmitSpirvCommand(
   // to SPIR-V (E.g. dynamic shared memory).
   auto PassPluginPath = findPassPlugin(C.getDriver(), Args);
   if (!PassPluginPath.empty()) {
-    const char *PassPathCStr = C.getArgs().MakeArgString(PassPluginPath);
+    StringRef PassPathCStr = C.getArgs().MakeArgString(PassPluginPath);
     const char *OptOutput = HIP::getTempFile(C, Name + "-lower", "bc");
     ArgStringList OptArgs{TempFile,     "-load-pass-plugin",
                           PassPathCStr, "-passes=hip-post-link-passes",
                           "-o",         OptOutput};
-    const char *Opt = Args.MakeArgString(getToolChain().GetProgramPath("opt"));
+    StringRef Opt = Args.MakeArgString(getToolChain().GetProgramPath("opt"));
     C.addCommand(std::make_unique<Command>(
         JA, *this, ResponseFileSupport::None(), Opt, OptArgs, Inputs, Output));
     TempFile = OptOutput;
@@ -120,7 +120,7 @@ void HIPSPV::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   if (Inputs.size() > 0 && Inputs[0].getType() == types::TY_Image &&
       JA.getType() == types::TY_Object)
     return HIP::constructGenerateObjFileFromHIPFatBinary(C, Output, Inputs,
@@ -272,7 +272,7 @@ HIPSPVToolChain::getDeviceLibs(
     bool Found = false;
     for (StringRef BCName : BCLibArgs) {
       StringRef FullName;
-      for (std::string LibraryPath : LibraryPaths) {
+      for (StringRef LibraryPath : LibraryPaths) {
         SmallString<128> Path(LibraryPath);
         llvm::sys::path::append(Path, BCName);
         FullName = Path;
@@ -289,7 +289,7 @@ HIPSPVToolChain::getDeviceLibs(
     // Search device library named as 'hipspv-<triple>.bc'.
     auto TT = getTriple().normalize();
     std::string BCName = "hipspv-" + TT + ".bc";
-    for (auto *LibPath : LibraryPaths) {
+    for (auto LibPath : LibraryPaths) {
       SmallString<128> Path(LibPath);
       llvm::sys::path::append(Path, BCName);
       if (llvm::sys::fs::exists(Path)) {

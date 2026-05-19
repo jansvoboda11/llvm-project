@@ -36,10 +36,10 @@ using namespace clang;
 using namespace driver;
 
 Command::Command(const Action &Source, const Tool &Creator,
-                 ResponseFileSupport ResponseSupport, const char *Executable,
+                 ResponseFileSupport ResponseSupport, StringRef Executable,
                  const llvm::opt::ArgStringList &Arguments,
                  ArrayRef<InputInfo> Inputs, ArrayRef<InputInfo> Outputs,
-                 const char *PrependArg)
+                 StringRef PrependArg)
     : Source(Source), Creator(Creator), ResponseSupport(ResponseSupport),
       Executable(Executable), PrependArg(PrependArg), Arguments(Arguments) {
   for (const auto &II : Inputs)
@@ -47,13 +47,13 @@ Command::Command(const Action &Source, const Tool &Creator,
       InputInfoList.push_back(II);
   for (const auto &II : Outputs)
     if (II.isFilename())
-      OutputFilenames.push_back(II.getFilename());
+      OutputFilenames.emplace_back(II.getFilename());
 }
 
 /// Check if the compiler flag in question should be skipped when
 /// emitting a reproducer. Also track how many arguments it has and if the
 /// option is some kind of include path.
-static bool skipArgs(const char *Flag, bool HaveCrashVFS, int &SkipNum,
+static bool skipArgs(StringRef Flag, bool HaveCrashVFS, int &SkipNum,
                      bool &IsInclude) {
   SkipNum = 2;
   // These flags are all of the form -Flag <Arg> and are treated as two
@@ -95,11 +95,10 @@ static bool skipArgs(const char *Flag, bool HaveCrashVFS, int &SkipNum,
     return true;
 
   // These flags are treated as a single argument (e.g., -F<Dir>).
-  StringRef FlagRef(Flag);
-  IsInclude = FlagRef.starts_with("-F") || FlagRef.starts_with("-I");
+  IsInclude = Flag.starts_with("-F") || Flag.starts_with("-I");
   if (IsInclude)
     return !HaveCrashVFS;
-  if (FlagRef.starts_with("-fmodules-cache-path="))
+  if (Flag.starts_with("-fmodules-cache-path="))
     return true;
 
   SkipNum = 0;
@@ -109,7 +108,7 @@ static bool skipArgs(const char *Flag, bool HaveCrashVFS, int &SkipNum,
 void Command::writeResponseFile(raw_ostream &OS) const {
   // In a file list, we only write the set of inputs to the response file
   if (ResponseSupport.ResponseKind == ResponseFileSupport::RF_FileList) {
-    for (const auto *Arg : InputFileList) {
+    for (StringRef Arg : InputFileList) {
       OS << Arg << '\n';
     }
     return;
@@ -118,14 +117,14 @@ void Command::writeResponseFile(raw_ostream &OS) const {
   // In regular response files, we send all arguments to the response file.
   // Wrapping all arguments in double quotes ensures that both Unix tools and
   // Windows tools understand the response file.
-  for (const auto *Arg : Arguments) {
+  for (StringRef Arg : Arguments) {
     OS << '"';
 
-    for (; *Arg != '\0'; Arg++) {
-      if (*Arg == '\"' || *Arg == '\\') {
+    for (char C : Arg) {
+      if (C == '\"' || C == '\\') {
         OS << '\\';
       }
-      OS << *Arg;
+      OS << C;
     }
 
     OS << "\" ";
@@ -133,26 +132,26 @@ void Command::writeResponseFile(raw_ostream &OS) const {
 }
 
 void Command::buildArgvForResponseFile(
-    llvm::SmallVectorImpl<const char *> &Out) const {
+    llvm::SmallVectorImpl<StringRef> &Out) const {
   // When not a file list, all arguments are sent to the response file.
   // This leaves us to set the argv to a single parameter, requesting the tool
   // to read the response file.
   if (ResponseSupport.ResponseKind != ResponseFileSupport::RF_FileList) {
     Out.push_back(Executable);
-    Out.push_back(ResponseFileFlag.c_str());
+    Out.push_back(ResponseFileFlag);
     return;
   }
 
   llvm::StringSet<> Inputs(llvm::from_range, InputFileList);
   Out.push_back(Executable);
 
-  if (PrependArg)
+  if (!PrependArg.empty())
     Out.push_back(PrependArg);
 
   // In a file list, build args vector ignoring parameters that will go in the
   // response file (elements of the InputFileList vector)
   bool FirstInput = true;
-  for (const auto *Arg : Arguments) {
+  for (StringRef Arg : Arguments) {
     if (Inputs.count(Arg) == 0) {
       Out.push_back(Arg);
     } else if (FirstInput) {
@@ -165,8 +164,7 @@ void Command::buildArgvForResponseFile(
 
 /// Rewrite relative include-like flag paths to absolute ones.
 static void
-rewriteIncludes(const llvm::ArrayRef<const char *> &Args, size_t Idx,
-                size_t NumArgs,
+rewriteIncludes(ArrayRef<StringRef> Args, size_t Idx, size_t NumArgs,
                 llvm::SmallVectorImpl<llvm::SmallString<128>> &IncFlags) {
   using namespace llvm;
   using namespace sys;
@@ -183,7 +181,7 @@ rewriteIncludes(const llvm::ArrayRef<const char *> &Args, size_t Idx,
 
   SmallString<128> NewInc;
   if (NumArgs == 1) {
-    StringRef FlagRef(Args[Idx + NumArgs - 1]);
+    StringRef FlagRef = Args[Idx + NumArgs - 1];
     assert((FlagRef.starts_with("-F") || FlagRef.starts_with("-I")) &&
            "Expecting -I or -F");
     StringRef Inc = FlagRef.substr(2);
@@ -196,7 +194,7 @@ rewriteIncludes(const llvm::ArrayRef<const char *> &Args, size_t Idx,
   }
 
   assert(NumArgs == 2 && "Not expecting more than two arguments");
-  StringRef Inc(Args[Idx + NumArgs - 1]);
+  StringRef Inc = Args[Idx + NumArgs - 1];
   if (!getAbsPath(Inc, NewInc))
     return;
   IncFlags.push_back(SmallString<128>(Args[Idx]));
@@ -209,19 +207,19 @@ void Command::Print(raw_ostream &OS, const char *Terminator, bool Quote,
   OS << ' ';
   llvm::sys::printArg(OS, Executable, /*Quote=*/true);
 
-  ArrayRef<const char *> Args = Arguments;
-  SmallVector<const char *, 128> ArgsRespFile;
-  if (ResponseFile != nullptr) {
+  ArrayRef<StringRef> Args = Arguments;
+  SmallVector<StringRef, 128> ArgsRespFile;
+  if (!ResponseFile.empty()) {
     buildArgvForResponseFile(ArgsRespFile);
-    Args = ArrayRef<const char *>(ArgsRespFile).slice(1); // no executable name
-  } else if (PrependArg) {
+    Args = ArrayRef<StringRef>(ArgsRespFile).slice(1); // no executable name
+  } else if (!PrependArg.empty()) {
     OS << ' ';
     llvm::sys::printArg(OS, PrependArg, /*Quote=*/true);
   }
 
   bool HaveCrashVFS = CrashInfo && !CrashInfo->VFSPath.empty();
   for (size_t i = 0, e = Args.size(); i < e; ++i) {
-    const char *const Arg = Args[i];
+    StringRef Arg = Args[i];
 
     if (CrashInfo) {
       int NumArgs = 0;
@@ -249,7 +247,7 @@ void Command::Print(raw_ostream &OS, const char *Terminator, bool Quote,
         return II.getFilename() == Arg;
       });
       if (Found != InputInfoList.end() &&
-          (i == 0 || StringRef(Args[i - 1]) != "-main-file-name")) {
+          (i == 0 || Args[i - 1] != "-main-file-name")) {
         // Replace the input file name with the crashinfo's file name.
         OS << ' ';
         StringRef ShortName = llvm::sys::path::filename(CrashInfo->Filename);
@@ -284,7 +282,7 @@ void Command::Print(raw_ostream &OS, const char *Terminator, bool Quote,
     llvm::sys::printArg(OS, ModCachePath, Quote);
   }
 
-  if (ResponseFile != nullptr) {
+  if (!ResponseFile.empty()) {
     OS << "\n Arguments passed via response file:\n";
     writeResponseFile(OS);
     // Avoiding duplicated newline terminator, since FileLists are
@@ -297,7 +295,7 @@ void Command::Print(raw_ostream &OS, const char *Terminator, bool Quote,
   OS << Terminator;
 }
 
-void Command::setResponseFile(const char *FileName) {
+void Command::setResponseFile(StringRef FileName) {
   ResponseFile = FileName;
   ResponseFileFlag = ResponseSupport.ResponseFlag;
   ResponseFileFlag += FileName;
@@ -326,13 +324,12 @@ int Command::Execute(ArrayRef<std::optional<StringRef>> Redirects,
                      std::string *ErrMsg, bool *ExecutionFailed) const {
   PrintFileNames();
 
-  SmallVector<const char *, 128> Argv;
-  if (ResponseFile == nullptr) {
+  SmallVector<StringRef, 128> Argv;
+  if (ResponseFile.empty()) {
     Argv.push_back(Executable);
-    if (PrependArg)
+    if (!PrependArg.empty())
       Argv.push_back(PrependArg);
     Argv.append(Arguments.begin(), Arguments.end());
-    Argv.push_back(nullptr);
   } else {
     // If the command is too large, we need to put arguments in a response file.
     std::string RespContents;
@@ -341,7 +338,6 @@ int Command::Execute(ArrayRef<std::optional<StringRef>> Redirects,
     // Write file contents and build the Argv vector
     writeResponseFile(SS);
     buildArgvForResponseFile(Argv);
-    Argv.push_back(nullptr);
 
     // Save the response file in the appropriate encoding
     if (std::error_code EC = writeFileWithEncoding(
@@ -365,7 +361,7 @@ int Command::Execute(ArrayRef<std::optional<StringRef>> Redirects,
     Env = ArrayRef(ArgvVectorStorage);
   }
 
-  auto Args = llvm::toStringRefArray(Argv.data());
+  ArrayRef<StringRef> Args = Argv;
 
   // Use Job-specific redirect files if they are present.
   if (!RedirectFiles.empty()) {
@@ -389,10 +385,10 @@ int Command::Execute(ArrayRef<std::optional<StringRef>> Redirects,
 
 CC1Command::CC1Command(const Action &Source, const Tool &Creator,
                        ResponseFileSupport ResponseSupport,
-                       const char *Executable,
+                       StringRef Executable,
                        const llvm::opt::ArgStringList &Arguments,
                        ArrayRef<InputInfo> Inputs, ArrayRef<InputInfo> Outputs,
-                       const char *PrependArg)
+                       StringRef PrependArg)
     : Command(Source, Creator, ResponseSupport, Executable, Arguments, Inputs,
               Outputs, PrependArg) {
   InProcess = true;
@@ -416,11 +412,9 @@ int CC1Command::Execute(ArrayRef<std::optional<StringRef>> Redirects,
   PrintFileNames();
 
   SmallVector<const char *, 128> Argv;
-  Argv.push_back(getExecutable());
-  Argv.append(getArguments().begin(), getArguments().end());
-  Argv.push_back(nullptr);
-  Argv.pop_back(); // The terminating null element shall not be part of the
-                   // slice (main() behavior).
+  Argv.push_back(getExecutable().data());
+  for (StringRef Arg : getArguments())
+    Argv.push_back(Arg.data());
 
   // This flag simply indicates that the program couldn't start, which isn't
   // applicable here.

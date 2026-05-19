@@ -473,7 +473,7 @@ void baremetal::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
                                             const InputInfo &Output,
                                             const InputInfoList &Inputs,
                                             const ArgList &Args,
-                                            const char *LinkingOutput) const {
+                                            StringRef LinkingOutput) const {
   const Driver &D = getToolChain().getDriver();
 
   // Silence warning for "clang -g foo.o -o foo"
@@ -500,7 +500,7 @@ void baremetal::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Delete old output archive file if it already exists before generating a new
   // archive file.
-  const char *OutputFileName = Output.getFilename();
+  StringRef OutputFileName = Output.getFilename();
   if (Output.isFilename() && llvm::sys::fs::exists(OutputFileName)) {
     if (std::error_code EC = llvm::sys::fs::remove(OutputFileName)) {
       D.Diag(diag::err_drv_unable_to_remove_file) << EC.message();
@@ -508,7 +508,7 @@ void baremetal::StaticLibTool::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
+  StringRef Exec = Args.MakeArgString(getToolChain().GetStaticLibToolPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -518,7 +518,7 @@ void baremetal::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                      const InputInfo &Output,
                                      const InputInfoList &Inputs,
                                      const ArgList &Args,
-                                     const char *LinkingOutput) const {
+                                     StringRef LinkingOutput) const {
   ArgStringList CmdArgs;
 
   auto &TC = static_cast<const toolchains::BareMetal &>(getToolChain());
@@ -564,7 +564,7 @@ void baremetal::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   bool NeedCRTs =
       !Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles);
 
-  const char *CRTBegin, *CRTEnd;
+  StringRef CRTBegin, CRTEnd;
   if (NeedCRTs) {
     if (!Args.hasArg(options::OPT_r)) {
       const char *crt = "crt0.o";

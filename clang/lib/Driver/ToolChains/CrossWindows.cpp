@@ -24,12 +24,12 @@ using llvm::opt::ArgStringList;
 void tools::CrossWindows::Assembler::ConstructJob(
     Compilation &C, const JobAction &JA, const InputInfo &Output,
     const InputInfoList &Inputs, const ArgList &Args,
-    const char *LinkingOutput) const {
+    StringRef LinkingOutput) const {
   claimNoWarnArgs(Args);
   const auto &TC =
       static_cast<const toolchains::CrossWindowsToolChain &>(getToolChain());
   ArgStringList CmdArgs;
-  const char *Exec;
+  StringRef Exec;
 
   switch (TC.getArch()) {
   default:
@@ -64,14 +64,14 @@ void tools::CrossWindows::Assembler::ConstructJob(
 void tools::CrossWindows::Linker::ConstructJob(
     Compilation &C, const JobAction &JA, const InputInfo &Output,
     const InputInfoList &Inputs, const ArgList &Args,
-    const char *LinkingOutput) const {
+    StringRef LinkingOutput) const {
   const auto &TC =
       static_cast<const toolchains::CrossWindowsToolChain &>(getToolChain());
   const llvm::Triple &T = TC.getTriple();
   const Driver &D = TC.getDriver();
   SmallString<128> EntryPoint;
   ArgStringList CmdArgs;
-  const char *Exec;
+  StringRef Exec;
 
   // Silence warning for "clang -g foo.o -o foo"
   Args.ClaimAllArgs(options::OPT_g_Group);

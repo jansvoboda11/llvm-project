@@ -101,8 +101,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
       Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getHeaderSearchOpts().ResourceDir =
-        GetResourcesPath(Argv[0], nullptr);
+    Clang->getHeaderSearchOpts().ResourceDir = GetResourcesPath(Argv[0]);
 
   Clang->createVirtualFileSystem();
 

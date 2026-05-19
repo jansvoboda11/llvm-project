@@ -690,7 +690,8 @@ Options::processAndFilterOutInstallAPIOptions(ArrayRef<const char *> Args) {
     if (A->getOption().getID() > (unsigned)OPT_UNKNOWN) {
       ClangDriverArgs.push_back(A->getSpelling().data());
     } else
-      llvm::append_range(ClangDriverArgs, A->getValues());
+      for (StringRef V : A->getValues())
+        ClangDriverArgs.push_back(V.data());
   }
   return ClangDriverArgs;
 }

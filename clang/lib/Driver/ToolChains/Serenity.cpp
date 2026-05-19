@@ -26,7 +26,7 @@ void tools::serenity::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                            const InputInfo &Output,
                                            const InputInfoList &Inputs,
                                            const ArgList &Args,
-                                           const char *LinkingOutput) const {
+                                           StringRef LinkingOutput) const {
   const auto &TC = static_cast<Generic_ELF const &>(getToolChain());
   const auto &D = TC.getDriver();
   const bool IsShared = Args.hasArg(options::OPT_shared);
@@ -161,7 +161,7 @@ void tools::serenity::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back(Args.MakeArgString(crtend_path));
   }
 
-  const char *Exec = Args.MakeArgString(TC.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(TC.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));

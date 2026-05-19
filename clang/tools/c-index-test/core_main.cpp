@@ -394,7 +394,7 @@ int indextest_core_main(int argc, const char **argv) {
 int indextest_perform_shell_execution(const char *command_line) {
   BumpPtrAllocator Alloc;
   llvm::StringSaver Saver(Alloc);
-  SmallVector<const char *, 4> Args;
+  SmallVector<StringRef, 4> Args;
   llvm::cl::TokenizeGNUCommandLine(command_line, Saver, Args);
   auto Program = llvm::sys::findProgramByName(Args[0]);
   if (std::error_code ec = Program.getError()) {

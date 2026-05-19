@@ -109,7 +109,7 @@ namespace types {
 
   /// lookupTypeForTypSpecifier - Lookup the type to use for a user
   /// specified type name.
-  ID lookupTypeForTypeSpecifier(const char *Name);
+  ID lookupTypeForTypeSpecifier(llvm::StringRef Name);
 
   /// getCompilationPhases - Get the list of compilation phases ('Phases') to be
   /// done for type 'Id' up until including LastPhase.

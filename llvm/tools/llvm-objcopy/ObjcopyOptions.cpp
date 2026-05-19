@@ -1727,7 +1727,7 @@ Error llvm::objcopy::runExtractBundleEntry(
 }
 
 Expected<SmallVector<StringRef>>
-objcopy::parseExtractBundleEntryOptions(ArrayRef<const char *> ArgsArr) {
+objcopy::parseExtractBundleEntryOptions(ArrayRefOfStringRef ArgsArr) {
   ExtractBundleEntryOptTable T;
   unsigned MissingArgumentIndex, MissingArgumentCount;
   opt::InputArgList InputArgs =

@@ -353,7 +353,7 @@ Expected<std::unique_ptr<lto::LTO>> createLTO(const ArgList &Args) {
     if (!to_integer(Arg->getValue(), Jobs) || Jobs == 0)
       reportError(createStringError("%s: expected a positive integer, got '%s'",
                                     Arg->getSpelling().data(),
-                                    Arg->getValue()));
+                                    Arg->getValue().str().c_str()));
   Backend =
       lto::createInProcessThinBackend(heavyweight_hardware_concurrency(Jobs));
 
@@ -407,7 +407,7 @@ Expected<std::unique_ptr<lto::LTO>> createLTO(const ArgList &Args) {
     if (!to_integer(Arg->getValue(), Partitions) || Partitions == 0)
       reportError(createStringError("%s: expected a positive integer, got '%s'",
                                     Arg->getSpelling().data(),
-                                    Arg->getValue()));
+                                    Arg->getValue().str().c_str()));
   lto::LTO::LTOKind Kind = Args.hasArg(OPT_thinlto) ? lto::LTO::LTOK_UnifiedThin
                                                     : lto::LTO::LTOK_Default;
   return std::make_unique<lto::LTO>(std::move(Conf), Backend, Partitions, Kind);
@@ -518,7 +518,8 @@ Expected<SmallVector<StringRef>> getInput(const ArgList &Args) {
             : std::string(Arg->getValue());
 
     if (!Filename && Arg->getOption().matches(OPT_library))
-      return createStringError("unable to find library -l%s", Arg->getValue());
+      return createStringError("unable to find library -l%s",
+                               Arg->getValue().str().c_str());
 
     if (!Filename || !sys::fs::exists(*Filename) ||
         sys::fs::is_directory(*Filename))
@@ -796,9 +797,9 @@ int main(int argc, char **argv) {
   // This forwards '-mllvm' arguments to LLVM if present.
   SmallVector<const char *> NewArgv = {argv[0]};
   for (const opt::Arg *Arg : Args.filtered(OPT_mllvm))
-    NewArgv.push_back(Arg->getValue());
+    NewArgv.push_back(Arg->getValue().data());
   for (const opt::Arg *Arg : Args.filtered(OPT_plugin_opt))
-    NewArgv.push_back(Arg->getValue());
+    NewArgv.push_back(Arg->getValue().data());
   cl::ParseCommandLineOptions(NewArgv.size(), &NewArgv[0]);
 
   // Get the input files to pass to 'nvlink'.

@@ -117,11 +117,11 @@ static void insertTargetAndModeArgs(const ParsedClangName &NameParts,
 }
 
 static void getCLEnvVarOptions(std::string &EnvValue, llvm::StringSaver &Saver,
-                               SmallVectorImpl<const char *> &Opts) {
+                               SmallVectorImpl<StringRef> &Opts) {
   llvm::cl::TokenizeWindowsCommandLine(EnvValue, Saver, Opts);
   // The first instance of '#' should be replaced with '=' in each option.
-  for (const char *Opt : Opts)
-    if (char *NumberSignPtr = const_cast<char *>(::strchr(Opt, '#')))
+  for (StringRef Opt : Opts)
+    if (char *NumberSignPtr = const_cast<char *>(::strchr(Opt.data(), '#')))
       *NumberSignPtr = '=';
 }
 
@@ -219,10 +219,17 @@ static int ExecuteCC1Tool(SmallVectorImpl<const char *> &ArgV,
   llvm::BumpPtrAllocator A;
   llvm::cl::ExpansionContext ECtx(A, llvm::cl::TokenizeGNUCommandLine,
                                   VFS.get());
-  if (llvm::Error Err = ECtx.expandResponseFiles(ArgV)) {
+  SmallVector<StringRef, 256> ArgVRefs(ArgV.begin(), ArgV.end());
+  if (llvm::Error Err = ECtx.expandResponseFiles(ArgVRefs)) {
     llvm::errs() << toString(std::move(Err)) << '\n';
     return 1;
   }
+
+  // Re-materialize ArgV from possibly-expanded ArgVRefs.
+  ArgV.clear();
+  for (StringRef A : ArgVRefs)
+    ArgV.push_back(A.data());
+
   StringRef Tool = ArgV[1];
   void *GetExecutablePathVP = (void *)(intptr_t)GetExecutablePath;
   if (Tool == "-cc1")
@@ -262,10 +269,14 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
 
   auto VFS = llvm::vfs::getRealFileSystem();
 
-  if (llvm::Error Err = expandResponseFiles(Args, ClangCLMode, A, VFS.get())) {
+  SmallVector<StringRef, 256> ArgsRefs(Args.begin(), Args.end());
+  if (llvm::Error Err = expandResponseFiles(ArgsRefs, ClangCLMode, A, VFS.get())) {
     llvm::errs() << toString(std::move(Err)) << '\n';
     return 1;
   }
+  Args.clear();
+  for (StringRef A : ArgsRefs)
+    Args.push_back(A.data());
 
   // Handle -cc1 integrated tools.
   if (Args.size() >= 2 && StringRef(Args[1]).starts_with("-cc1")) {
@@ -296,8 +307,11 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
     // Arguments in "CL" are prepended.
     std::optional<std::string> OptCL = llvm::sys::Process::GetEnv("CL");
     if (OptCL) {
+      SmallVector<StringRef, 8> PrependedOptsRefs;
+      getCLEnvVarOptions(*OptCL, Saver, PrependedOptsRefs);
       SmallVector<const char *, 8> PrependedOpts;
-      getCLEnvVarOptions(*OptCL, Saver, PrependedOpts);
+      for (StringRef A : PrependedOptsRefs)
+        PrependedOpts.push_back(A.data());
 
       // Insert right after the program name to prepend to the argument list.
       Args.insert(Args.begin() + 1, PrependedOpts.begin(), PrependedOpts.end());
@@ -305,8 +319,11 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
     // Arguments in "_CL_" are appended.
     std::optional<std::string> Opt_CL_ = llvm::sys::Process::GetEnv("_CL_");
     if (Opt_CL_) {
+      SmallVector<StringRef, 8> AppendedOptsRefs;
+      getCLEnvVarOptions(*Opt_CL_, Saver, AppendedOptsRefs);
       SmallVector<const char *, 8> AppendedOpts;
-      getCLEnvVarOptions(*Opt_CL_, Saver, AppendedOpts);
+      for (StringRef A : AppendedOptsRefs)
+        AppendedOpts.push_back(A.data());
 
       // Insert at the end of the argument list to append.
       Args.append(AppendedOpts.begin(), AppendedOpts.end());

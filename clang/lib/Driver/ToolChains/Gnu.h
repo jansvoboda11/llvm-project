@@ -49,7 +49,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
@@ -62,7 +62,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY StaticLibTool : public Tool {
@@ -76,7 +76,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 };
 } // end namespace gnutools
 
@@ -94,7 +94,7 @@ public:
   void ConstructJob(Compilation &C, const JobAction &JA,
                     const InputInfo &Output, const InputInfoList &Inputs,
                     const llvm::opt::ArgList &TCArgs,
-                    const char *LinkingOutput) const override;
+                    StringRef LinkingOutput) const override;
 
   /// RenderExtraToolArgs - Render any arguments necessary to force
   /// the particular tool mode.

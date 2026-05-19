@@ -28,7 +28,7 @@ void freebsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
                                       const InputInfo &Output,
                                       const InputInfoList &Inputs,
                                       const ArgList &Args,
-                                      const char *LinkingOutput) const {
+                                      StringRef LinkingOutput) const {
   const auto &ToolChain = static_cast<const FreeBSD &>(getToolChain());
   const auto &D = getToolChain().getDriver();
   const llvm::Triple &Triple = ToolChain.getTriple();
@@ -119,7 +119,7 @@ void freebsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   for (const auto &II : Inputs)
     CmdArgs.push_back(II.getFilename());
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetProgramPath("as"));
+  StringRef Exec = Args.MakeArgString(ToolChain.GetProgramPath("as"));
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -129,7 +129,7 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                    const InputInfo &Output,
                                    const InputInfoList &Inputs,
                                    const ArgList &Args,
-                                   const char *LinkingOutput) const {
+                                   StringRef LinkingOutput) const {
   const auto &ToolChain = static_cast<const FreeBSD &>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   const llvm::Triple &Triple = ToolChain.getTriple();
@@ -378,7 +378,7 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   ToolChain.addProfileRTLibs(Args, CmdArgs);
 
-  const char *Exec = Args.MakeArgString(getToolChain().GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(getToolChain().GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
@@ -447,7 +447,7 @@ void FreeBSD::AddCXXStdlibLibArgs(const ArgList &Args,
   if (SuffixedLib && GetCXXStdlibType(Args) == CST_Libcxx)
     std::replace_if(
         CmdArgs.begin(), CmdArgs.end(),
-        [](const char *S) { return StringRef(S) == "-lc++"; }, "-lc++_p");
+        [](StringRef S) { return S == "-lc++"; }, "-lc++_p");
 }
 
 void FreeBSD::AddCudaIncludeArgs(const ArgList &DriverArgs,

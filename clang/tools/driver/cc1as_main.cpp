@@ -245,8 +245,9 @@ bool AssemblerInvocation::CreateFromArgs(AssemblerInvocation &Opts,
 
   llvm::opt::Visibility VisibilityMask(options::CC1AsOption);
   unsigned MissingArgIndex, MissingArgCount;
-  InputArgList Args =
-      OptTbl.ParseArgs(Argv, MissingArgIndex, MissingArgCount, VisibilityMask);
+  InputArgList Args = OptTbl.ParseArgs(llvm::ArrayRefOfStringRef(Argv),
+                                       MissingArgIndex, MissingArgCount,
+                                       VisibilityMask);
 
   // Check for missing argument error.
   if (MissingArgCount) {

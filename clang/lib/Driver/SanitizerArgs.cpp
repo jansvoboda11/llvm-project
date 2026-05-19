@@ -243,7 +243,7 @@ static void parseSpecialCaseListArg(const Driver &D,
     // Match -fsanitize-(coverage-)?(allow|ignore)list.
     if (Arg->getOption().matches(SCLOptionID)) {
       Arg->claim();
-      std::string SCLPath = Arg->getValue();
+      std::string SCLPath = Arg->getValue().str();
       if (D.getVFS().exists(SCLPath)) {
         SCLFiles.push_back(SCLPath);
       } else if (DiagnoseErrors) {
@@ -1643,11 +1643,10 @@ SanitizerMask parseArgValues(const Driver &D, const llvm::opt::Arg *A,
       "Invalid argument in parseArgValues!");
   SanitizerMask Kinds;
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    const char *Value = A->getValue(i);
+    StringRef Value = A->getValue(i);
     SanitizerMask Kind;
     // Special case: don't accept -fsanitize=all.
-    if (A->getOption().matches(options::OPT_fsanitize_EQ) &&
-        0 == strcmp("all", Value))
+    if (A->getOption().matches(options::OPT_fsanitize_EQ) && Value == "all")
       Kind = SanitizerMask();
     else
       Kind = parseSanitizerValue(Value, /*AllowGroups=*/true);
@@ -1666,7 +1665,7 @@ void parseArgCutoffs(const Driver &D, const llvm::opt::Arg *A,
   assert(A->getOption().matches(options::OPT_fsanitize_skip_hot_cutoff_EQ) &&
          "Invalid argument in parseArgCutoffs!");
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    const char *Value = A->getValue(i);
+    StringRef Value = A->getValue(i);
 
     // We don't check the value of Cutoffs[i]: it's legal to specify
     // a cutoff of 0.
@@ -1682,7 +1681,7 @@ static int parseOverflowPatternExclusionValues(const Driver &D,
                                                bool DiagnoseErrors) {
   int Exclusions = 0;
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    const char *Value = A->getValue(i);
+    StringRef Value = A->getValue(i);
     int E =
         llvm::StringSwitch<int>(Value)
             .Case("none", LangOptionsBase::None)
@@ -1708,7 +1707,7 @@ int parseCoverageFeatures(const Driver &D, const llvm::opt::Arg *A,
          A->getOption().matches(options::OPT_fno_sanitize_coverage));
   int Features = 0;
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    const char *Value = A->getValue(i);
+    StringRef Value = A->getValue(i);
     int F = llvm::StringSwitch<int>(Value)
                 .Case("func", CoverageFunc)
                 .Case("bb", CoverageBB)
@@ -1747,7 +1746,7 @@ int parseBinaryMetadataFeatures(const Driver &D, const llvm::opt::Arg *A,
           options::OPT_fno_experimental_sanitize_metadata_EQ));
   int Features = 0;
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    const char *Value = A->getValue(i);
+    StringRef Value = A->getValue(i);
     int F = llvm::StringSwitch<int>(Value)
                 .Case("covered", BinaryMetadataCovered)
                 .Case("atomics", BinaryMetadataAtomics)
