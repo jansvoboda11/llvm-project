@@ -205,7 +205,7 @@ public:
 
     SanitizerMask Supported = ROCMToolChain::getSupportedSanitizers();
     SanitizerMask SupportedMask;
-    for (const char *Value : A->getValues()) {
+    for (StringRef Value : A->getValues()) {
       SanitizerMask K = parseSanitizerValue(Value, /*Allow Groups*/ true);
       if (K & Supported) {
         SupportedSanitizers.push_back(Value);

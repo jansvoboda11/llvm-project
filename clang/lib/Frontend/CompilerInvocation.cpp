@@ -5172,10 +5172,9 @@ bool CompilerInvocation::CreateFromArgsImpl(
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
-bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
-                                        ArrayRef<const char *> CommandLineArgs,
-                                        DiagnosticsEngine &Diags,
-                                        const char *Argv0) {
+bool CompilerInvocation::CreateFromArgs(
+    CompilerInvocation &Invocation, ArrayRef<StringRef> CommandLineArgs,
+    DiagnosticsEngine &Diags, const char *Argv0) {
   CompilerInvocation DummyInvocation;
 
   return RoundTrip(

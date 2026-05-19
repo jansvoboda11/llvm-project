@@ -109,7 +109,7 @@ static bool skipArgs(const char *Flag, bool HaveCrashVFS, int &SkipNum,
 void Command::writeResponseFile(raw_ostream &OS) const {
   // In a file list, we only write the set of inputs to the response file
   if (ResponseSupport.ResponseKind == ResponseFileSupport::RF_FileList) {
-    for (const auto *Arg : InputFileList) {
+    for (StringRef Arg : InputFileList) {
       OS << Arg << '\n';
     }
     return;
@@ -118,7 +118,7 @@ void Command::writeResponseFile(raw_ostream &OS) const {
   // In regular response files, we send all arguments to the response file.
   // Wrapping all arguments in double quotes ensures that both Unix tools and
   // Windows tools understand the response file.
-  for (const auto *Arg : Arguments) {
+  for (StringRef Arg : Arguments) {
     OS << '"';
 
     for (; *Arg != '\0'; Arg++) {
