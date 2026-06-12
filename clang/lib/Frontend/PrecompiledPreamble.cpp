@@ -446,6 +446,7 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
 
   // Tell the compiler invocation to generate a temporary precompiled header.
   FrontendOpts.ProgramAction = frontend::GeneratePCH;
+  PreambleInvocation->getLangOpts().CompilingPCH = true;
   FrontendOpts.OutputFile = std::string(
       StoreInMemory ? getInMemoryPreamblePath() : Storage->filePath());
   PreprocessorOpts.PrecompiledPreambleBytes.first = 0;
@@ -488,8 +489,6 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
 
   auto PreambleDepCollector = std::make_shared<PreambleDependencyCollector>();
   Clang->addDependencyCollector(PreambleDepCollector);
-
-  Clang->getLangOpts().CompilingPCH = true;
 
   // Remap the main source file to the preamble buffer.
   StringRef MainFilePath = FrontendOpts.Inputs[0].getFile();

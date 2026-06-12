@@ -112,8 +112,6 @@ public:
   CreateOutputFile(CompilerInstance &CI, StringRef InFile,
                    std::string &OutputFile, bool SetOnlyIfDifferent = false);
 
-  bool BeginSourceFileAction(CompilerInstance &CI) override;
-
   GeneratePCHAction(bool SetOnlyIfDifferent = false)
       : SetOnlyIfDifferent(SetOnlyIfDifferent) {}
 };

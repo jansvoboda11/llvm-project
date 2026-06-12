@@ -182,11 +182,6 @@ bool GeneratePCHAction::shouldEraseOutputFiles() {
   return ASTFrontendAction::shouldEraseOutputFiles();
 }
 
-bool GeneratePCHAction::BeginSourceFileAction(CompilerInstance &CI) {
-  CI.getLangOpts().CompilingPCH = true;
-  return ASTFrontendAction::BeginSourceFileAction(CI);
-}
-
 std::vector<std::unique_ptr<ASTConsumer>>
 GenerateModuleAction::CreateMultiplexConsumer(CompilerInstance &CI,
                                               StringRef InFile) {

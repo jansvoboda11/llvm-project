@@ -747,10 +747,6 @@ bool DependencyScanningAction::runInvocation(
     if (!MaybePrebuiltModulesASTMap)
       return false;
 
-    // Normally this would be handled by GeneratePCHAction
-    if (ScanInstance.getFrontendOpts().ProgramAction == frontend::GeneratePCH)
-      ScanInstance.getLangOpts().CompilingPCH = true;
-
     AsyncCompiles.emplace();
     SingleTUWithAsyncModuleCompiles Action(Service, Controller, *AsyncCompiles);
     (void)ScanInstance.ExecuteAction(Action);
