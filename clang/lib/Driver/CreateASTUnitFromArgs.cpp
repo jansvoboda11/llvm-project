@@ -98,23 +98,23 @@ std::unique_ptr<ASTUnit> clang::CreateASTUnitFromCommandLine(
 
   // Override any files that need remapping
   for (const auto &RemappedFile : RemappedFiles) {
-    CI->getPreprocessorOpts().addRemappedFile(RemappedFile.first,
-                                              RemappedFile.second);
+    CI->getMutPreprocessorOpts().addRemappedFile(RemappedFile.first,
+                                                 RemappedFile.second);
   }
-  PreprocessorOptions &PPOpts = CI->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = CI->getMutPreprocessorOpts();
   PPOpts.RemappedFilesKeepOriginalName = RemappedFilesKeepOriginalName;
   PPOpts.AllowPCHWithCompilerErrors = AllowPCHWithCompilerErrors;
   PPOpts.SingleFileParseMode = SingleFileParse;
   PPOpts.RetainExcludedConditionalBlocks = RetainExcludedConditionalBlocks;
 
   // Override the resources path.
-  CI->getHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
+  CI->getMutHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
 
-  CI->getFrontendOpts().SkipFunctionBodies =
+  CI->getMutFrontendOpts().SkipFunctionBodies =
       SkipFunctionBodies == SkipFunctionBodiesScope::PreambleAndMainFile;
 
   if (ModuleFormat)
-    CI->getHeaderSearchOpts().ModuleFormat = std::string(*ModuleFormat);
+    CI->getMutHeaderSearchOpts().ModuleFormat = std::string(*ModuleFormat);
 
   // Create the AST unit.
   std::unique_ptr<ASTUnit> AST;

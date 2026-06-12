@@ -416,25 +416,25 @@ std::shared_ptr<CompilerInvocation> dependencies::createScanCompilerInvocation(
     DependencyActionController &Controller) {
   auto ScanInvocation = std::make_shared<CompilerInvocation>(Invocation);
 
-  sanitizeDiagOpts(ScanInvocation->getDiagnosticOpts());
+  sanitizeDiagOpts(ScanInvocation->getMutDiagnosticOpts());
 
-  ScanInvocation->getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
+  ScanInvocation->getMutPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
       true;
 
   if (ScanInvocation->getHeaderSearchOpts().ModulesValidateOncePerBuildSession)
-    ScanInvocation->getHeaderSearchOpts().BuildSessionTimestamp =
+    ScanInvocation->getMutHeaderSearchOpts().BuildSessionTimestamp =
         Service.getOpts().BuildSessionTimestamp;
 
-  ScanInvocation->getFrontendOpts().DisableFree = false;
-  ScanInvocation->getFrontendOpts().GenerateGlobalModuleIndex = false;
-  ScanInvocation->getFrontendOpts().UseGlobalModuleIndex = false;
-  ScanInvocation->getFrontendOpts().GenReducedBMI = false;
-  ScanInvocation->getFrontendOpts().ModuleOutputPath.clear();
+  ScanInvocation->getMutFrontendOpts().DisableFree = false;
+  ScanInvocation->getMutFrontendOpts().GenerateGlobalModuleIndex = false;
+  ScanInvocation->getMutFrontendOpts().UseGlobalModuleIndex = false;
+  ScanInvocation->getMutFrontendOpts().GenReducedBMI = false;
+  ScanInvocation->getMutFrontendOpts().ModuleOutputPath.clear();
   // This will prevent us compiling individual modules asynchronously since
   // FileManager is not thread-safe, but it does improve performance for now.
-  ScanInvocation->getFrontendOpts().ModulesShareFileManager = true;
-  ScanInvocation->getHeaderSearchOpts().ModuleFormat = "raw";
-  ScanInvocation->getHeaderSearchOpts().ModulesIncludeVFSUsage =
+  ScanInvocation->getMutFrontendOpts().ModulesShareFileManager = true;
+  ScanInvocation->getMutHeaderSearchOpts().ModuleFormat = "raw";
+  ScanInvocation->getMutHeaderSearchOpts().ModulesIncludeVFSUsage =
       any(Service.getOpts().OptimizeArgs & ScanningOptimizations::VFS);
 
   // Consider different header search and diagnostic options to create
@@ -442,21 +442,21 @@ std::shared_ptr<CompilerInvocation> dependencies::createScanCompilerInvocation(
   //
   // TODO: Implement diagnostic bucketing to reduce the impact of strict
   // context hashing.
-  ScanInvocation->getHeaderSearchOpts().ModulesStrictContextHash = true;
-  ScanInvocation->getHeaderSearchOpts().ModulesSerializeOnlyPreprocessor = true;
-  ScanInvocation->getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
-  ScanInvocation->getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
-  ScanInvocation->getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
+  ScanInvocation->getMutHeaderSearchOpts().ModulesStrictContextHash = true;
+  ScanInvocation->getMutHeaderSearchOpts().ModulesSerializeOnlyPreprocessor = true;
+  ScanInvocation->getMutHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+  ScanInvocation->getMutHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+  ScanInvocation->getMutHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
       true;
-  ScanInvocation->getHeaderSearchOpts().ModulesForceValidateUserHeaders = false;
+  ScanInvocation->getMutHeaderSearchOpts().ModulesForceValidateUserHeaders = false;
 
   // Application extension only affects the handling of availability attributes,
   // which cannot change the dependencies.
-  ScanInvocation->getLangOpts().AppExt = false;
+  ScanInvocation->getMutLangOpts().AppExt = false;
 
   // Ensure that the scanner does not create new dependency collectors,
   // and thus won't write out the extra '.d' files to disk.
-  ScanInvocation->getDependencyOutputOpts() = {};
+  ScanInvocation->getMutDependencyOutputOpts() = {};
 
   Controller.initializeScanInvocation(*ScanInvocation);
 
@@ -677,7 +677,7 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
   bool BeginSourceFileAction(CompilerInstance &CI) override {
-    CI.getInvocation().getPreprocessorOpts().SingleModuleParseMode = true;
+    CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
     CI.getPreprocessor().addPPCallbacks(std::make_unique<AsyncModuleCompile>(
         CI, Service, Controller, Compiles));
     return true;
@@ -686,7 +686,7 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
 
 bool SingleModuleWithAsyncModuleCompiles::BeginSourceFileAction(
     CompilerInstance &CI) {
-  CI.getInvocation().getPreprocessorOpts().SingleModuleParseMode = true;
+  CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
   CI.getPreprocessor().addPPCallbacks(
       std::make_unique<AsyncModuleCompile>(CI, Service, Controller, Compiles));
   return true;
@@ -701,7 +701,7 @@ bool DependencyScanningAction::runInvocation(
   // Making sure that we canonicalize the defines early to avoid unnecessary
   // variants in both the scanner and in the resulting  explicit command lines.
   if (any(Service.getOpts().OptimizeArgs & ScanningOptimizations::Macros))
-    canonicalizeDefines(OriginalInvocation->getPreprocessorOpts());
+    canonicalizeDefines(OriginalInvocation->getMutPreprocessorOpts());
 
   if (Scanned) {
     CompilerInstance &ScanInstance = *ScanInstanceStorage;

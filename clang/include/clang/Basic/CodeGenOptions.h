@@ -40,7 +40,6 @@ namespace clang {
 /// that this large collection of bitfields is a trivial class type.
 class CodeGenOptionsBase {
   friend class CompilerInvocation;
-  friend class CompilerInvocationBase;
 
 public:
   /// For ASTs produced with different option value, signifies their level of

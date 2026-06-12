@@ -44,13 +44,13 @@ public:
 
 TEST(CodeGenTest, TestNullCodeGen) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = EmitLLVM;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = EmitLLVM;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
@@ -64,10 +64,10 @@ TEST(CodeGenTest, CodeGenFromIRMemBuffer) {
   auto Invocation = std::make_shared<CompilerInvocation>();
   std::unique_ptr<MemoryBuffer> MemBuffer =
       MemoryBuffer::getMemBuffer("", "test.ll");
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile(*MemBuffer, Language::LLVM_IR));
-  Invocation->getFrontendOpts().ProgramAction = frontend::EmitLLVMOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::EmitLLVMOnly;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();

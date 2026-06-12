@@ -138,7 +138,7 @@ private:
   /// including transitive dependencies.
   std::vector<std::string> FileDeps;
 
-  mutable std::variant<std::monostate, CowCompilerInvocation,
+  mutable std::variant<std::monostate, CompilerInvocation,
                        std::vector<std::string>>
       BuildInfo;
 };

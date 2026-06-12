@@ -419,9 +419,9 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   assert(VFS && "VFS is null");
 
   auto PreambleInvocation = std::make_shared<CompilerInvocation>(Invocation);
-  FrontendOptions &FrontendOpts = PreambleInvocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = PreambleInvocation->getMutFrontendOpts();
   PreprocessorOptions &PreprocessorOpts =
-      PreambleInvocation->getPreprocessorOpts();
+      PreambleInvocation->getMutPreprocessorOpts();
 
   std::shared_ptr<PCHBuffer> Buffer = std::make_shared<PCHBuffer>();
   std::unique_ptr<PCHStorage> Storage;
@@ -446,7 +446,7 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
 
   // Tell the compiler invocation to generate a temporary precompiled header.
   FrontendOpts.ProgramAction = frontend::GeneratePCH;
-  PreambleInvocation->getLangOpts().CompilingPCH = true;
+  PreambleInvocation->getMutLangOpts().CompilingPCH = true;
   FrontendOpts.OutputFile = std::string(
       StoreInMemory ? getInMemoryPreamblePath() : Storage->filePath());
   PreprocessorOpts.PrecompiledPreambleBytes.first = 0;
@@ -604,7 +604,7 @@ bool PrecompiledPreamble::CanReuse(const CompilerInvocation &Invocation,
 
   auto PreambleInvocation = std::make_shared<CompilerInvocation>(Invocation);
   PreprocessorOptions &PreprocessorOpts =
-      PreambleInvocation->getPreprocessorOpts();
+      PreambleInvocation->getMutPreprocessorOpts();
 
   // We've previously computed a preamble. Check whether we have the same
   // preamble now that we did before, and that there's enough space in
@@ -760,7 +760,7 @@ void PrecompiledPreamble::configurePreamble(
     llvm::MemoryBuffer *MainFileBuffer) const {
   assert(VFS);
 
-  auto &PreprocessorOpts = CI.getPreprocessorOpts();
+  auto &PreprocessorOpts = CI.getMutPreprocessorOpts();
 
   // Remap main file to point to MainFileBuffer.
   auto MainFilePath = CI.getFrontendOpts().Inputs[0].getFile();

@@ -143,7 +143,7 @@ private:
   /// been partially transformed into one that can perform explicit build of
   /// a discovered modular dependency. Note that this still needs to be adjusted
   /// for each individual module.
-  CowCompilerInvocation CommonInvocation;
+  CompilerInvocation CommonInvocation;
 
   std::optional<P1689ModuleInfo> ProvidedStdCXXModule;
   std::vector<P1689ModuleInfo> RequiredStdCXXModules;
@@ -175,9 +175,9 @@ private:
 
   /// Get a Clang invocation adjusted to build the given modular dependency.
   /// This excludes paths that are yet-to-be-provided by the build system.
-  CowCompilerInvocation getInvocationAdjustedForModuleBuildWithoutOutputs(
+  CompilerInvocation getInvocationAdjustedForModuleBuildWithoutOutputs(
       const ModuleDeps &Deps,
-      llvm::function_ref<void(CowCompilerInvocation &)> Optimize) const;
+      llvm::function_ref<void(CompilerInvocation &)> Optimize) const;
 
   /// Collect module map files for given modules.
   llvm::DenseSet<const FileEntry *>
@@ -189,15 +189,13 @@ private:
   /// Add module files (pcm) to the invocation, if needed.
   void addModuleFiles(CompilerInvocation &CI,
                       ArrayRef<ModuleID> ClangModuleDeps) const;
-  void addModuleFiles(CowCompilerInvocation &CI,
-                      ArrayRef<ModuleID> ClangModuleDeps) const;
 
   /// Add paths that require looking up outputs to the given dependencies.
-  void addOutputPaths(CowCompilerInvocation &CI, ModuleDeps &Deps);
+  void addOutputPaths(CompilerInvocation &CI, ModuleDeps &Deps);
 
   /// Compute the context hash for \p Deps, and create the mapping
   /// \c ModuleDepsByID[Deps.ID] = &Deps.
-  void associateWithContextHash(const CowCompilerInvocation &CI,
+  void associateWithContextHash(const CompilerInvocation &CI,
                                 ModuleDeps &Deps);
 };
 

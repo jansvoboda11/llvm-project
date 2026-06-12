@@ -29,7 +29,7 @@ const std::vector<std::string> &ModuleDeps::getBuildArguments() const {
   // on a single thread. Otherwise, it should be protected with a lock.
   assert(!std::holds_alternative<std::monostate>(BuildInfo) &&
          "Using uninitialized ModuleDeps");
-  if (const auto *CI = std::get_if<CowCompilerInvocation>(&BuildInfo))
+  if (const auto *CI = std::get_if<CompilerInvocation>(&BuildInfo))
     BuildInfo = CI->getCC1CommandLine();
   return std::get<std::vector<std::string>>(BuildInfo);
 }

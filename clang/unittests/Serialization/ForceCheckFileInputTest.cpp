@@ -78,12 +78,12 @@ export int aa = 43;
     std::shared_ptr<CompilerInvocation> Invocation =
         createInvocation(Args, CIOpts);
     EXPECT_TRUE(Invocation);
-    Invocation->getFrontendOpts().DisableFree = false;
+    Invocation->getMutFrontendOpts().DisableFree = false;
 
     auto Buf = CIOpts.VFS->getBufferForFile("a.cppm");
     EXPECT_TRUE(Buf);
 
-    Invocation->getPreprocessorOpts().addRemappedFile("a.cppm", Buf->get());
+    Invocation->getMutPreprocessorOpts().addRemappedFile("a.cppm", Buf->get());
 
     Buf->release();
 
@@ -117,7 +117,7 @@ export int aa = 43;
     std::shared_ptr<CompilerInvocation> Invocation =
         createInvocation(Args, CIOpts);
     EXPECT_TRUE(Invocation);
-    Invocation->getFrontendOpts().DisableFree = false;
+    Invocation->getMutFrontendOpts().DisableFree = false;
 
     CompilerInstance Clang(std::move(Invocation));
 

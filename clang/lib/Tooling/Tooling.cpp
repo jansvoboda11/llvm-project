@@ -174,8 +174,8 @@ CompilerInvocation *newInvocation(DiagnosticsEngine *Diagnostics,
   CompilerInvocation *Invocation = new CompilerInvocation;
   CompilerInvocation::CreateFromArgs(*Invocation, CC1Args, *Diagnostics,
                                      BinaryName);
-  Invocation->getFrontendOpts().DisableFree = false;
-  Invocation->getCodeGenOpts().DisableFree = false;
+  Invocation->getMutFrontendOpts().DisableFree = false;
+  Invocation->getMutCodeGenOpts().DisableFree = false;
   return Invocation;
 }
 
@@ -665,7 +665,7 @@ public:
     std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromCompilerInvocation(
         Invocation, std::move(PCHContainerOps), nullptr,
         CompilerInstance::createDiagnostics(Files->getVirtualFileSystem(),
-                                            Invocation->getDiagnosticOpts(),
+                                            Invocation->getMutDiagnosticOpts(),
                                             DiagConsumer,
                                             /*ShouldOwnClient=*/false),
         Files, false, CaptureKind);

@@ -71,7 +71,6 @@ enum class PointerAuthenticationMode : unsigned {
 /// this large collection of bitfields is a trivial class type.
 class LangOptionsBase {
   friend class CompilerInvocation;
-  friend class CompilerInvocationBase;
 
 public:
   using Visibility = clang::Visibility;

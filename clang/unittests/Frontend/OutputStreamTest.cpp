@@ -25,12 +25,12 @@ namespace {
 TEST(FrontendOutputTests, TestOutputStream) {
   llvm::InitializeAllTargetMCs();
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = EmitBC;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
 
   SmallVector<char, 256> IRBuffer;
@@ -50,12 +50,12 @@ TEST(FrontendOutputTests, TestOutputStream) {
 TEST(FrontendOutputTests, TestVerboseOutputStreamShared) {
   llvm::InitializeAllTargetMCs();
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("invalid").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = EmitBC;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
 
   std::string VerboseBuffer;
@@ -80,12 +80,12 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamOwned) {
   {
     llvm::InitializeAllTargetMCs();
     auto Invocation = std::make_shared<CompilerInvocation>();
-    Invocation->getPreprocessorOpts().addRemappedFile(
+    Invocation->getMutPreprocessorOpts().addRemappedFile(
         "test.cc", MemoryBuffer::getMemBuffer("invalid").release());
-    Invocation->getFrontendOpts().Inputs.push_back(
+    Invocation->getMutFrontendOpts().Inputs.push_back(
         FrontendInputFile("test.cc", Language::CXX));
-    Invocation->getFrontendOpts().ProgramAction = EmitBC;
-    Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
+    Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
     CompilerInstance Compiler(std::move(Invocation));
 
     std::unique_ptr<raw_ostream> VerboseStream =

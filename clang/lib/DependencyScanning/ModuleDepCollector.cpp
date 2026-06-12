@@ -132,7 +132,7 @@ static void optimizeDiagnosticOpts(DiagnosticOptions &Opts,
   Opts.Remarks.clear();
 }
 
-static void optimizeCWD(CowCompilerInvocation &BuildInvocation, StringRef CWD) {
+static void optimizeCWD(CompilerInvocation &BuildInvocation, StringRef CWD) {
   BuildInvocation.getMutFileSystemOpts().WorkingDir.clear();
   BuildInvocation.getMutCodeGenOpts().DebugCompilationDir.clear();
   BuildInvocation.getMutCodeGenOpts().CoverageCompilationDir.clear();
@@ -148,7 +148,7 @@ static std::vector<std::string> splitString(std::string S, char Separator) {
   return Result;
 }
 
-void ModuleDepCollector::addOutputPaths(CowCompilerInvocation &CI,
+void ModuleDepCollector::addOutputPaths(CompilerInvocation &CI,
                                         ModuleDeps &Deps) {
   CI.getMutFrontendOpts().OutputFile =
       Controller.lookupModuleOutput(Deps, ModuleOutputKind::ModuleFile);
@@ -238,7 +238,7 @@ bool dependencies::areOptionsInStableDir(const ArrayRef<StringRef> Directories,
   return true;
 }
 
-static CowCompilerInvocation
+static CompilerInvocation
 makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   CI.resetNonModularOptions();
   CI.clearImplicitModuleBuildOptions();
@@ -246,62 +246,62 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // The scanner takes care to avoid passing non-affecting module maps to the
   // explicit compiles. No need to do extra work just to find out there are no
   // module map files to prune.
-  CI.getHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
+  CI.getMutHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
 
   // Remove options incompatible with explicit module build or are likely to
   // differ between identical modules discovered from different translation
   // units.
-  CI.getFrontendOpts().Inputs.clear();
-  CI.getFrontendOpts().OutputFile.clear();
-  CI.getFrontendOpts().GenReducedBMI = false;
-  CI.getFrontendOpts().ModuleOutputPath.clear();
-  CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = false;
-  CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = false;
+  CI.getMutFrontendOpts().Inputs.clear();
+  CI.getMutFrontendOpts().OutputFile.clear();
+  CI.getMutFrontendOpts().GenReducedBMI = false;
+  CI.getMutFrontendOpts().ModuleOutputPath.clear();
+  CI.getMutHeaderSearchOpts().ModulesSkipHeaderSearchPaths = false;
+  CI.getMutHeaderSearchOpts().ModulesSkipDiagnosticOptions = false;
   // LLVM options are not going to affect the AST
-  CI.getFrontendOpts().LLVMArgs.clear();
+  CI.getMutFrontendOpts().LLVMArgs.clear();
 
   resetBenignCodeGenOptions(frontend::GenerateModule, CI.getLangOpts(),
-                            CI.getCodeGenOpts());
+                            CI.getMutCodeGenOpts());
 
   // Erase the command-line arguments. These don't make it into the final set of
   // compilation arguments and will be re-populated during compilation itself.
   // Keeping them around would make copies of the invocation expensive.
-  CI.getCodeGenOpts().Argv0 = nullptr;
-  CI.getCodeGenOpts().CommandLineArgs.clear();
+  CI.getMutCodeGenOpts().Argv0 = nullptr;
+  CI.getMutCodeGenOpts().CommandLineArgs.clear();
 
   // Map output paths that affect behaviour to "-" so their existence is in the
   // context hash. The final path will be computed in addOutputPaths.
   if (!CI.getDiagnosticOpts().DiagnosticSerializationFile.empty())
-    CI.getDiagnosticOpts().DiagnosticSerializationFile = "-";
+    CI.getMutDiagnosticOpts().DiagnosticSerializationFile = "-";
   if (!CI.getDependencyOutputOpts().OutputFile.empty())
-    CI.getDependencyOutputOpts().OutputFile = "-";
-  CI.getDependencyOutputOpts().Targets.clear();
-  CI.getDependencyOutputOpts().IncludeModuleFiles = MFDK_Direct;
+    CI.getMutDependencyOutputOpts().OutputFile = "-";
+  CI.getMutDependencyOutputOpts().Targets.clear();
+  CI.getMutDependencyOutputOpts().IncludeModuleFiles = MFDK_Direct;
 
-  CI.getFrontendOpts().ProgramAction = frontend::GenerateModule;
-  CI.getLangOpts().ModuleName.clear();
+  CI.getMutFrontendOpts().ProgramAction = frontend::GenerateModule;
+  CI.getMutLangOpts().ModuleName.clear();
 
   // Remove any macro definitions that are explicitly ignored.
   if (!CI.getHeaderSearchOpts().ModulesIgnoreMacros.empty()) {
     llvm::erase_if(
-        CI.getPreprocessorOpts().Macros,
+        CI.getMutPreprocessorOpts().Macros,
         [&CI](const std::pair<std::string, bool> &Def) {
           StringRef MacroDef = Def.first;
           return CI.getHeaderSearchOpts().ModulesIgnoreMacros.contains(
               llvm::CachedHashString(MacroDef.split('=').first));
         });
     // Remove the now unused option.
-    CI.getHeaderSearchOpts().ModulesIgnoreMacros.clear();
+    CI.getMutHeaderSearchOpts().ModulesIgnoreMacros.clear();
   }
 
   return CI;
 }
 
-CowCompilerInvocation
+CompilerInvocation
 ModuleDepCollector::getInvocationAdjustedForModuleBuildWithoutOutputs(
     const ModuleDeps &Deps,
-    llvm::function_ref<void(CowCompilerInvocation &)> Optimize) const {
-  CowCompilerInvocation CI = CommonInvocation;
+    llvm::function_ref<void(CompilerInvocation &)> Optimize) const {
+  CompilerInvocation CI = CommonInvocation;
 
   CI.getMutLangOpts().ModuleName = Deps.ID.ModuleName;
   CI.getMutFrontendOpts().IsSystemModule = Deps.IsSystem;
@@ -389,27 +389,12 @@ void ModuleDepCollector::addModuleMapFiles(
   for (const ModuleID &MID : ClangModuleDeps) {
     ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
-    CI.getFrontendOpts().ModuleMapFiles.push_back(MD->ClangModuleMapFile);
+    CI.getMutFrontendOpts().ModuleMapFiles.push_back(MD->ClangModuleMapFile);
   }
 }
 
 void ModuleDepCollector::addModuleFiles(
     CompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
-  for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
-    std::string PCMPath =
-        Controller.lookupModuleOutput(*MD, ModuleOutputKind::ModuleFile);
-
-    if (Service.getOpts().EagerLoadModules)
-      CI.getFrontendOpts().ModuleFiles.push_back(std::move(PCMPath));
-    else
-      CI.getHeaderSearchOpts().PrebuiltModuleFiles.insert(
-          {MID.ModuleName, std::move(PCMPath)});
-  }
-}
-
-void ModuleDepCollector::addModuleFiles(
-    CowCompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
   for (const ModuleID &MID : ClangModuleDeps) {
     ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     std::string PCMPath =
@@ -437,8 +422,8 @@ static bool needsModules(FrontendInputFile FIF) {
 void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
   CI.clearImplicitModuleBuildOptions();
   resetBenignCodeGenOptions(CI.getFrontendOpts().ProgramAction,
-                            CI.getLangOpts(), CI.getCodeGenOpts());
-  CI.getDependencyOutputOpts().IncludeModuleFiles = MFDK_Direct;
+                            CI.getLangOpts(), CI.getMutCodeGenOpts());
+  CI.getMutDependencyOutputOpts().IncludeModuleFiles = MFDK_Direct;
 
   if (llvm::any_of(CI.getFrontendOpts().Inputs, needsModules)) {
     Preprocessor &PP = ScanInstance.getPreprocessor();
@@ -447,7 +432,7 @@ void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
               PP.getHeaderSearchInfo()
                   .getModuleMap()
                   .getModuleMapFileForUniquing(CurrentModule))
-        CI.getFrontendOpts().ModuleMapFiles.emplace_back(
+        CI.getMutFrontendOpts().ModuleMapFiles.emplace_back(
             CurrentModuleMap->getNameAsRequested());
 
     SmallVector<ModuleID> DirectDeps;
@@ -461,11 +446,11 @@ void ModuleDepCollector::applyDiscoveredDependencies(CompilerInvocation &CI) {
     addModuleFiles(CI, DirectDeps);
 
     for (const auto &KV : DirectPrebuiltModularDeps)
-      CI.getFrontendOpts().ModuleFiles.push_back(KV.second.PCMFile);
+      CI.getMutFrontendOpts().ModuleFiles.push_back(KV.second.PCMFile);
   }
 }
 
-static bool isSafeToIgnoreCWD(const CowCompilerInvocation &CI) {
+static bool isSafeToIgnoreCWD(const CompilerInvocation &CI) {
   // Check if the command line input uses relative paths.
   // It is not safe to ignore the current working directory if any of the
   // command line inputs use relative paths.
@@ -479,7 +464,7 @@ static bool isSafeToIgnoreCWD(const CowCompilerInvocation &CI) {
 }
 
 static std::string getModuleContextHash(const ModuleDeps &MD,
-                                        const CowCompilerInvocation &CI,
+                                        const CompilerInvocation &CI,
                                         bool EagerLoadModules,
                                         llvm::vfs::FileSystem &VFS) {
   llvm::HashBuilder<llvm::TruncatedBLAKE3<16>, llvm::endianness::native>
@@ -522,7 +507,7 @@ static std::string getModuleContextHash(const ModuleDeps &MD,
 }
 
 void ModuleDepCollector::associateWithContextHash(
-    const CowCompilerInvocation &CI, ModuleDeps &Deps) {
+    const CompilerInvocation &CI, ModuleDeps &Deps) {
   Deps.ID.ContextHash =
       getModuleContextHash(Deps, CI, Service.getOpts().EagerLoadModules,
                            ScanInstance.getVirtualFileSystem());
@@ -783,9 +768,9 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
       });
 
   bool IgnoreCWD = false;
-  CowCompilerInvocation CI =
+  CompilerInvocation CI =
       MDC.getInvocationAdjustedForModuleBuildWithoutOutputs(
-          MD, [&](CowCompilerInvocation &BuildInvocation) {
+          MD, [&](CompilerInvocation &BuildInvocation) {
             if (any(MDC.Service.getOpts().OptimizeArgs &
                     (ScanningOptimizations::HeaderSearch |
                      ScanningOptimizations::VFS)))

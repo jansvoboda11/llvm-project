@@ -47,17 +47,17 @@ public:
   std::unique_ptr<ASTUnit> ParseAST(StringRef EntryFile) {
     PCHContainerOpts = std::make_shared<PCHContainerOperations>();
     auto CI = std::make_shared<CompilerInvocation>();
-    CI->getFrontendOpts().Inputs.push_back(FrontendInputFile(
+    CI->getMutFrontendOpts().Inputs.push_back(FrontendInputFile(
         EntryFile, FrontendOptions::getInputKindForExtension(
                        llvm::sys::path::extension(EntryFile).substr(1))));
 
-    CI->getHeaderSearchOpts().AddPath("headers",
+    CI->getMutHeaderSearchOpts().AddPath("headers",
                                       frontend::IncludeDirGroup::Quoted,
                                       /*isFramework*/ false,
                                       /*IgnoreSysRoot*/ false);
 
-    CI->getFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
-    CI->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    CI->getMutFileSystemOpts().WorkingDir = *VFS->getCurrentWorkingDirectory();
+    CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
     auto DiagOpts = std::make_shared<DiagnosticOptions>();
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
@@ -65,7 +65,7 @@ public:
                                             new DiagnosticConsumer));
 
     auto FileMgr =
-        llvm::makeIntrusiveRefCnt<FileManager>(CI->getFileSystemOpts(), VFS);
+        llvm::makeIntrusiveRefCnt<FileManager>(CI->getMutFileSystemOpts(), VFS);
 
     std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromCompilerInvocation(
         CI, PCHContainerOpts, DiagOpts, Diags, FileMgr, false,

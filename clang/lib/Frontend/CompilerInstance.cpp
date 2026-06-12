@@ -115,7 +115,7 @@ void CompilerInstance::setAuxTarget(TargetInfo *Value) { AuxTarget = Value; }
 bool CompilerInstance::createTarget() {
   // Create the target instance.
   setTarget(TargetInfo::CreateTargetInfo(getDiagnostics(),
-                                         getInvocation().getTargetOpts()));
+                                         getInvocation().getMutTargetOpts()));
   if (!hasTarget())
     return false;
 
@@ -1141,7 +1141,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   // Construct a compiler invocation for creating this module.
   auto Invocation = std::make_shared<CompilerInvocation>(getInvocation());
 
-  PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = Invocation->getMutPreprocessorOpts();
 
   // For any options that aren't intended to affect how a module is built,
   // reset them to their default values.
@@ -1149,7 +1149,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
 
   // Remove any macro definitions that are explicitly ignored by the module.
   // They aren't supposed to affect how the module is built anyway.
-  HeaderSearchOptions &HSOpts = Invocation->getHeaderSearchOpts();
+  HeaderSearchOptions &HSOpts = Invocation->getMutHeaderSearchOpts();
   llvm::erase_if(PPOpts.Macros,
                  [&HSOpts](const std::pair<std::string, bool> &def) {
                    StringRef MacroDef = def.first;
@@ -1158,16 +1158,16 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
                  });
 
   // If the original compiler invocation had -fmodule-name, pass it through.
-  Invocation->getLangOpts().ModuleName =
+  Invocation->getMutLangOpts().ModuleName =
       getInvocation().getLangOpts().ModuleName;
 
   // Note the name of the module we're building.
-  Invocation->getLangOpts().CurrentModule = std::string(ModuleName);
+  Invocation->getMutLangOpts().CurrentModule = std::string(ModuleName);
 
   // If there is a module map file, build the module using the module map.
   // Set up the inputs/outputs so that we build the module from its umbrella
   // header.
-  FrontendOptions &FrontendOpts = Invocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = Invocation->getMutFrontendOpts();
   FrontendOpts.OutputFile = ModuleFileName.str();
   FrontendOpts.DisableFree = false;
   FrontendOpts.GenerateGlobalModuleIndex = false;
@@ -1180,7 +1180,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   // Don't free the remapped file buffers; they are owned by our caller.
   PPOpts.RetainRemappedFileBuffers = true;
 
-  DiagnosticOptions &DiagOpts = Invocation->getDiagnosticOpts();
+  DiagnosticOptions &DiagOpts = Invocation->getMutDiagnosticOpts();
 
   DiagOpts.VerifyDiagnostics = 0;
   assert(getInvocation().computeContextHash() ==
@@ -1254,7 +1254,7 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
     // want to produce any dependency output from the module build.
     Instance.setModuleDepCollector(getModuleDepCollector());
   }
-  Inv.getDependencyOutputOpts() = DependencyOutputOptions();
+  Inv.getMutDependencyOutputOpts() = DependencyOutputOptions();
 
   return InstancePtr;
 }

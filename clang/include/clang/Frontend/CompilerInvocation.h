@@ -72,11 +72,24 @@ unsigned getOptimizationLevel(const llvm::opt::ArgList &Args, InputKind IK,
 
 unsigned getOptimizationLevelSize(const llvm::opt::ArgList &Args);
 
-/// The base class of CompilerInvocation. It keeps individual option objects
-/// behind reference-counted pointers, which is useful for clients that want to
-/// keep select option objects alive (even after CompilerInvocation gets
-/// destroyed) without making a copy.
-class CompilerInvocationBase {
+/// Helper class for holding the data necessary to invoke the compiler.
+///
+/// This class is designed to represent an abstract "invocation" of the
+/// compiler, including data such as the include paths, the code generation
+/// options, the warning flags, and so on.
+///
+/// Each \c *Options object is held behind a \c std::shared_ptr, so copying a
+/// \c CompilerInvocation is shallow by default and individual options objects
+/// only get their own copy on the first mutation through one of the
+/// \c getMut*Opts() accessors. This makes copies cheap when most options are
+/// reused unchanged (notably in the dependency scanner, which clones an
+/// invocation per discovered module and tweaks a handful of fields).
+///
+/// Discipline: do not store long-lived non-const references to the underlying
+/// \c *Options objects. A subsequent mutation through \c getMut*Opts() may
+/// silently re-bind the invocation's storage to a fresh copy, leaving any such
+/// reference pointing at the previous (now-shared) object.
+class CompilerInvocation {
 protected:
   /// Options controlling the language variant.
   std::shared_ptr<LangOptions> LangOpts;
@@ -120,17 +133,22 @@ protected:
   /// prevent creation of the reference-counted option objects.
   struct EmptyConstructor {};
 
-  CompilerInvocationBase();
-  CompilerInvocationBase(EmptyConstructor) {}
-  CompilerInvocationBase(const CompilerInvocationBase &X) = delete;
-  CompilerInvocationBase(CompilerInvocationBase &&X) = default;
-  CompilerInvocationBase &operator=(const CompilerInvocationBase &X) = delete;
-  CompilerInvocationBase &deep_copy_assign(const CompilerInvocationBase &X);
-  CompilerInvocationBase &shallow_copy_assign(const CompilerInvocationBase &X);
-  CompilerInvocationBase &operator=(CompilerInvocationBase &&X) = default;
-  ~CompilerInvocationBase() = default;
+  CompilerInvocation(EmptyConstructor) {}
 
 public:
+  CompilerInvocation();
+  CompilerInvocation(const CompilerInvocation &X)
+      : CompilerInvocation(EmptyConstructor{}) {
+    shallow_copy_assign(X);
+  }
+  CompilerInvocation(CompilerInvocation &&) = default;
+  CompilerInvocation &operator=(const CompilerInvocation &X) {
+    shallow_copy_assign(X);
+    return *this;
+  }
+  CompilerInvocation &operator=(CompilerInvocation &&) = default;
+  ~CompilerInvocation() = default;
+
   /// Const getters.
   /// @{
   const LangOptions &getLangOpts() const { return *LangOpts; }
@@ -150,6 +168,31 @@ public:
   const PreprocessorOutputOptions &getPreprocessorOutputOpts() const {
     return *PreprocessorOutputOpts;
   }
+  /// @}
+
+  /// Mutable getters.
+  ///
+  /// These follow copy-on-write semantics: if the underlying options object is
+  /// shared with another \c CompilerInvocation (use_count > 1), it is cloned
+  /// before the mutable reference is returned. Mutation must go through
+  /// \c getMut*Opts() — there is no non-const \c get*Opts() variant, since a
+  /// silent CoW clone behind a non-const accessor would invalidate the
+  /// invariant that two shallow-copied invocations observe the same option
+  /// objects.
+  /// @{
+  LangOptions &getMutLangOpts();
+  TargetOptions &getMutTargetOpts();
+  DiagnosticOptions &getMutDiagnosticOpts();
+  HeaderSearchOptions &getMutHeaderSearchOpts();
+  PreprocessorOptions &getMutPreprocessorOpts();
+  AnalyzerOptions &getMutAnalyzerOpts();
+  MigratorOptions &getMutMigratorOpts();
+  APINotesOptions &getMutAPINotesOpts();
+  CodeGenOptions &getMutCodeGenOpts();
+  FileSystemOptions &getMutFileSystemOpts();
+  FrontendOptions &getMutFrontendOpts();
+  DependencyOutputOptions &getMutDependencyOutputOpts();
+  PreprocessorOutputOptions &getMutPreprocessorOutputOpts();
   /// @}
 
   /// Visitation.
@@ -192,96 +235,6 @@ public:
   ///
   /// This is a (less-efficient) wrapper over generateCC1CommandLine().
   std::vector<std::string> getCC1CommandLine() const;
-
-protected:
-  /// Visits paths stored in the invocation. This is generally unsafe to call
-  /// directly, and each sub-class need to ensure calling this doesn't violate
-  /// its invariants.
-  void visitPathsImpl(llvm::function_ref<bool(std::string &)> Predicate);
-
-private:
-  /// Generate command line options from DiagnosticOptions.
-  static void GenerateDiagnosticArgs(const DiagnosticOptions &Opts,
-                                     ArgumentConsumer Consumer,
-                                     bool DefaultDiagColor);
-
-  /// Generate command line options from LangOptions.
-  static void GenerateLangArgs(const LangOptions &Opts,
-                               ArgumentConsumer Consumer, const llvm::Triple &T,
-                               InputKind IK);
-
-  // Generate command line options from CodeGenOptions.
-  static void GenerateCodeGenArgs(const CodeGenOptions &Opts,
-                                  ArgumentConsumer Consumer,
-                                  const llvm::Triple &T,
-                                  const std::string &OutputFile,
-                                  const LangOptions *LangOpts);
-  /// @}
-};
-
-class CowCompilerInvocation;
-
-/// Helper class for holding the data necessary to invoke the compiler.
-///
-/// This class is designed to represent an abstract "invocation" of the
-/// compiler, including data such as the include paths, the code generation
-/// options, the warning flags, and so on.
-class CompilerInvocation : public CompilerInvocationBase {
-public:
-  CompilerInvocation() = default;
-  CompilerInvocation(const CompilerInvocation &X)
-      : CompilerInvocationBase(EmptyConstructor{}) {
-    deep_copy_assign(X);
-  }
-  CompilerInvocation(CompilerInvocation &&) = default;
-  CompilerInvocation &operator=(const CompilerInvocation &X) {
-    deep_copy_assign(X);
-    return *this;
-  }
-  ~CompilerInvocation() = default;
-
-  explicit CompilerInvocation(const CowCompilerInvocation &X);
-  CompilerInvocation &operator=(const CowCompilerInvocation &X);
-
-  /// Const getters.
-  /// @{
-  // Note: These need to be pulled in manually. Otherwise, they get hidden by
-  // the mutable getters with the same names.
-  using CompilerInvocationBase::getLangOpts;
-  using CompilerInvocationBase::getTargetOpts;
-  using CompilerInvocationBase::getDiagnosticOpts;
-  using CompilerInvocationBase::getHeaderSearchOpts;
-  using CompilerInvocationBase::getPreprocessorOpts;
-  using CompilerInvocationBase::getAnalyzerOpts;
-  using CompilerInvocationBase::getMigratorOpts;
-  using CompilerInvocationBase::getAPINotesOpts;
-  using CompilerInvocationBase::getCodeGenOpts;
-  using CompilerInvocationBase::getFileSystemOpts;
-  using CompilerInvocationBase::getFrontendOpts;
-  using CompilerInvocationBase::getDependencyOutputOpts;
-  using CompilerInvocationBase::getPreprocessorOutputOpts;
-  /// @}
-
-  /// Mutable getters.
-  /// @{
-  LangOptions &getLangOpts() { return *LangOpts; }
-  TargetOptions &getTargetOpts() { return *TargetOpts; }
-  DiagnosticOptions &getDiagnosticOpts() { return *DiagnosticOpts; }
-  HeaderSearchOptions &getHeaderSearchOpts() { return *HSOpts; }
-  PreprocessorOptions &getPreprocessorOpts() { return *PPOpts; }
-  AnalyzerOptions &getAnalyzerOpts() { return *AnalyzerOpts; }
-  MigratorOptions &getMigratorOpts() { return *MigratorOpts; }
-  APINotesOptions &getAPINotesOpts() { return *APINotesOpts; }
-  CodeGenOptions &getCodeGenOpts() { return *CodeGenOpts; }
-  FileSystemOptions &getFileSystemOpts() { return *FSOpts; }
-  FrontendOptions &getFrontendOpts() { return *FrontendOpts; }
-  DependencyOutputOptions &getDependencyOutputOpts() {
-    return *DependencyOutputOpts;
-  }
-  PreprocessorOutputOptions &getPreprocessorOutputOpts() {
-    return *PreprocessorOutputOpts;
-  }
-  /// @}
 
   /// Create a compiler invocation from a list of input options.
   /// \returns true on success.
@@ -333,7 +286,37 @@ public:
   /// implicit modules.
   void clearImplicitModuleBuildOptions();
 
+protected:
+  /// Visits paths stored in the invocation. This is generally unsafe to call
+  /// directly, and each sub-class need to ensure calling this doesn't violate
+  /// its invariants.
+  void visitPathsImpl(llvm::function_ref<bool(std::string &)> Predicate);
+
 private:
+  /// Replace the underlying option storage with newly-allocated copies of \p
+  /// X's options. After this returns, no shared_ptr is shared with \p X.
+  CompilerInvocation &deep_copy_assign(const CompilerInvocation &X);
+  /// Share the underlying option storage with \p X. Subsequent mutations
+  /// through \c getMut*Opts() will create per-option copies on first write.
+  CompilerInvocation &shallow_copy_assign(const CompilerInvocation &X);
+
+  /// Generate command line options from DiagnosticOptions.
+  static void GenerateDiagnosticArgs(const DiagnosticOptions &Opts,
+                                     ArgumentConsumer Consumer,
+                                     bool DefaultDiagColor);
+
+  /// Generate command line options from LangOptions.
+  static void GenerateLangArgs(const LangOptions &Opts,
+                               ArgumentConsumer Consumer, const llvm::Triple &T,
+                               InputKind IK);
+
+  // Generate command line options from CodeGenOptions.
+  static void GenerateCodeGenArgs(const CodeGenOptions &Opts,
+                                  ArgumentConsumer Consumer,
+                                  const llvm::Triple &T,
+                                  const std::string &OutputFile,
+                                  const LangOptions *LangOpts);
+
   static bool CreateFromArgsImpl(CompilerInvocation &Res,
                                  ArrayRef<const char *> CommandLineArgs,
                                  DiagnosticsEngine &Diags, const char *Argv0);
@@ -350,49 +333,6 @@ private:
                                const llvm::Triple &T,
                                const std::string &OutputFile,
                                const LangOptions &LangOptsRef);
-};
-
-/// Same as \c CompilerInvocation, but with copy-on-write optimization.
-class CowCompilerInvocation : public CompilerInvocationBase {
-public:
-  CowCompilerInvocation() = default;
-  CowCompilerInvocation(const CowCompilerInvocation &X)
-      : CompilerInvocationBase(EmptyConstructor{}) {
-    shallow_copy_assign(X);
-  }
-  CowCompilerInvocation(CowCompilerInvocation &&) = default;
-  CowCompilerInvocation &operator=(const CowCompilerInvocation &X) {
-    shallow_copy_assign(X);
-    return *this;
-  }
-  ~CowCompilerInvocation() = default;
-
-  CowCompilerInvocation(const CompilerInvocation &X)
-      : CompilerInvocationBase(EmptyConstructor{}) {
-    deep_copy_assign(X);
-  }
-
-  CowCompilerInvocation(CompilerInvocation &&X)
-      : CompilerInvocationBase(std::move(X)) {}
-
-  // Const getters are inherited from the base class.
-
-  /// Mutable getters.
-  /// @{
-  LangOptions &getMutLangOpts();
-  TargetOptions &getMutTargetOpts();
-  DiagnosticOptions &getMutDiagnosticOpts();
-  HeaderSearchOptions &getMutHeaderSearchOpts();
-  PreprocessorOptions &getMutPreprocessorOpts();
-  AnalyzerOptions &getMutAnalyzerOpts();
-  MigratorOptions &getMutMigratorOpts();
-  APINotesOptions &getMutAPINotesOpts();
-  CodeGenOptions &getMutCodeGenOpts();
-  FileSystemOptions &getMutFileSystemOpts();
-  FrontendOptions &getMutFrontendOpts();
-  DependencyOutputOptions &getMutDependencyOutputOpts();
-  PreprocessorOutputOptions &getMutPreprocessorOutputOpts();
-  /// @}
 };
 
 IntrusiveRefCntPtr<llvm::vfs::FileSystem>

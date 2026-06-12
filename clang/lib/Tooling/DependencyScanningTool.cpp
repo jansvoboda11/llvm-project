@@ -458,7 +458,7 @@ bool CompilerInstanceWithContext::initialize(
 
   if (any(Worker.Service.getOpts().OptimizeArgs &
           ScanningOptimizations::Macros))
-    canonicalizeDefines(OriginalInvocation->getPreprocessorOpts());
+    canonicalizeDefines(OriginalInvocation->getMutPreprocessorOpts());
 
   // Create the CompilerInstance.
   std::shared_ptr<ModuleCache> ModCache =

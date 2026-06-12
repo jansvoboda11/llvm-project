@@ -242,7 +242,7 @@ ASTUnit::~ASTUnit() {
   // compiler instance *not* free these buffers for each invocation of the
   // parser.
   if (Invocation && OwnsRemappedFileBuffers) {
-    PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
+    const PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
     for (const auto &RB : PPOpts.RemappedFileBuffers)
       delete RB.second;
   }
@@ -1345,14 +1345,14 @@ ASTUnit::getMainBufferWithPrecompiledPreamble(
     const bool PreviousSkipFunctionBodies =
         PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies;
     if (SkipFunctionBodies == SkipFunctionBodiesScope::Preamble)
-      PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies = true;
+      PreambleInvocationIn.getMutFrontendOpts().SkipFunctionBodies = true;
 
     llvm::ErrorOr<PrecompiledPreamble> NewPreamble = PrecompiledPreamble::Build(
         PreambleInvocationIn, MainFileBuffer.get(), Bounds, Diagnostics, VFS,
         PCHContainerOps, StorePreamblesInMemory, PreambleStoragePath,
         Callbacks);
 
-    PreambleInvocationIn.getFrontendOpts().SkipFunctionBodies =
+    PreambleInvocationIn.getMutFrontendOpts().SkipFunctionBodies =
         PreviousSkipFunctionBodies;
 
     if (NewPreamble) {
@@ -1514,7 +1514,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
 
   if (!ResourceFilesPath.empty()) {
     // Override the resources path.
-    CI->getHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
+    CI->getMutHeaderSearchOpts().ResourceDir = std::string(ResourceFilesPath);
   }
   AST->OnlyLocalDecls = OnlyLocalDecls;
   AST->CaptureDiagnostics = CaptureDiagnostics;
@@ -1532,8 +1532,8 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
     DiagCleanup(Diags.get());
 
   // We'll manage file buffers ourselves.
-  CI->getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  CI->getFrontendOpts().DisableFree = false;
+  CI->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
+  CI->getMutFrontendOpts().DisableFree = false;
   ProcessWarningOptions(AST->getDiagnostics(), CI->getDiagnosticOpts(),
                         AST->getFileManager().getVirtualFileSystem());
 
@@ -1640,8 +1640,8 @@ bool ASTUnit::LoadFromCompilerInvocation(
   assert(VFS && "VFS is null");
 
   // We'll manage file buffers ourselves.
-  Invocation->getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  Invocation->getFrontendOpts().DisableFree = false;
+  Invocation->getMutPreprocessorOpts().RetainRemappedFileBuffers = true;
+  Invocation->getMutFrontendOpts().DisableFree = false;
   getDiagnostics().Reset();
   ProcessWarningOptions(getDiagnostics(), Invocation->getDiagnosticOpts(),
                         *VFS);
@@ -1723,14 +1723,13 @@ bool ASTUnit::Reparse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
   ParsingTimer.setOutput("Reparsing " + getMainFileName());
 
   // Remap files.
-  PreprocessorOptions &PPOpts = Invocation->getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = Invocation->getMutPreprocessorOpts();
   for (const auto &RB : PPOpts.RemappedFileBuffers)
     delete RB.second;
 
-  Invocation->getPreprocessorOpts().clearRemappedFiles();
+  PPOpts.clearRemappedFiles();
   for (const auto &RemappedFile : RemappedFiles) {
-    Invocation->getPreprocessorOpts().addRemappedFile(RemappedFile.first,
-                                                      RemappedFile.second);
+    PPOpts.addRemappedFile(RemappedFile.first, RemappedFile.second);
   }
 
   // If we have a preamble file lying around, or if we might try to
@@ -2043,9 +2042,9 @@ void ASTUnit::CodeComplete(
 
   auto CCInvocation = std::make_shared<CompilerInvocation>(*Invocation);
 
-  FrontendOptions &FrontendOpts = CCInvocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = CCInvocation->getMutFrontendOpts();
   CodeCompleteOptions &CodeCompleteOpts = FrontendOpts.CodeCompleteOpts;
-  PreprocessorOptions &PreprocessorOpts = CCInvocation->getPreprocessorOpts();
+  PreprocessorOptions &PreprocessorOpts = CCInvocation->getMutPreprocessorOpts();
 
   CodeCompleteOpts.IncludeMacros = IncludeMacros &&
                                    CachedCompletionResults.empty();
@@ -2066,7 +2065,7 @@ void ASTUnit::CodeComplete(
 
   // Spell-checking and warnings are wasteful during code-completion.
   LangOpts.SpellChecking = false;
-  CCInvocation->getDiagnosticOpts().IgnoreWarnings = true;
+  CCInvocation->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   auto Clang = std::make_unique<CompilerInstance>(std::move(CCInvocation),
                                                   PCHContainerOps);

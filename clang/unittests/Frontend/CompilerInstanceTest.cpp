@@ -84,7 +84,7 @@ TEST(CompilerInstance, DefaultVFSOverlayFromInvocation) {
 
 TEST(CompilerInstance, CreateVFSWithoutDiagnosticConsumer) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getHeaderSearchOpts().VFSOverlayFiles.push_back("/missing.yaml");
+  Invocation->getMutHeaderSearchOpts().VFSOverlayFiles.push_back("/missing.yaml");
   auto BaseFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   CompilerInstance Instance(std::move(Invocation));
   // Check that omitting the DiagnosticConsumer doesn't crash (e.g. by
@@ -173,7 +173,7 @@ TEST(CompilerInstance, SingleModuleParseModeCallback) {
 
   auto Invocation = createInvocation(
       {"clang", "tu.c", "-fmodules", "-fmodules-cache-path=/"});
-  Invocation->getPreprocessorOpts().SingleModuleParseMode = true;
+  Invocation->getMutPreprocessorOpts().SingleModuleParseMode = true;
 
   CompilerInstance Instance(std::move(Invocation));
   Instance.createVirtualFileSystem(VFS);

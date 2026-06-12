@@ -67,7 +67,7 @@ public:
     Compiler.createDiagnostics(DiagConsumer, /*ShouldOwnClient=*/false);
     Compiler.createSourceManager();
     Compiler.addDependencyCollector(std::make_shared<TestFileCollector>(
-        Compiler.getInvocation().getDependencyOutputOpts(), Deps));
+        Compiler.getInvocation().getMutDependencyOutputOpts(), Deps));
 
     auto Action = std::make_unique<PreprocessOnlyAction>();
     return Compiler.ExecuteAction(*Action);

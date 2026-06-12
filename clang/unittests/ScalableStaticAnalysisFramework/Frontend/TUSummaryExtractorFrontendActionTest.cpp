@@ -229,12 +229,12 @@ public:
 static std::unique_ptr<CompilerInstance>
 makeCompiler(TextDiagnosticBuffer &DiagBuf) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", llvm::MemoryBuffer::getMemBuffer("int x = 42;").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   auto Compiler = std::make_unique<CompilerInstance>(std::move(Invocation));
   Compiler->setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler->createDiagnostics(&DiagBuf, /*ShouldOwnClient=*/false);

@@ -17,7 +17,7 @@ namespace clang {
 
 class CompilerInstance;
 class CompilerInvocation;
-class CowCompilerInvocation;
+class CompilerInvocation;
 
 namespace dependencies {
 struct ModuleDeps;
@@ -86,7 +86,7 @@ public:
   /// Modifies the resulting module invocation and the associated structure.
   /// Returns true on success, false on failure.
   virtual bool finalizeModuleInvocation(CompilerInstance &ScanInstance,
-                                        CowCompilerInvocation &CI,
+                                        CompilerInvocation &CI,
                                         const ModuleDeps &MD) {
     return true;
   }

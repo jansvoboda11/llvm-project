@@ -83,13 +83,13 @@ private:
 
 TEST(ASTFrontendAction, Sanity) {
   auto invocation = std::make_shared<CompilerInvocation>();
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
@@ -103,13 +103,13 @@ TEST(ASTFrontendAction, Sanity) {
 
 TEST(ASTFrontendAction, IncrementalParsing) {
   auto invocation = std::make_shared<CompilerInvocation>();
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
@@ -123,9 +123,9 @@ TEST(ASTFrontendAction, IncrementalParsing) {
 
 TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
   auto invocation = std::make_shared<CompilerInvocation>();
-  invocation->getLangOpts().CPlusPlus = true;
-  invocation->getLangOpts().DelayedTemplateParsing = true;
-  invocation->getPreprocessorOpts().addRemappedFile(
+  invocation->getMutLangOpts().CPlusPlus = true;
+  invocation->getMutLangOpts().DelayedTemplateParsing = true;
+  invocation->getMutPreprocessorOpts().addRemappedFile(
     "test.cc", MemoryBuffer::getMemBuffer(
       "template<typename T> struct A { A(T); T data; };\n"
       "template<typename T> struct B: public A<T> {\n"
@@ -133,10 +133,10 @@ TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
       "  B(B const& b): A<T>(b.data) {}\n"
       "};\n"
       "B<char> c() { return B<char>(); }\n").release());
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
@@ -176,13 +176,13 @@ public:
 
 TEST(PreprocessorFrontendAction, EndSourceFile) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc",
       MemoryBuffer::getMemBuffer("int main() { float x; }").release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
@@ -235,15 +235,15 @@ struct TypoDiagnosticConsumer : public DiagnosticConsumer {
 
 TEST(ASTFrontendAction, ExternalSemaSource) {
   auto Invocation = std::make_shared<CompilerInvocation>();
-  Invocation->getLangOpts().CPlusPlus = true;
-  Invocation->getPreprocessorOpts().addRemappedFile(
+  Invocation->getMutLangOpts().CPlusPlus = true;
+  Invocation->getMutPreprocessorOpts().addRemappedFile(
       "test.cc", MemoryBuffer::getMemBuffer("void fooo();\n"
                                             "int main() { foo(); }")
                      .release());
-  Invocation->getFrontendOpts().Inputs.push_back(
+  Invocation->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile("test.cc", Language::CXX));
-  Invocation->getFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
-  Invocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+  Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
+  Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
   CompilerInstance Compiler(std::move(Invocation));
   auto *TDC = new TypoDiagnosticConsumer;
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());

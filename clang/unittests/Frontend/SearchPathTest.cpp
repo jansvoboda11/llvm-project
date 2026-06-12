@@ -64,9 +64,9 @@ protected:
   std::unique_ptr<HeaderSearch>
   makeHeaderSearchFromCC1Args(llvm::opt::ArgStringList Args) {
     CompilerInvocation::CreateFromArgs(*Invocation, Args, Diags);
-    HeaderSearchOptions HSOpts = Invocation->getHeaderSearchOpts();
-    LangOptions LangOpts = Invocation->getLangOpts();
-    Target = TargetInfo::CreateTargetInfo(Diags, Invocation->getTargetOpts());
+    HeaderSearchOptions HSOpts = Invocation->getMutHeaderSearchOpts();
+    LangOptions LangOpts = Invocation->getMutLangOpts();
+    Target = TargetInfo::CreateTargetInfo(Diags, Invocation->getMutTargetOpts());
     auto HeaderInfo = std::make_unique<HeaderSearch>(HSOpts, SourceMgr, Diags,
                                                      LangOpts, Target.get());
     ApplyHeaderSearchOptions(*HeaderInfo, HSOpts, LangOpts,

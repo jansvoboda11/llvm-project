@@ -528,7 +528,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   for (auto &UF : unsaved_files) {
     std::unique_ptr<llvm::MemoryBuffer> MB =
         llvm::MemoryBuffer::getMemBufferCopy(getContents(UF), UF.Filename);
-    CInvok->getPreprocessorOpts().addRemappedFile(UF.Filename, MB.get());
+    CInvok->getMutPreprocessorOpts().addRemappedFile(UF.Filename, MB.get());
     BufOwner->push_back(std::move(MB));
   }
 
@@ -536,13 +536,13 @@ static CXErrorCode clang_indexSourceFile_Impl(
   // (often very broken) source code, where spell-checking can have a
   // significant negative impact on performance (particularly when 
   // precompiled headers are involved), we disable it.
-  CInvok->getLangOpts().SpellChecking = false;
+  CInvok->getMutLangOpts().SpellChecking = false;
 
   if (index_options & CXIndexOpt_SuppressWarnings)
-    CInvok->getDiagnosticOpts().IgnoreWarnings = true;
+    CInvok->getMutDiagnosticOpts().IgnoreWarnings = true;
 
   // Make sure to use the raw module format.
-  CInvok->getHeaderSearchOpts().ModuleFormat = std::string(
+  CInvok->getMutHeaderSearchOpts().ModuleFormat = std::string(
       CXXIdx->getPCHContainerOperations()->getRawReader().getFormats().front());
 
   auto Unit = ASTUnit::create(CInvok, DiagOpts, Diags, CaptureDiagnostics,
@@ -563,7 +563,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   bool SkipBodies = (index_options & CXIndexOpt_SkipParsedBodiesInSession) &&
       CInvok->getLangOpts().CPlusPlus;
   if (SkipBodies)
-    CInvok->getFrontendOpts().SkipFunctionBodies = true;
+    CInvok->getMutFrontendOpts().SkipFunctionBodies = true;
 
   auto DataConsumer =
     std::make_shared<CXIndexDataConsumer>(client_data, CB, index_options,
@@ -581,7 +581,7 @@ static CXErrorCode clang_indexSourceFile_Impl(
   bool PrecompilePreamble = false;
   bool CreatePreambleOnFirstParse = false;
   bool CacheCodeCompletionResults = false;
-  PreprocessorOptions &PPOpts = CInvok->getPreprocessorOpts(); 
+  PreprocessorOptions &PPOpts = CInvok->getMutPreprocessorOpts();
   PPOpts.AllowPCHWithCompilerErrors = true;
 
   if (requestedToGetTU) {

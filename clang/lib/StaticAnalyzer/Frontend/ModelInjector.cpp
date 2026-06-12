@@ -72,13 +72,13 @@ void ModelInjector::onBodySynthesis(const NamedDecl *D) {
 
   auto Invocation = std::make_shared<CompilerInvocation>(CI.getInvocation());
 
-  FrontendOptions &FrontendOpts = Invocation->getFrontendOpts();
+  FrontendOptions &FrontendOpts = Invocation->getMutFrontendOpts();
   InputKind IK = Language::CXX; // FIXME
   FrontendOpts.Inputs.clear();
   FrontendOpts.Inputs.emplace_back(fileName, IK);
   FrontendOpts.DisableFree = true;
 
-  Invocation->getDiagnosticOpts().VerifyDiagnostics = 0;
+  Invocation->getMutDiagnosticOpts().VerifyDiagnostics = 0;
 
   // Modules are parsed by a separate CompilerInstance, so this code mimics that
   // behavior for models

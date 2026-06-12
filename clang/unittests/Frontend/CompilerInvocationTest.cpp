@@ -106,31 +106,31 @@ TEST(ContainsN, Two) {
 
 TEST(CompilerInvocationTest, DeepCopyConstructor) {
   CompilerInvocation A;
-  A.getAnalyzerOpts().Config["Key"] = "Old";
+  A.getMutAnalyzerOpts().Config["Key"] = "Old";
 
   CompilerInvocation B(A);
-  B.getAnalyzerOpts().Config["Key"] = "New";
+  B.getMutAnalyzerOpts().Config["Key"] = "New";
 
-  ASSERT_EQ(A.getAnalyzerOpts().Config["Key"], "Old");
+  ASSERT_EQ(A.getMutAnalyzerOpts().Config["Key"], "Old");
 }
 
 TEST(CompilerInvocationTest, DeepCopyAssignment) {
   CompilerInvocation A;
-  A.getAnalyzerOpts().Config["Key"] = "Old";
+  A.getMutAnalyzerOpts().Config["Key"] = "Old";
 
   CompilerInvocation B;
   B = A;
-  B.getAnalyzerOpts().Config["Key"] = "New";
+  B.getMutAnalyzerOpts().Config["Key"] = "New";
 
-  ASSERT_EQ(A.getAnalyzerOpts().Config["Key"], "Old");
+  ASSERT_EQ(A.getMutAnalyzerOpts().Config["Key"], "Old");
 }
 
 TEST(CompilerInvocationTest, CopyOnWriteConstructor) {
-  CowCompilerInvocation A;
+  CompilerInvocation A;
   A.getMutFrontendOpts().OutputFile = "x.o";
 
   // B's FrontendOptions are initially shared with A.
-  CowCompilerInvocation B(A);
+  CompilerInvocation B(A);
   EXPECT_EQ(&A.getFrontendOpts(), &B.getFrontendOpts());
 
   // Modifying A's FrontendOptions creates new copy, does not affect other opts.
@@ -144,11 +144,11 @@ TEST(CompilerInvocationTest, CopyOnWriteConstructor) {
 }
 
 TEST(CompilerInvocationTest, CopyOnWriteAssignment) {
-  CowCompilerInvocation A;
+  CompilerInvocation A;
   A.getMutFrontendOpts().OutputFile = "x.o";
 
   // B's FrontendOptions are initially independent of A.
-  CowCompilerInvocation B;
+  CompilerInvocation B;
   EXPECT_NE(&A.getFrontendOpts(), &B.getFrontendOpts());
 
   // B's FrontendOptions are shared with A after assignment.
@@ -1001,7 +1001,7 @@ TEST_F(CommandLineTest, TestModuleFileExtension) {
   // Exercise the check that only serializes instances of
   // TestModuleFileExtension by providing an instance of another
   // ModuleFileExtension subclass.
-  Invocation.getFrontendOpts().ModuleFileExtensions.push_back(
+  Invocation.getMutFrontendOpts().ModuleFileExtensions.push_back(
       std::make_shared<DummyModuleFileExtension>());
 
   Invocation.generateCC1CommandLine(GeneratedArgs, *this);
@@ -1083,7 +1083,7 @@ TEST_F(CommandLineTest, RoundTrip) {
               Contains(std::make_pair(std::string("XY=AB"), false)));
   ASSERT_EQ(Invocation.getPreprocessorOpts().ImplicitPCHInclude, "a.pch");
 
-  ASSERT_EQ(Invocation.getAnalyzerOpts().Config["ctu-import-threshold"], "42");
+  ASSERT_EQ(Invocation.getMutAnalyzerOpts().Config["ctu-import-threshold"], "42");
   ASSERT_TRUE(Invocation.getAnalyzerOpts().UnoptimizedCFG);
 
   ASSERT_TRUE(Invocation.getMigratorOpts().NoNSAllocReallocError);

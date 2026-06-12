@@ -120,7 +120,7 @@ template <class T> std::shared_ptr<T> make_shared_copy(const T &X) {
   return std::make_shared<T>(X);
 }
 
-CompilerInvocationBase::CompilerInvocationBase()
+CompilerInvocation::CompilerInvocation()
     : LangOpts(std::make_shared<LangOptions>()),
       TargetOpts(std::make_shared<TargetOptions>()),
       DiagnosticOpts(std::make_shared<DiagnosticOptions>()),
@@ -135,8 +135,8 @@ CompilerInvocationBase::CompilerInvocationBase()
       DependencyOutputOpts(std::make_shared<DependencyOutputOptions>()),
       PreprocessorOutputOpts(std::make_shared<PreprocessorOutputOptions>()) {}
 
-CompilerInvocationBase &
-CompilerInvocationBase::deep_copy_assign(const CompilerInvocationBase &X) {
+CompilerInvocation &
+CompilerInvocation::deep_copy_assign(const CompilerInvocation &X) {
   if (this != &X) {
     LangOpts = make_shared_copy(X.getLangOpts());
     TargetOpts = make_shared_copy(X.getTargetOpts());
@@ -155,8 +155,8 @@ CompilerInvocationBase::deep_copy_assign(const CompilerInvocationBase &X) {
   return *this;
 }
 
-CompilerInvocationBase &
-CompilerInvocationBase::shallow_copy_assign(const CompilerInvocationBase &X) {
+CompilerInvocation &
+CompilerInvocation::shallow_copy_assign(const CompilerInvocation &X) {
   if (this != &X) {
     LangOpts = X.LangOpts;
     TargetOpts = X.TargetOpts;
@@ -175,17 +175,6 @@ CompilerInvocationBase::shallow_copy_assign(const CompilerInvocationBase &X) {
   return *this;
 }
 
-CompilerInvocation::CompilerInvocation(const CowCompilerInvocation &X)
-    : CompilerInvocationBase(EmptyConstructor{}) {
-  CompilerInvocationBase::deep_copy_assign(X);
-}
-
-CompilerInvocation &
-CompilerInvocation::operator=(const CowCompilerInvocation &X) {
-  CompilerInvocationBase::deep_copy_assign(X);
-  return *this;
-}
-
 template <typename T>
 T &ensureOwned(std::shared_ptr<T> &Storage) {
   if (Storage.use_count() > 1)
@@ -193,56 +182,55 @@ T &ensureOwned(std::shared_ptr<T> &Storage) {
   return *Storage;
 }
 
-LangOptions &CowCompilerInvocation::getMutLangOpts() {
+LangOptions &CompilerInvocation::getMutLangOpts() {
   return ensureOwned(LangOpts);
 }
 
-TargetOptions &CowCompilerInvocation::getMutTargetOpts() {
+TargetOptions &CompilerInvocation::getMutTargetOpts() {
   return ensureOwned(TargetOpts);
 }
 
-DiagnosticOptions &CowCompilerInvocation::getMutDiagnosticOpts() {
+DiagnosticOptions &CompilerInvocation::getMutDiagnosticOpts() {
   return ensureOwned(DiagnosticOpts);
 }
 
-HeaderSearchOptions &CowCompilerInvocation::getMutHeaderSearchOpts() {
+HeaderSearchOptions &CompilerInvocation::getMutHeaderSearchOpts() {
   return ensureOwned(HSOpts);
 }
 
-PreprocessorOptions &CowCompilerInvocation::getMutPreprocessorOpts() {
+PreprocessorOptions &CompilerInvocation::getMutPreprocessorOpts() {
   return ensureOwned(PPOpts);
 }
 
-AnalyzerOptions &CowCompilerInvocation::getMutAnalyzerOpts() {
+AnalyzerOptions &CompilerInvocation::getMutAnalyzerOpts() {
   return ensureOwned(AnalyzerOpts);
 }
 
-MigratorOptions &CowCompilerInvocation::getMutMigratorOpts() {
+MigratorOptions &CompilerInvocation::getMutMigratorOpts() {
   return ensureOwned(MigratorOpts);
 }
 
-APINotesOptions &CowCompilerInvocation::getMutAPINotesOpts() {
+APINotesOptions &CompilerInvocation::getMutAPINotesOpts() {
   return ensureOwned(APINotesOpts);
 }
 
-CodeGenOptions &CowCompilerInvocation::getMutCodeGenOpts() {
+CodeGenOptions &CompilerInvocation::getMutCodeGenOpts() {
   return ensureOwned(CodeGenOpts);
 }
 
-FileSystemOptions &CowCompilerInvocation::getMutFileSystemOpts() {
+FileSystemOptions &CompilerInvocation::getMutFileSystemOpts() {
   return ensureOwned(FSOpts);
 }
 
-FrontendOptions &CowCompilerInvocation::getMutFrontendOpts() {
+FrontendOptions &CompilerInvocation::getMutFrontendOpts() {
   return ensureOwned(FrontendOpts);
 }
 
-DependencyOutputOptions &CowCompilerInvocation::getMutDependencyOutputOpts() {
+DependencyOutputOptions &CompilerInvocation::getMutDependencyOutputOpts() {
   return ensureOwned(DependencyOutputOpts);
 }
 
-PreprocessorOutputOptions &
-CowCompilerInvocation::getMutPreprocessorOutputOpts() {
+PreprocessorOutputOptions &CompilerInvocation::getMutPreprocessorOutputOpts() {
   return ensureOwned(PreprocessorOutputOpts);
 }
 
@@ -571,10 +559,10 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
                             InputKind IK) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
-  LangOptions &LangOpts = Invocation.getLangOpts();
-  CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
-  TargetOptions &TargetOpts = Invocation.getTargetOpts();
-  FrontendOptions &FrontendOpts = Invocation.getFrontendOpts();
+  LangOptions &LangOpts = Invocation.getMutLangOpts();
+  CodeGenOptions &CodeGenOpts = Invocation.getMutCodeGenOpts();
+  TargetOptions &TargetOpts = Invocation.getMutTargetOpts();
+  FrontendOptions &FrontendOpts = Invocation.getMutFrontendOpts();
   CodeGenOpts.XRayInstrumentFunctions = LangOpts.XRayInstrument;
   CodeGenOpts.XRayAlwaysEmitCustomEvents = LangOpts.XRayAlwaysEmitCustomEvents;
   CodeGenOpts.XRayAlwaysEmitTypedEvents = LangOpts.XRayAlwaysEmitTypedEvents;
@@ -670,7 +658,7 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
   // HLSL invocations should always have -Wconversion, -Wvector-conversion, and
   // -Wmatrix-conversion by default.
   if (LangOpts.HLSL) {
-    auto &Warnings = Invocation.getDiagnosticOpts().Warnings;
+    auto &Warnings = Invocation.getMutDiagnosticOpts().Warnings;
     if (!llvm::is_contained(Warnings, "conversion"))
       Warnings.insert(Warnings.begin(), "conversion");
     if (!llvm::is_contained(Warnings, "vector-conversion"))
@@ -1537,7 +1525,7 @@ static void parsePointerAuthOptions(PointerAuthOptions &Opts,
   CompilerInvocation::setDefaultPointerAuthOptions(Opts, LangOpts, Triple);
 }
 
-void CompilerInvocationBase::GenerateCodeGenArgs(const CodeGenOptions &Opts,
+void CompilerInvocation::GenerateCodeGenArgs(const CodeGenOptions &Opts,
                                                  ArgumentConsumer Consumer,
                                                  const llvm::Triple &T,
                                                  const std::string &OutputFile,
@@ -2541,7 +2529,7 @@ static bool ParseMigratorArgs(MigratorOptions &Opts, const ArgList &Args,
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
-void CompilerInvocationBase::GenerateDiagnosticArgs(
+void CompilerInvocation::GenerateDiagnosticArgs(
     const DiagnosticOptions &Opts, ArgumentConsumer Consumer,
     bool DefaultDiagColor) {
   const DiagnosticOptions *DiagnosticOpts = &Opts;
@@ -3714,7 +3702,7 @@ static StringRef GetInputKindName(InputKind IK) {
   llvm_unreachable("unknown input language");
 }
 
-void CompilerInvocationBase::GenerateLangArgs(const LangOptions &Opts,
+void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
                                               ArgumentConsumer Consumer,
                                               const llvm::Triple &T,
                                               InputKind IK) {
@@ -5060,7 +5048,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList Args = Opts.ParseArgs(CommandLineArgs, MissingArgIndex,
                                      MissingArgCount, VisibilityMask);
-  LangOptions &LangOpts = Res.getLangOpts();
+  LangOptions &LangOpts = Res.getMutLangOpts();
 
   // Check for missing argument error.
   if (MissingArgCount)
@@ -5078,38 +5066,39 @@ bool CompilerInvocation::CreateFromArgsImpl(
           << ArgString << Nearest;
   }
 
-  ParseFileSystemArgs(Res.getFileSystemOpts(), Args, Diags);
-  ParseMigratorArgs(Res.getMigratorOpts(), Args, Diags);
-  ParseAnalyzerArgs(Res.getAnalyzerOpts(), Args, Diags);
-  ParseDiagnosticArgs(Res.getDiagnosticOpts(), Args, &Diags,
+  ParseFileSystemArgs(Res.getMutFileSystemOpts(), Args, Diags);
+  ParseMigratorArgs(Res.getMutMigratorOpts(), Args, Diags);
+  ParseAnalyzerArgs(Res.getMutAnalyzerOpts(), Args, Diags);
+  ParseDiagnosticArgs(Res.getMutDiagnosticOpts(), Args, &Diags,
                       /*DefaultDiagColor=*/false);
-  ParseFrontendArgs(Res.getFrontendOpts(), Args, Diags, LangOpts.IsHeaderFile);
+  ParseFrontendArgs(Res.getMutFrontendOpts(), Args, Diags, LangOpts.IsHeaderFile);
   // FIXME: We shouldn't have to pass the DashX option around here
   InputKind DashX = Res.getFrontendOpts().DashX;
-  ParseTargetArgs(Res.getTargetOpts(), Args, Diags);
+  ParseTargetArgs(Res.getMutTargetOpts(), Args, Diags);
   llvm::Triple T(Res.getTargetOpts().Triple);
-  ParseHeaderSearchArgs(Res.getHeaderSearchOpts(), Args, Diags);
+  ParseHeaderSearchArgs(Res.getMutHeaderSearchOpts(), Args, Diags);
   if (Res.getFrontendOpts().GenReducedBMI ||
       Res.getFrontendOpts().ProgramAction ==
           frontend::GenerateReducedModuleInterface ||
       Res.getFrontendOpts().ProgramAction ==
           frontend::GenerateModuleInterface) {
-    Res.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
-    Res.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+    Res.getMutHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+    Res.getMutHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
   }
-  ParseAPINotesArgs(Res.getAPINotesOpts(), Args, Diags);
+  ParseAPINotesArgs(Res.getMutAPINotesOpts(), Args, Diags);
 
   ParsePointerAuthArgs(LangOpts, Args, Diags);
 
-  ParseLangArgs(LangOpts, Args, DashX, T, Res.getPreprocessorOpts().Includes,
+  ParseLangArgs(LangOpts, Args, DashX, T, Res.getMutPreprocessorOpts().Includes,
                 Diags);
+
   if (Res.getFrontendOpts().ProgramAction == frontend::RewriteObjC)
     LangOpts.ObjCExceptions = 1;
 
   for (auto Warning : Res.getDiagnosticOpts().Warnings) {
     if (Warning == "misexpect" &&
         !Diags.isIgnored(diag::warn_profile_data_misexpect, SourceLocation())) {
-      Res.getCodeGenOpts().MisExpect = true;
+      Res.getMutCodeGenOpts().MisExpect = true;
     }
   }
 
@@ -5117,7 +5106,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
     // During CUDA device-side compilation, the aux triple is the
     // triple used for host compilation.
     if (LangOpts.CUDAIsDevice)
-      Res.getTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
+      Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
   }
 
   if (LangOpts.OpenACC && !Res.getFrontendOpts().UseClangIRPipeline &&
@@ -5126,34 +5115,34 @@ bool CompilerInvocation::CreateFromArgsImpl(
 
   // Set the triple of the host for OpenMP device compile.
   if (LangOpts.OpenMPIsTargetDevice)
-    Res.getTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
+    Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
 
   // Set the default and host triples for SYCL device compilation.
   if (LangOpts.SYCLIsDevice) {
     if (!Args.hasArg(options::OPT_triple))
-      Res.getTargetOpts().Triple = "spirv64-unknown-unknown";
-    Res.getTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
+      Res.getMutTargetOpts().Triple = "spirv64-unknown-unknown";
+    Res.getMutTargetOpts().HostTriple = Res.getFrontendOpts().AuxTriple;
   }
 
-  ParseCodeGenArgs(Res.getCodeGenOpts(), Args, DashX, Diags, T,
+  ParseCodeGenArgs(Res.getMutCodeGenOpts(), Args, DashX, Diags, T,
                    Res.getFrontendOpts().OutputFile, LangOpts);
 
   // FIXME: Override value name discarding when asan or msan is used because the
   // backend passes depend on the name of the alloca in order to print out
   // names.
-  Res.getCodeGenOpts().DiscardValueNames &=
+  Res.getMutCodeGenOpts().DiscardValueNames &=
       !LangOpts.Sanitize.has(SanitizerKind::Address) &&
       !LangOpts.Sanitize.has(SanitizerKind::KernelAddress) &&
       !LangOpts.Sanitize.has(SanitizerKind::Memory) &&
       !LangOpts.Sanitize.has(SanitizerKind::KernelMemory);
 
-  ParsePreprocessorArgs(Res.getPreprocessorOpts(), Args, Diags,
+  ParsePreprocessorArgs(Res.getMutPreprocessorOpts(), Args, Diags,
                         Res.getFrontendOpts().ProgramAction,
-                        Res.getFrontendOpts());
-  ParsePreprocessorOutputArgs(Res.getPreprocessorOutputOpts(), Args, Diags,
+                        Res.getMutFrontendOpts());
+  ParsePreprocessorOutputArgs(Res.getMutPreprocessorOutputOpts(), Args, Diags,
                               Res.getFrontendOpts().ProgramAction);
 
-  ParseDependencyOutputArgs(Res.getDependencyOutputOpts(), Args, Diags,
+  ParseDependencyOutputArgs(Res.getMutDependencyOutputOpts(), Args, Diags,
                             Res.getFrontendOpts().ProgramAction,
                             Res.getPreprocessorOutputOpts().ShowLineMarkers);
   if (!Res.getDependencyOutputOpts().OutputFile.empty() &&
@@ -5163,14 +5152,14 @@ bool CompilerInvocation::CreateFromArgsImpl(
   // If sanitizer is enabled, disable OPT_ffine_grained_bitfield_accesses.
   if (Res.getCodeGenOpts().FineGrainedBitfieldAccesses &&
       !Res.getLangOpts().Sanitize.empty()) {
-    Res.getCodeGenOpts().FineGrainedBitfieldAccesses = false;
+    Res.getMutCodeGenOpts().FineGrainedBitfieldAccesses = false;
     Diags.Report(diag::warn_drv_fine_grained_bitfield_accesses_ignored);
   }
 
   // Store the command-line for using in the CodeView backend.
   if (Res.getCodeGenOpts().CodeViewCommandLine) {
-    Res.getCodeGenOpts().Argv0 = Argv0;
-    append_range(Res.getCodeGenOpts().CommandLineArgs, CommandLineArgs);
+    Res.getMutCodeGenOpts().Argv0 = Argv0;
+    append_range(Res.getMutCodeGenOpts().CommandLineArgs, CommandLineArgs);
   }
 
   if (!Res.getCodeGenOpts().ProfileInstrumentUsePath.empty() &&
@@ -5345,7 +5334,7 @@ std::string CompilerInvocation::computeContextHash() const {
   return toString(llvm::APInt(64, Hash), 36, /*Signed=*/false);
 }
 
-void CompilerInvocationBase::visitPathsImpl(
+void CompilerInvocation::visitPathsImpl(
     llvm::function_ref<bool(std::string &)> Predicate) {
 #define RETURN_IF(PATH)                                                        \
   do {                                                                         \
@@ -5418,15 +5407,15 @@ void CompilerInvocationBase::visitPathsImpl(
     RETURN_IF(ExtraDep.first);
 }
 
-void CompilerInvocationBase::visitPaths(
+void CompilerInvocation::visitPaths(
     llvm::function_ref<bool(StringRef)> Callback) const {
   // The const_cast here is OK, because visitPathsImpl() itself doesn't modify
   // the invocation, and our callback takes immutable StringRefs.
-  return const_cast<CompilerInvocationBase *>(this)->visitPathsImpl(
+  return const_cast<CompilerInvocation *>(this)->visitPathsImpl(
       [&Callback](std::string &Path) { return Callback(StringRef(Path)); });
 }
 
-void CompilerInvocationBase::generateCC1CommandLine(
+void CompilerInvocation::generateCC1CommandLine(
     ArgumentConsumer Consumer) const {
   llvm::Triple T(getTargetOpts().Triple);
 
@@ -5450,7 +5439,7 @@ void CompilerInvocationBase::generateCC1CommandLine(
   GenerateDependencyOutputArgs(getDependencyOutputOpts(), Consumer);
 }
 
-std::vector<std::string> CompilerInvocationBase::getCC1CommandLine() const {
+std::vector<std::string> CompilerInvocation::getCC1CommandLine() const {
   std::vector<std::string> Args{"-cc1"};
   generateCC1CommandLine(
       [&Args](const Twine &Arg) { Args.push_back(Arg.str()); });
@@ -5458,21 +5447,21 @@ std::vector<std::string> CompilerInvocationBase::getCC1CommandLine() const {
 }
 
 void CompilerInvocation::resetNonModularOptions() {
-  getLangOpts().resetNonModularOptions();
-  getPreprocessorOpts().resetNonModularOptions();
-  getCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
+  getMutLangOpts().resetNonModularOptions();
+  getMutPreprocessorOpts().resetNonModularOptions();
+  getMutCodeGenOpts().resetNonModularOptions(getHeaderSearchOpts().ModuleFormat);
 }
 
 void CompilerInvocation::clearImplicitModuleBuildOptions() {
-  getLangOpts().ImplicitModules = false;
-  getHeaderSearchOpts().ImplicitModuleMaps = false;
-  getHeaderSearchOpts().ModuleCachePath.clear();
-  getHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;
-  getHeaderSearchOpts().BuildSessionTimestamp = 0;
+  getMutLangOpts().ImplicitModules = false;
+  getMutHeaderSearchOpts().ImplicitModuleMaps = false;
+  getMutHeaderSearchOpts().ModuleCachePath.clear();
+  getMutHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;
+  getMutHeaderSearchOpts().BuildSessionTimestamp = 0;
   // The specific values we canonicalize to for pruning don't affect behaviour,
   /// so use the default values so they may be dropped from the command-line.
-  getHeaderSearchOpts().ModuleCachePruneInterval = 7 * 24 * 60 * 60;
-  getHeaderSearchOpts().ModuleCachePruneAfter = 31 * 24 * 60 * 60;
+  getMutHeaderSearchOpts().ModuleCachePruneInterval = 7 * 24 * 60 * 60;
+  getMutHeaderSearchOpts().ModuleCachePruneAfter = 31 * 24 * 60 * 60;
 }
 
 IntrusiveRefCntPtr<llvm::vfs::FileSystem>

@@ -85,15 +85,15 @@ public:
   std::unique_ptr<ASTUnit> ParseAST(const std::string &EntryFile) {
     PCHContainerOpts = std::make_shared<PCHContainerOperations>();
     std::shared_ptr<CompilerInvocation> CI(new CompilerInvocation);
-    CI->getFrontendOpts().Inputs.push_back(
+    CI->getMutFrontendOpts().Inputs.push_back(
       FrontendInputFile(EntryFile, FrontendOptions::getInputKindForExtension(
         llvm::sys::path::extension(EntryFile).substr(1))));
 
-    CI->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+    CI->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
 
-    CI->getPreprocessorOpts().RemappedFileBuffers = GetRemappedFiles();
+    CI->getMutPreprocessorOpts().RemappedFileBuffers = GetRemappedFiles();
 
-    PreprocessorOptions &PPOpts = CI->getPreprocessorOpts();
+    PreprocessorOptions &PPOpts = CI->getMutPreprocessorOpts();
     PPOpts.RemappedFilesKeepOriginalName = true;
 
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(

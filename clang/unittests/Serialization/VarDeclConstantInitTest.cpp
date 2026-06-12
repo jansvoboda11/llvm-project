@@ -104,7 +104,7 @@ export namespace Fibonacci
   std::shared_ptr<CompilerInvocation> Invocation =
       createInvocation(Args, CIOpts);
   ASSERT_TRUE(Invocation);
-  Invocation->getFrontendOpts().DisableFree = false;
+  Invocation->getMutFrontendOpts().DisableFree = false;
 
   CompilerInstance Instance(std::move(Invocation));
   Instance.setDiagnostics(Diags);

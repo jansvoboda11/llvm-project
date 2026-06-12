@@ -280,74 +280,76 @@ public:
   /// @name Forwarding Methods
   /// @{
 
-  AnalyzerOptions &getAnalyzerOpts() { return Invocation->getAnalyzerOpts(); }
+  AnalyzerOptions &getAnalyzerOpts() { return Invocation->getMutAnalyzerOpts(); }
 
   CodeGenOptions &getCodeGenOpts() {
-    return Invocation->getCodeGenOpts();
+    return Invocation->getMutCodeGenOpts();
   }
   const CodeGenOptions &getCodeGenOpts() const {
     return Invocation->getCodeGenOpts();
   }
 
   DependencyOutputOptions &getDependencyOutputOpts() {
-    return Invocation->getDependencyOutputOpts();
+    return Invocation->getMutDependencyOutputOpts();
   }
   const DependencyOutputOptions &getDependencyOutputOpts() const {
     return Invocation->getDependencyOutputOpts();
   }
 
   DiagnosticOptions &getDiagnosticOpts() {
-    return Invocation->getDiagnosticOpts();
+    return Invocation->getMutDiagnosticOpts();
   }
   const DiagnosticOptions &getDiagnosticOpts() const {
     return Invocation->getDiagnosticOpts();
   }
 
   FileSystemOptions &getFileSystemOpts() {
-    return Invocation->getFileSystemOpts();
+    return Invocation->getMutFileSystemOpts();
   }
   const FileSystemOptions &getFileSystemOpts() const {
     return Invocation->getFileSystemOpts();
   }
 
   FrontendOptions &getFrontendOpts() {
-    return Invocation->getFrontendOpts();
+    return Invocation->getMutFrontendOpts();
   }
   const FrontendOptions &getFrontendOpts() const {
     return Invocation->getFrontendOpts();
   }
 
   HeaderSearchOptions &getHeaderSearchOpts() {
-    return Invocation->getHeaderSearchOpts();
+    return Invocation->getMutHeaderSearchOpts();
   }
   const HeaderSearchOptions &getHeaderSearchOpts() const {
     return Invocation->getHeaderSearchOpts();
   }
 
-  APINotesOptions &getAPINotesOpts() { return Invocation->getAPINotesOpts(); }
+  APINotesOptions &getAPINotesOpts() {
+    return Invocation->getMutAPINotesOpts();
+  }
   const APINotesOptions &getAPINotesOpts() const {
     return Invocation->getAPINotesOpts();
   }
 
-  LangOptions &getLangOpts() { return Invocation->getLangOpts(); }
+  LangOptions &getLangOpts() { return Invocation->getMutLangOpts(); }
   const LangOptions &getLangOpts() const { return Invocation->getLangOpts(); }
 
   PreprocessorOptions &getPreprocessorOpts() {
-    return Invocation->getPreprocessorOpts();
+    return Invocation->getMutPreprocessorOpts();
   }
   const PreprocessorOptions &getPreprocessorOpts() const {
     return Invocation->getPreprocessorOpts();
   }
 
   PreprocessorOutputOptions &getPreprocessorOutputOpts() {
-    return Invocation->getPreprocessorOutputOpts();
+    return Invocation->getMutPreprocessorOutputOpts();
   }
   const PreprocessorOutputOptions &getPreprocessorOutputOpts() const {
     return Invocation->getPreprocessorOutputOpts();
   }
 
   TargetOptions &getTargetOpts() {
-    return Invocation->getTargetOpts();
+    return Invocation->getMutTargetOpts();
   }
   const TargetOptions &getTargetOpts() const {
     return Invocation->getTargetOpts();
