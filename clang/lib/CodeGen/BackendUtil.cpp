@@ -208,7 +208,7 @@ class EmitAssemblyHelper {
   }
 
 public:
-  EmitAssemblyHelper(CompilerInstance &CI, CodeGenOptions &CGOpts,
+  EmitAssemblyHelper(CompilerInstance &CI, const CodeGenOptions &CGOpts,
                      llvm::Module *M,
                      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS)
       : CI(CI), Diags(CI.getDiagnostics()), CodeGenOpts(CGOpts),
@@ -1425,9 +1425,9 @@ runThinLTOBackend(CompilerInstance &CI, ModuleSummaryIndex *CombinedIndex,
   }
 }
 
-void clang::emitBackendOutput(CompilerInstance &CI, CodeGenOptions &CGOpts,
-                              StringRef TDesc, llvm::Module *M,
-                              BackendAction Action,
+void clang::emitBackendOutput(CompilerInstance &CI,
+                              const CodeGenOptions &CGOpts, StringRef TDesc,
+                              llvm::Module *M, BackendAction Action,
                               IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                               std::unique_ptr<raw_pwrite_stream> OS,
                               BackendConsumer *BC) {

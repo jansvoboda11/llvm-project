@@ -1161,6 +1161,51 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
         CI.getLangOpts().ModuleName;
   }
 
+  // For preprocessed C++20 header units, the input is something like foo.iih
+  // and the original .h pathname is recorded as a `# 1 "FILE"` linemarker on
+  // the first line. We resolve that pre-createPreprocessor by reading the
+  // input directly through the FileManager (or the supplied memory buffer),
+  // so the resulting module name can be set on the invocation while LangOpts
+  // is still considered mutable. The full SourceManager-backed
+  // ReadOriginalFileName runs again later for non-header-unit preprocessed
+  // input that doesn't need pre-Preprocessor module-name resolution.
+  if (CI.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
+      Input.getKind().isPreprocessed() && !usesPreprocessorOnly() &&
+      CI.getLangOpts().ModuleName.empty()) {
+    StringRef FirstLine;
+    std::unique_ptr<llvm::MemoryBuffer> OwnedBuffer;
+    if (Input.isFile()) {
+      auto BufferOrErr =
+          CI.getFileManager().getBufferForFile(Input.getFile());
+      if (BufferOrErr) {
+        OwnedBuffer = std::move(*BufferOrErr);
+        FirstLine = OwnedBuffer->getBuffer();
+      }
+    } else {
+      FirstLine = Input.getBuffer().getBuffer();
+    }
+    if (size_t NL = FirstLine.find('\n'); NL != StringRef::npos)
+      FirstLine = FirstLine.substr(0, NL);
+    StringRef PresumedInputFile;
+    // Match `# NUM "FILENAME"` (possibly with leading/trailing whitespace).
+    StringRef Rest = FirstLine.ltrim();
+    if (Rest.consume_front("#")) {
+      Rest = Rest.ltrim();
+      while (!Rest.empty() && llvm::isDigit(Rest.front()))
+        Rest = Rest.drop_front();
+      Rest = Rest.ltrim();
+      if (Rest.consume_front("\"")) {
+        if (size_t Close = Rest.find('"'); Close != StringRef::npos)
+          PresumedInputFile = Rest.substr(0, Close);
+      }
+    }
+    if (PresumedInputFile.empty())
+      PresumedInputFile = StringRef(getCurrentFileOrBufferName());
+    CI.getInvocation().getMutLangOpts().ModuleName = PresumedInputFile.str();
+    CI.getInvocation().getMutLangOpts().CurrentModule =
+        CI.getLangOpts().ModuleName;
+  }
+
   // Set up the preprocessor if needed. When parsing model files the
   // preprocessor of the original source is reused.
   if (!isModelParsingAction())
@@ -1173,30 +1218,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
   if (!CI.InitializeSourceManager(Input))
     return false;
-
-  if (CI.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
-      Input.getKind().isPreprocessed() && !usesPreprocessorOnly()) {
-    // We have an input filename like foo.iih, but we want to find the right
-    // module name (and original file, to build the map entry).
-    // Check if the first line specifies the original source file name with a
-    // linemarker.
-    //
-    // FIXME: This still mutates LangOptions after the Preprocessor has been
-    // constructed because ReadOriginalFileName needs the SourceManager to
-    // already be initialized with the main file. The preprocessed-input remap
-    // path inside createPreprocessor (InitializeFileRemapping) currently
-    // assumes the SourceManager has not been initialized yet, so we cannot
-    // simply hoist InitializeSourceManager above createPreprocessor.
-    std::string PresumedInputFile = std::string(getCurrentFileOrBufferName());
-    ReadOriginalFileName(CI, PresumedInputFile);
-    // Unless the user overrides this, the module name is the name by which the
-    // original file was known.
-    if (CI.getLangOpts().ModuleName.empty())
-      CI.getInvocation().getMutLangOpts().ModuleName =
-          std::string(PresumedInputFile);
-    CI.getInvocation().getMutLangOpts().CurrentModule =
-        CI.getLangOpts().ModuleName;
-  }
 
   // For module map files, we first parse the module map and synthesize a
   // "<module-includes>" buffer before more conventional processing.
