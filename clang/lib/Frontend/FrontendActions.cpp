@@ -276,10 +276,14 @@ bool GenerateModuleInterfaceAction::PrepareToExecuteAction(
 
 bool GenerateModuleInterfaceAction::BeginInvocation(CompilerInstance &CI) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
-  // and start observing it through their const LangOptions& references.
+  // and start observing it through their const LangOptions& references. Note
+  // that the parent's BeginInvocation resets CompilingModule to None as a
+  // per-input precondition, so we have to override it after chaining.
+  if (!GenerateModuleAction::BeginInvocation(CI))
+    return false;
   CI.getInvocation().getMutLangOpts().setCompilingModule(
       LangOptions::CMK_ModuleInterface);
-  return GenerateModuleAction::BeginInvocation(CI);
+  return true;
 }
 
 std::unique_ptr<ASTConsumer>
@@ -322,9 +326,11 @@ bool GenerateHeaderUnitAction::BeginInvocation(CompilerInstance &CI) {
     CI.getDiagnostics().Report(diag::err_module_interface_requires_cpp_modules);
     return false;
   }
+  if (!GenerateModuleAction::BeginInvocation(CI))
+    return false;
   CI.getInvocation().getMutLangOpts().setCompilingModule(
       LangOptions::CMK_HeaderUnit);
-  return GenerateModuleAction::BeginInvocation(CI);
+  return true;
 }
 
 std::unique_ptr<raw_pwrite_stream>

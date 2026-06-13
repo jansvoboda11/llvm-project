@@ -370,6 +370,13 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 FrontendAction::~FrontendAction() {}
 
 bool FrontendAction::BeginInvocation(CompilerInstance &CI) {
+  // Reset per-input state on the invocation. CompilingModule is per-input
+  // (CompilerInstance reuses one invocation across multiple BeginSourceFile
+  // calls), so each input has to clear it back to None and then let any
+  // override below override it before Preprocessor/ASTContext start
+  // observing CodeGenOptions / LangOptions through their const references.
+  CI.getInvocation().getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+
   // If any registered plugin will attach an after-main-action AST consumer,
   // the AST must remain alive through codegen so that consumer can read it.
   // Decide this here, before the Preprocessor/ASTContext are constructed and
@@ -860,12 +867,13 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
   // If we fail, reset state since the client will not end up calling the
   // matching EndSourceFile(). All paths that return true should release this.
+  // Note: LangOpts.CompilingModule is reset on the *next* input via the
+  // BeginInvocation hook, so we don't have to reset it here too.
   llvm::scope_exit FailureCleanup([&]() {
     if (HasBegunSourceFile)
       CI.getDiagnosticClient().EndSourceFile();
     CI.setASTConsumer(nullptr);
     CI.clearOutputFiles(/*EraseFiles=*/true);
-    CI.getInvocation().getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
     setCurrentInput(FrontendInputFile());
     setCompilerInstance(nullptr);
   });
@@ -1472,7 +1480,8 @@ void FrontendAction::EndSourceFile() {
 
   setCompilerInstance(nullptr);
   setCurrentInput(FrontendInputFile());
-  CI.getInvocation().getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+  // LangOpts.CompilingModule is reset on the *next* input via the
+  // BeginInvocation hook, so we don't have to reset it here.
 }
 
 bool FrontendAction::shouldEraseOutputFiles() {

@@ -948,11 +948,15 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
 
 bool CodeGenAction::BeginInvocation(CompilerInstance &CI) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
-  // and start observing it through their const LangOptions& references.
+  // and start observing it through their const LangOptions& references. Note
+  // that the parent's BeginInvocation resets CompilingModule to None as a
+  // per-input precondition, so we have to override it after chaining.
+  if (!ASTFrontendAction::BeginInvocation(CI))
+    return false;
   if (CI.getFrontendOpts().GenReducedBMI)
     CI.getInvocation().getMutLangOpts().setCompilingModule(
         LangOptions::CMK_ModuleInterface);
-  return ASTFrontendAction::BeginInvocation(CI);
+  return true;
 }
 
 static std::unique_ptr<raw_pwrite_stream>
