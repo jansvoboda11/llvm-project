@@ -563,6 +563,7 @@ struct SingleModuleWithAsyncModuleCompiles : PreprocessOnlyAction {
                                       AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
+  bool BeginInvocation(CompilerInstance &CI) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
 };
 
@@ -676,17 +677,30 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
                                   AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
-  bool BeginSourceFileAction(CompilerInstance &CI) override {
+  bool BeginInvocation(CompilerInstance &CI) override {
+    if (!PreprocessOnlyAction::BeginInvocation(CI))
+      return false;
     CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
+    return true;
+  }
+
+  bool BeginSourceFileAction(CompilerInstance &CI) override {
     CI.getPreprocessor().addPPCallbacks(std::make_unique<AsyncModuleCompile>(
         CI, Service, Controller, Compiles));
     return true;
   }
 };
 
+bool SingleModuleWithAsyncModuleCompiles::BeginInvocation(
+    CompilerInstance &CI) {
+  if (!PreprocessOnlyAction::BeginInvocation(CI))
+    return false;
+  CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
+  return true;
+}
+
 bool SingleModuleWithAsyncModuleCompiles::BeginSourceFileAction(
     CompilerInstance &CI) {
-  CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
   CI.getPreprocessor().addPPCallbacks(
       std::make_unique<AsyncModuleCompile>(CI, Service, Controller, Compiles));
   return true;
