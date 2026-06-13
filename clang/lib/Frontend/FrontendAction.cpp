@@ -369,6 +369,35 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 
 FrontendAction::~FrontendAction() {}
 
+bool FrontendAction::BeginInvocation(CompilerInstance &CI) {
+  // If any registered plugin will attach an after-main-action AST consumer,
+  // the AST must remain alive through codegen so that consumer can read it.
+  // Decide this here, before the Preprocessor/ASTContext are constructed and
+  // start observing CodeGenOptions through const references — otherwise the
+  // setting would have to happen post-construction in CreateWrappedASTConsumer.
+  //
+  // We can't peek at the plugins' ParseArgs success here (that depends on
+  // per-input state we don't have yet), so the prediction is conservative:
+  // any plugin whose ActionType is or could become AddAfterMainAction is
+  // enough to keep the AST alive. The downside is missing the case where the
+  // plugin would have failed ParseArgs and its consumer wouldn't actually
+  // exist — that just means a slightly larger working set during codegen.
+  for (const FrontendPluginRegistry::entry &Plugin :
+       FrontendPluginRegistry::entries()) {
+    std::unique_ptr<PluginASTAction> P = Plugin.instantiate();
+    PluginASTAction::ActionType ActionType = P->getActionType();
+    if (ActionType == PluginASTAction::CmdlineAfterMainAction &&
+        llvm::is_contained(CI.getFrontendOpts().AddPluginActions,
+                           Plugin.getName()))
+      ActionType = PluginASTAction::AddAfterMainAction;
+    if (ActionType == PluginASTAction::AddAfterMainAction) {
+      CI.getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
+      break;
+    }
+  }
+  return true;
+}
+
 void FrontendAction::setCurrentInput(const FrontendInputFile &CurrentInput,
                                      std::unique_ptr<ASTUnit> AST) {
   this->CurrentInput = CurrentInput;
@@ -463,14 +492,8 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
 
   // Add to Consumers the main consumer, then all the plugins that go after it
   Consumers.push_back(std::move(Consumer));
-  if (!AfterConsumers.empty()) {
-    // If we have plugins after the main consumer, which may be the codegen
-    // action, they likely will need the ASTContext, so don't clear it in the
-    // codegen action.
-    CI.getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
-    for (auto &C : AfterConsumers)
-      Consumers.push_back(std::move(C));
-  }
+  for (auto &C : AfterConsumers)
+    Consumers.push_back(std::move(C));
 
   assert(Consumers.size() >= 1 && "should have added the main consumer");
   if (Consumers.size() == 1)
@@ -1152,9 +1175,10 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     //
     // FIXME: This still mutates LangOptions after the Preprocessor has been
     // constructed because ReadOriginalFileName needs the SourceManager to
-    // already be initialized with the main file. Fixing this properly means
-    // either teaching CompilerInstance to set up the main file before
-    // createPreprocessor, or moving ModuleName resolution out of LangOptions.
+    // already be initialized with the main file. The preprocessed-input remap
+    // path inside createPreprocessor (InitializeFileRemapping) currently
+    // assumes the SourceManager has not been initialized yet, so we cannot
+    // simply hoist InitializeSourceManager above createPreprocessor.
     std::string PresumedInputFile = std::string(getCurrentFileOrBufferName());
     ReadOriginalFileName(CI, PresumedInputFile);
     // Unless the user overrides this, the module name is the name by which the

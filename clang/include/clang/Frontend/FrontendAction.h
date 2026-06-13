@@ -75,9 +75,15 @@ protected:
   /// opportunity to modify the CompilerInvocation or do some other action
   /// before BeginSourceFileAction is called.
   ///
+  /// The default implementation walks the FrontendPluginRegistry and clears
+  /// CodeGenOptions::ClearASTBeforeBackend if any plugin would attach an
+  /// after-main consumer to the action — those consumers run after codegen
+  /// and need the AST to still be alive. Overrides that want this behavior
+  /// must chain to FrontendAction::BeginInvocation.
+  ///
   /// \return True on success; on failure BeginSourceFileAction(),
   /// ExecuteAction() and EndSourceFileAction() will not be called.
-  virtual bool BeginInvocation(CompilerInstance &CI) { return true; }
+  virtual bool BeginInvocation(CompilerInstance &CI);
 
   /// Callback at the start of processing a single input.
   ///
