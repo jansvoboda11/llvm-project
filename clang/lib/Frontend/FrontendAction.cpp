@@ -850,6 +850,14 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   if (!BeginInvocation(CI))
     return false;
 
+  // For module map files, mark the invocation as compiling a module before
+  // any consumer (Preprocessor, ASTContext, ...) is created. This was
+  // previously done late, inside the ModuleMap branch below, after
+  // createPreprocessor had already captured a reference to LangOptions.
+  if (Input.getKind().getFormat() == InputKind::ModuleMap)
+    CI.getInvocation().getMutLangOpts().setCompilingModule(
+        LangOptions::CMK_ModuleMap);
+
   // The list of module files the input AST file depends on. This is separate
   // from FrontendOptions::ModuleFiles, because those only represent explicit
   // modules, while this is capable of representing implicit ones too.
@@ -1147,9 +1155,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // For module map files, we first parse the module map and synthesize a
   // "<module-includes>" buffer before more conventional processing.
   if (Input.getKind().getFormat() == InputKind::ModuleMap) {
-    CI.getInvocation().getMutLangOpts().setCompilingModule(
-        LangOptions::CMK_ModuleMap);
-
     std::string PresumedModuleMapFile;
     unsigned OffsetToContents;
     if (loadModuleMapForModuleBuild(CI, Input.isSystem(),

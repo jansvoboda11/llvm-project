@@ -946,11 +946,13 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
   return BEConsumer->getCodeGenerator();
 }
 
-bool CodeGenAction::BeginSourceFileAction(CompilerInstance &CI) {
+bool CodeGenAction::BeginInvocation(CompilerInstance &CI) {
+  // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
+  // and start observing it through their const LangOptions& references.
   if (CI.getFrontendOpts().GenReducedBMI)
     CI.getInvocation().getMutLangOpts().setCompilingModule(
         LangOptions::CMK_ModuleInterface);
-  return ASTFrontendAction::BeginSourceFileAction(CI);
+  return ASTFrontendAction::BeginInvocation(CI);
 }
 
 static std::unique_ptr<raw_pwrite_stream>

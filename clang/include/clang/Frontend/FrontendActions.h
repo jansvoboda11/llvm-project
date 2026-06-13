@@ -177,8 +177,8 @@ public:
 /// files) for C++20 Named Modules.
 class GenerateModuleInterfaceAction : public GenerateModuleAction {
 protected:
+  bool BeginInvocation(CompilerInstance &CI) override;
   bool PrepareToExecuteAction(CompilerInstance &CI) override;
-  bool BeginSourceFileAction(CompilerInstance &CI) override;
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
@@ -200,7 +200,7 @@ private:
 class GenerateHeaderUnitAction : public GenerateModuleAction {
 
 private:
-  bool BeginSourceFileAction(CompilerInstance &CI) override;
+  bool BeginInvocation(CompilerInstance &CI) override;
 
   std::unique_ptr<raw_pwrite_stream>
   CreateOutputFile(CompilerInstance &CI, StringRef InFile) override;
