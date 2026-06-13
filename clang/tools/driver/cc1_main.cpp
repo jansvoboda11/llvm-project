@@ -270,7 +270,7 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
       Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getHeaderSearchOpts().ResourceDir =
+    Clang->getInvocation().getMutHeaderSearchOpts().ResourceDir =
         GetResourcesPath(Argv0, MainAddr);
 
   /// Create the actual file system.

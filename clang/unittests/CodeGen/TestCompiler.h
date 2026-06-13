@@ -34,8 +34,8 @@ struct TestCompiler {
 
   TestCompiler(clang::LangOptions LO,
                clang::CodeGenOptions CGO = clang::CodeGenOptions()) {
-    compiler.getLangOpts() = LO;
-    compiler.getCodeGenOpts() = CGO;
+    compiler.getInvocation().getMutLangOpts() = LO;
+    compiler.getInvocation().getMutCodeGenOpts() = CGO;
     compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
     compiler.createDiagnostics();
 
@@ -44,9 +44,10 @@ struct TestCompiler {
     Tr.setOS(Triple::Linux);
     Tr.setVendor(Triple::VendorType::UnknownVendor);
     Tr.setEnvironment(Triple::EnvironmentType::UnknownEnvironment);
-    compiler.getTargetOpts().Triple = Tr.getTriple();
+    compiler.getInvocation().getMutTargetOpts().Triple = Tr.getTriple();
     compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
-        compiler.getDiagnostics(), compiler.getTargetOpts()));
+        compiler.getDiagnostics(),
+        compiler.getInvocation().getMutTargetOpts()));
 
     const clang::TargetInfo &TInfo = compiler.getTarget();
     PtrSize = TInfo.getPointerWidth(clang::LangAS::Default) / 8;

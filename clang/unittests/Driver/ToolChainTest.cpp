@@ -590,9 +590,9 @@ TEST(ToolChainTest, UEFICallingConventionTest) {
   Tr.setEnvironment(llvm::Triple::EnvironmentType::UnknownEnvironment);
   Tr.setArch(llvm::Triple::ArchType::x86_64);
 
-  compiler.getTargetOpts().Triple = Tr.getTriple();
+  compiler.getInvocation().getMutTargetOpts().Triple = Tr.getTriple();
   compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
-      compiler.getDiagnostics(), compiler.getTargetOpts()));
+      compiler.getDiagnostics(), compiler.getInvocation().getMutTargetOpts()));
 
   EXPECT_EQ(compiler.getTarget().getCallingConvKind(true),
             TargetInfo::CallingConvKind::CCK_MicrosoftWin64);

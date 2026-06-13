@@ -342,7 +342,7 @@ public:
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override {
-    PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
+    const PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
 
     if (!PPOpts.ImplicitPCHInclude.empty())
       DataConsumer->importedPCH(PPOpts.ImplicitPCHInclude);

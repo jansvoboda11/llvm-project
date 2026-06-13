@@ -448,7 +448,7 @@ ExtractAPIAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
 }
 
 bool ExtractAPIAction::PrepareToExecuteAction(CompilerInstance &CI) {
-  auto &Inputs = CI.getFrontendOpts().Inputs;
+  auto &Inputs = CI.getInvocation().getMutFrontendOpts().Inputs;
   if (Inputs.empty())
     return true;
 

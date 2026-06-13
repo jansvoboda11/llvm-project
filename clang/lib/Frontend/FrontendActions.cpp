@@ -249,7 +249,7 @@ GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
     HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
     ModuleFileName FileName = HS.getCachedModuleFileName(
         CI.getLangOpts().CurrentModule, ModuleMapFile);
-    CI.getFrontendOpts().OutputFile = FileName.str();
+    CI.getInvocation().getMutFrontendOpts().OutputFile = FileName.str();
   }
 
   // Because this is exposed via libclang we must disable RemoveFileOnSignal.
@@ -276,7 +276,8 @@ bool GenerateModuleInterfaceAction::PrepareToExecuteAction(
 
 bool GenerateModuleInterfaceAction::BeginSourceFileAction(
     CompilerInstance &CI) {
-  CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+  CI.getInvocation().getMutLangOpts().setCompilingModule(
+      LangOptions::CMK_ModuleInterface);
 
   return GenerateModuleAction::BeginSourceFileAction(CI);
 }
@@ -321,7 +322,8 @@ bool GenerateHeaderUnitAction::BeginSourceFileAction(CompilerInstance &CI) {
     CI.getDiagnostics().Report(diag::err_module_interface_requires_cpp_modules);
     return false;
   }
-  CI.getLangOpts().setCompilingModule(LangOptions::CMK_HeaderUnit);
+  CI.getInvocation().getMutLangOpts().setCompilingModule(
+      LangOptions::CMK_HeaderUnit);
   return GenerateModuleAction::BeginSourceFileAction(CI);
 }
 
@@ -849,7 +851,7 @@ namespace {
 bool DumpModuleInfoAction::BeginInvocation(CompilerInstance &CI) {
   // The Object file reader also supports raw ast files and there is no point in
   // being strict about the module file format in -module-file-info mode.
-  CI.getHeaderSearchOpts().ModuleFormat = "obj";
+  CI.getInvocation().getMutHeaderSearchOpts().ModuleFormat = "obj";
   return true;
 }
 

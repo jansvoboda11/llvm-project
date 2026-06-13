@@ -90,12 +90,12 @@ export int aa = 43;
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
 
-    Instance.getFrontendOpts().OutputFile = BMIPath;
+    Instance.getInvocation().getMutFrontendOpts().OutputFile = BMIPath;
 
     Instance.createVirtualFileSystem(CIOpts.VFS);
     Instance.createFileManager();
 
-    Instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+    Instance.getInvocation().getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
@@ -128,8 +128,8 @@ export int aa = 43;
 
     EXPECT_TRUE(Clang.createTarget());
     Clang.createPreprocessor(TU_Complete);
-    Clang.getHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
-    Clang.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+    Clang.getInvocation().getMutHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
+    Clang.getInvocation().getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
     Clang.createASTReader();
 
     addFile("a.cppm", R"cpp(

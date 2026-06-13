@@ -267,9 +267,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
   // Configure valid SSAF options so the failure is purely from the wrapped
   // action, not from runner creation.
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   TUSummaryExtractorFrontendAction ExtractorAction(
       std::make_unique<FailingAction>());
@@ -283,9 +283,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
        RunnerFailsWithInvalidFormat_WrappedConsumerStillRuns) {
   // Use an unregistered format extension so TUSummaryRunner::create fails.
   std::string Output = makePath("output.xyz");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   auto Wrapped = std::make_unique<RecordingAction>();
   const EventLog &Log = Wrapped->getLog();
@@ -313,9 +313,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
 TEST_F(TUSummaryExtractorFrontendActionTest,
        RunnerFailsWithUnknownExtractor_WrappedConsumerStillRuns) {
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NonExistentExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NonExistentExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   auto Wrapped = std::make_unique<RecordingAction>();
   const EventLog &Log = Wrapped->getLog();
@@ -338,9 +338,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
 TEST_F(TUSummaryExtractorFrontendActionTest,
        RunnerSucceeds_ASTConsumerCallbacksPropagate) {
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   auto Wrapped = std::make_unique<RecordingAction>();
   const EventLog &Log = Wrapped->getLog();
@@ -393,9 +393,9 @@ struct OrderCheckingAction : public ASTFrontendAction {
 TEST_F(TUSummaryExtractorFrontendActionTest,
        RunnerSucceeds_WrappedRunsBeforeRunner) {
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   auto Wrapped = std::make_unique<OrderCheckingAction>();
   Wrapped->OutputPath = Output;
@@ -415,9 +415,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
 
 TEST_F(TUSummaryExtractorFrontendActionTest, RunnerFailsToWrite) {
   std::string Output = makePath("output.FailingSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "test-cu";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "test-cu";
 
   TUSummaryExtractorFrontendAction Action(std::make_unique<RecordingAction>());
 
@@ -437,8 +437,8 @@ TEST_F(TUSummaryExtractorFrontendActionTest, RunnerFailsToWrite) {
 TEST_F(TUSummaryExtractorFrontendActionTest,
        MissingCompilationUnitIdDiagnoses) {
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
   // SSAFCompilationUnitId left empty.
 
   auto Wrapped = std::make_unique<RecordingAction>();
@@ -461,9 +461,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
 TEST_F(TUSummaryExtractorFrontendActionTest,
        EmptyCompilationUnitIdDiagnoses) {
   std::string Output = makePath("output.MockSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = "";
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = "";
 
   auto Wrapped = std::make_unique<RecordingAction>();
   const EventLog &Log = Wrapped->getLog();
@@ -488,9 +488,9 @@ TEST_F(TUSummaryExtractorFrontendActionTest,
 
   const std::string CUId = "cu-X-test";
   std::string Output = makePath("output.CapturingSerializationFormat");
-  Compiler->getFrontendOpts().SSAFTUSummaryFile = Output;
-  Compiler->getFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
-  Compiler->getFrontendOpts().SSAFCompilationUnitId = CUId;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFTUSummaryFile = Output;
+  Compiler->getInvocation().getMutFrontendOpts().SSAFExtractSummaries = {"NoOpExtractor"};
+  Compiler->getInvocation().getMutFrontendOpts().SSAFCompilationUnitId = CUId;
 
   TUSummaryExtractorFrontendAction Action(std::make_unique<RecordingAction>());
   EXPECT_TRUE(Compiler->ExecuteAction(Action));

@@ -110,7 +110,7 @@ export namespace Fibonacci
   Instance.setDiagnostics(Diags);
 
   std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
-  Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+  Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
 
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));

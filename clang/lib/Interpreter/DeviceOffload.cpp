@@ -30,7 +30,7 @@ IncrementalCUDADeviceParser::IncrementalCUDADeviceParser(
     llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> FS,
     llvm::Error &Err, std::list<PartialTranslationUnit> &PTUs)
     : IncrementalParser(DeviceInstance, DeviceAct, Err, PTUs), VFS(FS),
-      CodeGenOpts(HostInstance.getCodeGenOpts()),
+      CodeGenOpts(HostInstance.getInvocation().getMutCodeGenOpts()),
       TargetOpts(DeviceInstance.getTargetOpts()) {
   if (Err)
     return;

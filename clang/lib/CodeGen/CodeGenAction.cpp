@@ -319,7 +319,7 @@ void BackendConsumer::HandleTranslationUnit(ASTContext &C) {
 
   EmbedBitcode(getModule(), CodeGenOpts, llvm::MemoryBufferRef());
 
-  emitBackendOutput(CI, CI.getCodeGenOpts(),
+  emitBackendOutput(CI, CI.getInvocation().getMutCodeGenOpts(),
                     C.getTargetInfo().getDataLayoutString(), getModule(),
                     Action, FS, std::move(AsmOutStream), this);
 
@@ -948,7 +948,8 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
 
 bool CodeGenAction::BeginSourceFileAction(CompilerInstance &CI) {
   if (CI.getFrontendOpts().GenReducedBMI)
-    CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+    CI.getInvocation().getMutLangOpts().setCompilingModule(
+        LangOptions::CMK_ModuleInterface);
   return ASTFrontendAction::BeginSourceFileAction(CI);
 }
 
@@ -1201,7 +1202,7 @@ void CodeGenAction::ExecuteAction() {
   }
   LLVMRemarkFileHandle OptRecordFile = std::move(*OptRecordFileOrErr);
 
-  emitBackendOutput(CI, CI.getCodeGenOpts(),
+  emitBackendOutput(CI, CI.getInvocation().getMutCodeGenOpts(),
                     CI.getTarget().getDataLayoutString(), TheModule.get(), BA,
                     CI.getFileManager().getVirtualFileSystemPtr(),
                     std::move(OS));

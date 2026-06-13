@@ -365,7 +365,7 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
       nullptr, diag));
   llvm::SmallVector<clang::StoredDiagnostic, 8> sd = {};
   llvm::SmallVector<const llvm::MemoryBuffer *, 1> tb = {};
-  InterpCI->getFrontendOpts().Inputs[0] = FrontendInputFile(
+  InterpCI->getInvocation().getMutFrontendOpts().Inputs[0] = FrontendInputFile(
       CodeCompletionFileName, Language::CXX, InputKind::Source);
   auto Act = std::make_unique<IncrementalSyntaxOnlyAction>(ParentCI);
   std::unique_ptr<llvm::MemoryBuffer> MB =
@@ -379,7 +379,8 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
   AU->CodeComplete(CodeCompletionFileName, 1, Col, RemappedFiles, false, false,
                    false, consumer,
                    std::make_shared<clang::PCHContainerOperations>(), diag,
-                   InterpCI->getLangOpts(), AU->getSourceManagerPtr(),
+                   InterpCI->getInvocation().getMutLangOpts(),
+                   AU->getSourceManagerPtr(),
                    AU->getFileManagerPtr(), sd, tb, std::move(Act));
 }
 

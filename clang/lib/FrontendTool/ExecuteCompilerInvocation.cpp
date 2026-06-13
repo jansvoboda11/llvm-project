@@ -129,9 +129,9 @@ CreateFrontendBaseAction(CompilerInstance &CI) {
         std::unique_ptr<PluginASTAction> P(Plugin.instantiate());
         if ((P->getActionType() != PluginASTAction::ReplaceAction &&
              P->getActionType() != PluginASTAction::CmdlineAfterMainAction) ||
-            !P->ParseArgs(
-                CI,
-                CI.getFrontendOpts().PluginArgs[std::string(Plugin.getName())]))
+            !P->ParseArgs(CI, CI.getInvocation()
+                                  .getMutFrontendOpts()
+                                  .PluginArgs[std::string(Plugin.getName())]))
           return nullptr;
         return std::move(P);
       }
@@ -197,9 +197,9 @@ CreateFrontendAction(CompilerInstance &CI) {
   if (FEOpts.EmitSymbolGraph) {
     if (FEOpts.SymbolGraphOutputDir.empty()) {
       CI.getDiagnostics().Report(diag::warn_missing_symbol_graph_dir);
-      CI.getFrontendOpts().SymbolGraphOutputDir = ".";
+      CI.getInvocation().getMutFrontendOpts().SymbolGraphOutputDir = ".";
     }
-    CI.getCodeGenOpts().ClearASTBeforeBackend = false;
+    CI.getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
     Act = std::make_unique<WrappingExtractAPIAction>(std::move(Act));
   }
 
@@ -258,7 +258,7 @@ bool ExecuteCompilerInvocation(CompilerInstance *Clang) {
 #if CLANG_ENABLE_STATIC_ANALYZER
   // These should happen AFTER plugins have been loaded!
 
-  AnalyzerOptions &AnOpts = Clang->getAnalyzerOpts();
+  AnalyzerOptions &AnOpts = Clang->getInvocation().getMutAnalyzerOpts();
 
   // Honor -analyzer-checker-help and -analyzer-checker-help-hidden.
   if (AnOpts.ShowCheckerHelp || AnOpts.ShowCheckerHelpAlpha ||

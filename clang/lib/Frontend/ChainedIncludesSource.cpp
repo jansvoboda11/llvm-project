@@ -95,7 +95,8 @@ IntrusiveRefCntPtr<ExternalSemaSource>
 clang::createChainedIncludesSource(CompilerInstance &CI,
                                    IntrusiveRefCntPtr<ASTReader> &OutReader) {
 
-  std::vector<std::string> &includes = CI.getPreprocessorOpts().ChainedIncludes;
+  const std::vector<std::string> &includes =
+      CI.getPreprocessorOpts().ChainedIncludes;
   assert(!includes.empty() && "No '-chain-include' in options!");
 
   std::vector<std::unique_ptr<CompilerInstance>> CIs;
@@ -121,10 +122,11 @@ clang::createChainedIncludesSource(CompilerInstance &CI,
     FrontendInputFile InputFile(includes[i], IK);
     CInvok->getMutFrontendOpts().Inputs.push_back(InputFile);
 
-    TextDiagnosticPrinter *DiagClient =
-        new TextDiagnosticPrinter(llvm::errs(), CI.getDiagnosticOpts());
+    TextDiagnosticPrinter *DiagClient = new TextDiagnosticPrinter(
+        llvm::errs(), CI.getInvocation().getMutDiagnosticOpts());
     auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
-        DiagnosticIDs::create(), CI.getDiagnosticOpts(), DiagClient);
+        DiagnosticIDs::create(), CI.getInvocation().getMutDiagnosticOpts(),
+        DiagClient);
 
     auto Clang = std::make_unique<CompilerInstance>(
         std::move(CInvok), CI.getPCHContainerOperations());

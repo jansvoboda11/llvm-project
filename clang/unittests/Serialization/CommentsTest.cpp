@@ -102,7 +102,7 @@ void foo() {}
   CompilerInstance Instance(std::move(Invocation));
   Instance.createVirtualFileSystem(CIOpts.VFS);
   Instance.setDiagnostics(Diags);
-  Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+  Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
   ASSERT_FALSE(Diags->hasErrorOccurred());

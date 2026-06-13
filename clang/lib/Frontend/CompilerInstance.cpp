@@ -143,12 +143,12 @@ bool CompilerInstance::createTarget() {
   if (!getTarget().hasStrictFP() && !getLangOpts().ExpStrictFP) {
     if (getLangOpts().RoundingMath) {
       getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_rounding);
-      getLangOpts().RoundingMath = false;
+      Invocation->getMutLangOpts().RoundingMath = false;
     }
     auto FPExc = getLangOpts().getFPExceptionMode();
     if (FPExc != LangOptions::FPE_Default && FPExc != LangOptions::FPE_Ignore) {
       getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_exceptions);
-      getLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
+      Invocation->getMutLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
     }
     // FIXME: can we disable FEnvAccess?
   }
@@ -162,7 +162,8 @@ bool CompilerInstance::createTarget() {
   // Inform the target of the language options.
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
+  getTarget().adjust(getDiagnostics(), Invocation->getMutLangOpts(),
+                     getAuxTarget());
 
   if (auto *Aux = getAuxTarget())
     getTarget().setAuxTarget(Aux);
@@ -358,8 +359,9 @@ static void SetupSerializedDiagnostics(DiagnosticOptions &DiagOpts,
 
 void CompilerInstance::createDiagnostics(DiagnosticConsumer *Client,
                                          bool ShouldOwnClient) {
-  Diagnostics = createDiagnostics(getVirtualFileSystem(), getDiagnosticOpts(),
-                                  Client, ShouldOwnClient, &getCodeGenOpts());
+  Diagnostics = createDiagnostics(
+      getVirtualFileSystem(), Invocation->getMutDiagnosticOpts(), Client,
+      ShouldOwnClient, &getCodeGenOpts());
 }
 
 IntrusiveRefCntPtr<DiagnosticsEngine> CompilerInstance::createDiagnostics(
@@ -473,7 +475,8 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
                                       getSourceManager(), *HeaderInfo, *this,
                                       /*IdentifierInfoLookup=*/nullptr,
                                       /*OwnsHeaderSearch=*/true, TUKind);
-  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
+  getTarget().adjust(getDiagnostics(), Invocation->getMutLangOpts(),
+                     getAuxTarget());
   PP->Initialize(getTarget(), getAuxTarget());
 
   if (PPOpts.DetailedRecord)
@@ -566,8 +569,9 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
 void CompilerInstance::createASTContext() {
   Preprocessor &PP = getPreprocessor();
   auto Context = llvm::makeIntrusiveRefCnt<ASTContext>(
-      getLangOpts(), PP.getSourceManager(), PP.getIdentifierTable(),
-      PP.getSelectorTable(), PP.getBuiltinInfo(), PP.TUKind);
+      Invocation->getMutLangOpts(), PP.getSourceManager(),
+      PP.getIdentifierTable(), PP.getSelectorTable(), PP.getBuiltinInfo(),
+      PP.TUKind);
   Context->InitBuiltinTypes(getTarget(), getAuxTarget());
   setASTContext(std::move(Context));
 }
@@ -1012,8 +1016,8 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
 
   // Sort vectors containing toc data and no toc data variables to facilitate
   // binary search later.
-  llvm::sort(getCodeGenOpts().TocDataVarsUserSpecified);
-  llvm::sort(getCodeGenOpts().NoTocDataVars);
+  llvm::sort(Invocation->getMutCodeGenOpts().TocDataVarsUserSpecified);
+  llvm::sort(Invocation->getMutCodeGenOpts().NoTocDataVars);
 
   for (const FrontendInputFile &FIF : getFrontendOpts().Inputs) {
     // Reset the ID tables if we are reusing the SourceManager and parsing
@@ -1115,8 +1119,9 @@ void CompilerInstance::LoadRequestedPlugins() {
        FrontendPluginRegistry::entries()) {
     std::unique_ptr<PluginASTAction> P(Plugin.instantiate());
     if (P->getActionType() == PluginASTAction::ReplaceAction) {
-      getFrontendOpts().ProgramAction = clang::frontend::PluginAction;
-      getFrontendOpts().ActionName = Plugin.getName().str();
+      Invocation->getMutFrontendOpts().ProgramAction =
+          clang::frontend::PluginAction;
+      Invocation->getMutFrontendOpts().ActionName = Plugin.getName().str();
       break;
     }
   }
@@ -1751,7 +1756,7 @@ void CompilerInstance::createASTReader() {
                          getHeaderSearchOpts().ModuleCachePruneInterval,
                          getHeaderSearchOpts().ModuleCachePruneAfter);
 
-  HeaderSearchOptions &HSOpts = getHeaderSearchOpts();
+  const HeaderSearchOptions &HSOpts = getHeaderSearchOpts();
   std::string Sysroot = HSOpts.Sysroot;
   const PreprocessorOptions &PPOpts = getPreprocessorOpts();
   const FrontendOptions &FEOpts = getFrontendOpts();

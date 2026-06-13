@@ -487,7 +487,7 @@ dependencies::computePrebuiltModulesASTMap(
   if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
     if (visitPrebuiltModule(
             ScanInstance.getPreprocessorOpts().ImplicitPCHInclude, ScanInstance,
-            ScanInstance.getHeaderSearchOpts().PrebuiltModuleFiles,
+            ScanInstance.getInvocation().getMutHeaderSearchOpts().PrebuiltModuleFiles,
             PrebuiltModulesASTMap, ScanInstance.getDiagnostics(), StableDirs))
       return {};
 
@@ -656,7 +656,7 @@ struct AsyncModuleCompile : PPCallbacks {
                                                     *Compiles);
         (void)ModCI1->ExecuteAction(Action1);
         // The real scan below.
-        ModCI2->getPreprocessorOpts().SingleModuleParseMode = false;
+        ModCI2->getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = false;
         GenerateModuleFromModuleMapAction Action2;
         (void)ModCI2->ExecuteAction(Action2);
       });

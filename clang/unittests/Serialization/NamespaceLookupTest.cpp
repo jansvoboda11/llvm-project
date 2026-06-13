@@ -82,9 +82,9 @@ public:
 
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
-    Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+    Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
     // Avoid memory leaks.
-    Instance.getFrontendOpts().DisableFree = false;
+    Instance.getInvocation().getMutFrontendOpts().DisableFree = false;
     GenerateModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
     EXPECT_FALSE(Diags->hasErrorOccurred());

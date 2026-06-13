@@ -101,7 +101,7 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
       Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getHeaderSearchOpts().ResourceDir =
+    Clang->getInvocation().getMutHeaderSearchOpts().ResourceDir =
         GetResourcesPath(Argv[0], nullptr);
 
   Clang->createVirtualFileSystem();
@@ -127,15 +127,16 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
                                    "Initialization failed. "
                                    "Target is missing");
 
-  Clang->getTarget().adjust(Clang->getDiagnostics(), Clang->getLangOpts(),
+  Clang->getTarget().adjust(Clang->getDiagnostics(),
+                            Clang->getInvocation().getMutLangOpts(),
                             Clang->getAuxTarget());
 
   // Don't clear the AST before backend codegen since we do codegen multiple
   // times, reusing the same AST.
-  Clang->getCodeGenOpts().ClearASTBeforeBackend = false;
+  Clang->getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
 
-  Clang->getFrontendOpts().DisableFree = false;
-  Clang->getCodeGenOpts().DisableFree = false;
+  Clang->getInvocation().getMutFrontendOpts().DisableFree = false;
+  Clang->getInvocation().getMutCodeGenOpts().DisableFree = false;
   return std::move(Clang);
 }
 

@@ -84,7 +84,7 @@ public:
 
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
-    Instance.getFrontendOpts().OutputFile = CacheBMIPath;
+    Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
     EXPECT_FALSE(Diags->hasErrorOccurred());

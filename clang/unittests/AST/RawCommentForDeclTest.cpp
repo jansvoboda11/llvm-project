@@ -41,7 +41,7 @@ public:
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  llvm::StringRef) override {
-    CI.getLangOpts().CommentOpts.ParseAllComments = true;
+    CI.getInvocation().getMutLangOpts().CommentOpts.ParseAllComments = true;
     return std::make_unique<Consumer>(*this);
   }
 

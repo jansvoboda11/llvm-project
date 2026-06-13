@@ -278,79 +278,57 @@ public:
 
   /// @}
   /// @name Forwarding Methods
+  ///
+  /// Read-only forwarders to the underlying \c CompilerInvocation. There are no
+  /// non-const forwarders; once a \c CompilerInstance owns an invocation, that
+  /// invocation is treated as frozen — callers that need to mutate the options
+  /// must either configure the \c CompilerInvocation before constructing the
+  /// instance, or go through \c getInvocation().getMut*Opts() explicitly so the
+  /// mutation is visible at the call site.
   /// @{
 
-  AnalyzerOptions &getAnalyzerOpts() { return Invocation->getMutAnalyzerOpts(); }
-
-  CodeGenOptions &getCodeGenOpts() {
-    return Invocation->getMutCodeGenOpts();
+  const AnalyzerOptions &getAnalyzerOpts() const {
+    return Invocation->getAnalyzerOpts();
   }
+
   const CodeGenOptions &getCodeGenOpts() const {
     return Invocation->getCodeGenOpts();
   }
 
-  DependencyOutputOptions &getDependencyOutputOpts() {
-    return Invocation->getMutDependencyOutputOpts();
-  }
   const DependencyOutputOptions &getDependencyOutputOpts() const {
     return Invocation->getDependencyOutputOpts();
   }
 
-  DiagnosticOptions &getDiagnosticOpts() {
-    return Invocation->getMutDiagnosticOpts();
-  }
   const DiagnosticOptions &getDiagnosticOpts() const {
     return Invocation->getDiagnosticOpts();
   }
 
-  FileSystemOptions &getFileSystemOpts() {
-    return Invocation->getMutFileSystemOpts();
-  }
   const FileSystemOptions &getFileSystemOpts() const {
     return Invocation->getFileSystemOpts();
   }
 
-  FrontendOptions &getFrontendOpts() {
-    return Invocation->getMutFrontendOpts();
-  }
   const FrontendOptions &getFrontendOpts() const {
     return Invocation->getFrontendOpts();
   }
 
-  HeaderSearchOptions &getHeaderSearchOpts() {
-    return Invocation->getMutHeaderSearchOpts();
-  }
   const HeaderSearchOptions &getHeaderSearchOpts() const {
     return Invocation->getHeaderSearchOpts();
   }
 
-  APINotesOptions &getAPINotesOpts() {
-    return Invocation->getMutAPINotesOpts();
-  }
   const APINotesOptions &getAPINotesOpts() const {
     return Invocation->getAPINotesOpts();
   }
 
-  LangOptions &getLangOpts() { return Invocation->getMutLangOpts(); }
   const LangOptions &getLangOpts() const { return Invocation->getLangOpts(); }
 
-  PreprocessorOptions &getPreprocessorOpts() {
-    return Invocation->getMutPreprocessorOpts();
-  }
   const PreprocessorOptions &getPreprocessorOpts() const {
     return Invocation->getPreprocessorOpts();
   }
 
-  PreprocessorOutputOptions &getPreprocessorOutputOpts() {
-    return Invocation->getMutPreprocessorOutputOpts();
-  }
   const PreprocessorOutputOptions &getPreprocessorOutputOpts() const {
     return Invocation->getPreprocessorOutputOpts();
   }
 
-  TargetOptions &getTargetOpts() {
-    return Invocation->getMutTargetOpts();
-  }
   const TargetOptions &getTargetOpts() const {
     return Invocation->getTargetOpts();
   }

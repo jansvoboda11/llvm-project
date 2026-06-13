@@ -152,7 +152,7 @@ bool FixItRecompile::BeginInvocation(CompilerInstance &CI) {
   ProcessWarningOptions(CI.getDiagnostics(), CI.getDiagnosticOpts(),
                         CI.getVirtualFileSystem());
 
-  PreprocessorOptions &PPOpts = CI.getPreprocessorOpts();
+  PreprocessorOptions &PPOpts = CI.getInvocation().getMutPreprocessorOpts();
   PPOpts.RemappedFiles.insert(PPOpts.RemappedFiles.end(),
                               RewrittenFiles.begin(), RewrittenFiles.end());
   PPOpts.RemappedFilesKeepOriginalName = false;
@@ -248,14 +248,14 @@ public:
     Instance.createDiagnostics(
         new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
         /*ShouldOwnClient=*/true);
-    Instance.getFrontendOpts().DisableFree = false;
-    Instance.getFrontendOpts().Inputs.clear();
-    Instance.getFrontendOpts().Inputs.emplace_back(
+    Instance.getInvocation().getMutFrontendOpts().DisableFree = false;
+    Instance.getInvocation().getMutFrontendOpts().Inputs.clear();
+    Instance.getInvocation().getMutFrontendOpts().Inputs.emplace_back(
         Filename, InputKind(Language::Unknown, InputKind::Precompiled));
-    Instance.getFrontendOpts().ModuleFiles.clear();
-    Instance.getFrontendOpts().ModuleMapFiles.clear();
+    Instance.getInvocation().getMutFrontendOpts().ModuleFiles.clear();
+    Instance.getInvocation().getMutFrontendOpts().ModuleMapFiles.clear();
     // Don't recursively rewrite imports. We handle them all at the top level.
-    Instance.getPreprocessorOutputOpts().RewriteImports = false;
+    Instance.getInvocation().getMutPreprocessorOutputOpts().RewriteImports = false;
 
     llvm::CrashRecoveryContext().RunSafelyOnThread([&]() {
       RewriteIncludesAction Action;

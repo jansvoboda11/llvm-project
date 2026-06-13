@@ -559,7 +559,7 @@ struct SkipBodyConsumer : public clang::ASTConsumer {
 struct SkipBodyAction : public clang::ASTFrontendAction {
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &Compiler,
                                                  StringRef) override {
-    Compiler.getFrontendOpts().SkipFunctionBodies = true;
+    Compiler.getInvocation().getMutFrontendOpts().SkipFunctionBodies = true;
     return std::make_unique<SkipBodyConsumer>();
   }
 };

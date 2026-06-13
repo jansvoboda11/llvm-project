@@ -94,7 +94,7 @@ public:
                                                  StringRef File) override {
     // Suppress the default HTML/text path diagnostic consumers that would
     // otherwise emit to stderr via DiagnosticsEngine::Report().
-    Compiler.getAnalyzerOpts().AnalysisDiagOpt = PD_NONE;
+    Compiler.getInvocation().getMutAnalyzerOpts().AnalysisDiagOpt = PD_NONE;
     std::unique_ptr<AnalysisASTConsumer> AnalysisConsumer =
         CreateAnalysisConsumer(Compiler);
     if (OnlyEmitWarnings)
@@ -103,7 +103,8 @@ public:
     else
       AnalysisConsumer->AddDiagnosticConsumer(
           std::make_unique<PathDiagConsumer>(DiagsOutput));
-    addChecker<Fns...>(*AnalysisConsumer, Compiler.getAnalyzerOpts());
+    addChecker<Fns...>(*AnalysisConsumer,
+                       Compiler.getInvocation().getMutAnalyzerOpts());
     return std::move(AnalysisConsumer);
   }
 };

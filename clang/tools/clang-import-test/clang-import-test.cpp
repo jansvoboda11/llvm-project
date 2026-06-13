@@ -213,7 +213,8 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
   TargetInfo *TI = TargetInfo::CreateTargetInfo(
       Ins->getDiagnostics(), Ins->getInvocation().getMutTargetOpts());
   Ins->setTarget(TI);
-  Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getLangOpts(),
+  Ins->getTarget().adjust(Ins->getDiagnostics(),
+                          Ins->getInvocation().getMutLangOpts(),
                           /*AuxTarget=*/nullptr);
   Ins->createFileManager();
   Ins->createSourceManager();
@@ -226,7 +227,7 @@ std::unique_ptr<ASTContext>
 BuildASTContext(CompilerInstance &CI, SelectorTable &ST, Builtin::Context &BC) {
   auto &PP = CI.getPreprocessor();
   auto AST = std::make_unique<ASTContext>(
-      CI.getLangOpts(), CI.getSourceManager(),
+      CI.getInvocation().getMutLangOpts(), CI.getSourceManager(),
       PP.getIdentifierTable(), ST, BC, PP.TUKind);
   AST->InitBuiltinTypes(CI.getTarget());
   return AST;
