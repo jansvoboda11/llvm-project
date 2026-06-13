@@ -1081,38 +1081,36 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     }
   }
 
-  // Set up the preprocessor if needed. When parsing model files the
-  // preprocessor of the original source is reused.
-  if (!isModelParsingAction())
-    CI.createPreprocessor(getTranslationUnitKind());
-
-  // Inform the diagnostic client we are processing a source file.
-  CI.getDiagnosticClient().BeginSourceFile(CI.getLangOpts(),
-                                           &CI.getPreprocessor());
-  HasBegunSourceFile = true;
-
   // Handle C++20 header units.
   // Here, the user has the option to specify that the header name should be
   // looked up in the pre-processor search paths (and the main filename as
   // passed by the driver might therefore be incomplete until that look-up).
+  // Resolve the file BEFORE creating the Preprocessor so that the resulting
+  // module name can be set on the invocation while the *Options are still
+  // mutable; otherwise the Preprocessor would already hold a const reference
+  // to LangOptions when we mutate ModuleName/CurrentModule below.
   if (CI.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
       !Input.getKind().isPreprocessed()) {
     StringRef FileName = Input.getFile();
     InputKind Kind = Input.getKind();
     if (Kind.getHeaderUnitKind() != InputKind::HeaderUnit_Abs) {
-      assert(CI.hasPreprocessor() &&
-             "trying to build a header unit without a Pre-processor?");
-      HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
+      // Build a temporary HeaderSearch so the lookup uses the configured
+      // search paths without forcing us to create the real Preprocessor first.
+      HeaderSearch TmpHS(CI.getHeaderSearchOpts(), CI.getSourceManager(),
+                         CI.getDiagnostics(), CI.getLangOpts(), &CI.getTarget());
+      ApplyHeaderSearchOptions(TmpHS, CI.getHeaderSearchOpts(),
+                               CI.getLangOpts(),
+                               CI.getTarget().getTriple());
       // Relative searches begin from CWD.
       auto Dir = CI.getFileManager().getOptionalDirectoryRef(".");
       SmallVector<std::pair<OptionalFileEntryRef, DirectoryEntryRef>, 1> CWD;
       CWD.push_back({std::nullopt, *Dir});
       OptionalFileEntryRef FE =
-          HS.LookupFile(FileName, SourceLocation(),
-                        /*Angled*/ Input.getKind().getHeaderUnitKind() ==
-                            InputKind::HeaderUnit_System,
-                        nullptr, nullptr, CWD, nullptr, nullptr, nullptr,
-                        nullptr, nullptr, nullptr);
+          TmpHS.LookupFile(FileName, SourceLocation(),
+                           /*Angled*/ Input.getKind().getHeaderUnitKind() ==
+                               InputKind::HeaderUnit_System,
+                           nullptr, nullptr, CWD, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr);
       if (!FE) {
         CI.getDiagnostics().Report(diag::err_module_header_file_not_found)
             << FileName;
@@ -1132,6 +1130,16 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
         CI.getLangOpts().ModuleName;
   }
 
+  // Set up the preprocessor if needed. When parsing model files the
+  // preprocessor of the original source is reused.
+  if (!isModelParsingAction())
+    CI.createPreprocessor(getTranslationUnitKind());
+
+  // Inform the diagnostic client we are processing a source file.
+  CI.getDiagnosticClient().BeginSourceFile(CI.getLangOpts(),
+                                           &CI.getPreprocessor());
+  HasBegunSourceFile = true;
+
   if (!CI.InitializeSourceManager(Input))
     return false;
 
@@ -1141,6 +1149,12 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // module name (and original file, to build the map entry).
     // Check if the first line specifies the original source file name with a
     // linemarker.
+    //
+    // FIXME: This still mutates LangOptions after the Preprocessor has been
+    // constructed because ReadOriginalFileName needs the SourceManager to
+    // already be initialized with the main file. Fixing this properly means
+    // either teaching CompilerInstance to set up the main file before
+    // createPreprocessor, or moving ModuleName resolution out of LangOptions.
     std::string PresumedInputFile = std::string(getCurrentFileOrBufferName());
     ReadOriginalFileName(CI, PresumedInputFile);
     // Unless the user overrides this, the module name is the name by which the
