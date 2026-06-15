@@ -115,7 +115,7 @@ void CompilerInstance::setAuxTarget(TargetInfo *Value) { AuxTarget = Value; }
 bool CompilerInstance::createTarget() {
   // Create the target instance.
   setTarget(TargetInfo::CreateTargetInfo(getDiagnostics(),
-                                         getInvocation().getMutTargetOpts()));
+                                         Invocation->getMutTargetOpts()));
   if (!hasTarget())
     return false;
 
@@ -1187,6 +1187,9 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
              Invocation->computeContextHash() &&
          "Module hash mismatch!");
 
+  // Don't propagate per-TU dependency output settings to the module build.
+  Invocation->getMutDependencyOutputOpts() = DependencyOutputOptions();
+
   std::shared_ptr<ModuleCache> ModCache;
   if (ThreadSafeConfig) {
     ModCache = ThreadSafeConfig->getModuleCache();
@@ -1198,8 +1201,6 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   auto InstancePtr = std::make_unique<CompilerInstance>(
       std::move(Invocation), getPCHContainerOperations(), std::move(ModCache));
   auto &Instance = *InstancePtr;
-
-  auto &Inv = Instance.getInvocation();
 
   if (ThreadSafeConfig) {
     Instance.setVirtualFileSystem(ThreadSafeConfig->getVFS());
@@ -1254,7 +1255,6 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
     // want to produce any dependency output from the module build.
     Instance.setModuleDepCollector(getModuleDepCollector());
   }
-  Inv.getMutDependencyOutputOpts() = DependencyOutputOptions();
 
   return InstancePtr;
 }

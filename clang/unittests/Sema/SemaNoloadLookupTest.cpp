@@ -82,9 +82,9 @@ public:
         createInvocation(Args, CIOpts);
     EXPECT_TRUE(Invocation);
 
+    Invocation->getMutFrontendOpts().OutputFile = CacheBMIPath;
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
-    Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
     EXPECT_FALSE(Diags->hasErrorOccurred());

@@ -249,7 +249,7 @@ GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
     HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
     ModuleFileName FileName = HS.getCachedModuleFileName(
         CI.getLangOpts().CurrentModule, ModuleMapFile);
-    CI.getInvocation().getMutFrontendOpts().OutputFile = FileName.str();
+    getMutInvocation().getMutFrontendOpts().OutputFile = FileName.str();
   }
 
   // Because this is exposed via libclang we must disable RemoveFileOnSignal.

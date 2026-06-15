@@ -2067,6 +2067,10 @@ void ASTUnit::CodeComplete(
   LangOpts.SpellChecking = false;
   CCInvocation->getMutDiagnosticOpts().IgnoreWarnings = true;
 
+  // Materialize a mutable reference before std::move so we can pass it to
+  // getMainBufferWithPrecompiledPreamble below (which still mutates a few
+  // SkipFunctionBodies flags on the invocation).
+  CompilerInvocation &Inv = *CCInvocation;
   auto Clang = std::make_unique<CompilerInstance>(std::move(CCInvocation),
                                                   PCHContainerOps);
 
@@ -2074,7 +2078,6 @@ void ASTUnit::CodeComplete(
   llvm::CrashRecoveryContextCleanupRegistrar<CompilerInstance>
     CICleanup(Clang.get());
 
-  auto &Inv = Clang->getInvocation();
   OriginalSourceFile =
       std::string(Clang->getFrontendOpts().Inputs[0].getFile());
 
@@ -2154,8 +2157,7 @@ void ASTUnit::CodeComplete(
 
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
         FileMgr->getVirtualFileSystemPtr();
-    Preamble->AddImplicitPreamble(Clang->getInvocation(), VFS,
-                                  OverrideMainBuffer.get());
+    Preamble->AddImplicitPreamble(Inv, VFS, OverrideMainBuffer.get());
     // FIXME: there is no way to update VFS if it was changed by
     // AddImplicitPreamble as FileMgr is accepted as a parameter by this method.
     // We use on-disk preambles instead and rely on FileMgr's VFS to ensure the

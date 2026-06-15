@@ -82,7 +82,22 @@ enum class DisableValidationForModuleKind;
 /// come in two forms; a short form that reuses the CompilerInstance objects,
 /// and a long form that takes explicit instances of any required objects.
 class CompilerInstance : public ModuleLoader {
-  /// The options used in this compiler instance.
+  /// FIXME: Several pre-Preprocessor setup paths still need mutable access
+  /// to the held CompilerInvocation; befriend them while those paths move
+  /// pre-construction.
+  friend class FrontendAction;
+  friend class WrapperFrontendAction;
+  /// The options used in this compiler instance. The public API
+  /// (\c getInvocation, \c getInvocationPtr) treats this as const: callers
+  /// must finalize the \c CompilerInvocation before handing it to the
+  /// constructor, and components such as Preprocessor / ASTContext observe
+  /// it through const references.
+  ///
+  /// FIXME: A handful of internal call sites under \c CompilerInstance still
+  /// mutate the held invocation post-construction (createTarget,
+  /// createPreprocessor, createASTContext, plugin replacement). Those are
+  /// being moved pre-construction; once they are gone this member will
+  /// become \c shared_ptr<const CompilerInvocation>.
   std::shared_ptr<CompilerInvocation> Invocation;
 
   /// The virtual file system instance.
@@ -263,9 +278,11 @@ public:
   /// @name Compiler Invocation and Options
   /// @{
 
-  CompilerInvocation &getInvocation() { return *Invocation; }
+  const CompilerInvocation &getInvocation() const { return *Invocation; }
 
-  std::shared_ptr<CompilerInvocation> getInvocationPtr() { return Invocation; }
+  std::shared_ptr<const CompilerInvocation> getInvocationPtr() const {
+    return Invocation;
+  }
 
   /// Indicates whether we should (re)build the global module index.
   bool shouldBuildGlobalModuleIndex() const;

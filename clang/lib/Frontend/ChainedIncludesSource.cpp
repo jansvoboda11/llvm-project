@@ -127,14 +127,19 @@ clang::createChainedIncludesSource(CompilerInstance &CI,
     auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
         DiagnosticIDs::create(), CI.getDiagnosticOpts(), DiagClient);
 
+    // Materialize the mutable TargetOptions reference before std::move so we
+    // can pass it to CreateTargetInfo (which mutates it during target setup);
+    // the shared_ptr move keeps the underlying object alive at the same
+    // address.
+    TargetOptions &MutTargetOpts = CInvok->getMutTargetOpts();
     auto Clang = std::make_unique<CompilerInstance>(
         std::move(CInvok), CI.getPCHContainerOperations());
     // Inherit the VFS as-is: code below does not make changes to the VFS or to
     // the VFS-affecting options.
     Clang->setVirtualFileSystem(CI.getVirtualFileSystemPtr());
     Clang->setDiagnostics(Diags);
-    Clang->setTarget(TargetInfo::CreateTargetInfo(
-        Clang->getDiagnostics(), Clang->getInvocation().getMutTargetOpts()));
+    Clang->setTarget(
+        TargetInfo::CreateTargetInfo(Clang->getDiagnostics(), MutTargetOpts));
     Clang->createFileManager();
     Clang->createSourceManager();
     Clang->createPreprocessor(TU_Prefix);

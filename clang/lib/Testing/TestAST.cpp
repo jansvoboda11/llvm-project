@@ -77,7 +77,10 @@ void createMissingComponents(CompilerInstance &Clang) {
 } // namespace
 
 TestAST::TestAST(const TestInputs &In) {
-  Clang = std::make_unique<CompilerInstance>();
+  // Build the invocation separately so we can populate it from cc1 args
+  // before the CompilerInstance starts treating it as frozen.
+  auto Invocation = std::make_shared<CompilerInvocation>();
+  Clang = std::make_unique<CompilerInstance>(Invocation);
   // If we don't manage to finish parsing, create CompilerInstance components
   // anyway so that the test will see an empty AST instead of crashing.
   llvm::scope_exit RecoverFromEarlyExit(
@@ -112,7 +115,7 @@ TestAST::TestAST(const TestInputs &In) {
   for (const auto &S : In.ExtraArgs)
     Argv.push_back(S.c_str());
   Argv.push_back(Filename.c_str());
-  if (!CompilerInvocation::CreateFromArgs(Clang->getInvocation(), Argv,
+  if (!CompilerInvocation::CreateFromArgs(*Invocation, Argv,
                                           Clang->getDiagnostics(), "clang")) {
     ADD_FAILURE() << "Failed to create invocation";
     return;

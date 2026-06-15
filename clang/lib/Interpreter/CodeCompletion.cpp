@@ -360,12 +360,17 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
   auto consumer = ReplCompletionConsumer(CCResults, *this);
 
   auto diag = InterpCI->getDiagnosticsPtr();
+  // FIXME: ASTUnit::LoadFromCompilerInvocationAction wants a non-const
+  // CompilerInvocation. The Interpreter genuinely shares its invocation
+  // mutably across CompilerInstance and ASTUnit; until that mutation moves
+  // out, breach the frozen-invocation invariant via const_pointer_cast.
+  auto MutInvPtr = std::const_pointer_cast<CompilerInvocation>(
+      InterpCI->getInvocationPtr());
   std::unique_ptr<ASTUnit> AU(ASTUnit::LoadFromCompilerInvocationAction(
-      InterpCI->getInvocationPtr(), std::make_shared<PCHContainerOperations>(),
-      nullptr, diag));
+      MutInvPtr, std::make_shared<PCHContainerOperations>(), nullptr, diag));
   llvm::SmallVector<clang::StoredDiagnostic, 8> sd = {};
   llvm::SmallVector<const llvm::MemoryBuffer *, 1> tb = {};
-  InterpCI->getInvocation().getMutFrontendOpts().Inputs[0] = FrontendInputFile(
+  MutInvPtr->getMutFrontendOpts().Inputs[0] = FrontendInputFile(
       CodeCompletionFileName, Language::CXX, InputKind::Source);
   auto Act = std::make_unique<IncrementalSyntaxOnlyAction>(ParentCI);
   std::unique_ptr<llvm::MemoryBuffer> MB =
@@ -379,7 +384,7 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
   AU->CodeComplete(CodeCompletionFileName, 1, Col, RemappedFiles, false, false,
                    false, consumer,
                    std::make_shared<clang::PCHContainerOperations>(), diag,
-                   InterpCI->getInvocation().getMutLangOpts(),
+                   MutInvPtr->getMutLangOpts(),
                    AU->getSourceManagerPtr(),
                    AU->getFileManagerPtr(), sd, tb, std::move(Act));
 }

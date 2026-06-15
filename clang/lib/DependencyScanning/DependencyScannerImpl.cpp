@@ -484,12 +484,18 @@ dependencies::computePrebuiltModulesASTMap(
   // instead.
   PrebuiltModulesAttrsMap PrebuiltModulesASTMap;
 
-  if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
+  if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
+    // FIXME: Post-construction mutation of the invocation. The prebuilt
+    // module file map is populated based on a visit that needs the constructed
+    // ScanInstance, so it cannot trivially move pre-construction.
+    auto &MutHSOpts = const_cast<CompilerInvocation &>(ScanInstance.getInvocation())
+                          .getMutHeaderSearchOpts();
     if (visitPrebuiltModule(
             ScanInstance.getPreprocessorOpts().ImplicitPCHInclude, ScanInstance,
-            ScanInstance.getInvocation().getMutHeaderSearchOpts().PrebuiltModuleFiles,
-            PrebuiltModulesASTMap, ScanInstance.getDiagnostics(), StableDirs))
+            MutHSOpts.PrebuiltModuleFiles, PrebuiltModulesASTMap,
+            ScanInstance.getDiagnostics(), StableDirs))
       return {};
+  }
 
   return PrebuiltModulesASTMap;
 }
@@ -658,7 +664,11 @@ struct AsyncModuleCompile : PPCallbacks {
                                                     *Compiles);
         (void)ModCI1->ExecuteAction(Action1);
         // The real scan below.
-        ModCI2->getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = false;
+        // FIXME: Post-construction mutation. ModCI2 was built with
+        // SingleModuleParseMode=true; flip it for Action2.
+        const_cast<CompilerInvocation &>(ModCI2->getInvocation())
+            .getMutPreprocessorOpts()
+            .SingleModuleParseMode = false;
         GenerateModuleFromModuleMapAction Action2;
         (void)ModCI2->ExecuteAction(Action2);
       });

@@ -80,11 +80,11 @@ public:
         createInvocation(Args, CIOpts);
     EXPECT_TRUE(Invocation);
 
+    Invocation->getMutFrontendOpts().OutputFile = CacheBMIPath;
+    // Avoid memory leaks.
+    Invocation->getMutFrontendOpts().DisableFree = false;
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
-    Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
-    // Avoid memory leaks.
-    Instance.getInvocation().getMutFrontendOpts().DisableFree = false;
     GenerateModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
     EXPECT_FALSE(Diags->hasErrorOccurred());

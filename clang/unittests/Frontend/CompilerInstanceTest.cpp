@@ -148,6 +148,9 @@ TEST(CompilerInstance, MultipleInputsCleansFileIDs) {
       createInvocation(Args, std::move(CIOpts));
   ASSERT_TRUE(CInvok) << "could not create compiler invocation";
 
+  // Capture a mutable reference before std::move so we can append the
+  // second input below.
+  FrontendOptions &MutFrontendOpts = CInvok->getMutFrontendOpts();
   CompilerInstance Instance(std::move(CInvok));
   Instance.setVirtualFileSystem(VFS);
   Instance.setDiagnostics(Diags);
@@ -156,8 +159,7 @@ TEST(CompilerInstance, MultipleInputsCleansFileIDs) {
   // Run once for `a.cc` and then for `a.h`. This makes sure we get the same
   // file ID for `b.h` in the second run as `a.h` from first run.
   const auto &OrigInputKind = Instance.getFrontendOpts().Inputs[0].getKind();
-  Instance.getInvocation().getMutFrontendOpts().Inputs.emplace_back(
-      "a.h", OrigInputKind);
+  MutFrontendOpts.Inputs.emplace_back("a.h", OrigInputKind);
 
   SyntaxOnlyAction Act;
   EXPECT_TRUE(Instance.ExecuteAction(Act)) << "Failed to execute action";
@@ -197,7 +199,7 @@ TEST(CompilerInstance, SingleModuleParseModeCallback) {
     bool BeginSourceFileAction(CompilerInstance &CI) override {
       auto Cb = std::make_unique<ModuleLoadSkippedCallback>(SkippedModules);
       CI.getPreprocessor().addPPCallbacks(std::move(Cb));
-      return SyntaxOnlyAction::BeginInvocation(CI.getInvocation(),
+      return SyntaxOnlyAction::BeginInvocation(getMutInvocation(),
                                                CI.getDiagnostics(),
                                                CI.getVirtualFileSystem());
     }

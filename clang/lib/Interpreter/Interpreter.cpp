@@ -117,6 +117,13 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   Invocation->getMutFrontendOpts().DisableFree = false;
   Invocation->getMutCodeGenOpts().DisableFree = false;
 
+  // Materialize the mutable TargetOptions reference before std::move so
+  // we can pass it to CreateTargetInfo (which mutates it during target
+  // setup); the shared_ptr move keeps the underlying object alive at the
+  // same address.
+  TargetOptions &MutTargetOpts = Invocation->getMutTargetOpts();
+  LangOptions &MutLangOpts = Invocation->getMutLangOpts();
+
   std::unique_ptr<CompilerInstance> Clang(
       new CompilerInstance(std::move(Invocation), std::move(PCHOps)));
 
@@ -131,15 +138,14 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
                                    "Initialization failed. "
                                    "Unable to flush diagnostics");
 
-  Clang->setTarget(TargetInfo::CreateTargetInfo(
-      Clang->getDiagnostics(), Clang->getInvocation().getMutTargetOpts()));
+  Clang->setTarget(
+      TargetInfo::CreateTargetInfo(Clang->getDiagnostics(), MutTargetOpts));
   if (!Clang->hasTarget())
     return llvm::createStringError(llvm::errc::not_supported,
                                    "Initialization failed. "
                                    "Target is missing");
 
-  Clang->getTarget().adjustLangOptions(Clang->getDiagnostics(),
-                                       Clang->getInvocation().getMutLangOpts());
+  Clang->getTarget().adjustLangOptions(Clang->getDiagnostics(), MutLangOpts);
   Clang->getTarget().adjust(Clang->getDiagnostics(), Clang->getLangOpts(),
                             Clang->getAuxTarget());
 

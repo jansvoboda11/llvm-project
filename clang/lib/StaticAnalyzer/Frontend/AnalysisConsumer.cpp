@@ -837,7 +837,12 @@ ento::CreateAnalysisConsumer(CompilerInstance &CI) {
   // Disable the effects of '-Werror' when using the AnalysisConsumer.
   CI.getPreprocessor().getDiagnostics().setWarningsAsErrors(false);
 
-  AnalyzerOptions &analyzerOpts = CI.getInvocation().getMutAnalyzerOpts();
+  // FIXME: Post-construction mutation of the invocation. The analyzer
+  // infrastructure (CheckerRegistry) mutates AnalyzerOptions::Config to
+  // record defaults; until that moves pre-construction this site uses
+  // const_cast.
+  AnalyzerOptions &analyzerOpts =
+      const_cast<AnalyzerOptions &>(CI.getAnalyzerOpts());
   bool hasModelPath = analyzerOpts.Config.count("model-path") > 0;
 
   return std::make_unique<AnalysisConsumer>(

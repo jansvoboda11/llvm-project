@@ -60,14 +60,16 @@ public:
                      FileManager *FileMgr,
                      std::shared_ptr<PCHContainerOperations> PCHContainerOps,
                      DiagnosticConsumer *DiagConsumer) override {
+    DependencyOutputOptions &MutDepOutputOpts =
+        Invocation->getMutDependencyOutputOpts();
     CompilerInstance Compiler(std::move(Invocation),
                               std::move(PCHContainerOps));
     Compiler.setVirtualFileSystem(FileMgr->getVirtualFileSystemPtr());
     Compiler.setFileManager(FileMgr);
     Compiler.createDiagnostics(DiagConsumer, /*ShouldOwnClient=*/false);
     Compiler.createSourceManager();
-    Compiler.addDependencyCollector(std::make_shared<TestFileCollector>(
-        Compiler.getInvocation().getMutDependencyOutputOpts(), Deps));
+    Compiler.addDependencyCollector(
+        std::make_shared<TestFileCollector>(MutDepOutputOpts, Deps));
 
     auto Action = std::make_unique<PreprocessOnlyAction>();
     return Compiler.ExecuteAction(*Action);

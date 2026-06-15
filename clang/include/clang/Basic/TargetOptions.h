@@ -61,11 +61,9 @@ public:
   /// line.
   llvm::StringMap<bool> FeatureMap;
 
-  /// Supported OpenCL extensions and optional core features.
-  llvm::StringMap<bool> OpenCLFeaturesMap;
-
   /// The list of OpenCL extensions to enable or disable, as written on
-  /// the command line.
+  /// the command line. The TargetInfo derives the resolved feature map from
+  /// these (combined with the target's defaults) at construction time.
   std::vector<std::string> OpenCLExtensionsAsWritten;
 
   /// If given, enables support for __int128_t and __uint128_t types.

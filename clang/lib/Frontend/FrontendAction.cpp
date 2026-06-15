@@ -369,6 +369,14 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 
 FrontendAction::~FrontendAction() {}
 
+CompilerInvocation &FrontendAction::getMutInvocation() const {
+  return *getCompilerInstance().Invocation;
+}
+
+CompilerInvocation &FrontendAction::getMutInvocation(CompilerInstance &CI) {
+  return *CI.Invocation;
+}
+
 bool FrontendAction::BeginInvocation(CompilerInvocation &Invocation,
                                      DiagnosticsEngine &Diags,
                                      llvm::vfs::FileSystem &VFS) {
@@ -485,15 +493,20 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
       }
     }
     if ((ActionType == PluginASTAction::AddBeforeMainAction ||
-         ActionType == PluginASTAction::AddAfterMainAction) &&
-        P->ParseArgs(CI, CI.getInvocation()
-                             .getMutFrontendOpts()
-                             .PluginArgs[std::string(Plugin.getName())])) {
-      std::unique_ptr<ASTConsumer> PluginConsumer = P->CreateASTConsumer(CI, InFile);
-      if (ActionType == PluginASTAction::AddBeforeMainAction) {
-        Consumers.push_back(std::move(PluginConsumer));
-      } else {
-        AfterConsumers.push_back(std::move(PluginConsumer));
+         ActionType == PluginASTAction::AddAfterMainAction)) {
+      auto It = CI.getFrontendOpts().PluginArgs.find(
+          std::string(Plugin.getName()));
+      static const std::vector<std::string> NoArgs;
+      const std::vector<std::string> &Args =
+          It != CI.getFrontendOpts().PluginArgs.end() ? It->second : NoArgs;
+      if (P->ParseArgs(CI, Args)) {
+        std::unique_ptr<ASTConsumer> PluginConsumer =
+            P->CreateASTConsumer(CI, InFile);
+        if (ActionType == PluginASTAction::AddBeforeMainAction) {
+          Consumers.push_back(std::move(PluginConsumer));
+        } else {
+          AfterConsumers.push_back(std::move(PluginConsumer));
+        }
       }
     }
   }
@@ -879,7 +892,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     setCompilerInstance(nullptr);
   });
 
-  if (!BeginInvocation(CI.getInvocation(), CI.getDiagnostics(),
+  if (!BeginInvocation(*CI.Invocation, CI.getDiagnostics(),
                        CI.getVirtualFileSystem()))
     return false;
 
@@ -888,7 +901,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // previously done late, inside the ModuleMap branch below, after
   // createPreprocessor had already captured a reference to LangOptions.
   if (Input.getKind().getFormat() == InputKind::ModuleMap)
-    CI.getInvocation().getMutLangOpts().setCompilingModule(
+    CI.Invocation->getMutLangOpts().setCompilingModule(
         LangOptions::CMK_ModuleMap);
 
   // The list of module files the input AST file depends on. This is separate
@@ -903,7 +916,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     StringRef InputFile = Input.getFile();
 
     std::unique_ptr<ASTUnit> AST = clang::loadAndApplyASTUnitOptions(
-        CI.getInvocation(), InputFile, CI.getPCHContainerReader(),
+        *CI.Invocation, InputFile, CI.getPCHContainerReader(),
         CI.getVirtualFileSystemPtr(), CI.getDiagnosticsPtr());
     if (!AST)
       return false;
@@ -927,7 +940,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
           ModuleFiles.emplace_back(MF.FileName);
 
       ASTReader->visitTopLevelModuleMaps(PrimaryModule, [&](FileEntryRef FE) {
-        CI.getInvocation().getMutFrontendOpts().ModuleMapFiles.push_back(
+        CI.Invocation->getMutFrontendOpts().ModuleMapFiles.push_back(
             std::string(FE.getName()));
       });
     }
@@ -1053,7 +1066,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
   if (!CI.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
     FileManager &FileMgr = CI.getFileManager();
-    PreprocessorOptions &PPOpts = CI.getInvocation().getMutPreprocessorOpts();
+    PreprocessorOptions &PPOpts = CI.Invocation->getMutPreprocessorOpts();
 
     // Canonicalize ImplicitPCHInclude. This way, all the downstream code,
     // including the ASTWriter, will receive the absolute path to the included
@@ -1144,8 +1157,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // Unless the user has overridden the name, the header unit module name is
     // the pathname for the file.
     if (CI.getLangOpts().ModuleName.empty())
-      CI.getInvocation().getMutLangOpts().ModuleName = std::string(FileName);
-    CI.getInvocation().getMutLangOpts().CurrentModule =
+      CI.Invocation->getMutLangOpts().ModuleName = std::string(FileName);
+    CI.Invocation->getMutLangOpts().CurrentModule =
         CI.getLangOpts().ModuleName;
   }
 
@@ -1189,8 +1202,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     }
     if (PresumedInputFile.empty())
       PresumedInputFile = StringRef(getCurrentFileOrBufferName());
-    CI.getInvocation().getMutLangOpts().ModuleName = PresumedInputFile.str();
-    CI.getInvocation().getMutLangOpts().CurrentModule =
+    CI.Invocation->getMutLangOpts().ModuleName = PresumedInputFile.str();
+    CI.Invocation->getMutLangOpts().CurrentModule =
         CI.getLangOpts().ModuleName;
   }
 

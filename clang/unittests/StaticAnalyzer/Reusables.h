@@ -58,11 +58,15 @@ protected:
 public:
   ExprEngineConsumer(CompilerInstance &C)
       : C(C),
-        ChkMgr(C.getASTContext(), C.getInvocation().getMutAnalyzerOpts(),
+        // FIXME: const_cast until the analyzer no longer mutates AnalyzerOptions
+        // (Config map default insertion) post-CompilerInstance construction.
+        ChkMgr(C.getASTContext(),
+               const_cast<AnalyzerOptions &>(C.getAnalyzerOpts()),
                C.getPreprocessor()),
-        CTU(C), AMgr(C.getASTContext(), C.getPreprocessor(), {},
-                     CreateRegionStoreManager, CreateRangeConstraintManager,
-                     &ChkMgr, C.getInvocation().getMutAnalyzerOpts()),
+        CTU(C),
+        AMgr(C.getASTContext(), C.getPreprocessor(), {},
+             CreateRegionStoreManager, CreateRangeConstraintManager, &ChkMgr,
+             const_cast<AnalyzerOptions &>(C.getAnalyzerOpts())),
         VisitedCallees(), FS(),
         Eng(CTU, AMgr, &VisitedCallees, &FS, ExprEngine::Inline_Regular) {}
 };

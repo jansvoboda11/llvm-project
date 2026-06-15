@@ -27,27 +27,33 @@ namespace llvm {
 
 struct TestCompiler {
   LLVMContext Context;
+  std::shared_ptr<clang::CompilerInvocation> Invocation;
   clang::CompilerInstance compiler;
   std::unique_ptr<clang::CodeGenerator> CG;
   llvm::Module *M = nullptr;
   unsigned PtrSize = 0;
 
   TestCompiler(clang::LangOptions LO,
-               clang::CodeGenOptions CGO = clang::CodeGenOptions()) {
-    compiler.getInvocation().getMutLangOpts() = LO;
-    compiler.getInvocation().getMutCodeGenOpts() = CGO;
+               clang::CodeGenOptions CGO = clang::CodeGenOptions())
+      : Invocation([&] {
+          auto Inv = std::make_shared<clang::CompilerInvocation>();
+          Inv->getMutLangOpts() = LO;
+          Inv->getMutCodeGenOpts() = CGO;
+          std::string TrStr =
+              llvm::Triple::normalize(llvm::sys::getProcessTriple());
+          llvm::Triple Tr(TrStr);
+          Tr.setOS(Triple::Linux);
+          Tr.setVendor(Triple::VendorType::UnknownVendor);
+          Tr.setEnvironment(Triple::EnvironmentType::UnknownEnvironment);
+          Inv->getMutTargetOpts().Triple = Tr.getTriple();
+          return Inv;
+        }()),
+        compiler(Invocation) {
     compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
     compiler.createDiagnostics();
 
-    std::string TrStr = llvm::Triple::normalize(llvm::sys::getProcessTriple());
-    llvm::Triple Tr(TrStr);
-    Tr.setOS(Triple::Linux);
-    Tr.setVendor(Triple::VendorType::UnknownVendor);
-    Tr.setEnvironment(Triple::EnvironmentType::UnknownEnvironment);
-    compiler.getInvocation().getMutTargetOpts().Triple = Tr.getTriple();
     compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
-        compiler.getDiagnostics(),
-        compiler.getInvocation().getMutTargetOpts()));
+        compiler.getDiagnostics(), Invocation->getMutTargetOpts()));
 
     const clang::TargetInfo &TInfo = compiler.getTarget();
     PtrSize = TInfo.getPointerWidth(clang::LangAS::Default) / 8;

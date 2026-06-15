@@ -24,7 +24,12 @@ static void cleanupRemappedFileBuffers(CompilerInstance &CI) {
   for (const auto &RB : CI.getPreprocessorOpts().RemappedFileBuffers) {
     delete RB.second;
   }
-  CI.getInvocation().getMutPreprocessorOpts().clearRemappedFiles();
+  // FIXME: This breaches the frozen-invocation invariant; cleanup should
+  // run on the invocation pre-construction, or RemappedFileBuffers should
+  // not be on the invocation at all.
+  const_cast<CompilerInvocation &>(CI.getInvocation())
+      .getMutPreprocessorOpts()
+      .clearRemappedFiles();
 }
 
 TEST(IncrementalCompilerBuilder, SetCompilerArgs) {

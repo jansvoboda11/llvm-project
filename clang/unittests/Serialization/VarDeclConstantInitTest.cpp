@@ -106,11 +106,11 @@ export namespace Fibonacci
   ASSERT_TRUE(Invocation);
   Invocation->getMutFrontendOpts().DisableFree = false;
 
+  std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
+  Invocation->getMutFrontendOpts().OutputFile = CacheBMIPath;
+
   CompilerInstance Instance(std::move(Invocation));
   Instance.setDiagnostics(Diags);
-
-  std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
-  Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
 
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));

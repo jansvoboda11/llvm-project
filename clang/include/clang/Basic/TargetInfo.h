@@ -225,8 +225,14 @@ enum OpenCLTypeKind : uint8_t {
 ///
 class TargetInfo : public TransferrableTargetInfo,
                    public RefCountedBase<TargetInfo> {
-  TargetOptions *TargetOpts;
+  const TargetOptions *TargetOpts;
   llvm::Triple Triple;
+  /// Resolved set of supported OpenCL extensions and optional core features.
+  /// Populated during target construction from the target's defaults and the
+  /// user-supplied list in \c TargetOptions::OpenCLExtensionsAsWritten. Owned
+  /// by the TargetInfo so the underlying TargetOptions can stay const post
+  /// CompilerInstance construction.
+  llvm::StringMap<bool> OpenCLFeaturesMap;
 protected:
   // Target values set by the ctor of the actual target implementation.  Default
   // values are specified by the TargetInfo constructor.
@@ -324,7 +330,7 @@ public:
   virtual ~TargetInfo();
 
   /// Retrieve the target options.
-  TargetOptions &getTargetOpts() const {
+  const TargetOptions &getTargetOpts() const {
     assert(TargetOpts && "Missing target options");
     return *TargetOpts;
   }
@@ -1856,7 +1862,7 @@ public:
 
   virtual void supportAllOpenCLOpts(bool V = true) {
 #define OPENCLEXTNAME(Ext)                                                     \
-  setFeatureEnabled(getTargetOpts().OpenCLFeaturesMap, #Ext, V);
+  setFeatureEnabled(OpenCLFeaturesMap, #Ext, V);
 #include "clang/Basic/OpenCLExtensions.def"
   }
 
@@ -1872,7 +1878,7 @@ public:
         continue;
       }
 
-      getTargetOpts().OpenCLFeaturesMap[Name] = V;
+      OpenCLFeaturesMap[Name] = V;
     }
   }
 
@@ -1880,13 +1886,11 @@ public:
   virtual void setDependentOpenCLOpts();
 
   /// Get supported OpenCL extensions and optional core features.
-  llvm::StringMap<bool> &getSupportedOpenCLOpts() {
-    return getTargetOpts().OpenCLFeaturesMap;
-  }
+  llvm::StringMap<bool> &getSupportedOpenCLOpts() { return OpenCLFeaturesMap; }
 
   /// Get const supported OpenCL extensions and optional core features.
   const llvm::StringMap<bool> &getSupportedOpenCLOpts() const {
-    return getTargetOpts().OpenCLFeaturesMap;
+    return OpenCLFeaturesMap;
   }
 
   /// Get address space for OpenCL type.

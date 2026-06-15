@@ -254,21 +254,24 @@ public:
     (*OS) << '\n';
 
     // Rewrite the contents of the module in a separate compiler instance.
-    CompilerInstance Instance(
-        std::make_shared<CompilerInvocation>(CI.getInvocation()),
-        CI.getPCHContainerOperations(), CI.getModuleCachePtr());
+    auto NewInvocation =
+        std::make_shared<CompilerInvocation>(CI.getInvocation());
+    NewInvocation->getMutFrontendOpts().DisableFree = false;
+    NewInvocation->getMutFrontendOpts().Inputs.clear();
+    NewInvocation->getMutFrontendOpts().Inputs.emplace_back(
+        Filename, InputKind(Language::Unknown, InputKind::Precompiled));
+    NewInvocation->getMutFrontendOpts().ModuleFiles.clear();
+    NewInvocation->getMutFrontendOpts().ModuleMapFiles.clear();
+    // Don't recursively rewrite imports. We handle them all at the top level.
+    NewInvocation->getMutPreprocessorOutputOpts().RewriteImports = false;
+
+    CompilerInstance Instance(std::move(NewInvocation),
+                              CI.getPCHContainerOperations(),
+                              CI.getModuleCachePtr());
     Instance.setVirtualFileSystem(CI.getVirtualFileSystemPtr());
     Instance.createDiagnostics(
         new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
         /*ShouldOwnClient=*/true);
-    Instance.getInvocation().getMutFrontendOpts().DisableFree = false;
-    Instance.getInvocation().getMutFrontendOpts().Inputs.clear();
-    Instance.getInvocation().getMutFrontendOpts().Inputs.emplace_back(
-        Filename, InputKind(Language::Unknown, InputKind::Precompiled));
-    Instance.getInvocation().getMutFrontendOpts().ModuleFiles.clear();
-    Instance.getInvocation().getMutFrontendOpts().ModuleMapFiles.clear();
-    // Don't recursively rewrite imports. We handle them all at the top level.
-    Instance.getInvocation().getMutPreprocessorOutputOpts().RewriteImports = false;
 
     llvm::CrashRecoveryContext().RunSafelyOnThread([&]() {
       RewriteIncludesAction Action;

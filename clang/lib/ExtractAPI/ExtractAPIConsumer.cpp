@@ -448,7 +448,9 @@ ExtractAPIAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
 }
 
 bool ExtractAPIAction::PrepareToExecuteAction(CompilerInstance &CI) {
-  auto &Inputs = CI.getInvocation().getMutFrontendOpts().Inputs;
+  // PrepareToExecuteAction runs before setCompilerInstance, so use the
+  // CI-taking overload.
+  auto &Inputs = getMutInvocation(CI).getMutFrontendOpts().Inputs;
   if (Inputs.empty())
     return true;
 

@@ -145,6 +145,21 @@ public:
     return *Instance;
   }
 
+  /// Mutable access to the held CompilerInvocation. Most setup should
+  /// finalize the invocation pre-CompilerInstance construction so this is
+  /// not needed; this exists as a transitional accessor for per-input setup
+  /// inside FrontendAction subclasses that hasn't yet moved earlier in the
+  /// lifecycle. The public CompilerInstance::getInvocation() returns const,
+  /// preserving the immutability invariant for outside callers.
+  // FIXME: Drop this when all in-tree FrontendAction subclasses have moved
+  // their mutations pre-construction.
+  CompilerInvocation &getMutInvocation() const;
+
+  /// Like \c getMutInvocation but operating on an explicit
+  /// \c CompilerInstance reference. Useful from \c PrepareToExecuteAction
+  /// where the action has not yet been bound via \c setCompilerInstance.
+  static CompilerInvocation &getMutInvocation(CompilerInstance &CI);
+
   void setCompilerInstance(CompilerInstance *Value) { Instance = Value; }
 
   /// @}

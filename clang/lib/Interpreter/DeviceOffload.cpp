@@ -30,7 +30,11 @@ IncrementalCUDADeviceParser::IncrementalCUDADeviceParser(
     llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> FS,
     llvm::Error &Err, std::list<PartialTranslationUnit> &PTUs)
     : IncrementalParser(DeviceInstance, DeviceAct, Err, PTUs), VFS(FS),
-      CodeGenOpts(HostInstance.getInvocation().getMutCodeGenOpts()),
+      // FIXME: DeviceOffload mutates HostInstance's CodeGenOpts post
+      // construction (CudaGpuBinaryFileName). Until that mutation moves
+      // pre-construction, breach the frozen-invocation invariant via
+      // const_cast.
+      CodeGenOpts(const_cast<CodeGenOptions &>(HostInstance.getCodeGenOpts())),
       TargetOpts(DeviceInstance.getTargetOpts()) {
   if (Err)
     return;

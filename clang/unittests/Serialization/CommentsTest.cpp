@@ -99,10 +99,10 @@ void foo() {}
       createInvocation(Args, CIOpts);
   ASSERT_TRUE(Invocation);
 
+  Invocation->getMutFrontendOpts().OutputFile = CacheBMIPath;
   CompilerInstance Instance(std::move(Invocation));
   Instance.createVirtualFileSystem(CIOpts.VFS);
   Instance.setDiagnostics(Diags);
-  Instance.getInvocation().getMutFrontendOpts().OutputFile = CacheBMIPath;
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
   ASSERT_FALSE(Diags->hasErrorOccurred());

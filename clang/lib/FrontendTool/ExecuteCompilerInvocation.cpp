@@ -127,11 +127,14 @@ CreateFrontendBaseAction(CompilerInstance &CI) {
          FrontendPluginRegistry::entries()) {
       if (Plugin.getName() == CI.getFrontendOpts().ActionName) {
         std::unique_ptr<PluginASTAction> P(Plugin.instantiate());
+        auto It = CI.getFrontendOpts().PluginArgs.find(
+            std::string(Plugin.getName()));
+        static const std::vector<std::string> NoArgs;
+        const std::vector<std::string> &Args =
+            It != CI.getFrontendOpts().PluginArgs.end() ? It->second : NoArgs;
         if ((P->getActionType() != PluginASTAction::ReplaceAction &&
              P->getActionType() != PluginASTAction::CmdlineAfterMainAction) ||
-            !P->ParseArgs(CI, CI.getInvocation()
-                                  .getMutFrontendOpts()
-                                  .PluginArgs[std::string(Plugin.getName())]))
+            !P->ParseArgs(CI, Args))
           return nullptr;
         return std::move(P);
       }
@@ -255,7 +258,7 @@ bool ExecuteCompilerInvocation(CompilerInstance *Clang) {
 #if CLANG_ENABLE_STATIC_ANALYZER
   // These should happen AFTER plugins have been loaded!
 
-  AnalyzerOptions &AnOpts = Clang->getInvocation().getMutAnalyzerOpts();
+  const AnalyzerOptions &AnOpts = Clang->getAnalyzerOpts();
 
   // Honor -analyzer-checker-help and -analyzer-checker-help-hidden.
   if (AnOpts.ShowCheckerHelp || AnOpts.ShowCheckerHelpAlpha ||

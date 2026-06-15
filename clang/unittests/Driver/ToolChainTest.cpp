@@ -579,20 +579,23 @@ TEST(CompilerInvocation, SplitSwarfSingleCrash) {
 }
 
 TEST(ToolChainTest, UEFICallingConventionTest) {
-  clang::CompilerInstance compiler;
-  compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
-  compiler.createDiagnostics();
-
-  std::string TrStr = "x86_64-unknown-uefi";
-  llvm::Triple Tr(TrStr);
+  // Build the invocation separately so we can mutate its target triple
+  // before the CompilerInstance starts treating it as frozen.
+  auto Invocation = std::make_shared<clang::CompilerInvocation>();
+  llvm::Triple Tr{"x86_64-unknown-uefi"};
   Tr.setOS(llvm::Triple::OSType::UEFI);
   Tr.setVendor(llvm::Triple::VendorType::UnknownVendor);
   Tr.setEnvironment(llvm::Triple::EnvironmentType::UnknownEnvironment);
   Tr.setArch(llvm::Triple::ArchType::x86_64);
+  Invocation->getMutTargetOpts().Triple = Tr.getTriple();
+  clang::TargetOptions &MutTargetOpts = Invocation->getMutTargetOpts();
 
-  compiler.getInvocation().getMutTargetOpts().Triple = Tr.getTriple();
+  clang::CompilerInstance compiler(std::move(Invocation));
+  compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
+  compiler.createDiagnostics();
+
   compiler.setTarget(clang::TargetInfo::CreateTargetInfo(
-      compiler.getDiagnostics(), compiler.getInvocation().getMutTargetOpts()));
+      compiler.getDiagnostics(), MutTargetOpts));
 
   EXPECT_EQ(compiler.getTarget().getCallingConvKind(true),
             TargetInfo::CallingConvKind::CCK_MicrosoftWin64);

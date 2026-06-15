@@ -205,16 +205,20 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
   Inv->getMutCodeGenOpts().setDebugInfo(llvm::codegenoptions::FullDebugInfo);
   Inv->getMutTargetOpts().Triple = llvm::sys::getDefaultTargetTriple();
 
+  // Capture mutable references to TargetOpts/LangOpts before std::move so
+  // that downstream setup (CreateTargetInfo, adjustLangOptions) can mutate
+  // them; the shared_ptr move keeps the underlying objects alive.
+  TargetOptions &MutTargetOpts = Inv->getMutTargetOpts();
+  LangOptions &MutLangOpts = Inv->getMutLangOpts();
   auto Ins = std::make_unique<CompilerInstance>(std::move(Inv));
 
   Ins->createVirtualFileSystem(llvm::vfs::getRealFileSystem(), DC.get());
   Ins->createDiagnostics(DC.release(), /*ShouldOwnClient=*/true);
 
-  TargetInfo *TI = TargetInfo::CreateTargetInfo(
-      Ins->getDiagnostics(), Ins->getInvocation().getMutTargetOpts());
+  TargetInfo *TI =
+      TargetInfo::CreateTargetInfo(Ins->getDiagnostics(), MutTargetOpts);
   Ins->setTarget(TI);
-  Ins->getTarget().adjustLangOptions(Ins->getDiagnostics(),
-                                     Ins->getInvocation().getMutLangOpts());
+  Ins->getTarget().adjustLangOptions(Ins->getDiagnostics(), MutLangOpts);
   Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getLangOpts(),
                           /*AuxTarget=*/nullptr);
   Ins->createFileManager();
@@ -227,8 +231,10 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
 std::unique_ptr<ASTContext>
 BuildASTContext(CompilerInstance &CI, SelectorTable &ST, Builtin::Context &BC) {
   auto &PP = CI.getPreprocessor();
+  // FIXME: ASTContext stores LangOptions by non-const ref; const_cast until
+  // ASTContext can take const LangOptions.
   auto AST = std::make_unique<ASTContext>(
-      CI.getInvocation().getMutLangOpts(), CI.getSourceManager(),
+      const_cast<LangOptions &>(CI.getLangOpts()), CI.getSourceManager(),
       PP.getIdentifierTable(), ST, BC, PP.TUKind);
   AST->InitBuiltinTypes(CI.getTarget());
   return AST;
