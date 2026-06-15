@@ -193,15 +193,12 @@ CreateFrontendAction(CompilerInstance &CI) {
 
   // Wrap the base FE action in an extract api action to generate
   // symbol graph as a biproduct of compilation (enabled with
-  // --emit-symbol-graph option)
-  if (FEOpts.EmitSymbolGraph) {
-    if (FEOpts.SymbolGraphOutputDir.empty()) {
-      CI.getDiagnostics().Report(diag::warn_missing_symbol_graph_dir);
-      CI.getInvocation().getMutFrontendOpts().SymbolGraphOutputDir = ".";
-    }
-    CI.getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
+  // --emit-symbol-graph option). Associated invocation mutations
+  // (defaulting SymbolGraphOutputDir to "." with a diagnostic, and
+  // disabling ClearASTBeforeBackend) happen pre-construction in
+  // FixupInvocation.
+  if (FEOpts.EmitSymbolGraph)
     Act = std::make_unique<WrappingExtractAPIAction>(std::move(Act));
-  }
 
   // If there are any AST files to merge, create a frontend action
   // adaptor to perform the merge.

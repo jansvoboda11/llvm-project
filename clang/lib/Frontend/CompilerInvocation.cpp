@@ -707,6 +707,20 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
           << A->getSpelling() << T.getTriple();
   }
 
+  // Account for action wrappers added downstream by ExecuteCompilerInvocation.
+  // Doing this here freezes the invocation before the CompilerInstance is
+  // constructed; the alternative is post-construction mutation in
+  // CreateFrontendAction.
+  if (FrontendOpts.EmitSymbolGraph) {
+    if (FrontendOpts.SymbolGraphOutputDir.empty()) {
+      Diags.Report(diag::warn_missing_symbol_graph_dir);
+      FrontendOpts.SymbolGraphOutputDir = ".";
+    }
+    // The wrapping ExtractAPI consumer runs after main codegen, so the AST
+    // must outlive that pass.
+    CodeGenOpts.ClearASTBeforeBackend = false;
+  }
+
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
@@ -2316,6 +2330,12 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
     Diags.Report(diag::err_drv_amdgpu_ieee_without_no_honor_nans);
 
   Opts.StaticClosure = Args.hasArg(options::OPT_static_libclosure);
+
+  // Sort vectors containing toc data and no toc data variables to facilitate
+  // binary search later. Done here so the invocation reaches CompilerInstance
+  // already sorted.
+  llvm::sort(Opts.TocDataVarsUserSpecified);
+  llvm::sort(Opts.NoTocDataVars);
 
   return Diags.getNumErrors() == NumErrorsBefore;
 }
