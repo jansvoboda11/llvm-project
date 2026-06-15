@@ -247,6 +247,13 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
   bool Success =
       CompilerInvocation::CreateFromArgs(*Invocation, Argv, Diags, Argv0);
 
+  // Infer the builtin include path if unspecified. Done pre-construction so
+  // the CompilerInstance observes the final invocation.
+  if (Invocation->getHeaderSearchOpts().UseBuiltinIncludes &&
+      Invocation->getHeaderSearchOpts().ResourceDir.empty())
+    Invocation->getMutHeaderSearchOpts().ResourceDir =
+        GetResourcesPath(Argv0, MainAddr);
+
   auto Clang = std::make_unique<CompilerInstance>(std::move(Invocation),
                                                   std::move(PCHOps));
 
@@ -266,12 +273,6 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
   // --print-enabled-extensions takes priority over the actual compilation.
   if (Clang->getFrontendOpts().PrintEnabledExtensions)
     return PrintEnabledExtensions(Clang->getTargetOpts());
-
-  // Infer the builtin include path if unspecified.
-  if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
-      Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getInvocation().getMutHeaderSearchOpts().ResourceDir =
-        GetResourcesPath(Argv0, MainAddr);
 
   /// Create the actual file system.
   auto VFS = [] {

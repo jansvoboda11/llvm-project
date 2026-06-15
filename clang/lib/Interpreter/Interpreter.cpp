@@ -82,11 +82,9 @@ GetCC1Arguments(DiagnosticsEngine *Diagnostics,
 
 static llvm::Expected<std::unique_ptr<CompilerInstance>>
 CreateCI(const llvm::opt::ArgStringList &Argv) {
-  std::unique_ptr<CompilerInstance> Clang(new CompilerInstance());
-
   // Register the support for object-file-wrapped Clang modules.
   // FIXME: Clang should register these container operations automatically.
-  auto PCHOps = Clang->getPCHContainerOperations();
+  auto PCHOps = std::make_shared<PCHContainerOperations>();
   PCHOps->registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
   PCHOps->registerReader(std::make_unique<ObjectFilePCHContainerReader>());
 
@@ -95,14 +93,32 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
   DiagnosticOptions DiagOpts;
   TextDiagnosticBuffer *DiagsBuffer = new TextDiagnosticBuffer;
   DiagnosticsEngine Diags(DiagnosticIDs::create(), DiagOpts, DiagsBuffer);
+  auto Invocation = std::make_shared<CompilerInvocation>();
   bool Success = CompilerInvocation::CreateFromArgs(
-      Clang->getInvocation(), llvm::ArrayRef(Argv.begin(), Argv.size()), Diags);
+      *Invocation, llvm::ArrayRef(Argv.begin(), Argv.size()), Diags);
+
+  // Configure the invocation pre-construction so the CompilerInstance
+  // observes a frozen invocation.
 
   // Infer the builtin include path if unspecified.
-  if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
-      Clang->getHeaderSearchOpts().ResourceDir.empty())
-    Clang->getInvocation().getMutHeaderSearchOpts().ResourceDir =
+  if (Invocation->getHeaderSearchOpts().UseBuiltinIncludes &&
+      Invocation->getHeaderSearchOpts().ResourceDir.empty())
+    Invocation->getMutHeaderSearchOpts().ResourceDir =
         GetResourcesPath(Argv[0], nullptr);
+
+  // FIXME: Merge with CompilerInstance::ExecuteAction.
+  llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer("").release();
+  Invocation->getMutPreprocessorOpts().addRemappedFile("<<< inputs >>>", MB);
+
+  // Don't clear the AST before backend codegen since we do codegen multiple
+  // times, reusing the same AST.
+  Invocation->getMutCodeGenOpts().ClearASTBeforeBackend = false;
+
+  Invocation->getMutFrontendOpts().DisableFree = false;
+  Invocation->getMutCodeGenOpts().DisableFree = false;
+
+  std::unique_ptr<CompilerInstance> Clang(
+      new CompilerInstance(std::move(Invocation), std::move(PCHOps)));
 
   Clang->createVirtualFileSystem();
 
@@ -115,11 +131,6 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
                                    "Initialization failed. "
                                    "Unable to flush diagnostics");
 
-  // FIXME: Merge with CompilerInstance::ExecuteAction.
-  llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer("").release();
-  Clang->getInvocation().getMutPreprocessorOpts().addRemappedFile(
-      "<<< inputs >>>", MB);
-
   Clang->setTarget(TargetInfo::CreateTargetInfo(
       Clang->getDiagnostics(), Clang->getInvocation().getMutTargetOpts()));
   if (!Clang->hasTarget())
@@ -131,12 +142,6 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
                             Clang->getInvocation().getMutLangOpts(),
                             Clang->getAuxTarget());
 
-  // Don't clear the AST before backend codegen since we do codegen multiple
-  // times, reusing the same AST.
-  Clang->getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
-
-  Clang->getInvocation().getMutFrontendOpts().DisableFree = false;
-  Clang->getInvocation().getMutCodeGenOpts().DisableFree = false;
   return std::move(Clang);
 }
 
