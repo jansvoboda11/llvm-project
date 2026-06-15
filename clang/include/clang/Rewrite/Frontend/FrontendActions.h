@@ -53,7 +53,9 @@ public:
     : WrapperFrontendAction(std::move(WrappedAction)) {}
 
 protected:
-  bool BeginInvocation(CompilerInstance &CI) override;
+  bool BeginInvocation(CompilerInvocation &Invocation,
+                       DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override;
 };
 
 class RewriteObjCAction : public ASTFrontendAction {

@@ -29,6 +29,12 @@
 #include <string>
 #include <vector>
 
+namespace llvm {
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+} // namespace llvm
+
 namespace clang {
 class ASTMergeAction;
 class CompilerInstance;
@@ -83,7 +89,9 @@ protected:
   ///
   /// \return True on success; on failure BeginSourceFileAction(),
   /// ExecuteAction() and EndSourceFileAction() will not be called.
-  virtual bool BeginInvocation(CompilerInstance &CI);
+  virtual bool BeginInvocation(CompilerInvocation &Invocation,
+                               DiagnosticsEngine &Diags,
+                               llvm::vfs::FileSystem &VFS);
 
   /// Callback at the start of processing a single input.
   ///
@@ -327,7 +335,9 @@ protected:
   bool PrepareToExecuteAction(CompilerInstance &CI) override;
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
-  bool BeginInvocation(CompilerInstance &CI) override;
+  bool BeginInvocation(CompilerInvocation &Invocation,
+                       DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
   void ExecuteAction() override;
   void EndSourceFile() override;

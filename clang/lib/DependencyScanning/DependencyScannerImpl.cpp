@@ -563,7 +563,8 @@ struct SingleModuleWithAsyncModuleCompiles : PreprocessOnlyAction {
                                       AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
-  bool BeginInvocation(CompilerInstance &CI) override;
+  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
 };
 
@@ -677,10 +678,11 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
                                   AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
-  bool BeginInvocation(CompilerInstance &CI) override {
-    if (!PreprocessOnlyAction::BeginInvocation(CI))
+  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override {
+    if (!PreprocessOnlyAction::BeginInvocation(Invocation, Diags, VFS))
       return false;
-    CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
+    Invocation.getMutPreprocessorOpts().SingleModuleParseMode = true;
     return true;
   }
 
@@ -692,10 +694,11 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
 };
 
 bool SingleModuleWithAsyncModuleCompiles::BeginInvocation(
-    CompilerInstance &CI) {
-  if (!PreprocessOnlyAction::BeginInvocation(CI))
+    CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+    llvm::vfs::FileSystem &VFS) {
+  if (!PreprocessOnlyAction::BeginInvocation(Invocation, Diags, VFS))
     return false;
-  CI.getInvocation().getMutPreprocessorOpts().SingleModuleParseMode = true;
+  Invocation.getMutPreprocessorOpts().SingleModuleParseMode = true;
   return true;
 }
 

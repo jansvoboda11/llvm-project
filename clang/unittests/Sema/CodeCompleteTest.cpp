@@ -127,10 +127,15 @@ public:
   CodeCompleteAction(ParsedSourceLocation P, CodeCompleteConsumer *Consumer)
       : CompletePosition(std::move(P)), Consumer(Consumer) {}
 
-  bool BeginInvocation(CompilerInstance &CI) override {
-    CI.getInvocation().getMutFrontendOpts().CodeCompletionAt = CompletePosition;
-    CI.setCodeCompletionConsumer(Consumer);
+  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override {
+    Invocation.getMutFrontendOpts().CodeCompletionAt = CompletePosition;
     return true;
+  }
+
+  bool BeginSourceFileAction(CompilerInstance &CI) override {
+    CI.setCodeCompletionConsumer(Consumer);
+    return SyntaxOnlyAction::BeginSourceFileAction(CI);
   }
 
 private:

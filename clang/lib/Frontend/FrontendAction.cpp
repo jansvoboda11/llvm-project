@@ -369,13 +369,14 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 
 FrontendAction::~FrontendAction() {}
 
-bool FrontendAction::BeginInvocation(CompilerInstance &CI) {
-  // Reset per-input state on the invocation. CompilingModule is per-input
-  // (CompilerInstance reuses one invocation across multiple BeginSourceFile
-  // calls), so each input has to clear it back to None and then let any
-  // override below override it before Preprocessor/ASTContext start
-  // observing CodeGenOptions / LangOptions through their const references.
-  CI.getInvocation().getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+bool FrontendAction::BeginInvocation(CompilerInvocation &Invocation,
+                                     DiagnosticsEngine &Diags,
+                                     llvm::vfs::FileSystem &VFS) {
+  // Reset per-input state on the invocation. CompilingModule is per-input,
+  // so each input has to clear it back to None and then let any override
+  // below override it before Preprocessor/ASTContext start observing
+  // CodeGenOptions / LangOptions through their const references.
+  Invocation.getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
 
   // If any registered plugin will attach an after-main-action AST consumer,
   // the AST must remain alive through codegen so that consumer can read it.
@@ -394,11 +395,11 @@ bool FrontendAction::BeginInvocation(CompilerInstance &CI) {
     std::unique_ptr<PluginASTAction> P = Plugin.instantiate();
     PluginASTAction::ActionType ActionType = P->getActionType();
     if (ActionType == PluginASTAction::CmdlineAfterMainAction &&
-        llvm::is_contained(CI.getFrontendOpts().AddPluginActions,
+        llvm::is_contained(Invocation.getFrontendOpts().AddPluginActions,
                            Plugin.getName()))
       ActionType = PluginASTAction::AddAfterMainAction;
     if (ActionType == PluginASTAction::AddAfterMainAction) {
-      CI.getInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
+      Invocation.getMutCodeGenOpts().ClearASTBeforeBackend = false;
       break;
     }
   }
@@ -878,7 +879,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     setCompilerInstance(nullptr);
   });
 
-  if (!BeginInvocation(CI))
+  if (!BeginInvocation(CI.getInvocation(), CI.getDiagnostics(),
+                       CI.getVirtualFileSystem()))
     return false;
 
   // For module map files, mark the invocation as compiling a module before
@@ -1556,8 +1558,10 @@ WrapperFrontendAction::CreateASTConsumer(CompilerInstance &CI,
                                          StringRef InFile) {
   return WrappedAction->CreateASTConsumer(CI, InFile);
 }
-bool WrapperFrontendAction::BeginInvocation(CompilerInstance &CI) {
-  return WrappedAction->BeginInvocation(CI);
+bool WrapperFrontendAction::BeginInvocation(CompilerInvocation &Invocation,
+                                            DiagnosticsEngine &Diags,
+                                            llvm::vfs::FileSystem &VFS) {
+  return WrappedAction->BeginInvocation(Invocation, Diags, VFS);
 }
 bool WrapperFrontendAction::BeginSourceFileAction(CompilerInstance &CI) {
   WrappedAction->setCurrentInput(getCurrentInput());

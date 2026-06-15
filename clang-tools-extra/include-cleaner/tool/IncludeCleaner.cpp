@@ -141,12 +141,13 @@ private:
   llvm::function_ref<bool(llvm::StringRef)> HeaderFilter;
   llvm::StringMap<std::string> &EditedFiles;
 
-  bool BeginInvocation(CompilerInstance &CI) override {
+  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+                       llvm::vfs::FileSystem &VFS) override {
     // We only perform include-cleaner analysis. So we disable diagnostics that
     // won't affect our analysis to make the tool more robust against
     // in-development code.
-    CI.getLangOpts().ModulesDeclUse = false;
-    CI.getLangOpts().ModulesStrictDeclUse = false;
+    Invocation.getMutLangOpts().ModulesDeclUse = false;
+    Invocation.getMutLangOpts().ModulesStrictDeclUse = false;
     return true;
   }
 

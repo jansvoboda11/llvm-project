@@ -112,14 +112,27 @@ void FixItAction::EndSourceFileAction() {
   ASTFrontendAction::EndSourceFileAction();
 }
 
-bool FixItRecompile::BeginInvocation(CompilerInstance &CI) {
-
-  std::vector<std::pair<std::string, std::string> > RewrittenFiles;
+bool FixItRecompile::BeginInvocation(CompilerInvocation &Invocation,
+                                     DiagnosticsEngine &Diags,
+                                     llvm::vfs::FileSystem &VFS) {
+  // Run a SyntaxOnly fix-it pass on a separate CompilerInstance with a copy
+  // of the outer invocation, then forward the rewritten files into the outer
+  // invocation as remapped inputs so the wrapped action sees them.
+  std::vector<std::pair<std::string, std::string>> RewrittenFiles;
   bool err = false;
   {
-    const FrontendOptions &FEOpts = CI.getFrontendOpts();
+    auto FixInvocation = std::make_shared<CompilerInvocation>(Invocation);
+    auto FixCI = std::make_unique<CompilerInstance>(FixInvocation);
+    FixCI->createVirtualFileSystem(
+        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>(&VFS));
+    FixCI->createDiagnostics(Diags.getClient(), /*ShouldOwnClient=*/false);
+    FixCI->createFileManager();
+    if (!FixCI->createTarget())
+      return false;
+
+    const FrontendOptions &FEOpts = FixInvocation->getFrontendOpts();
     std::unique_ptr<FrontendAction> FixAction(new SyntaxOnlyAction());
-    if (FixAction->BeginSourceFile(CI, FEOpts.Inputs[0])) {
+    if (FixAction->BeginSourceFile(*FixCI, FEOpts.Inputs[0])) {
       std::unique_ptr<FixItOptions> FixItOpts;
       if (FEOpts.FixToTemporaries)
         FixItOpts.reset(new FixItRewriteToTemp());
@@ -128,8 +141,8 @@ bool FixItRecompile::BeginInvocation(CompilerInstance &CI) {
       FixItOpts->Silent = true;
       FixItOpts->FixWhatYouCan = FEOpts.FixWhatYouCan;
       FixItOpts->FixOnlyWarnings = FEOpts.FixOnlyWarnings;
-      FixItRewriter Rewriter(CI.getDiagnostics(), CI.getSourceManager(),
-                             CI.getLangOpts(), FixItOpts.get());
+      FixItRewriter Rewriter(FixCI->getDiagnostics(), FixCI->getSourceManager(),
+                             FixCI->getLangOpts(), FixItOpts.get());
       if (llvm::Error Err = FixAction->Execute()) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
@@ -139,20 +152,20 @@ bool FixItRecompile::BeginInvocation(CompilerInstance &CI) {
       err = Rewriter.WriteFixedFiles(&RewrittenFiles);
 
       FixAction->EndSourceFile();
-      CI.setSourceManager(nullptr);
-      CI.setFileManager(nullptr);
     } else {
       err = true;
     }
   }
   if (err)
     return false;
-  CI.getDiagnosticClient().clear();
-  CI.getDiagnostics().Reset();
-  ProcessWarningOptions(CI.getDiagnostics(), CI.getDiagnosticOpts(),
-                        CI.getVirtualFileSystem());
 
-  PreprocessorOptions &PPOpts = CI.getInvocation().getMutPreprocessorOpts();
+  // The inner fix-it run shared the outer DiagnosticConsumer; clear any
+  // diagnostics accumulated there so the wrapped action's compilation is
+  // not affected. The outer DiagnosticsEngine itself was not used, so it
+  // does not need to be reset.
+  Diags.getClient()->clear();
+
+  PreprocessorOptions &PPOpts = Invocation.getMutPreprocessorOpts();
   PPOpts.RemappedFiles.insert(PPOpts.RemappedFiles.end(),
                               RewrittenFiles.begin(), RewrittenFiles.end());
   PPOpts.RemappedFilesKeepOriginalName = false;

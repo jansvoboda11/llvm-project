@@ -219,19 +219,15 @@ protected:
              llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> ExtraFS)
             : PP(PP), PI(PI), ExtraFS(std::move(ExtraFS)) {}
         bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
+          if (ExtraFS) {
+            auto OverlayFS =
+                llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+                    CI.getFileManager().getVirtualFileSystemPtr());
+            OverlayFS->pushOverlay(ExtraFS);
+            CI.getFileManager().setVirtualFileSystem(std::move(OverlayFS));
+          }
           CI.getPreprocessor().addPPCallbacks(PP.record(CI.getPreprocessor()));
           PI.record(CI);
-          return true;
-        }
-
-        bool BeginInvocation(CompilerInstance &CI) override {
-          if (!ExtraFS)
-            return true;
-          auto OverlayFS =
-              llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
-                  CI.getFileManager().getVirtualFileSystemPtr());
-          OverlayFS->pushOverlay(ExtraFS);
-          CI.getFileManager().setVirtualFileSystem(std::move(OverlayFS));
           return true;
         }
 

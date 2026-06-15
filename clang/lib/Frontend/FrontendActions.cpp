@@ -274,14 +274,16 @@ bool GenerateModuleInterfaceAction::PrepareToExecuteAction(
   return GenerateModuleAction::PrepareToExecuteAction(CI);
 }
 
-bool GenerateModuleInterfaceAction::BeginInvocation(CompilerInstance &CI) {
+bool GenerateModuleInterfaceAction::BeginInvocation(
+    CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
+    llvm::vfs::FileSystem &VFS) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
   // and start observing it through their const LangOptions& references. Note
   // that the parent's BeginInvocation resets CompilingModule to None as a
   // per-input precondition, so we have to override it after chaining.
-  if (!GenerateModuleAction::BeginInvocation(CI))
+  if (!GenerateModuleAction::BeginInvocation(Invocation, Diags, VFS))
     return false;
-  CI.getInvocation().getMutLangOpts().setCompilingModule(
+  Invocation.getMutLangOpts().setCompilingModule(
       LangOptions::CMK_ModuleInterface);
   return true;
 }
@@ -321,15 +323,16 @@ GenerateReducedModuleInterfaceAction::CreateASTConsumer(CompilerInstance &CI,
       CI.getFrontendOpts().OutputFile, CI.getCodeGenOpts());
 }
 
-bool GenerateHeaderUnitAction::BeginInvocation(CompilerInstance &CI) {
-  if (!CI.getLangOpts().CPlusPlusModules) {
-    CI.getDiagnostics().Report(diag::err_module_interface_requires_cpp_modules);
+bool GenerateHeaderUnitAction::BeginInvocation(CompilerInvocation &Invocation,
+                                               DiagnosticsEngine &Diags,
+                                               llvm::vfs::FileSystem &VFS) {
+  if (!Invocation.getLangOpts().CPlusPlusModules) {
+    Diags.Report(diag::err_module_interface_requires_cpp_modules);
     return false;
   }
-  if (!GenerateModuleAction::BeginInvocation(CI))
+  if (!GenerateModuleAction::BeginInvocation(Invocation, Diags, VFS))
     return false;
-  CI.getInvocation().getMutLangOpts().setCompilingModule(
-      LangOptions::CMK_HeaderUnit);
+  Invocation.getMutLangOpts().setCompilingModule(LangOptions::CMK_HeaderUnit);
   return true;
 }
 
@@ -854,10 +857,12 @@ namespace {
   };
 }
 
-bool DumpModuleInfoAction::BeginInvocation(CompilerInstance &CI) {
+bool DumpModuleInfoAction::BeginInvocation(CompilerInvocation &Invocation,
+                                           DiagnosticsEngine &Diags,
+                                           llvm::vfs::FileSystem &VFS) {
   // The Object file reader also supports raw ast files and there is no point in
   // being strict about the module file format in -module-file-info mode.
-  CI.getInvocation().getMutHeaderSearchOpts().ModuleFormat = "obj";
+  Invocation.getMutHeaderSearchOpts().ModuleFormat = "obj";
   return true;
 }
 
