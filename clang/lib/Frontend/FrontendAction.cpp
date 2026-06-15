@@ -899,28 +899,14 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // If we're replaying the build of an AST file, import it and set up
   // the initial state from its build.
   if (ReplayASTFile) {
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags = CI.getDiagnosticsPtr();
-
-    // The AST unit populates its own diagnostics engine rather than ours.
-    auto ASTDiags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
-        Diags->getDiagnosticIDs(), Diags->getDiagnosticOptions());
-    ASTDiags->setClient(Diags->getClient(), /*OwnsClient*/false);
-
     // FIXME: What if the input is a memory buffer?
     StringRef InputFile = Input.getFile();
 
-    std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromASTFile(
-        InputFile, CI.getPCHContainerReader(), ASTUnit::LoadPreprocessorOnly,
-        CI.getVirtualFileSystemPtr(), nullptr, ASTDiags, CI.getFileSystemOpts(),
-        CI.getHeaderSearchOpts());
+    std::unique_ptr<ASTUnit> AST = clang::loadAndApplyASTUnitOptions(
+        CI.getInvocation(), InputFile, CI.getPCHContainerReader(),
+        CI.getVirtualFileSystemPtr(), CI.getDiagnosticsPtr());
     if (!AST)
       return false;
-
-    // Options relating to how we treat the input (but not what we do with it)
-    // are inherited from the AST unit.
-    CI.getInvocation().getMutHeaderSearchOpts() = AST->getHeaderSearchOpts();
-    CI.getInvocation().getMutPreprocessorOpts() = AST->getPreprocessorOpts();
-    CI.getInvocation().getMutLangOpts() = AST->getLangOpts();
 
     // Set the shared objects, these are reset when we finish processing the
     // file, otherwise the CompilerInstance will happily destroy them.
@@ -1604,3 +1590,28 @@ bool WrapperFrontendAction::hasCodeCompletionSupport() const {
 WrapperFrontendAction::WrapperFrontendAction(
     std::unique_ptr<FrontendAction> WrappedAction)
   : WrappedAction(std::move(WrappedAction)) {}
+
+std::unique_ptr<ASTUnit> clang::loadAndApplyASTUnitOptions(
+    CompilerInvocation &Invocation, StringRef InputFile,
+    const PCHContainerReader &PCHContainerOps,
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    IntrusiveRefCntPtr<DiagnosticsEngine> Diags) {
+  // The AST unit populates its own diagnostics engine rather than ours.
+  auto ASTDiags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
+      Diags->getDiagnosticIDs(), Diags->getDiagnosticOptions());
+  ASTDiags->setClient(Diags->getClient(), /*OwnsClient*/ false);
+
+  std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromASTFile(
+      InputFile, PCHContainerOps, ASTUnit::LoadPreprocessorOnly, VFS,
+      /*ToolInfo=*/nullptr, ASTDiags, Invocation.getFileSystemOpts(),
+      Invocation.getHeaderSearchOpts());
+  if (!AST)
+    return nullptr;
+
+  // Options relating to how we treat the input (but not what we do with it)
+  // are inherited from the AST unit.
+  Invocation.getMutHeaderSearchOpts() = AST->getHeaderSearchOpts();
+  Invocation.getMutPreprocessorOpts() = AST->getPreprocessorOpts();
+  Invocation.getMutLangOpts() = AST->getLangOpts();
+  return AST;
+}

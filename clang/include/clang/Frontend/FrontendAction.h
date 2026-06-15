@@ -38,6 +38,9 @@ class FileSystem;
 namespace clang {
 class ASTMergeAction;
 class CompilerInstance;
+class CompilerInvocation;
+class DiagnosticsEngine;
+class PCHContainerReader;
 
 /// Abstract base class for actions which can be performed by the frontend.
 class FrontendAction {
@@ -356,6 +359,21 @@ public:
   bool hasIRSupport() const override;
   bool hasCodeCompletionSupport() const override;
 };
+
+/// Load a precompiled AST and apply its serialized options to \p Invocation.
+///
+/// When replaying a build, the AST file's serialized HeaderSearchOpts,
+/// PreprocessorOpts, and LangOpts define the truth. This helper loads the
+/// AST and copies those options into \p Invocation. It is intended to run
+/// BEFORE a \c CompilerInstance is constructed from \p Invocation so the
+/// instance observes the replayed options as final.
+///
+/// Returns nullptr on failure (errors reported via \p Diags).
+std::unique_ptr<ASTUnit> loadAndApplyASTUnitOptions(
+    CompilerInvocation &Invocation, StringRef InputFile,
+    const PCHContainerReader &PCHContainerOps,
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    IntrusiveRefCntPtr<DiagnosticsEngine> Diags);
 
 }  // end namespace clang
 
