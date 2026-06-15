@@ -822,16 +822,21 @@ void PPCTargetInfo::fillValidCPUList(SmallVectorImpl<StringRef> &Values) const {
   llvm::PPC::fillValidCPUList(Values);
 }
 
-void PPCTargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
-                           const TargetInfo *Aux) {
+void PPCTargetInfo::adjustLangOptions(DiagnosticsEngine &Diags,
+                                      LangOptions &Opts) {
   if (HasAltivec)
     Opts.AltiVec = 1;
+  TargetInfo::adjustLangOptions(Diags, Opts);
+  Opts.IEEE128 = 1;
+}
+
+void PPCTargetInfo::adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
+                           const TargetInfo *Aux) {
   TargetInfo::adjust(Diags, Opts, Aux);
   if (LongDoubleFormat != &llvm::APFloat::IEEEdouble())
     LongDoubleFormat = Opts.PPCIEEELongDouble
                            ? &llvm::APFloat::IEEEquad()
                            : &llvm::APFloat::PPCDoubleDouble();
-  Opts.IEEE128 = 1;
   if (getTriple().isOSAIX() && Opts.EnableAIXQuadwordAtomicsABI &&
       HasQuadwordAtomics)
     MaxAtomicInlineWidth = 128;

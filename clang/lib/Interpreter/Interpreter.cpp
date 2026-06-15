@@ -138,8 +138,9 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
                                    "Initialization failed. "
                                    "Target is missing");
 
-  Clang->getTarget().adjust(Clang->getDiagnostics(),
-                            Clang->getInvocation().getMutLangOpts(),
+  Clang->getTarget().adjustLangOptions(Clang->getDiagnostics(),
+                                       Clang->getInvocation().getMutLangOpts());
+  Clang->getTarget().adjust(Clang->getDiagnostics(), Clang->getLangOpts(),
                             Clang->getAuxTarget());
 
   return std::move(Clang);

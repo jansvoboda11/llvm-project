@@ -1375,10 +1375,20 @@ public:
   /// Set forced language options.
   ///
   /// Apply changes to the target information with respect to certain
-  /// language options which change the target configuration and adjust
-  /// the language based on the target options where applicable.
-  virtual void adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+  /// language options which change the target configuration. This is the
+  /// TargetInfo-mutating half of the original \c adjust pair: it observes
+  /// LangOptions but does not mutate them. Callers must run
+  /// \c adjustLangOptions first if any LangOptions mutations are needed —
+  /// after that, \c adjust observes a finalized LangOptions and only
+  /// updates TargetInfo state.
+  virtual void adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
                       const TargetInfo *Aux);
+
+  /// Mutate LangOptions based on TargetInfo capabilities. Runs before
+  /// \c adjust. Splitting this out lets callers materialize the final
+  /// LangOptions before any code starts observing it through const
+  /// references, which is the pattern \c CompilerInstance relies on.
+  virtual void adjustLangOptions(DiagnosticsEngine &Diags, LangOptions &Opts);
 
   /// Initialize the map with the default set of target features for the
   /// CPU this should include all legal feature strings on the target.

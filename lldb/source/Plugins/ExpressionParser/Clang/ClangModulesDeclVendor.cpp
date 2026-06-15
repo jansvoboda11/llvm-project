@@ -775,6 +775,8 @@ ClangModulesDeclVendor::Create(Target &target) {
   if (!instance->hasTarget())
     return nullptr;
 
+  instance->getTarget().adjustLangOptions(
+      *diagnostics_engine, instance->getInvocation().getMutLangOpts());
   instance->getTarget().adjust(*diagnostics_engine, instance->getLangOpts(),
                                /*AuxTarget=*/nullptr);
 

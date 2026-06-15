@@ -213,8 +213,9 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
   TargetInfo *TI = TargetInfo::CreateTargetInfo(
       Ins->getDiagnostics(), Ins->getInvocation().getMutTargetOpts());
   Ins->setTarget(TI);
-  Ins->getTarget().adjust(Ins->getDiagnostics(),
-                          Ins->getInvocation().getMutLangOpts(),
+  Ins->getTarget().adjustLangOptions(Ins->getDiagnostics(),
+                                     Ins->getInvocation().getMutLangOpts());
+  Ins->getTarget().adjust(Ins->getDiagnostics(), Ins->getLangOpts(),
                           /*AuxTarget=*/nullptr);
   Ins->createFileManager();
   Ins->createSourceManager();

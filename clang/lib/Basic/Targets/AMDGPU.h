@@ -96,7 +96,7 @@ class LLVM_LIBRARY_VISIBILITY AMDGPUTargetInfo final : public TargetInfo {
 public:
   AMDGPUTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts);
 
-  void adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+  void adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
               const TargetInfo *Aux) override;
 
   uint64_t getPointerWidthV(LangAS AS) const override {

@@ -216,7 +216,7 @@ public:
     AddrSpaceMap = DefaultIsGeneric ? &SPIRDefIsGenMap : &SPIRDefIsPrivMap;
   }
 
-  void adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+  void adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
               const TargetInfo *Aux) override {
     TargetInfo::adjust(Diags, Opts, Aux);
     // FIXME: SYCL specification considers unannotated pointers and references
@@ -429,7 +429,7 @@ public:
   std::optional<LangAS> getConstantAddressSpace() const override {
     return ConstantAS;
   }
-  void adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+  void adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
               const TargetInfo *Aux) override {
     BaseSPIRVTargetInfo::adjust(Diags, Opts, Aux);
     // opencl_constant will map to UniformConstant in SPIR-V
@@ -491,7 +491,7 @@ public:
 
   void setAuxTarget(const TargetInfo *Aux) override;
 
-  void adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+  void adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
               const TargetInfo *Aux) override {
     TargetInfo::adjust(Diags, Opts, Aux);
 

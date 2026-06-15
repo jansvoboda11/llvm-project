@@ -415,10 +415,41 @@ bool TargetInfo::isTypeSigned(IntType T) {
 }
 
 /// adjust - Set forced language options.
+/// Apply changes to LangOptions based on this target's capabilities.
+/// Runs before \c adjust so the LangOptions are finalized before any code
+/// starts observing them through const references.
+void TargetInfo::adjustLangOptions(DiagnosticsEngine &Diags,
+                                   LangOptions &Opts) {
+  if (Opts.OpenCL) {
+    // OpenCL C v3.0 s6.7.5 - The generic address space requires support for
+    // OpenCL C 2.0 or OpenCL C 3.0 with the __opencl_c_generic_address_space
+    // feature
+    // OpenCL C v3.0 s6.2.1 - OpenCL pipes require support of OpenCL C 2.0
+    // or later and __opencl_c_pipes feature
+    // FIXME: These language options are also defined in setLangDefaults()
+    // for OpenCL C 2.0 but with no access to target capabilities. Target
+    // should be immutable once created and thus these language options need
+    // to be defined only once.
+    if (Opts.getOpenCLCompatibleVersion() == 300) {
+      const auto &OpenCLFeaturesMap = getSupportedOpenCLOpts();
+      Opts.OpenCLGenericAddressSpace = hasFeatureEnabled(
+          OpenCLFeaturesMap, "__opencl_c_generic_address_space");
+      Opts.OpenCLPipes =
+          hasFeatureEnabled(OpenCLFeaturesMap, "__opencl_c_pipes");
+      Opts.Blocks =
+          hasFeatureEnabled(OpenCLFeaturesMap, "__opencl_c_device_enqueue");
+    }
+  }
+
+  if (Opts.ProtectParens && !checkArithmeticFenceSupported()) {
+    Diags.Report(diag::err_opt_not_valid_on_target) << "-fprotect-parens";
+    Opts.ProtectParens = false;
+  }
+}
+
 /// Apply changes to the target information with respect to certain
-/// language options which change the target configuration and adjust
-/// the language based on the target options where applicable.
-void TargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+/// language options which change the target configuration.
+void TargetInfo::adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
                         const TargetInfo *Aux) {
   if (Opts.NoBitFieldTypeAlign)
     UseBitFieldTypeAlignment = false;
@@ -481,25 +512,6 @@ void TargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
     HalfFormat = &llvm::APFloat::IEEEhalf();
     FloatFormat = &llvm::APFloat::IEEEsingle();
     LongDoubleFormat = &llvm::APFloat::IEEEquad();
-
-    // OpenCL C v3.0 s6.7.5 - The generic address space requires support for
-    // OpenCL C 2.0 or OpenCL C 3.0 with the __opencl_c_generic_address_space
-    // feature
-    // OpenCL C v3.0 s6.2.1 - OpenCL pipes require support of OpenCL C 2.0
-    // or later and __opencl_c_pipes feature
-    // FIXME: These language options are also defined in setLangDefaults()
-    // for OpenCL C 2.0 but with no access to target capabilities. Target
-    // should be immutable once created and thus these language options need
-    // to be defined only once.
-    if (Opts.getOpenCLCompatibleVersion() == 300) {
-      const auto &OpenCLFeaturesMap = getSupportedOpenCLOpts();
-      Opts.OpenCLGenericAddressSpace = hasFeatureEnabled(
-          OpenCLFeaturesMap, "__opencl_c_generic_address_space");
-      Opts.OpenCLPipes =
-          hasFeatureEnabled(OpenCLFeaturesMap, "__opencl_c_pipes");
-      Opts.Blocks =
-          hasFeatureEnabled(OpenCLFeaturesMap, "__opencl_c_device_enqueue");
-    }
   }
 
   if (Opts.DoubleSize) {
@@ -548,11 +560,6 @@ void TargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
   // its corresponding signed type.
   PaddingOnUnsignedFixedPoint |= Opts.PaddingOnUnsignedFixedPoint;
   CheckFixedPointBits();
-
-  if (Opts.ProtectParens && !checkArithmeticFenceSupported()) {
-    Diags.Report(diag::err_opt_not_valid_on_target) << "-fprotect-parens";
-    Opts.ProtectParens = false;
-  }
 
   if (Opts.MaxBitIntWidth)
     MaxBitIntWidth = static_cast<unsigned>(Opts.MaxBitIntWidth);

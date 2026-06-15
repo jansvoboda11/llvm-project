@@ -162,8 +162,8 @@ bool CompilerInstance::createTarget() {
   // Inform the target of the language options.
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  getTarget().adjust(getDiagnostics(), Invocation->getMutLangOpts(),
-                     getAuxTarget());
+  getTarget().adjustLangOptions(getDiagnostics(), Invocation->getMutLangOpts());
+  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
 
   if (auto *Aux = getAuxTarget())
     getTarget().setAuxTarget(Aux);
@@ -475,8 +475,8 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
                                       getSourceManager(), *HeaderInfo, *this,
                                       /*IdentifierInfoLookup=*/nullptr,
                                       /*OwnsHeaderSearch=*/true, TUKind);
-  getTarget().adjust(getDiagnostics(), Invocation->getMutLangOpts(),
-                     getAuxTarget());
+  getTarget().adjustLangOptions(getDiagnostics(), Invocation->getMutLangOpts());
+  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
   PP->Initialize(getTarget(), getAuxTarget());
 
   if (PPOpts.DetailedRecord)

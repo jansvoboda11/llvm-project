@@ -231,7 +231,7 @@ AMDGPUTargetInfo::AMDGPUTargetInfo(const llvm::Triple &Triple,
   HalfArgsAndReturns = true;
 }
 
-void AMDGPUTargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
+void AMDGPUTargetInfo::adjust(DiagnosticsEngine &Diags, const LangOptions &Opts,
                               const TargetInfo *Aux) {
   TargetInfo::adjust(Diags, Opts, Aux);
   AtomicOpts = AtomicOptions(Opts);

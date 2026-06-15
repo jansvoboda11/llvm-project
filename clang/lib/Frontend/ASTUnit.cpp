@@ -792,9 +792,9 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
   AST->Target =
       TargetInfo::CreateTargetInfo(AST->PP->getDiagnostics(), *AST->TargetOpts);
   // Inform the target of the language options.
-  //
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
+  AST->Target->adjustLangOptions(AST->PP->getDiagnostics(), *AST->LangOpts);
   AST->Target->adjust(AST->PP->getDiagnostics(), *AST->LangOpts,
                       /*AuxTarget=*/nullptr);
 
