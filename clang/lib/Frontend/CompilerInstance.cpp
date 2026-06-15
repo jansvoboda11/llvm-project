@@ -307,7 +307,7 @@ void CompilerInstance::createVirtualFileSystem(
 }
 
 // Diagnostics
-static void SetUpDiagnosticLog(DiagnosticOptions &DiagOpts,
+static void SetUpDiagnosticLog(const DiagnosticOptions &DiagOpts,
                                const CodeGenOptions *CodeGenOpts,
                                DiagnosticsEngine &Diags) {
   std::error_code EC;
@@ -342,7 +342,7 @@ static void SetUpDiagnosticLog(DiagnosticOptions &DiagOpts,
   }
 }
 
-static void SetupSerializedDiagnostics(DiagnosticOptions &DiagOpts,
+static void SetupSerializedDiagnostics(const DiagnosticOptions &DiagOpts,
                                        DiagnosticsEngine &Diags,
                                        StringRef OutputFile) {
   auto SerializedConsumer =
@@ -360,12 +360,12 @@ static void SetupSerializedDiagnostics(DiagnosticOptions &DiagOpts,
 void CompilerInstance::createDiagnostics(DiagnosticConsumer *Client,
                                          bool ShouldOwnClient) {
   Diagnostics = createDiagnostics(
-      getVirtualFileSystem(), Invocation->getMutDiagnosticOpts(), Client,
+      getVirtualFileSystem(), Invocation->getDiagnosticOpts(), Client,
       ShouldOwnClient, &getCodeGenOpts());
 }
 
 IntrusiveRefCntPtr<DiagnosticsEngine> CompilerInstance::createDiagnostics(
-    llvm::vfs::FileSystem &VFS, DiagnosticOptions &Opts,
+    llvm::vfs::FileSystem &VFS, const DiagnosticOptions &Opts,
     DiagnosticConsumer *Client, bool ShouldOwnClient,
     const CodeGenOptions *CodeGenOpts) {
   auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(

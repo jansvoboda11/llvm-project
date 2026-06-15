@@ -123,10 +123,9 @@ clang::createChainedIncludesSource(CompilerInstance &CI,
     CInvok->getMutFrontendOpts().Inputs.push_back(InputFile);
 
     TextDiagnosticPrinter *DiagClient = new TextDiagnosticPrinter(
-        llvm::errs(), CI.getInvocation().getMutDiagnosticOpts());
+        llvm::errs(), CI.getDiagnosticOpts());
     auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
-        DiagnosticIDs::create(), CI.getInvocation().getMutDiagnosticOpts(),
-        DiagClient);
+        DiagnosticIDs::create(), CI.getDiagnosticOpts(), DiagClient);
 
     auto Clang = std::make_unique<CompilerInstance>(
         std::move(CInvok), CI.getPCHContainerOperations());

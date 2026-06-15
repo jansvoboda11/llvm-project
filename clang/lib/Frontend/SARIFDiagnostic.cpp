@@ -31,7 +31,7 @@
 namespace clang {
 
 SARIFDiagnostic::SARIFDiagnostic(raw_ostream &OS, const LangOptions &LangOpts,
-                                 DiagnosticOptions &DiagOpts,
+                                 const DiagnosticOptions &DiagOpts,
                                  SarifDocumentWriter *Writer)
     : DiagnosticRenderer(LangOpts, DiagOpts), Writer(Writer) {}
 

@@ -16,7 +16,7 @@ using namespace clang;
 using namespace markup;
 
 LogDiagnosticPrinter::LogDiagnosticPrinter(
-    raw_ostream &os, DiagnosticOptions &,
+    raw_ostream &os, const DiagnosticOptions &,
     std::unique_ptr<raw_ostream> StreamOwner)
     : OS(os), StreamOwner(std::move(StreamOwner)), LangOpts(nullptr) {}
 

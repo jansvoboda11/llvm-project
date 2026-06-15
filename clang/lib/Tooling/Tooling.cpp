@@ -665,7 +665,7 @@ public:
     std::unique_ptr<ASTUnit> AST = ASTUnit::LoadFromCompilerInvocation(
         Invocation, std::move(PCHContainerOps), nullptr,
         CompilerInstance::createDiagnostics(Files->getVirtualFileSystem(),
-                                            Invocation->getMutDiagnosticOpts(),
+                                            Invocation->getDiagnosticOpts(),
                                             DiagConsumer,
                                             /*ShouldOwnClient=*/false),
         Files, false, CaptureKind);

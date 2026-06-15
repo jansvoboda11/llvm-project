@@ -61,7 +61,7 @@ class LogDiagnosticPrinter : public DiagnosticConsumer {
   std::string DwarfDebugFlags;
 
 public:
-  LogDiagnosticPrinter(raw_ostream &OS, DiagnosticOptions &DiagOpts,
+  LogDiagnosticPrinter(raw_ostream &OS, const DiagnosticOptions &DiagOpts,
                        std::unique_ptr<raw_ostream> StreamOwner);
 
   void setDwarfDebugFlags(StringRef Value) {

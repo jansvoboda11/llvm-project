@@ -54,7 +54,7 @@ class SDiagsRenderer : public DiagnosticNoteRenderer {
   SDiagsWriter &Writer;
 public:
   SDiagsRenderer(SDiagsWriter &Writer, const LangOptions &LangOpts,
-                 DiagnosticOptions &DiagOpts)
+                 const DiagnosticOptions &DiagOpts)
       : DiagnosticNoteRenderer(LangOpts, DiagOpts), Writer(Writer) {}
 
   ~SDiagsRenderer() override {}
@@ -137,7 +137,8 @@ class SDiagsWriter : public DiagnosticConsumer {
         State(std::move(State)) {}
 
 public:
-  SDiagsWriter(StringRef File, DiagnosticOptions &Diags, bool MergeChildRecords)
+  SDiagsWriter(StringRef File, const DiagnosticOptions &Diags,
+               bool MergeChildRecords)
       : LangOpts(nullptr), OriginalInstance(true),
         MergeChildRecords(MergeChildRecords),
         State(std::make_shared<SharedState>(File, Diags)) {
@@ -237,7 +238,7 @@ private:
   /// State that is shared among the various clones of this diagnostic
   /// consumer.
   struct SharedState {
-    SharedState(StringRef File, DiagnosticOptions &DiagOpts)
+    SharedState(StringRef File, const DiagnosticOptions &DiagOpts)
         : DiagOpts(DiagOpts), Stream(Buffer), OutputFile(File.str()),
           EmittedAnyDiagBlocks(false) {}
 
@@ -291,7 +292,7 @@ private:
 namespace clang {
 namespace serialized_diags {
 std::unique_ptr<DiagnosticConsumer> create(StringRef OutputFile,
-                                           DiagnosticOptions &DiagOpts,
+                                           const DiagnosticOptions &DiagOpts,
                                            bool MergeChildRecords) {
   return std::make_unique<SDiagsWriter>(OutputFile, DiagOpts,
                                         MergeChildRecords);

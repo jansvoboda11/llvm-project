@@ -23,7 +23,7 @@
 namespace clang {
 
 SARIFDiagnosticPrinter::SARIFDiagnosticPrinter(raw_ostream &OS,
-                                               DiagnosticOptions &DiagOpts)
+                                               const DiagnosticOptions &DiagOpts)
     : OS(OS), DiagOpts(DiagOpts) {}
 
 void SARIFDiagnosticPrinter::BeginSourceFile(const LangOptions &LO,

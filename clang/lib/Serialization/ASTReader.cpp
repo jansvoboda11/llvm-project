@@ -732,7 +732,7 @@ bool PCHValidator::ReadDiagnosticOptions(DiagnosticOptions &DiagOpts,
 
   Module *Importer = PP.getCurrentModule();
 
-  DiagnosticOptions &ExistingOpts = ExistingDiags.getDiagnosticOptions();
+  const DiagnosticOptions &ExistingOpts = ExistingDiags.getDiagnosticOptions();
   bool SystemHeaderWarningsInModule =
       Importer && llvm::is_contained(ExistingOpts.SystemHeaderWarningsModules,
                                      Importer->Name);

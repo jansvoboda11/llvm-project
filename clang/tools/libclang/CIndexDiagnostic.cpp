@@ -84,7 +84,8 @@ public:
     
 class CXDiagnosticRenderer : public DiagnosticNoteRenderer {
 public:
-  CXDiagnosticRenderer(const LangOptions &LangOpts, DiagnosticOptions &DiagOpts,
+  CXDiagnosticRenderer(const LangOptions &LangOpts,
+                       const DiagnosticOptions &DiagOpts,
                        CXDiagnosticSetImpl *mainSet)
       : DiagnosticNoteRenderer(LangOpts, DiagOpts), CurrentSet(mainSet),
         MainSet(mainSet) {}

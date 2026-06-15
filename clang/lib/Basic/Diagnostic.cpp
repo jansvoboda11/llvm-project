@@ -75,7 +75,7 @@ DummyArgToStringFn(DiagnosticsEngine::ArgumentKind AK, intptr_t QT,
 }
 
 DiagnosticsEngine::DiagnosticsEngine(IntrusiveRefCntPtr<DiagnosticIDs> diags,
-                                     DiagnosticOptions &DiagOpts,
+                                     const DiagnosticOptions &DiagOpts,
                                      DiagnosticConsumer *client,
                                      bool ShouldOwnClient)
     : Diags(std::move(diags)), DiagOpts(DiagOpts) {

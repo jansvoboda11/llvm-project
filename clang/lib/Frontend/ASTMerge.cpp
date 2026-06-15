@@ -42,7 +42,7 @@ void ASTMergeAction::ExecuteAction() {
       *CI.getASTContext().getTranslationUnitDecl());
   for (unsigned I = 0, N = ASTFiles.size(); I != N; ++I) {
     auto Diags = llvm::makeIntrusiveRefCnt<DiagnosticsEngine>(
-        DiagIDs, CI.getInvocation().getMutDiagnosticOpts(),
+        DiagIDs, CI.getDiagnosticOpts(),
         new ForwardingDiagnosticConsumer(*CI.getDiagnostics().getClient()),
         /*ShouldOwnClient=*/true);
     std::unique_ptr<ASTUnit> Unit = ASTUnit::LoadFromASTFile(

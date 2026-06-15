@@ -29,7 +29,7 @@
 using namespace clang;
 
 DiagnosticRenderer::DiagnosticRenderer(const LangOptions &LangOpts,
-                                       DiagnosticOptions &DiagOpts)
+                                       const DiagnosticOptions &DiagOpts)
     : LangOpts(LangOpts), DiagOpts(DiagOpts), LastLevel() {}
 
 DiagnosticRenderer::~DiagnosticRenderer() = default;

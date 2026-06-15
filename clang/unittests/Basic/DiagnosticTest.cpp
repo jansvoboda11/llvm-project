@@ -254,18 +254,18 @@ private:
 };
 
 TEST_F(SuppressionMappingTest, MissingMappingFile) {
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), ElementsAre(AllOf(
                            WithMessage("no such file or directory: 'foo.txt'"),
                            IsError())));
 }
 
 TEST_F(SuppressionMappingTest, MalformedFile) {
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer("asdf", "foo.txt"));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(),
               ElementsAre(AllOf(
                   WithMessage("failed to process suppression mapping file "
@@ -274,10 +274,10 @@ TEST_F(SuppressionMappingTest, MalformedFile) {
 }
 
 TEST_F(SuppressionMappingTest, UnknownDiagName) {
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer("[non-existing-warning]"));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), ElementsAre(WithMessage(
                            "unknown warning option 'non-existing-warning'")));
 }
@@ -286,10 +286,10 @@ TEST_F(SuppressionMappingTest, SuppressesGroup) {
   llvm::StringLiteral SuppressionMappingFile = R"(
   [unused]
   src:*)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 
   SourceLocation FooLoc = locForFile("foo.cpp");
@@ -302,10 +302,10 @@ TEST_F(SuppressionMappingTest, EmitCategoryIsExcluded) {
   [unused]
   src:*
   src:*foo.cpp=emit)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 
   EXPECT_TRUE(Diags.isSuppressedViaMapping(diag::warn_unused_function,
@@ -320,10 +320,10 @@ TEST_F(SuppressionMappingTest, LastMatchWins) {
   src:*clang/*
   src:*clang/lib/Sema/*=emit
   src:*clang/lib/Sema/foo*)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 
   EXPECT_TRUE(Diags.isSuppressedViaMapping(
@@ -339,10 +339,10 @@ TEST_F(SuppressionMappingTest, LongShortMatch) {
   [unused]
   src:*test/*
   src:*lld/*=emit)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 
   EXPECT_TRUE(Diags.isSuppressedViaMapping(diag::warn_unused_function,
@@ -356,10 +356,10 @@ TEST_F(SuppressionMappingTest, ShortLongMatch) {
   [unused]
   src:*lld/*=emit
   src:*test/*)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 
   EXPECT_TRUE(Diags.isSuppressedViaMapping(diag::warn_unused_function,
@@ -372,11 +372,11 @@ TEST_F(SuppressionMappingTest, IsIgnored) {
   llvm::StringLiteral SuppressionMappingFile = R"(
   [unused]
   src:*clang/*)";
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
-  Diags.getDiagnosticOptions().Warnings = {"unused"};
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.Warnings = {"unused"};
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer(SuppressionMappingFile));
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   ASSERT_THAT(diags(), IsEmpty());
 
   SourceManager &SM = Diags.getSourceManager();
@@ -407,11 +407,11 @@ TEST_F(SuppressionMappingTest, IsIgnored) {
 }
 
 TEST_F(SuppressionMappingTest, ParsingRespectsOtherWarningOpts) {
-  Diags.getDiagnosticOptions().DiagnosticSuppressionMappingsFile = "foo.txt";
+  DiagOpts.DiagnosticSuppressionMappingsFile = "foo.txt";
   FS->addFile("foo.txt", /*ModificationTime=*/{},
               llvm::MemoryBuffer::getMemBuffer("[non-existing-warning]"));
-  Diags.getDiagnosticOptions().Warnings.push_back("no-unknown-warning-option");
-  clang::ProcessWarningOptions(Diags, Diags.getDiagnosticOptions(), *FS);
+  DiagOpts.Warnings.push_back("no-unknown-warning-option");
+  clang::ProcessWarningOptions(Diags, DiagOpts, *FS);
   EXPECT_THAT(diags(), IsEmpty());
 }
 } // namespace
