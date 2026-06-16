@@ -1049,7 +1049,12 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     }
   }
 
-  if (!BeginInvocation(*CI.Invocation, Input, CI))
+  // The held invocation is stored as shared_ptr<const>; this is the
+  // documented mutation window — BeginInvocation runs before any const
+  // observer (Preprocessor / ASTContext) reads it.
+  CompilerInvocation &MutInv =
+      const_cast<CompilerInvocation &>(*CI.Invocation);
+  if (!BeginInvocation(MutInv, Input, CI))
     return false;
   // BeginInvocation may have rewritten CurrentInput (e.g. C++20 header-unit
   // resolution rewrites HeaderUnit_Name → HeaderUnit_Abs). Update the action's
@@ -1067,9 +1072,13 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     // FIXME: What if the input is a memory buffer?
     StringRef InputFile = Input.getFile();
 
+    // The AST-replay path overwrites HeaderSearchOpts/PreprocessorOpts/
+    // LangOpts on the invocation with whatever the AST recorded; this is
+    // the second documented mutation window on the held invocation.
     std::unique_ptr<ASTUnit> AST = clang::loadAndApplyASTUnitOptions(
-        *CI.Invocation, InputFile, CI.getPCHContainerReader(),
-        CI.getVirtualFileSystemPtr(), CI.getDiagnosticsPtr());
+        const_cast<CompilerInvocation &>(*CI.Invocation), InputFile,
+        CI.getPCHContainerReader(), CI.getVirtualFileSystemPtr(),
+        CI.getDiagnosticsPtr());
     if (!AST)
       return false;
 
@@ -1092,8 +1101,9 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
           ModuleFiles.emplace_back(MF.FileName);
 
       ASTReader->visitTopLevelModuleMaps(PrimaryModule, [&](FileEntryRef FE) {
-        CI.Invocation->getMutFrontendOpts().ModuleMapFiles.push_back(
-            std::string(FE.getName()));
+        const_cast<CompilerInvocation &>(*CI.Invocation)
+            .getMutFrontendOpts()
+            .ModuleMapFiles.push_back(std::string(FE.getName()));
       });
     }
 

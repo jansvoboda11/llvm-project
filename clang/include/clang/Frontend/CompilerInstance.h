@@ -93,15 +93,12 @@ class CompilerInstance : public ModuleLoader {
   /// (\c getInvocation, \c getInvocationPtr) treats this as const: callers
   /// must finalize the \c CompilerInvocation before handing it to the
   /// constructor, and components such as Preprocessor / ASTContext observe
-  /// it through const references.
-  ///
-  /// FIXME: A handful of sites still reach into the held invocation post-
-  /// construction via friend access on \c FrontendAction (the
-  /// \c BeginInvocation hook is the documented per-input mutation point;
-  /// the AST-replay path inside \c BeginSourceFile populates the invocation
-  /// from an \c ASTUnit). Once those mutations are split off the held
-  /// member, this will become \c shared_ptr<const CompilerInvocation>.
-  std::shared_ptr<CompilerInvocation> Invocation;
+  /// it through const references. \c FrontendAction::BeginSourceFile is
+  /// the one documented exception: via friend access it casts the const
+  /// away to feed the \c BeginInvocation hook a mutable view, and the
+  /// AST-replay branch populates the invocation from a loaded \c ASTUnit.
+  /// Both run before any const observer reads the invocation.
+  std::shared_ptr<const CompilerInvocation> Invocation;
 
   /// The virtual file system instance.
   IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
