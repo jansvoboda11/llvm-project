@@ -455,6 +455,10 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   PreprocessorOpts.GeneratePreamble = true;
 
   // Create the compiler instance to use for building the precompiled preamble.
+  // Hold an alias to the invocation so we can run target setup against it
+  // just below; the shared_ptr move keeps the underlying object alive at the
+  // same address.
+  CompilerInvocation &MutInv = *PreambleInvocation;
   auto Clang = std::make_unique<CompilerInstance>(std::move(PreambleInvocation),
                                                   std::move(PCHContainerOps));
 
@@ -465,8 +469,12 @@ llvm::ErrorOr<PrecompiledPreamble> PrecompiledPreamble::Build(
   Clang->setDiagnostics(Diagnostics);
 
   // Create the target instance.
-  if (!Clang->createTarget())
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Clang->getDiagnostics(), MutInv, TR))
     return BuildPreambleError::CouldntCreateTargetInfo;
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   if (Clang->getFrontendOpts().Inputs.size() != 1 ||
       Clang->getFrontendOpts().Inputs[0].getKind().getFormat() !=

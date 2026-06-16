@@ -242,6 +242,10 @@ static CompilerWithInvocation makeCompiler(TextDiagnosticBuffer &DiagBuf) {
   auto Compiler = std::make_unique<CompilerInstance>(Invocation);
   Compiler->setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler->createDiagnostics(&DiagBuf, /*ShouldOwnClient=*/false);
+  CompilerInstance::TargetCreationResult TR;
+  if (CompilerInstance::createTarget(Compiler->getDiagnostics(), *Invocation,
+                                     TR))
+    Compiler->installTarget(std::move(TR));
   return {std::move(Invocation), std::move(Compiler)};
 }
 

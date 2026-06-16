@@ -112,11 +112,16 @@ export using ::E;
   EXPECT_TRUE(BuiltPreamble->CanReuse(*Invocation, *Buffer, Bounds, *VFS));
   BuiltPreamble->OverridePreamble(*Invocation, VFS, Buffer.get());
 
-  auto Clang = std::make_unique<CompilerInstance>(std::move(Invocation));
+  auto Clang = std::make_unique<CompilerInstance>(Invocation);
   Clang->setDiagnostics(Diags);
   Clang->createVirtualFileSystem(VFS);
   Clang->createFileManager();
-  EXPECT_TRUE(Clang->createTarget());
+  CompilerInstance::TargetCreationResult TR;
+  EXPECT_TRUE(CompilerInstance::createTarget(Clang->getDiagnostics(),
+                                             *Invocation, TR));
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   Buffer.release();
 

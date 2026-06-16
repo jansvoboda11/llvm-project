@@ -463,10 +463,16 @@ bool CompilerInstanceWithContext::initialize(
   // Create the CompilerInstance.
   std::shared_ptr<ModuleCache> ModCache =
       makeInProcessModuleCache(Worker.Service.getModuleCacheEntries());
-  CIPtr = std::make_unique<CompilerInstance>(
+  std::shared_ptr<CompilerInvocation> ScanInvocation =
       createScanCompilerInvocation(*OriginalInvocation, Worker.Service,
-                                   Controller),
-      Worker.PCHContainerOps, std::move(ModCache));
+                                   Controller);
+  // Hold an alias to the scan invocation so we can run target setup
+  // against it just below; the shared_ptr move keeps the underlying
+  // object alive at the same address.
+  CompilerInvocation &MutScanInv = *ScanInvocation;
+  CIPtr = std::make_unique<CompilerInstance>(std::move(ScanInvocation),
+                                             Worker.PCHContainerOps,
+                                             std::move(ModCache));
   auto &CI = *CIPtr;
 
   initializeScanCompilerInstance(
@@ -485,9 +491,12 @@ bool CompilerInstanceWithContext::initialize(
   // We do not create the target in initializeScanCompilerInstance because
   // setting it here is unique for by-name lookups. We create the target only
   // once here, and the information is reused for all computeDependencies calls.
-  // We do not need to call createTarget explicitly if we go through
-  // CompilerInstance::ExecuteAction to perform scanning.
-  CI.createTarget();
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(CI.getDiagnostics(), MutScanInv, TR))
+    return false;
+  CI.setTarget(TR.Target.get());
+  CI.setAuxTarget(TR.AuxTarget.get());
+  CI.setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   return true;
 }

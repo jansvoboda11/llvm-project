@@ -254,6 +254,10 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
     Invocation->getMutHeaderSearchOpts().ResourceDir =
         GetResourcesPath(Argv0, MainAddr);
 
+  // Hold an alias to the invocation so we can run target setup against it
+  // post-construction; the shared_ptr move keeps the underlying object alive
+  // at the same address.
+  CompilerInvocation &MutInv = *Invocation;
   auto Clang = std::make_unique<CompilerInstance>(std::move(Invocation),
                                                   std::move(PCHOps));
 
@@ -292,6 +296,13 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
   DiagsBuffer->FlushDiagnostics(Clang->getDiagnostics());
   if (!Success)
     return 1;
+
+  // Configure the TargetInfo. This is the last mutation to the invocation;
+  // ExecuteCompilerInvocation below treats it as frozen.
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Clang->getDiagnostics(), MutInv, TR))
+    return 1;
+  Clang->installTarget(std::move(TR));
 
   // Execute the frontend actions.
   Success = ExecuteCompilerInvocation(Clang.get());

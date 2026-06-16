@@ -93,10 +93,12 @@ class CompilerInstance : public ModuleLoader {
   /// constructor, and components such as Preprocessor / ASTContext observe
   /// it through const references.
   ///
-  /// FIXME: A handful of internal call sites under \c CompilerInstance still
-  /// mutate the held invocation post-construction (createTarget,
-  /// createPreprocessor, createASTContext, plugin replacement). Those are
-  /// being moved pre-construction; once they are gone this member will
+  /// FIXME: A few sites still mutate the held invocation post-construction:
+  /// \c LoadRequestedPlugins flips ProgramAction/ActionName when a plugin
+  /// requests \c ReplaceAction, and \c FrontendAction::BeginSourceFile
+  /// canonicalizes some per-input fields (CompilingModule, ImplicitPCHInclude
+  /// path, header-unit ModuleName). Those are being moved pre-construction or
+  /// into the BeginInvocation hook; once they are gone this member will
   /// become \c shared_ptr<const CompilerInvocation>.
   std::shared_ptr<CompilerInvocation> Invocation;
 
@@ -419,8 +421,49 @@ public:
   /// Replace the current AuxTarget.
   void setAuxTarget(TargetInfo *Value);
 
-  // Create Target and AuxTarget based on current options
-  bool createTarget();
+  /// Hand the AuxTargetOptions storage to the instance to keep alive
+  /// alongside the AuxTarget that points into it.
+  void setAuxTargetOpts(std::unique_ptr<TargetOptions> Opts) {
+    AuxTargetOpts = std::move(Opts);
+  }
+
+  /// Result of \c createTarget — the resolved primary and (optional)
+  /// auxiliary \c TargetInfo plus the \c TargetOptions storage that the
+  /// auxiliary target points into. Caller installs these on the
+  /// \c CompilerInstance via \c setTarget / \c setAuxTarget /
+  /// \c setAuxTargetOpts.
+  struct TargetCreationResult {
+    IntrusiveRefCntPtr<TargetInfo> Target;
+    IntrusiveRefCntPtr<TargetInfo> AuxTarget;
+    std::unique_ptr<TargetOptions> AuxTargetOpts;
+  };
+
+  /// Install a \c TargetCreationResult on this instance: takes the primary
+  /// target, the aux target (if any), and ownership of the aux target's
+  /// options storage.
+  void installTarget(TargetCreationResult Result) {
+    setTarget(Result.Target.get());
+    setAuxTarget(Result.AuxTarget.get());
+    setAuxTargetOpts(std::move(Result.AuxTargetOpts));
+  }
+
+  /// Build the primary \c TargetInfo for \p Inv, optionally building an
+  /// auxiliary \c TargetInfo when LangOpts/FrontendOpts request one, and
+  /// apply target-driven mutations to the invocation's \c TargetOptions
+  /// and \c LangOptions in place. Returns \c false on failure (errors
+  /// reported via \p Diags).
+  ///
+  /// Must be called while \p Inv is still effectively mutable — i.e.
+  /// before its options are observed through \c const references such as
+  /// those captured by \c Preprocessor / \c ASTContext / \c TargetInfo.
+  /// In practice this means callers either run target setup before the
+  /// invocation is handed to a \c CompilerInstance, or capture an alias
+  /// to the invocation just before \c std::move-ing it into the
+  /// constructor and run target setup with that alias before the first
+  /// observer (e.g. \c createPreprocessor) reads the invocation.
+  static bool createTarget(DiagnosticsEngine &Diags, CompilerInvocation &Inv,
+                           TargetCreationResult &Out,
+                           TargetInfo *PreExistingAux = nullptr);
 
   /// @}
   /// @name Virtual File System

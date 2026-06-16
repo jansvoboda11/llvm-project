@@ -444,12 +444,20 @@ bool FrontendActionFactory::runInvocation(
     std::shared_ptr<CompilerInvocation> Invocation, FileManager *Files,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     DiagnosticConsumer *DiagConsumer) {
-  // Create a compiler instance to handle the actual work.
+  // Create a compiler instance to handle the actual work. Hold an alias to
+  // the invocation so we can run target setup against it post-construction;
+  // the shared_ptr move keeps the underlying object alive at the same address.
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation), std::move(PCHContainerOps));
   Compiler.setVirtualFileSystem(Files->getVirtualFileSystemPtr());
   Compiler.setFileManager(Files);
   Compiler.createDiagnostics(DiagConsumer, /*ShouldOwnClient=*/false);
   Compiler.createSourceManager();
+
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR))
+    return false;
+  Compiler.installTarget(std::move(TR));
 
   // The FrontendAction can have lifetime requirements for Compiler or its
   // members, and we need to ensure it's deleted earlier than Compiler. So we

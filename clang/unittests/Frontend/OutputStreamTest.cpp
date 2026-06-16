@@ -31,6 +31,7 @@ TEST(FrontendOutputTests, TestOutputStream) {
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
 
   SmallVector<char, 256> IRBuffer;
@@ -40,6 +41,11 @@ TEST(FrontendOutputTests, TestOutputStream) {
   Compiler.setOutputStream(std::move(IRStream));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   bool Success = ExecuteCompilerInvocation(&Compiler);
   EXPECT_TRUE(Success);
@@ -56,6 +62,7 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamShared) {
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
 
   std::string VerboseBuffer;
@@ -67,6 +74,11 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamShared) {
   Compiler.createDiagnostics(new TextDiagnosticPrinter(llvm::nulls(), DiagOpts),
                              true);
   Compiler.setVerboseOutputStream(VerboseStream);
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   bool Success = ExecuteCompilerInvocation(&Compiler);
   EXPECT_FALSE(Success);
@@ -86,6 +98,7 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamOwned) {
         FrontendInputFile("test.cc", Language::CXX));
     Invocation->getMutFrontendOpts().ProgramAction = EmitBC;
     Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+    CompilerInvocation &MutInv = *Invocation;
     CompilerInstance Compiler(std::move(Invocation));
 
     std::unique_ptr<raw_ostream> VerboseStream =
@@ -97,6 +110,11 @@ TEST(FrontendOutputTests, TestVerboseOutputStreamOwned) {
     Compiler.createDiagnostics(
         new TextDiagnosticPrinter(llvm::nulls(), DiagOpts), true);
     Compiler.setVerboseOutputStream(std::move(VerboseStream));
+
+    CompilerInstance::TargetCreationResult TR;
+    ASSERT_TRUE(
+        CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+    Compiler.installTarget(std::move(TR));
 
     Success = ExecuteCompilerInvocation(&Compiler);
   }

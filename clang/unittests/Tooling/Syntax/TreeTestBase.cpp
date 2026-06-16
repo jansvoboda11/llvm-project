@@ -158,6 +158,11 @@ SyntaxTreeTest::buildTree(StringRef Code, const TestClangConfig &ClangConfig) {
   Compiler.setFileManager(FileMgr);
   Compiler.setSourceManager(SourceMgr);
 
+  CompilerInstance::TargetCreationResult TR;
+  if (CompilerInstance::createTarget(Compiler.getDiagnostics(), *Invocation,
+                                     TR))
+    Compiler.installTarget(std::move(TR));
+
   syntax::TranslationUnit *Root = nullptr;
   BuildSyntaxTreeAction Recorder(Root, this->TM, this->TB, this->Arena);
 

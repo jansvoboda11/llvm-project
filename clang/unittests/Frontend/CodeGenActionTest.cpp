@@ -51,9 +51,15 @@ TEST(CodeGenTest, TestNullCodeGen) {
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getMutFrontendOpts().ProgramAction = EmitLLVM;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   std::unique_ptr<FrontendAction> Act(new NullCodeGenAction);
   bool Success = Compiler.ExecuteAction(*Act);
@@ -68,9 +74,15 @@ TEST(CodeGenTest, CodeGenFromIRMemBuffer) {
       FrontendInputFile(*MemBuffer, Language::LLVM_IR));
   Invocation->getMutFrontendOpts().ProgramAction = frontend::EmitLLVMOnly;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   EmitLLVMOnlyAction Action;
   bool Success = Compiler.ExecuteAction(Action);

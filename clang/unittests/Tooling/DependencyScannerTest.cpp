@@ -62,6 +62,7 @@ public:
                      DiagnosticConsumer *DiagConsumer) override {
     DependencyOutputOptions &MutDepOutputOpts =
         Invocation->getMutDependencyOutputOpts();
+    CompilerInvocation &MutInv = *Invocation;
     CompilerInstance Compiler(std::move(Invocation),
                               std::move(PCHContainerOps));
     Compiler.setVirtualFileSystem(FileMgr->getVirtualFileSystemPtr());
@@ -70,6 +71,11 @@ public:
     Compiler.createSourceManager();
     Compiler.addDependencyCollector(
         std::make_shared<TestFileCollector>(MutDepOutputOpts, Deps));
+
+    CompilerInstance::TargetCreationResult TR;
+    if (!CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR))
+      return false;
+    Compiler.installTarget(std::move(TR));
 
     auto Action = std::make_unique<PreprocessOnlyAction>();
     return Compiler.ExecuteAction(*Action);

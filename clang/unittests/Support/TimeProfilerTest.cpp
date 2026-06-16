@@ -92,10 +92,16 @@ bool compileFromString(StringRef Code, StringRef Standard, StringRef File,
       CompilerInstance::createDiagnostics(*FS, InvocationDiagOpts);
   CompilerInvocation::CreateFromArgs(*Invocation, Args, *InvocationDiags);
 
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(std::move(FS));
   Compiler.createDiagnostics();
   Compiler.createFileManager();
+
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR))
+    return false;
+  Compiler.installTarget(std::move(TR));
 
   TestFrontendAction Action(MutationListener);
   return Compiler.ExecuteAction(Action);
@@ -110,10 +116,16 @@ bool compileFromArgs(ArrayRef<const char *> Args, FrontendAction &Action) {
   if (!CompilerInvocation::CreateFromArgs(*Invocation, Args, *InvocationDiags))
     return false;
 
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(std::move(FS));
   Compiler.createDiagnostics();
   Compiler.createFileManager();
+
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR))
+    return false;
+  Compiler.installTarget(std::move(TR));
 
   return Compiler.ExecuteAction(Action);
 }

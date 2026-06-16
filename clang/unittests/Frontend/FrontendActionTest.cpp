@@ -90,9 +90,15 @@ TEST(ASTFrontendAction, Sanity) {
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *invocation;
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(compiler.getDiagnostics(), MutInv, TR));
+  compiler.installTarget(std::move(TR));
 
   TestASTFrontendAction test_action;
   ASSERT_TRUE(compiler.ExecuteAction(test_action));
@@ -110,9 +116,15 @@ TEST(ASTFrontendAction, IncrementalParsing) {
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *invocation;
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(compiler.getDiagnostics(), MutInv, TR));
+  compiler.installTarget(std::move(TR));
 
   TestASTFrontendAction test_action(/*enableIncrementalProcessing=*/true);
   ASSERT_TRUE(compiler.ExecuteAction(test_action));
@@ -137,9 +149,15 @@ TEST(ASTFrontendAction, LateTemplateIncrementalParsing) {
       FrontendInputFile("test.cc", Language::CXX));
   invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *invocation;
   CompilerInstance compiler(std::move(invocation));
   compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(compiler.getDiagnostics(), MutInv, TR));
+  compiler.installTarget(std::move(TR));
 
   TestASTFrontendAction test_action(/*enableIncrementalProcessing=*/true,
                                     /*actOnEndOfTranslationUnit=*/true);
@@ -183,9 +201,15 @@ TEST(PreprocessorFrontendAction, EndSourceFile) {
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   TestPPCallbacks *Callbacks = new TestPPCallbacks;
   TestPPCallbacksFrontendAction TestAction(Callbacks);
@@ -244,12 +268,18 @@ TEST(ASTFrontendAction, ExternalSemaSource) {
       FrontendInputFile("test.cc", Language::CXX));
   Invocation->getMutFrontendOpts().ProgramAction = frontend::ParseSyntaxOnly;
   Invocation->getMutTargetOpts().Triple = "i386-unknown-linux-gnu";
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Compiler(std::move(Invocation));
   auto *TDC = new TypoDiagnosticConsumer;
   Compiler.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   Compiler.createDiagnostics(TDC, /*ShouldOwnClient=*/true);
   Compiler.setExternalSemaSource(
       llvm::makeIntrusiveRefCnt<TypoExternalSemaSource>(Compiler));
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+  Compiler.installTarget(std::move(TR));
 
   SyntaxOnlyAction TestAction;
   ASSERT_TRUE(Compiler.ExecuteAction(TestAction));

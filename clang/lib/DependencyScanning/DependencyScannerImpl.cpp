@@ -756,14 +756,23 @@ bool DependencyScanningAction::runInvocation(
   std::optional<AsyncModuleCompiles> AsyncCompiles;
   if (Service.getOpts().AsyncScanModules) {
     auto ModCache = makeInProcessModuleCache(Service.getModuleCacheEntries());
+    auto AsyncInvocation = std::make_shared<CompilerInvocation>(*ScanInvocation);
+    CompilerInvocation &MutAsyncInv = *AsyncInvocation;
     auto ScanInstanceStorage = std::make_unique<CompilerInstance>(
-        std::make_shared<CompilerInvocation>(*ScanInvocation), PCHContainerOps,
-        std::move(ModCache));
+        std::move(AsyncInvocation), PCHContainerOps, std::move(ModCache));
     CompilerInstance &ScanInstance = *ScanInstanceStorage;
 
     DiagnosticConsumer DiagConsumer;
     initializeScanCompilerInstance(ScanInstance, FS, &DiagConsumer, Service,
                                    DepFS);
+
+    CompilerInstance::TargetCreationResult TR;
+    if (!CompilerInstance::createTarget(ScanInstance.getDiagnostics(),
+                                        MutAsyncInv, TR))
+      return false;
+    ScanInstance.setTarget(TR.Target.get());
+    ScanInstance.setAuxTarget(TR.AuxTarget.get());
+    ScanInstance.setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
     // FIXME: Do this only once.
     SmallVector<StringRef> StableDirs = getInitialStableDirs(ScanInstance);
@@ -778,12 +787,21 @@ bool DependencyScanningAction::runInvocation(
   }
 
   auto ModCache = makeInProcessModuleCache(Service.getModuleCacheEntries());
+  CompilerInvocation &MutScanInv = *ScanInvocation;
   ScanInstanceStorage.emplace(std::move(ScanInvocation),
                               std::move(PCHContainerOps), std::move(ModCache));
   CompilerInstance &ScanInstance = *ScanInstanceStorage;
 
   initializeScanCompilerInstance(ScanInstance, FS, DiagConsumer, Service,
                                  DepFS);
+
+  CompilerInstance::TargetCreationResult MainTR;
+  if (!CompilerInstance::createTarget(ScanInstance.getDiagnostics(),
+                                      MutScanInv, MainTR))
+    return false;
+  ScanInstance.setTarget(MainTR.Target.get());
+  ScanInstance.setAuxTarget(MainTR.AuxTarget.get());
+  ScanInstance.setAuxTargetOpts(std::move(MainTR.AuxTargetOpts));
 
   llvm::SmallVector<StringRef> StableDirs = getInitialStableDirs(ScanInstance);
   auto MaybePrebuiltModulesASTMap =

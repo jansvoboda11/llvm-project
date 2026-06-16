@@ -149,12 +149,18 @@ TEST(CompilerInstance, MultipleInputsCleansFileIDs) {
   ASSERT_TRUE(CInvok) << "could not create compiler invocation";
 
   // Capture a mutable reference before std::move so we can append the
-  // second input below.
+  // second input below and run target setup post-construction.
   FrontendOptions &MutFrontendOpts = CInvok->getMutFrontendOpts();
+  CompilerInvocation &MutInv = *CInvok;
   CompilerInstance Instance(std::move(CInvok));
   Instance.setVirtualFileSystem(VFS);
   Instance.setDiagnostics(Diags);
   Instance.createFileManager();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+  Instance.installTarget(std::move(TR));
 
   // Run once for `a.cc` and then for `a.h`. This makes sure we get the same
   // file ID for `b.h` in the second run as `a.h` from first run.
@@ -178,10 +184,16 @@ TEST(CompilerInstance, SingleModuleParseModeCallback) {
       {"clang", "tu.c", "-fmodules", "-fmodules-cache-path=/"});
   Invocation->getMutPreprocessorOpts().SingleModuleParseMode = true;
 
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Instance(std::move(Invocation));
   Instance.createVirtualFileSystem(VFS);
   Instance.createFileManager();
   Instance.createDiagnostics();
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+  Instance.installTarget(std::move(TR));
 
   struct ModuleLoadSkippedCallback : PPCallbacks {
     std::vector<std::string> &SkippedModules;

@@ -112,61 +112,67 @@ void CompilerInstance::setVerboseOutputStream(std::unique_ptr<raw_ostream> Value
 void CompilerInstance::setTarget(TargetInfo *Value) { Target = Value; }
 void CompilerInstance::setAuxTarget(TargetInfo *Value) { AuxTarget = Value; }
 
-bool CompilerInstance::createTarget() {
-  // Create the target instance.
-  setTarget(TargetInfo::CreateTargetInfo(getDiagnostics(),
-                                         Invocation->getMutTargetOpts()));
-  if (!hasTarget())
+bool CompilerInstance::createTarget(DiagnosticsEngine &Diags,
+                                    CompilerInvocation &Inv,
+                                    TargetCreationResult &Out,
+                                    TargetInfo *PreExistingAux) {
+  // Create the primary target. CreateTargetInfo canonicalizes target
+  // features into the (mutable) TargetOptions.
+  Out.Target = TargetInfo::CreateTargetInfo(Diags, Inv.getMutTargetOpts());
+  if (!Out.Target)
     return false;
 
-  if (getLangOpts().SYCLIsDevice && !getTarget().getTriple().isGPU()) {
-    getDiagnostics().Report(diag::err_sycl_device_invalid_target)
-        << getTarget().getTriple().str();
+  const LangOptions &LangOpts = Inv.getLangOpts();
+  const FrontendOptions &FrontendOpts = Inv.getFrontendOpts();
+
+  if (LangOpts.SYCLIsDevice && !Out.Target->getTriple().isGPU()) {
+    Diags.Report(diag::err_sycl_device_invalid_target)
+        << Out.Target->getTriple().str();
     return false;
   }
 
-  // Check whether AuxTarget exists, if not, then create TargetInfo for the
-  // other side of CUDA/OpenMP/SYCL compilation.
-  if (!getAuxTarget() &&
-      (getLangOpts().CUDA || getLangOpts().isTargetDevice()) &&
-      !getFrontendOpts().AuxTriple.empty()) {
-    auto &TO = AuxTargetOpts = std::make_unique<TargetOptions>();
-    TO->Triple = llvm::Triple::normalize(getFrontendOpts().AuxTriple);
-    if (getFrontendOpts().AuxTargetCPU)
-      TO->CPU = *getFrontendOpts().AuxTargetCPU;
-    if (getFrontendOpts().AuxTargetFeatures)
-      TO->FeaturesAsWritten = *getFrontendOpts().AuxTargetFeatures;
-    TO->HostTriple = getTarget().getTriple().str();
-    setAuxTarget(TargetInfo::CreateTargetInfo(getDiagnostics(), *TO));
+  // If the caller already has an auxiliary target set, keep using it; only
+  // synthesize a fresh one when CUDA/target-device LangOpts ask for one and
+  // a triple is available.
+  TargetInfo *AuxTarget = PreExistingAux;
+  if (!AuxTarget && (LangOpts.CUDA || LangOpts.isTargetDevice()) &&
+      !FrontendOpts.AuxTriple.empty()) {
+    Out.AuxTargetOpts = std::make_unique<TargetOptions>();
+    auto &TO = *Out.AuxTargetOpts;
+    TO.Triple = llvm::Triple::normalize(FrontendOpts.AuxTriple);
+    if (FrontendOpts.AuxTargetCPU)
+      TO.CPU = *FrontendOpts.AuxTargetCPU;
+    if (FrontendOpts.AuxTargetFeatures)
+      TO.FeaturesAsWritten = *FrontendOpts.AuxTargetFeatures;
+    TO.HostTriple = Out.Target->getTriple().str();
+    Out.AuxTarget = TargetInfo::CreateTargetInfo(Diags, TO);
+    AuxTarget = Out.AuxTarget.get();
   }
 
-  if (!getTarget().hasStrictFP() && !getLangOpts().ExpStrictFP) {
-    if (getLangOpts().RoundingMath) {
-      getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_rounding);
-      Invocation->getMutLangOpts().RoundingMath = false;
+  if (!Out.Target->hasStrictFP() && !LangOpts.ExpStrictFP) {
+    if (LangOpts.RoundingMath) {
+      Diags.Report(diag::warn_fe_backend_unsupported_fp_rounding);
+      Inv.getMutLangOpts().RoundingMath = false;
     }
-    auto FPExc = getLangOpts().getFPExceptionMode();
+    auto FPExc = LangOpts.getFPExceptionMode();
     if (FPExc != LangOptions::FPE_Default && FPExc != LangOptions::FPE_Ignore) {
-      getDiagnostics().Report(diag::warn_fe_backend_unsupported_fp_exceptions);
-      Invocation->getMutLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
+      Diags.Report(diag::warn_fe_backend_unsupported_fp_exceptions);
+      Inv.getMutLangOpts().setFPExceptionMode(LangOptions::FPE_Ignore);
     }
-    // FIXME: can we disable FEnvAccess?
   }
 
-  // We should do it here because target knows nothing about
-  // language options when it's being created.
-  if (getLangOpts().OpenCL &&
-      !getTarget().validateOpenCLTarget(getLangOpts(), getDiagnostics()))
+  if (LangOpts.OpenCL &&
+      !Out.Target->validateOpenCLTarget(LangOpts, Diags))
     return false;
 
   // Inform the target of the language options.
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  getTarget().adjustLangOptions(getDiagnostics(), Invocation->getMutLangOpts());
-  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
+  Out.Target->adjustLangOptions(Diags, Inv.getMutLangOpts());
+  Out.Target->adjust(Diags, Inv.getLangOpts(), AuxTarget);
 
-  if (auto *Aux = getAuxTarget())
-    getTarget().setAuxTarget(Aux);
+  if (AuxTarget)
+    Out.Target->setAuxTarget(AuxTarget);
 
   return true;
 }
@@ -475,8 +481,6 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
                                       getSourceManager(), *HeaderInfo, *this,
                                       /*IdentifierInfoLookup=*/nullptr,
                                       /*OwnsHeaderSearch=*/true, TUKind);
-  getTarget().adjustLangOptions(getDiagnostics(), Invocation->getMutLangOpts());
-  getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
   PP->Initialize(getTarget(), getAuxTarget());
 
   if (PPOpts.DetailedRecord)
@@ -997,8 +1001,11 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
   if (!Act.PrepareToExecute(*this))
     return false;
 
-  if (!createTarget())
-    return false;
+  assert(hasTarget() &&
+         "TargetInfo must be configured before ExecuteAction. Run "
+         "CompilerInstance::createTarget on the (still-mutable) "
+         "invocation pre-construction and install the result via "
+         "setTarget/setAuxTarget/setAuxTargetOpts.");
 
   // rewriter project will change target built-in bool type from its default.
   if (getFrontendOpts().ProgramAction == frontend::RewriteObjC)
@@ -1197,6 +1204,10 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   }
 
   // Construct a compiler instance that will be used to create the module.
+  // Hold an alias to the invocation so we can run target setup against it
+  // after diagnostics are wired up; the shared_ptr move keeps the underlying
+  // object alive at the same address.
+  CompilerInvocation &MutInv = *Invocation;
   auto InstancePtr = std::make_unique<CompilerInstance>(
       std::move(Invocation), getPCHContainerOperations(), std::move(ModCache));
   auto &Instance = *InstancePtr;
@@ -1222,6 +1233,16 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   }
   if (llvm::is_contained(DiagOpts.SystemHeaderWarningsModules, ModuleName))
     Instance.getDiagnostics().setSuppressSystemWarnings(false);
+
+  // Set up the target now that diagnostics are available. This is the last
+  // mutation to the invocation; subsequent setup observes it through const
+  // references.
+  TargetCreationResult TR;
+  if (!createTarget(Instance.getDiagnostics(), MutInv, TR))
+    return nullptr;
+  Instance.setTarget(TR.Target.get());
+  Instance.setAuxTarget(TR.AuxTarget.get());
+  Instance.setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   Instance.createSourceManager();
   SourceManager &SourceMgr = Instance.getSourceManager();

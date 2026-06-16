@@ -1169,8 +1169,13 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
   Clang->setDiagnostics(getDiagnosticsPtr());
 
   // Create the target instance.
-  if (!Clang->createTarget())
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Clang->getDiagnostics(), *CCInvocation,
+                                      TR))
     return true;
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   assert(Clang->getFrontendOpts().Inputs.size() == 1 &&
          "Invocation must have exactly one source file!");
@@ -1537,7 +1542,10 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
   ProcessWarningOptions(AST->getDiagnostics(), CI->getDiagnosticOpts(),
                         AST->getFileManager().getVirtualFileSystem());
 
-  // Create the compiler instance to use for building the AST.
+  // Create the compiler instance to use for building the AST. Hold an alias
+  // to the invocation so we can run target setup against it just below; the
+  // shared_ptr move keeps the underlying object alive at the same address.
+  CompilerInvocation &MutInv = *CI;
   auto Clang = std::make_unique<CompilerInstance>(std::move(CI),
                                                   std::move(PCHContainerOps));
 
@@ -1553,8 +1561,12 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
   Clang->setDiagnostics(AST->getDiagnosticsPtr());
 
   // Create the target instance.
-  if (!Clang->createTarget())
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Clang->getDiagnostics(), MutInv, TR))
     return nullptr;
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   assert(Clang->getFrontendOpts().Inputs.size() == 1 &&
          "Invocation must have exactly one source file!");
@@ -2090,9 +2102,12 @@ void ASTUnit::CodeComplete(
                         FileMgr->getVirtualFileSystem());
 
   // Create the target instance.
-  if (!Clang->createTarget()) {
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Clang->getDiagnostics(), Inv, TR))
     return;
-  }
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
   assert(Clang->getFrontendOpts().Inputs.size() == 1 &&
          "Invocation must have exactly one source file!");

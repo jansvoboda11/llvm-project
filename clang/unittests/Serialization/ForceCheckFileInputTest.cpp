@@ -90,11 +90,17 @@ export int aa = 43;
     Invocation->getMutFrontendOpts().OutputFile = BMIPath;
     Invocation->getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
+    CompilerInvocation &MutInv = *Invocation;
     CompilerInstance Instance(std::move(Invocation));
     Instance.setDiagnostics(Diags);
 
     Instance.createVirtualFileSystem(CIOpts.VFS);
     Instance.createFileManager();
+
+    CompilerInstance::TargetCreationResult TR;
+    EXPECT_TRUE(
+        CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+    Instance.installTarget(std::move(TR));
 
     GenerateReducedModuleInterfaceAction Action;
     EXPECT_TRUE(Instance.ExecuteAction(Action));
@@ -120,6 +126,7 @@ export int aa = 43;
     Invocation->getMutHeaderSearchOpts().ForceCheckCXX20ModulesInputFiles = true;
     Invocation->getMutHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
+    CompilerInvocation &MutInv = *Invocation;
     CompilerInstance Clang(std::move(Invocation));
 
     Clang.setDiagnostics(Diags);
@@ -127,7 +134,12 @@ export int aa = 43;
     Clang.createFileManager();
     Clang.createSourceManager();
 
-    EXPECT_TRUE(Clang.createTarget());
+    CompilerInstance::TargetCreationResult TR;
+    EXPECT_TRUE(
+        CompilerInstance::createTarget(Clang.getDiagnostics(), MutInv, TR));
+    Clang.setTarget(TR.Target.get());
+    Clang.setAuxTarget(TR.AuxTarget.get());
+    Clang.setAuxTargetOpts(std::move(TR.AuxTargetOpts));
     Clang.createPreprocessor(TU_Complete);
     Clang.createASTReader();
 

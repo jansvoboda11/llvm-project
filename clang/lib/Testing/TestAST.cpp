@@ -53,7 +53,7 @@ public:
 
 // Fills in the bits of a CompilerInstance that weren't initialized yet.
 // Provides "empty" ASTContext etc if we fail before parsing gets started.
-void createMissingComponents(CompilerInstance &Clang) {
+void createMissingComponents(CompilerInstance &Clang, CompilerInvocation &Inv) {
   if (!Clang.hasVirtualFileSystem())
     Clang.createVirtualFileSystem();
   if (!Clang.hasDiagnostics())
@@ -62,8 +62,14 @@ void createMissingComponents(CompilerInstance &Clang) {
     Clang.createFileManager();
   if (!Clang.hasSourceManager())
     Clang.createSourceManager();
-  if (!Clang.hasTarget())
-    Clang.createTarget();
+  if (!Clang.hasTarget()) {
+    CompilerInstance::TargetCreationResult TR;
+    if (CompilerInstance::createTarget(Clang.getDiagnostics(), Inv, TR)) {
+      Clang.setTarget(TR.Target.get());
+      Clang.setAuxTarget(TR.AuxTarget.get());
+      Clang.setAuxTargetOpts(std::move(TR.AuxTargetOpts));
+    }
+  }
   if (!Clang.hasPreprocessor())
     Clang.createPreprocessor(TU_Complete);
   if (!Clang.hasASTConsumer())
@@ -84,7 +90,7 @@ TestAST::TestAST(const TestInputs &In) {
   // If we don't manage to finish parsing, create CompilerInstance components
   // anyway so that the test will see an empty AST instead of crashing.
   llvm::scope_exit RecoverFromEarlyExit(
-      [&] { createMissingComponents(*Clang); });
+      [&] { createMissingComponents(*Clang, *Invocation); });
 
   std::string Filename = In.FileName;
   if (Filename.empty())
@@ -126,7 +132,12 @@ TestAST::TestAST(const TestInputs &In) {
 
   // Running the FrontendAction creates the other components: SourceManager,
   // Preprocessor, ASTContext, Sema. Preprocessor needs TargetInfo to be set.
-  EXPECT_TRUE(Clang->createTarget());
+  CompilerInstance::TargetCreationResult TR;
+  EXPECT_TRUE(
+      CompilerInstance::createTarget(Clang->getDiagnostics(), *Invocation, TR));
+  Clang->setTarget(TR.Target.get());
+  Clang->setAuxTarget(TR.AuxTarget.get());
+  Clang->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
   Action =
       In.MakeAction ? In.MakeAction() : std::make_unique<SyntaxOnlyAction>();
   const FrontendInputFile &Main = Clang->getFrontendOpts().Inputs.front();

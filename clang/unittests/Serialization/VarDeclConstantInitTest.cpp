@@ -109,8 +109,14 @@ export namespace Fibonacci
   std::string CacheBMIPath = llvm::Twine(TestDir + "/Cached.pcm").str();
   Invocation->getMutFrontendOpts().OutputFile = CacheBMIPath;
 
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Instance(std::move(Invocation));
   Instance.setDiagnostics(Diags);
+
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+  Instance.installTarget(std::move(TR));
 
   GenerateReducedModuleInterfaceAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));

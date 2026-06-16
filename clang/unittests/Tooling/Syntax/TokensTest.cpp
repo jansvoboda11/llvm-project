@@ -136,11 +136,17 @@ public:
     CI->getMutFrontendOpts().DisableFree = false;
     CI->getMutPreprocessorOpts().addRemappedFile(
         FileName, llvm::MemoryBuffer::getMemBufferCopy(Code).release());
+    CompilerInvocation &MutInv = *CI;
     CompilerInstance Compiler(std::move(CI));
     Compiler.setDiagnostics(Diags);
     Compiler.setVirtualFileSystem(FS);
     Compiler.setFileManager(FileMgr);
     Compiler.setSourceManager(SourceMgr);
+
+    CompilerInstance::TargetCreationResult TR;
+    ASSERT_TRUE(
+        CompilerInstance::createTarget(Compiler.getDiagnostics(), MutInv, TR));
+    Compiler.installTarget(std::move(TR));
 
     this->Buffer = TokenBuffer(*SourceMgr);
     RecordTokens Recorder(this->Buffer);

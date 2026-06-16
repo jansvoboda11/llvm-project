@@ -127,8 +127,13 @@ bool FixItRecompile::BeginInvocation(CompilerInvocation &Invocation,
         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>(&VFS));
     FixCI->createDiagnostics(Diags.getClient(), /*ShouldOwnClient=*/false);
     FixCI->createFileManager();
-    if (!FixCI->createTarget())
+    CompilerInstance::TargetCreationResult TR;
+    if (!CompilerInstance::createTarget(FixCI->getDiagnostics(), *FixInvocation,
+                                        TR))
       return false;
+    FixCI->setTarget(TR.Target.get());
+    FixCI->setAuxTarget(TR.AuxTarget.get());
+    FixCI->setAuxTargetOpts(std::move(TR.AuxTargetOpts));
 
     const FrontendOptions &FEOpts = FixInvocation->getFrontendOpts();
     std::unique_ptr<FrontendAction> FixAction(new SyntaxOnlyAction());

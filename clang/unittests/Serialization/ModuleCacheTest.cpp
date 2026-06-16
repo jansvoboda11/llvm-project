@@ -121,9 +121,14 @@ TEST_F(ModuleCacheTest, CachedModuleNewPath) {
   std::shared_ptr<CompilerInvocation> Invocation =
       createInvocationAndEnableFree(Args, CIOpts);
   ASSERT_TRUE(Invocation);
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Instance(std::move(Invocation));
   Instance.setVirtualFileSystem(CIOpts.VFS);
   Instance.setDiagnostics(Diags);
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+  Instance.installTarget(std::move(TR));
   SyntaxOnlyAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
   ASSERT_FALSE(Diags->hasErrorOccurred());
@@ -144,11 +149,16 @@ TEST_F(ModuleCacheTest, CachedModuleNewPath) {
   std::shared_ptr<CompilerInvocation> Invocation2 =
       createInvocationAndEnableFree(Args2, CIOpts);
   ASSERT_TRUE(Invocation2);
+  CompilerInvocation &MutInv2 = *Invocation2;
   CompilerInstance Instance2(std::move(Invocation2),
                              Instance.getPCHContainerOperations(),
                              Instance.getModuleCachePtr());
   Instance2.setVirtualFileSystem(CIOpts.VFS);
   Instance2.setDiagnostics(Diags);
+  CompilerInstance::TargetCreationResult TR2;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance2.getDiagnostics(), MutInv2, TR2));
+  Instance2.installTarget(std::move(TR2));
   SyntaxOnlyAction Action2;
   ASSERT_FALSE(Instance2.ExecuteAction(Action2));
   ASSERT_TRUE(Diags->hasErrorOccurred());
@@ -173,9 +183,14 @@ TEST_F(ModuleCacheTest, CachedModuleNewPathAllowErrors) {
   std::shared_ptr<CompilerInvocation> Invocation =
       createInvocationAndEnableFree(Args, CIOpts);
   ASSERT_TRUE(Invocation);
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Instance(std::move(Invocation));
   Instance.setVirtualFileSystem(CIOpts.VFS);
   Instance.setDiagnostics(Diags);
+  CompilerInstance::TargetCreationResult TR;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR));
+  Instance.installTarget(std::move(TR));
   SyntaxOnlyAction Action;
   ASSERT_TRUE(Instance.ExecuteAction(Action));
   ASSERT_FALSE(Diags->hasErrorOccurred());
@@ -190,11 +205,16 @@ TEST_F(ModuleCacheTest, CachedModuleNewPathAllowErrors) {
   std::shared_ptr<CompilerInvocation> Invocation2 =
       createInvocationAndEnableFree(Args2, CIOpts);
   ASSERT_TRUE(Invocation2);
+  CompilerInvocation &MutInv2 = *Invocation2;
   CompilerInstance Instance2(std::move(Invocation2),
                              Instance.getPCHContainerOperations(),
                              Instance.getModuleCachePtr());
   Instance2.setVirtualFileSystem(CIOpts.VFS);
   Instance2.setDiagnostics(Diags);
+  CompilerInstance::TargetCreationResult TR2;
+  ASSERT_TRUE(
+      CompilerInstance::createTarget(Instance2.getDiagnostics(), MutInv2, TR2));
+  Instance2.installTarget(std::move(TR2));
   SyntaxOnlyAction Action2;
   ASSERT_FALSE(Instance2.ExecuteAction(Action2));
   ASSERT_TRUE(Diags->hasErrorOccurred());
