@@ -100,7 +100,10 @@ public:
   ASTContext *Ctx;
   Preprocessor &PP;
   const std::string OutDir;
-  AnalyzerOptions &Opts;
+  // Owned by value: CheckerRegistry mutates Config defaults during checker
+  // registration. Keeping our own copy keeps those mutations off the
+  // (frozen) CompilerInvocation's AnalyzerOptions.
+  AnalyzerOptions Opts;
   ArrayRef<std::string> Plugins;
   std::unique_ptr<CodeInjector> Injector;
   cross_tu::CrossTranslationUnitContext CTU;
@@ -134,10 +137,11 @@ public:
   FunctionSummariesTy FunctionSummaries;
 
   AnalysisConsumer(CompilerInstance &CI, const std::string &outdir,
-                   AnalyzerOptions &opts, ArrayRef<std::string> plugins,
+                   AnalyzerOptions opts, ArrayRef<std::string> plugins,
                    std::unique_ptr<CodeInjector> injector)
       : RecVisitorMode(0), RecVisitorBR(nullptr), Ctx(nullptr),
-        PP(CI.getPreprocessor()), OutDir(outdir), Opts(opts), Plugins(plugins),
+        PP(CI.getPreprocessor()), OutDir(outdir), Opts(std::move(opts)),
+        Plugins(plugins),
         Injector(std::move(injector)), CTU(CI),
         MacroExpansions(CI.getLangOpts()) {
 
@@ -359,6 +363,8 @@ public:
   void AddCheckerRegistrationFn(std::function<void(CheckerRegistry&)> Fn) override {
     CheckerRegistrationFns.push_back(std::move(Fn));
   }
+
+  AnalyzerOptions &getMutAnalyzerOptions() override { return Opts; }
 
 private:
   void storeTopLevelDecls(DeclGroupRef DG);
@@ -837,16 +843,14 @@ ento::CreateAnalysisConsumer(CompilerInstance &CI) {
   // Disable the effects of '-Werror' when using the AnalysisConsumer.
   CI.getPreprocessor().getDiagnostics().setWarningsAsErrors(false);
 
-  // FIXME: Post-construction mutation of the invocation. The analyzer
-  // infrastructure (CheckerRegistry) mutates AnalyzerOptions::Config to
-  // record defaults; until that moves pre-construction this site uses
-  // const_cast.
-  AnalyzerOptions &analyzerOpts =
-      const_cast<AnalyzerOptions &>(CI.getAnalyzerOpts());
+  // Copy the invocation's AnalyzerOptions into the AnalysisConsumer; the
+  // analyzer setup (CheckerRegistry) mutates Config to record defaults and
+  // we want those mutations to stay off the frozen invocation.
+  AnalyzerOptions analyzerOpts = CI.getAnalyzerOpts();
   bool hasModelPath = analyzerOpts.Config.count("model-path") > 0;
 
   return std::make_unique<AnalysisConsumer>(
-      CI, CI.getFrontendOpts().OutputFile, analyzerOpts,
+      CI, CI.getFrontendOpts().OutputFile, std::move(analyzerOpts),
       CI.getFrontendOpts().Plugins,
       hasModelPath ? std::make_unique<ModelInjector>(CI) : nullptr);
 }

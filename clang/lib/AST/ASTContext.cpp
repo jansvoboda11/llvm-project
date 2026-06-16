@@ -927,7 +927,7 @@ static bool isAddrSpaceMapManglingEnabled(const TargetInfo &TI,
   llvm_unreachable("getAddressSpaceMapMangling() doesn't cover anything.");
 }
 
-ASTContext::ASTContext(LangOptions &LOpts, SourceManager &SM,
+ASTContext::ASTContext(const LangOptions &LOpts, SourceManager &SM,
                        IdentifierTable &idents, SelectorTable &sels,
                        Builtin::Context &builtins, TranslationUnitKind TUKind)
     : ConstantArrayTypes(this_(), ConstantArrayTypesLog2InitSize),

@@ -19,17 +19,13 @@ using namespace clang;
 namespace {
 
 // Usually FrontendAction takes the raw pointers and wraps them back into
-// unique_ptrs in InitializeFileRemapping()
+// unique_ptrs in InitializeFileRemapping(). The RemappedFileBuffers list
+// itself goes away with the CompilerInstance; we only need to free the raw
+// MemoryBuffers it points at.
 static void cleanupRemappedFileBuffers(CompilerInstance &CI) {
   for (const auto &RB : CI.getPreprocessorOpts().RemappedFileBuffers) {
     delete RB.second;
   }
-  // FIXME: This breaches the frozen-invocation invariant; cleanup should
-  // run on the invocation pre-construction, or RemappedFileBuffers should
-  // not be on the invocation at all.
-  const_cast<CompilerInvocation &>(CI.getInvocation())
-      .getMutPreprocessorOpts()
-      .clearRemappedFiles();
 }
 
 TEST(IncrementalCompilerBuilder, SetCompilerArgs) {

@@ -663,12 +663,10 @@ struct AsyncModuleCompile : PPCallbacks {
         SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
                                                     *Compiles);
         (void)ModCI1->ExecuteAction(Action1);
-        // The real scan below.
-        // FIXME: Post-construction mutation. ModCI2 was built with
-        // SingleModuleParseMode=true; flip it for Action2.
-        const_cast<CompilerInvocation &>(ModCI2->getInvocation())
-            .getMutPreprocessorOpts()
-            .SingleModuleParseMode = false;
+        // The real scan below. ModCI2 was cloned from CI, which has
+        // SingleModuleParseMode=false; Action2 doesn't set it true, so the
+        // flag is already in the desired state without a post-construction
+        // mutation here.
         GenerateModuleFromModuleMapAction Action2;
         (void)ModCI2->ExecuteAction(Action2);
       });

@@ -22,6 +22,7 @@ class StringRef;
 namespace clang {
 class CodeCompletionResult;
 class CompilerInstance;
+class CompilerInvocation;
 
 struct ReplCodeCompleter {
   ReplCodeCompleter() = default;
@@ -40,8 +41,13 @@ struct ReplCodeCompleter {
   /// provides ASTContexts.
 
   /// \param CCResults [out] The completion results.
-  void codeComplete(CompilerInstance *InterpCI, llvm::StringRef Content,
-                    unsigned Line, unsigned Col,
+  ///
+  /// \p InterpInvocation is the host invocation that re-parsing will mutate
+  /// (re-input, lang-options) — the Interpreter shares it with \p InterpCI
+  /// via Interpreter::getMutHostInvocation().
+  void codeComplete(CompilerInstance *InterpCI,
+                    CompilerInvocation &InterpInvocation,
+                    llvm::StringRef Content, unsigned Line, unsigned Col,
                     const CompilerInstance *ParentCI,
                     std::vector<std::string> &CCResults);
 };

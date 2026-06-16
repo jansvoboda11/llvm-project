@@ -755,7 +755,7 @@ private:
 
   /// The language options used to create the AST associated with
   ///  this ASTContext object.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// NoSanitizeList object that is used by sanitizers to decide which
   /// entities should not be instrumented.
@@ -1416,9 +1416,9 @@ public:
   /// are stored here.
   llvm::DenseMap<const CXXMethodDecl *, CXXCastPath> LambdaCastPaths;
 
-  ASTContext(LangOptions &LOpts, SourceManager &SM, IdentifierTable &idents,
-             SelectorTable &sels, Builtin::Context &builtins,
-             TranslationUnitKind TUKind);
+  ASTContext(const LangOptions &LOpts, SourceManager &SM,
+             IdentifierTable &idents, SelectorTable &sels,
+             Builtin::Context &builtins, TranslationUnitKind TUKind);
   ASTContext(const ASTContext &) = delete;
   ASTContext &operator=(const ASTContext &) = delete;
   ~ASTContext();

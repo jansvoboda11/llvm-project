@@ -353,6 +353,7 @@ void ExternalSource::completeVisibleDeclsMap(
 }
 
 void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
+                                     CompilerInvocation &InterpInvocation,
                                      llvm::StringRef Content, unsigned Line,
                                      unsigned Col,
                                      const CompilerInstance *ParentCI,
@@ -360,17 +361,18 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
   auto consumer = ReplCompletionConsumer(CCResults, *this);
 
   auto diag = InterpCI->getDiagnosticsPtr();
-  // FIXME: ASTUnit::LoadFromCompilerInvocationAction wants a non-const
-  // CompilerInvocation. The Interpreter genuinely shares its invocation
-  // mutably across CompilerInstance and ASTUnit; until that mutation moves
-  // out, breach the frozen-invocation invariant via const_pointer_cast.
-  auto MutInvPtr = std::const_pointer_cast<CompilerInvocation>(
-      InterpCI->getInvocationPtr());
+  // ASTUnit::LoadFromCompilerInvocationAction takes a shared_ptr to a
+  // mutable invocation; alias the (mutable) host invocation we were
+  // handed in via the aliasing-shared_ptr constructor so the AST unit
+  // shares ownership without us having to copy or const-cast.
+  auto MutInvPtr =
+      std::shared_ptr<CompilerInvocation>(InterpCI->getInvocationPtr(),
+                                          &InterpInvocation);
   std::unique_ptr<ASTUnit> AU(ASTUnit::LoadFromCompilerInvocationAction(
       MutInvPtr, std::make_shared<PCHContainerOperations>(), nullptr, diag));
   llvm::SmallVector<clang::StoredDiagnostic, 8> sd = {};
   llvm::SmallVector<const llvm::MemoryBuffer *, 1> tb = {};
-  MutInvPtr->getMutFrontendOpts().Inputs[0] = FrontendInputFile(
+  InterpInvocation.getMutFrontendOpts().Inputs[0] = FrontendInputFile(
       CodeCompletionFileName, Language::CXX, InputKind::Source);
   auto Act = std::make_unique<IncrementalSyntaxOnlyAction>(ParentCI);
   std::unique_ptr<llvm::MemoryBuffer> MB =
@@ -384,7 +386,7 @@ void ReplCodeCompleter::codeComplete(CompilerInstance *InterpCI,
   AU->CodeComplete(CodeCompletionFileName, 1, Col, RemappedFiles, false, false,
                    false, consumer,
                    std::make_shared<clang::PCHContainerOperations>(), diag,
-                   MutInvPtr->getMutLangOpts(),
+                   InterpInvocation.getMutLangOpts(),
                    AU->getSourceManagerPtr(),
                    AU->getFileManagerPtr(), sd, tb, std::move(Act));
 }

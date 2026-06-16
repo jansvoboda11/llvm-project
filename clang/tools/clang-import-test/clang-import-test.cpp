@@ -231,11 +231,9 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
 std::unique_ptr<ASTContext>
 BuildASTContext(CompilerInstance &CI, SelectorTable &ST, Builtin::Context &BC) {
   auto &PP = CI.getPreprocessor();
-  // FIXME: ASTContext stores LangOptions by non-const ref; const_cast until
-  // ASTContext can take const LangOptions.
   auto AST = std::make_unique<ASTContext>(
-      const_cast<LangOptions &>(CI.getLangOpts()), CI.getSourceManager(),
-      PP.getIdentifierTable(), ST, BC, PP.TUKind);
+      CI.getLangOpts(), CI.getSourceManager(), PP.getIdentifierTable(), ST, BC,
+      PP.TUKind);
   AST->InitBuiltinTypes(CI.getTarget());
   return AST;
 }

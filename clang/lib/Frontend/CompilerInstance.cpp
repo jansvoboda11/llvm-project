@@ -569,9 +569,8 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
 void CompilerInstance::createASTContext() {
   Preprocessor &PP = getPreprocessor();
   auto Context = llvm::makeIntrusiveRefCnt<ASTContext>(
-      Invocation->getMutLangOpts(), PP.getSourceManager(),
-      PP.getIdentifierTable(), PP.getSelectorTable(), PP.getBuiltinInfo(),
-      PP.TUKind);
+      getLangOpts(), PP.getSourceManager(), PP.getIdentifierTable(),
+      PP.getSelectorTable(), PP.getBuiltinInfo(), PP.TUKind);
   Context->InitBuiltinTypes(getTarget(), getAuxTarget());
   setASTContext(std::move(Context));
 }

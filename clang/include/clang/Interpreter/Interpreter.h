@@ -41,6 +41,7 @@ class Compilation;
 } // namespace driver
 
 class CompilerInstance;
+class CompilerInvocation;
 class CXXRecordDecl;
 class Decl;
 class IncrementalParser;
@@ -127,6 +128,12 @@ class Interpreter {
   /// An optional compiler instance for CUDA offloading
   std::unique_ptr<CompilerInstance> DeviceCI;
 
+  /// Aliased mutable handle to the host CompilerInstance's invocation.
+  /// Held separately so the CUDA device-offload path can update
+  /// CodeGenOptions::CudaGpuBinaryFileName per PTU; the host
+  /// CompilerInstance's public API still treats its invocation as const.
+  std::shared_ptr<CompilerInvocation> HostInvocation;
+
 protected:
   // Derived classes can use an extended interface of the Interpreter.
   Interpreter(std::unique_ptr<CompilerInstance> Instance, llvm::Error &Err,
@@ -154,6 +161,13 @@ public:
   ASTContext &getASTContext();
   const CompilerInstance *getCompilerInstance() const;
   CompilerInstance *getCompilerInstance();
+
+  /// Aliased mutable handle to the host CompilerInstance's invocation. The
+  /// Interpreter intentionally retains a non-const view so dynamic
+  /// per-PTU updates (e.g. CudaGpuBinaryFileName) and code-completion
+  /// re-parses can mutate the shared invocation; the host's public
+  /// CompilerInstance still treats getInvocation() as const.
+  CompilerInvocation &getMutHostInvocation() { return *HostInvocation; }
   llvm::Expected<IncrementalExecutor &> getExecutionEngine();
 
   llvm::Expected<PartialTranslationUnit &> Parse(llvm::StringRef Code);

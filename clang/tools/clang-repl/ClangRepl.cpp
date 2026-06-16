@@ -244,8 +244,8 @@ ReplListCompleter::operator()(llvm::StringRef Buffer, size_t Pos,
   }
   auto *MainCI = (*Interp)->getCompilerInstance();
   auto CC = clang::ReplCodeCompleter();
-  CC.codeComplete(MainCI, Buffer, Lines, Pos + 1,
-                  MainInterp.getCompilerInstance(), Results);
+  CC.codeComplete(MainCI, (*Interp)->getMutHostInvocation(), Buffer, Lines,
+                  Pos + 1, MainInterp.getCompilerInstance(), Results);
   for (auto c : Results) {
     if (c.find(CC.Prefix) == 0)
       Comps.push_back(

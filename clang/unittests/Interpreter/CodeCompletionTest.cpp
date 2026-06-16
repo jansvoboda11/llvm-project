@@ -59,8 +59,8 @@ public:
     auto *ParentCI = this->Interp->getCompilerInstance();
     auto *MainCI = (*ComplInterp)->getCompilerInstance();
     auto CC = ReplCodeCompleter();
-    CC.codeComplete(MainCI, Input, /* Lines */ 1, Input.size() + 1, ParentCI,
-                    Results);
+    CC.codeComplete(MainCI, (*ComplInterp)->getMutHostInvocation(), Input,
+                    /* Lines */ 1, Input.size() + 1, ParentCI, Results);
 
     for (auto Res : Results)
       if (Res.find(CC.Prefix) == 0)

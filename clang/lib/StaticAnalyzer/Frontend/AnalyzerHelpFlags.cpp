@@ -24,12 +24,11 @@ void ento::printCheckerHelp(raw_ostream &out, CompilerInstance &CI) {
   out << "OVERVIEW: Clang Static Analyzer Checkers List\n\n";
   out << "USAGE: -analyzer-checker <CHECKER or PACKAGE,...>\n\n";
 
-  // FIXME: CheckerRegistry mutates AnalyzerOptions::Config (defaults insert).
-  // Until that mutation moves pre-CompilerInstance construction, this site
-  // breaches the frozen-invocation invariant via const_cast.
-  auto &MutAnOpts = const_cast<AnalyzerOptions &>(CI.getAnalyzerOpts());
+  // Work on a local copy of AnalyzerOptions: CheckerRegistry mutates Config
+  // to record defaults, and the held CompilerInvocation is frozen.
+  AnalyzerOptions LocalOpts = CI.getAnalyzerOpts();
   auto CheckerMgr = std::make_unique<CheckerManager>(
-      MutAnOpts, CI.getLangOpts(), CI.getDiagnostics(),
+      LocalOpts, CI.getLangOpts(), CI.getDiagnostics(),
       CI.getFrontendOpts().Plugins);
 
   CheckerMgr->getCheckerRegistryData().printCheckerWithDescList(
@@ -39,10 +38,9 @@ void ento::printCheckerHelp(raw_ostream &out, CompilerInstance &CI) {
 void ento::printEnabledCheckerList(raw_ostream &out, CompilerInstance &CI) {
   out << "OVERVIEW: Clang Static Analyzer Enabled Checkers List\n\n";
 
-  // FIXME: see printCheckerHelp.
-  auto &MutAnOpts = const_cast<AnalyzerOptions &>(CI.getAnalyzerOpts());
+  AnalyzerOptions LocalOpts = CI.getAnalyzerOpts();
   auto CheckerMgr = std::make_unique<CheckerManager>(
-      MutAnOpts, CI.getLangOpts(), CI.getDiagnostics(),
+      LocalOpts, CI.getLangOpts(), CI.getDiagnostics(),
       CI.getFrontendOpts().Plugins);
 
   CheckerMgr->getCheckerRegistryData().printEnabledCheckerList(out);
@@ -50,10 +48,9 @@ void ento::printEnabledCheckerList(raw_ostream &out, CompilerInstance &CI) {
 
 void ento::printCheckerConfigList(raw_ostream &out, CompilerInstance &CI) {
 
-  // FIXME: see printCheckerHelp.
-  auto &MutAnOpts = const_cast<AnalyzerOptions &>(CI.getAnalyzerOpts());
+  AnalyzerOptions LocalOpts = CI.getAnalyzerOpts();
   auto CheckerMgr = std::make_unique<CheckerManager>(
-      MutAnOpts, CI.getLangOpts(), CI.getDiagnostics(),
+      LocalOpts, CI.getLangOpts(), CI.getDiagnostics(),
       CI.getFrontendOpts().Plugins);
 
   CheckerMgr->getCheckerRegistryData().printCheckerOptionList(

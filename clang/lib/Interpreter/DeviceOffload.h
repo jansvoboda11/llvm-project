@@ -20,6 +20,7 @@
 namespace clang {
 struct PartialTranslationUnit;
 class CompilerInstance;
+class CompilerInvocation;
 class CodeGenOptions;
 class TargetOptions;
 class IncrementalAction;
@@ -28,7 +29,7 @@ class IncrementalCUDADeviceParser : public IncrementalParser {
 
 public:
   IncrementalCUDADeviceParser(
-      CompilerInstance &DeviceInstance, CompilerInstance &HostInstance,
+      CompilerInstance &DeviceInstance, CompilerInvocation &HostInvocation,
       IncrementalAction *DeviceAct,
       llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> VFS,
       llvm::Error &Err, std::list<PartialTranslationUnit> &PTUs);

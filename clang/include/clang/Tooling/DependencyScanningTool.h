@@ -167,6 +167,11 @@ class CompilerInstanceWithContext {
 
   // Compiler Instance
   std::unique_ptr<CompilerInstance> CIPtr;
+  // Mutable handle to the scan invocation, retained alongside CIPtr so the
+  // DependencyScanning code can populate HeaderSearchOptions::PrebuiltModuleFiles
+  // after the scan instance is set up. The held CompilerInstance still treats
+  // its invocation as const.
+  std::shared_ptr<CompilerInvocation> ScanInvocation;
 
   // Source location offset.
   int32_t SrcLocOffset = 0;

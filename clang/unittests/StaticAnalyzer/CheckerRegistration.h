@@ -92,11 +92,12 @@ public:
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &Compiler,
                                                  StringRef File) override {
-    // Suppress the default HTML/text path diagnostic consumers that would
-    // otherwise emit to stderr via DiagnosticsEngine::Report().
-    getMutInvocation().getMutAnalyzerOpts().AnalysisDiagOpt = PD_NONE;
     std::unique_ptr<AnalysisASTConsumer> AnalysisConsumer =
         CreateAnalysisConsumer(Compiler);
+    // Suppress the default HTML/text path diagnostic consumers that would
+    // otherwise emit to stderr via DiagnosticsEngine::Report(). Mutate the
+    // analyzer's own copy of AnalyzerOptions, not the (frozen) invocation.
+    AnalysisConsumer->getMutAnalyzerOptions().AnalysisDiagOpt = PD_NONE;
     if (OnlyEmitWarnings)
       AnalysisConsumer->AddDiagnosticConsumer(
           std::make_unique<OnlyWarningsDiagConsumer>(DiagsOutput));
@@ -104,7 +105,7 @@ public:
       AnalysisConsumer->AddDiagnosticConsumer(
           std::make_unique<PathDiagConsumer>(DiagsOutput));
     addChecker<Fns...>(*AnalysisConsumer,
-                       getMutInvocation().getMutAnalyzerOpts());
+                       AnalysisConsumer->getMutAnalyzerOptions());
     return std::move(AnalysisConsumer);
   }
 };

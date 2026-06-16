@@ -44,6 +44,10 @@ protected:
   CompilerInstance &C;
 
 private:
+  // Owned copy: CheckerRegistry mutates Config defaults during checker
+  // registration. Keeping our own copy keeps those mutations off the
+  // (frozen) invocation's AnalyzerOptions.
+  AnalyzerOptions LocalAnOpts;
   // We need to construct all of these in order to construct ExprEngine.
   CheckerManager ChkMgr;
   cross_tu::CrossTranslationUnitContext CTU;
@@ -57,16 +61,11 @@ protected:
 
 public:
   ExprEngineConsumer(CompilerInstance &C)
-      : C(C),
-        // FIXME: const_cast until the analyzer no longer mutates AnalyzerOptions
-        // (Config map default insertion) post-CompilerInstance construction.
-        ChkMgr(C.getASTContext(),
-               const_cast<AnalyzerOptions &>(C.getAnalyzerOpts()),
-               C.getPreprocessor()),
-        CTU(C),
+      : C(C), LocalAnOpts(C.getAnalyzerOpts()),
+        ChkMgr(C.getASTContext(), LocalAnOpts, C.getPreprocessor()), CTU(C),
         AMgr(C.getASTContext(), C.getPreprocessor(), {},
              CreateRegionStoreManager, CreateRangeConstraintManager, &ChkMgr,
-             const_cast<AnalyzerOptions &>(C.getAnalyzerOpts())),
+             LocalAnOpts),
         VisitedCallees(), FS(),
         Eng(CTU, AMgr, &VisitedCallees, &FS, ExprEngine::Inline_Regular) {}
 };

@@ -25,16 +25,15 @@
 namespace clang {
 
 IncrementalCUDADeviceParser::IncrementalCUDADeviceParser(
-    CompilerInstance &DeviceInstance, CompilerInstance &HostInstance,
+    CompilerInstance &DeviceInstance, CompilerInvocation &HostInvocation,
     IncrementalAction *DeviceAct,
     llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> FS,
     llvm::Error &Err, std::list<PartialTranslationUnit> &PTUs)
     : IncrementalParser(DeviceInstance, DeviceAct, Err, PTUs), VFS(FS),
-      // FIXME: DeviceOffload mutates HostInstance's CodeGenOpts post
-      // construction (CudaGpuBinaryFileName). Until that mutation moves
-      // pre-construction, breach the frozen-invocation invariant via
-      // const_cast.
-      CodeGenOpts(const_cast<CodeGenOptions &>(HostInstance.getCodeGenOpts())),
+      // The interpreter mutates CudaGpuBinaryFileName per PTU; the host
+      // invocation is the source of truth and is shared (not const-frozen)
+      // with the host CompilerInstance via Interpreter::HostInvocation.
+      CodeGenOpts(HostInvocation.getMutCodeGenOpts()),
       TargetOpts(DeviceInstance.getTargetOpts()) {
   if (Err)
     return;

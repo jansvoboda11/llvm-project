@@ -21,6 +21,7 @@
 
 namespace clang {
 
+class AnalyzerOptions;
 class CompilerInstance;
 
 namespace ento {
@@ -44,6 +45,12 @@ public:
   ///   });
   virtual void
   AddCheckerRegistrationFn(std::function<void(CheckerRegistry &)> Fn) = 0;
+
+  /// Mutable access to the AnalyzerOptions owned by this consumer. The
+  /// analyzer copies AnalyzerOptions out of the invocation at construction
+  /// time so it can mutate Config defaults, CheckersAndPackages, etc.
+  /// without touching the (frozen) CompilerInvocation.
+  virtual AnalyzerOptions &getMutAnalyzerOptions() = 0;
 };
 
 /// CreateAnalysisConsumer - Creates an ASTConsumer to run various code

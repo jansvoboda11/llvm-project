@@ -267,6 +267,13 @@ Interpreter::Interpreter(std::unique_ptr<CompilerInstance> Instance,
                          std::unique_ptr<clang::ASTConsumer> Consumer)
     : IncrExecutorBuilder(std::move(IEB)) {
   CI = std::move(Instance);
+  // Retain a mutable handle to the host invocation. The Interpreter relies
+  // on aliasing the CompilerInstance's invocation so that downstream
+  // components (in particular the CUDA device-offload parser) can update
+  // CodeGenOptions::CudaGpuBinaryFileName per partial translation unit
+  // without going through any setter on CompilerInstance.
+  HostInvocation =
+      std::const_pointer_cast<CompilerInvocation>(CI->getInvocationPtr());
   llvm::ErrorAsOutParameter EAO(&ErrOut);
   auto LLVMCtx = std::make_unique<llvm::LLVMContext>();
   TSCtx = std::make_unique<llvm::orc::ThreadSafeContext>(std::move(LLVMCtx));
@@ -424,8 +431,8 @@ Interpreter::createWithCUDA(std::unique_ptr<CompilerInstance> CI,
   Interp->DeviceCI = std::move(DCI);
 
   auto DeviceParser = std::make_unique<IncrementalCUDADeviceParser>(
-      *Interp->DeviceCI, *Interp->getCompilerInstance(),
-      Interp->DeviceAct.get(), IMVFS, Err, Interp->PTUs);
+      *Interp->DeviceCI, *Interp->HostInvocation, Interp->DeviceAct.get(),
+      IMVFS, Err, Interp->PTUs);
 
   if (Err)
     return std::move(Err);
