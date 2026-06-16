@@ -81,13 +81,21 @@ void ModelInjector::onBodySynthesis(const NamedDecl *D) {
   Invocation->getMutDiagnosticOpts().VerifyDiagnostics = 0;
 
   // Modules are parsed by a separate CompilerInstance, so this code mimics that
-  // behavior for models
+  // behavior for models. Hold an alias to the invocation so we can run target
+  // setup against it post-construction; the shared_ptr move keeps the
+  // underlying object alive at the same address.
+  CompilerInvocation &MutInv = *Invocation;
   CompilerInstance Instance(std::move(Invocation),
                             CI.getPCHContainerOperations());
   Instance.setVirtualFileSystem(CI.getVirtualFileSystemPtr());
   Instance.createDiagnostics(
       new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
       /*ShouldOwnClient=*/true);
+
+  CompilerInstance::TargetCreationResult TR;
+  if (!CompilerInstance::createTarget(Instance.getDiagnostics(), MutInv, TR))
+    return;
+  Instance.installTarget(std::move(TR));
 
   Instance.getDiagnostics().setSourceManager(SM.get());
 
