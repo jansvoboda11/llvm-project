@@ -237,8 +237,6 @@ bool ExecuteCompilerInvocation(CompilerInstance *Clang) {
     return true;
   }
 
-  Clang->LoadRequestedPlugins();
-
   // Honor -mllvm.
   //
   // FIXME: Remove this, one day.

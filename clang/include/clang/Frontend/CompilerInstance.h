@@ -93,13 +93,11 @@ class CompilerInstance : public ModuleLoader {
   /// constructor, and components such as Preprocessor / ASTContext observe
   /// it through const references.
   ///
-  /// FIXME: A few sites still mutate the held invocation post-construction:
-  /// \c LoadRequestedPlugins flips ProgramAction/ActionName when a plugin
-  /// requests \c ReplaceAction, and \c FrontendAction::BeginSourceFile
-  /// canonicalizes some per-input fields (CompilingModule, ImplicitPCHInclude
-  /// path, header-unit ModuleName). Those are being moved pre-construction or
-  /// into the BeginInvocation hook; once they are gone this member will
-  /// become \c shared_ptr<const CompilerInvocation>.
+  /// FIXME: \c FrontendAction::BeginSourceFile still mutates the held
+  /// invocation post-construction (CompilingModule for ModuleMap inputs,
+  /// ImplicitPCHInclude path canonicalization, header-unit ModuleName).
+  /// Once those move into the BeginInvocation hook, this member will become
+  /// \c shared_ptr<const CompilerInvocation>.
   std::shared_ptr<CompilerInvocation> Invocation;
 
   /// The virtual file system instance.
@@ -273,7 +271,12 @@ public:
   /// At the end of a compilation, print the number of warnings/errors.
   void printDiagnosticStats();
 
-  /// Load the list of plugins requested in the \c FrontendOptions.
+  /// Load the AST plugin libraries listed in \c FrontendOptions::Plugins
+  /// and the pass plugins listed in \c CodeGenOptions::PassPlugins. Does not
+  /// mutate the held \c CompilerInvocation; callers that want a plugin's
+  /// \c ReplaceAction request applied should do so pre-construction by
+  /// invoking \c applyPluginReplaceAction on the (still-mutable)
+  /// invocation after the plugin libraries have been loaded.
   void LoadRequestedPlugins();
 
   /// @}
@@ -1039,6 +1042,19 @@ public:
   ModuleCache &getModuleCache() const { return *ModCache; }
   std::shared_ptr<ModuleCache> getModuleCachePtr() const { return ModCache; }
 };
+
+/// Scan the \c FrontendPluginRegistry for any plugin requesting
+/// \c ReplaceAction and, if found, redirect the invocation's
+/// \c ProgramAction / \c ActionName to that plugin. Mutates \p Inv.
+///
+/// The caller must have loaded the AST plugin libraries listed in
+/// \c FrontendOptions::Plugins before calling this — otherwise the
+/// registry has no entries to scan. This is intended to run
+/// pre-\c CompilerInstance-construction (or against a still-mutable
+/// alias of the invocation) so the resulting \c ProgramAction is
+/// observed by \c CreateFrontendAction without further mutation of the
+/// frozen invocation held by the \c CompilerInstance.
+void applyPluginReplaceAction(CompilerInvocation &Inv);
 
 } // end namespace clang
 

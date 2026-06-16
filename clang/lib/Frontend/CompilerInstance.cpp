@@ -1114,15 +1114,18 @@ void CompilerInstance::LoadRequestedPlugins() {
           << Path << toString(PassPlugin.takeError());
     }
   }
+}
 
-  // Check if any of the loaded plugins replaces the main AST action
+void clang::applyPluginReplaceAction(CompilerInvocation &Inv) {
+  // If any registered plugin requested ReplaceAction, redirect the program
+  // action to it. The caller must have loaded the plugin libraries before
+  // calling this; otherwise the FrontendPluginRegistry has nothing to scan.
   for (const FrontendPluginRegistry::entry &Plugin :
        FrontendPluginRegistry::entries()) {
     std::unique_ptr<PluginASTAction> P(Plugin.instantiate());
     if (P->getActionType() == PluginASTAction::ReplaceAction) {
-      Invocation->getMutFrontendOpts().ProgramAction =
-          clang::frontend::PluginAction;
-      Invocation->getMutFrontendOpts().ActionName = Plugin.getName().str();
+      Inv.getMutFrontendOpts().ProgramAction = clang::frontend::PluginAction;
+      Inv.getMutFrontendOpts().ActionName = Plugin.getName().str();
       break;
     }
   }

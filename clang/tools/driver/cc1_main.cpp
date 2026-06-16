@@ -304,6 +304,13 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
     return 1;
   Clang->installTarget(std::move(TR));
 
+  // Load AST plugin libraries and pass plugins, then apply any plugin
+  // ReplaceAction request to the invocation. The replace-action mutation
+  // happens through the still-mutable alias (MutInv) before any const
+  // observer reads the invocation; ExecuteCompilerInvocation only reads.
+  Clang->LoadRequestedPlugins();
+  applyPluginReplaceAction(MutInv);
+
   // Execute the frontend actions.
   Success = ExecuteCompilerInvocation(Clang.get());
 
