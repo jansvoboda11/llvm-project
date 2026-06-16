@@ -185,12 +185,12 @@ bool GeneratePCHAction::shouldEraseOutputFiles() {
 std::vector<std::unique_ptr<ASTConsumer>>
 GenerateModuleAction::CreateMultiplexConsumer(CompilerInstance &CI,
                                               StringRef InFile) {
+  std::string OutputFile;
   if (!OS)
-    OS = CreateOutputFile(CI, InFile);
+    OS = CreateOutputFile(CI, InFile, OutputFile);
   if (!OS)
     return {};
 
-  std::string OutputFile = CI.getFrontendOpts().OutputFile;
   std::string Sysroot;
 
   auto Buffer = std::make_shared<PCHBuffer>();
@@ -238,26 +238,32 @@ bool GenerateModuleFromModuleMapAction::BeginSourceFileAction(
 
 std::unique_ptr<raw_pwrite_stream>
 GenerateModuleFromModuleMapAction::CreateOutputFile(CompilerInstance &CI,
-                                                    StringRef InFile) {
+                                                    StringRef InFile,
+                                                    std::string &OutputFile) {
   // If no output file was provided, figure out where this module would go
   // in the module cache.
-  if (CI.getFrontendOpts().OutputFile.empty()) {
+  StringRef OutputPath = CI.getFrontendOpts().OutputFile;
+  std::string DerivedPath;
+  if (OutputPath.empty()) {
     StringRef ModuleMapFile = CI.getFrontendOpts().OriginalModuleMap;
     if (ModuleMapFile.empty())
       ModuleMapFile = InFile;
 
     HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
-    ModuleFileName FileName = HS.getCachedModuleFileName(
-        CI.getLangOpts().CurrentModule, ModuleMapFile);
-    getMutInvocation().getMutFrontendOpts().OutputFile = FileName.str();
+    DerivedPath = HS.getCachedModuleFileName(CI.getLangOpts().CurrentModule,
+                                             ModuleMapFile)
+                      .str()
+                      .str();
+    OutputPath = DerivedPath;
   }
+  OutputFile = std::string(OutputPath);
 
   // Because this is exposed via libclang we must disable RemoveFileOnSignal.
-  return CI.createDefaultOutputFile(/*Binary=*/true, InFile, /*Extension=*/"",
-                                    /*RemoveFileOnSignal=*/false,
-                                    /*CreateMissingDirectories=*/true,
-                                    /*ForceUseTemporary=*/true,
-                                    /*SetOnlyIfDifferent=*/SetOnlyIfDifferent);
+  return CI.createOutputFile(OutputPath, /*Binary=*/true,
+                             /*RemoveFileOnSignal=*/false,
+                             /*UseTemporary=*/true,
+                             /*CreateMissingDirectories=*/true,
+                             /*SetOnlyIfDifferent=*/SetOnlyIfDifferent);
 }
 
 bool GenerateModuleInterfaceAction::PrepareToExecuteAction(
@@ -309,8 +315,19 @@ GenerateModuleInterfaceAction::CreateASTConsumer(CompilerInstance &CI,
 
 std::unique_ptr<raw_pwrite_stream>
 GenerateModuleInterfaceAction::CreateOutputFile(CompilerInstance &CI,
-                                                StringRef InFile) {
-  return CI.createDefaultOutputFile(/*Binary=*/true, InFile, "pcm");
+                                                StringRef InFile,
+                                                std::string &OutputFile) {
+  StringRef OutputPath = CI.getFrontendOpts().OutputFile;
+  SmallString<128> DerivedPath;
+  if (OutputPath.empty()) {
+    DerivedPath = InFile;
+    llvm::sys::path::replace_extension(DerivedPath, "pcm");
+    OutputPath = DerivedPath;
+  }
+  OutputFile = std::string(OutputPath);
+  return CI.createOutputFile(OutputPath, /*Binary=*/true,
+                             /*RemoveFileOnSignal=*/true,
+                             /*UseTemporary=*/CI.getFrontendOpts().UseTemporary);
 }
 
 std::unique_ptr<ASTConsumer>
@@ -336,8 +353,19 @@ bool GenerateHeaderUnitAction::BeginInvocation(CompilerInvocation &Inv,
 
 std::unique_ptr<raw_pwrite_stream>
 GenerateHeaderUnitAction::CreateOutputFile(CompilerInstance &CI,
-                                           StringRef InFile) {
-  return CI.createDefaultOutputFile(/*Binary=*/true, InFile, "pcm");
+                                           StringRef InFile,
+                                           std::string &OutputFile) {
+  StringRef OutputPath = CI.getFrontendOpts().OutputFile;
+  SmallString<128> DerivedPath;
+  if (OutputPath.empty()) {
+    DerivedPath = InFile;
+    llvm::sys::path::replace_extension(DerivedPath, "pcm");
+    OutputPath = DerivedPath;
+  }
+  OutputFile = std::string(OutputPath);
+  return CI.createOutputFile(OutputPath, /*Binary=*/true,
+                             /*RemoveFileOnSignal=*/true,
+                             /*UseTemporary=*/CI.getFrontendOpts().UseTemporary);
 }
 
 SyntaxOnlyAction::~SyntaxOnlyAction() {

@@ -24,6 +24,8 @@ public:
   ~TUSummaryExtractorFrontendAction();
 
 protected:
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
 };

@@ -447,12 +447,18 @@ ExtractAPIAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
                                               std::move(LCF), *API);
 }
 
-bool ExtractAPIAction::PrepareToExecuteAction(CompilerInstance &CI) {
-  // PrepareToExecuteAction runs before setCompilerInstance, so use the
-  // CI-taking overload.
-  auto &Inputs = getMutInvocation(CI).getMutFrontendOpts().Inputs;
+ArrayRef<FrontendInputFile>
+ExtractAPIAction::getInputs(CompilerInstance &CI) {
+  // Lazy on first call: synthesize a single buffer-based input from the
+  // invocation's header inputs. Returning the synthesized list keeps the
+  // held CompilerInvocation untouched — earlier versions of this method
+  // mutated CI's invocation.Inputs directly.
+  if (!SynthesizedInputs.empty() || Buffer)
+    return SynthesizedInputs;
+
+  ArrayRef<FrontendInputFile> Inputs = CI.getFrontendOpts().Inputs;
   if (Inputs.empty())
-    return true;
+    return Inputs;
 
   if (!CI.hasFileManager())
     CI.createFileManager();
@@ -497,12 +503,9 @@ bool ExtractAPIAction::PrepareToExecuteAction(CompilerInstance &CI) {
 
   Buffer = llvm::MemoryBuffer::getMemBufferCopy(HeaderContents,
                                                 getInputBufferName());
-
-  // Set that buffer up as our "real" input in the CompilerInstance.
-  Inputs.clear();
-  Inputs.emplace_back(Buffer->getMemBufferRef(), Kind, /*IsSystem*/ false);
-
-  return true;
+  SynthesizedInputs.emplace_back(Buffer->getMemBufferRef(), Kind,
+                                 /*IsSystem*/ false);
+  return SynthesizedInputs;
 }
 
 void ExtractAPIAction::EndSourceFileAction() {

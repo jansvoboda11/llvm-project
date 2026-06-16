@@ -39,9 +39,16 @@ public:
   CollectCommentsAction(std::vector<FoundComment> &Comments)
       : Comments(Comments) {}
 
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override {
+    if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
+      return false;
+    Inv.getMutLangOpts().CommentOpts.ParseAllComments = true;
+    return true;
+  }
+
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  llvm::StringRef) override {
-    getMutInvocation().getMutLangOpts().CommentOpts.ParseAllComments = true;
     return std::make_unique<Consumer>(*this);
   }
 

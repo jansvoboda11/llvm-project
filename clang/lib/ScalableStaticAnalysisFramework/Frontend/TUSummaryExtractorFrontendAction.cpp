@@ -171,6 +171,21 @@ TUSummaryExtractorFrontendAction::TUSummaryExtractorFrontendAction(
     std::unique_ptr<FrontendAction> WrappedAction)
     : WrapperFrontendAction(std::move(WrappedAction)) {}
 
+bool TUSummaryExtractorFrontendAction::BeginInvocation(CompilerInvocation &Inv,
+                                                       FrontendInputFile &Input,
+                                                       CompilerInstance &CI) {
+  if (!WrapperFrontendAction::BeginInvocation(Inv, Input, CI))
+    return false;
+  // The summary runner attaches an after-codegen consumer; the AST must
+  // remain alive through codegen so that consumer can read it. Decide this
+  // here, while the invocation is still effectively mutable, instead of in
+  // CreateASTConsumer where the held invocation is treated as frozen.
+  if (!Inv.getFrontendOpts().SSAFCompilationUnitId.empty() &&
+      !Inv.getFrontendOpts().SSAFTUSummaryFile.empty())
+    Inv.getMutCodeGenOpts().ClearASTBeforeBackend = false;
+  return true;
+}
+
 std::unique_ptr<ASTConsumer>
 TUSummaryExtractorFrontendAction::CreateASTConsumer(CompilerInstance &CI,
                                                     StringRef InFile) {
@@ -179,7 +194,6 @@ TUSummaryExtractorFrontendAction::CreateASTConsumer(CompilerInstance &CI,
     return nullptr;
 
   if (auto Runner = TUSummaryRunner::create(CI)) {
-    getMutInvocation().getMutCodeGenOpts().ClearASTBeforeBackend = false;
     std::vector<std::unique_ptr<ASTConsumer>> Consumers;
     Consumers.reserve(2);
     Consumers.push_back(std::move(WrappedConsumer));

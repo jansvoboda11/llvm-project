@@ -82,11 +82,13 @@ enum class DisableValidationForModuleKind;
 /// come in two forms; a short form that reuses the CompilerInstance objects,
 /// and a long form that takes explicit instances of any required objects.
 class CompilerInstance : public ModuleLoader {
-  /// FIXME: Several pre-Preprocessor setup paths still need mutable access
-  /// to the held CompilerInvocation; befriend them while those paths move
-  /// pre-construction.
+  /// Befriended so \c FrontendAction::BeginSourceFile can hand the held
+  /// \c CompilerInvocation to the \c BeginInvocation hook as mutable, and
+  /// so the AST-replay branch can populate the invocation from a loaded
+  /// \c ASTUnit. Both run before \c Preprocessor / \c ASTContext start
+  /// observing the invocation through \c const references; outside of
+  /// that window the public API treats the invocation as frozen.
   friend class FrontendAction;
-  friend class WrapperFrontendAction;
   /// The options used in this compiler instance. The public API
   /// (\c getInvocation, \c getInvocationPtr) treats this as const: callers
   /// must finalize the \c CompilerInvocation before handing it to the

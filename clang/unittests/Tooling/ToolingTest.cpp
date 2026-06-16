@@ -557,9 +557,16 @@ struct SkipBodyConsumer : public clang::ASTConsumer {
 };
 
 struct SkipBodyAction : public clang::ASTFrontendAction {
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override {
+    if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
+      return false;
+    Inv.getMutFrontendOpts().SkipFunctionBodies = true;
+    return true;
+  }
+
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &Compiler,
                                                  StringRef) override {
-    getMutInvocation().getMutFrontendOpts().SkipFunctionBodies = true;
     return std::make_unique<SkipBodyConsumer>();
   }
 };

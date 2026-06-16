@@ -1020,7 +1020,7 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
   if (getFrontendOpts().ShowStats || !getFrontendOpts().StatsFile.empty())
     llvm::EnableStatistics(false);
 
-  for (const FrontendInputFile &FIF : getFrontendOpts().Inputs) {
+  for (const FrontendInputFile &FIF : Act.getInputs(*this)) {
     // Reset the ID tables if we are reusing the SourceManager and parsing
     // regular files.
     if (hasSourceManager() && !Act.isModelParsingAction())

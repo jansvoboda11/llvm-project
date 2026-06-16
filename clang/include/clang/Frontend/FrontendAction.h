@@ -171,21 +171,6 @@ public:
     return *Instance;
   }
 
-  /// Mutable access to the held CompilerInvocation. Most setup should
-  /// finalize the invocation pre-CompilerInstance construction so this is
-  /// not needed; this exists as a transitional accessor for per-input setup
-  /// inside FrontendAction subclasses that hasn't yet moved earlier in the
-  /// lifecycle. The public CompilerInstance::getInvocation() returns const,
-  /// preserving the immutability invariant for outside callers.
-  // FIXME: Drop this when all in-tree FrontendAction subclasses have moved
-  // their mutations pre-construction.
-  CompilerInvocation &getMutInvocation() const;
-
-  /// Like \c getMutInvocation but operating on an explicit
-  /// \c CompilerInstance reference. Useful from \c PrepareToExecuteAction
-  /// where the action has not yet been bound via \c setCompilerInstance.
-  static CompilerInvocation &getMutInvocation(CompilerInstance &CI);
-
   void setCompilerInstance(CompilerInstance *Value) { Instance = Value; }
 
   /// @}
@@ -277,6 +262,15 @@ public:
   bool PrepareToExecute(CompilerInstance &CI) {
     return PrepareToExecuteAction(CI);
   }
+
+  /// Return the list of inputs that the action wants to be processed, in
+  /// order. The default implementation returns the invocation's
+  /// \c FrontendOptions::Inputs verbatim. Overrides can synthesize a
+  /// different list — \c ExtractAPIAction, for example, returns a single
+  /// memory-buffer input that combines all the header file paths from the
+  /// invocation. The returned reference must remain valid for the duration
+  /// of \c CompilerInstance::ExecuteAction.
+  virtual ArrayRef<FrontendInputFile> getInputs(CompilerInstance &CI);
 
   /// Prepare the action for processing the input file \p Input.
   ///

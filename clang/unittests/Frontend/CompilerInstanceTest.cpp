@@ -211,8 +211,7 @@ TEST(CompilerInstance, SingleModuleParseModeCallback) {
     bool BeginSourceFileAction(CompilerInstance &CI) override {
       auto Cb = std::make_unique<ModuleLoadSkippedCallback>(SkippedModules);
       CI.getPreprocessor().addPPCallbacks(std::move(Cb));
-      FrontendInputFile Input = getCurrentInput();
-      return SyntaxOnlyAction::BeginInvocation(getMutInvocation(), Input, CI);
+      return SyntaxOnlyAction::BeginSourceFileAction(CI);
     }
   };
 

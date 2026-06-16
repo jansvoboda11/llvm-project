@@ -369,12 +369,9 @@ FrontendAction::FrontendAction() : Instance(nullptr) {}
 
 FrontendAction::~FrontendAction() {}
 
-CompilerInvocation &FrontendAction::getMutInvocation() const {
-  return *getCompilerInstance().Invocation;
-}
-
-CompilerInvocation &FrontendAction::getMutInvocation(CompilerInstance &CI) {
-  return *CI.Invocation;
+ArrayRef<FrontendInputFile>
+FrontendAction::getInputs(CompilerInstance &CI) {
+  return CI.getFrontendOpts().Inputs;
 }
 
 bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,

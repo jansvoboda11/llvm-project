@@ -123,11 +123,18 @@ public:
       : Success(Success), OverrideLimit(OverrideLimit) {}
 
 protected:
+  bool BeginInvocation(clang::CompilerInvocation &Inv,
+                       clang::FrontendInputFile &Input,
+                       clang::CompilerInstance &CI) override {
+    if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
+      return false;
+    Inv.getMutAnalyzerOpts().CTUImportThreshold = OverrideLimit;
+    Inv.getMutAnalyzerOpts().CTUImportCppThreshold = OverrideLimit;
+    return true;
+  }
+
   std::unique_ptr<clang::ASTConsumer>
   CreateASTConsumer(clang::CompilerInstance &CI, StringRef) override {
-    getMutInvocation().getMutAnalyzerOpts().CTUImportThreshold = OverrideLimit;
-    getMutInvocation().getMutAnalyzerOpts().CTUImportCppThreshold =
-        OverrideLimit;
     return std::make_unique<CTUASTConsumer>(CI, Success);
   }
 

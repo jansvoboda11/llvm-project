@@ -27,6 +27,10 @@ protected:
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
 
+  /// Synthesize a single buffer-based input from the invocation's header
+  /// inputs (rather than mutating the held \c CompilerInvocation).
+  ArrayRef<FrontendInputFile> getInputs(CompilerInstance &CI) override;
+
 private:
 
   /// The input file originally provided on the command line.
@@ -35,12 +39,10 @@ private:
   /// include is quoted or not.
   SmallVector<std::pair<SmallString<32>, bool>> KnownInputFiles;
 
-  /// Prepare to execute the action on the given CompilerInstance.
-  ///
-  /// This is called before executing the action on any inputs. This generates a
-  /// single header that includes all of CI's inputs and replaces CI's input
-  /// list with it before actually executing the action.
-  bool PrepareToExecuteAction(CompilerInstance &CI) override;
+  /// One-element list returned by \c getInputs after the synthesized buffer
+  /// is built. Stored so the \c ArrayRef returned to
+  /// \c CompilerInstance::ExecuteAction stays valid for the life of the run.
+  SmallVector<FrontendInputFile, 1> SynthesizedInputs;
 
   /// Called after executing the action on the synthesized input buffer.
   ///

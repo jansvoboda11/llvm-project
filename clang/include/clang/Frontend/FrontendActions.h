@@ -127,7 +127,8 @@ private:
   std::unique_ptr<raw_pwrite_stream> OS;
 
   virtual std::unique_ptr<raw_pwrite_stream>
-  CreateOutputFile(CompilerInstance &CI, StringRef InFile) = 0;
+  CreateOutputFile(CompilerInstance &CI, StringRef InFile,
+                   std::string &OutputFile) = 0;
 
 protected:
   std::vector<std::unique_ptr<ASTConsumer>>
@@ -164,7 +165,8 @@ private:
   bool BeginSourceFileAction(CompilerInstance &CI) override;
 
   std::unique_ptr<raw_pwrite_stream>
-  CreateOutputFile(CompilerInstance &CI, StringRef InFile) override;
+  CreateOutputFile(CompilerInstance &CI, StringRef InFile,
+                   std::string &OutputFile) override;
 
   bool SetOnlyIfDifferent;
 
@@ -187,7 +189,8 @@ protected:
   TranslationUnitKind getTranslationUnitKind() override { return TU_Complete; }
 
   std::unique_ptr<raw_pwrite_stream>
-  CreateOutputFile(CompilerInstance &CI, StringRef InFile) override;
+  CreateOutputFile(CompilerInstance &CI, StringRef InFile,
+                   std::string &OutputFile) override;
 };
 
 /// Only generates the reduced BMI. This action is mainly used by tests.
@@ -205,7 +208,8 @@ private:
                        CompilerInstance &CI) override;
 
   std::unique_ptr<raw_pwrite_stream>
-  CreateOutputFile(CompilerInstance &CI, StringRef InFile) override;
+  CreateOutputFile(CompilerInstance &CI, StringRef InFile,
+                   std::string &OutputFile) override;
 };
 
 class SyntaxOnlyAction : public ASTFrontendAction {
