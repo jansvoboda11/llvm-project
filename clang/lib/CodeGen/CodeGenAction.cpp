@@ -946,18 +946,17 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
   return BEConsumer->getCodeGenerator();
 }
 
-bool CodeGenAction::BeginInvocation(CompilerInvocation &Invocation,
-                                    DiagnosticsEngine &Diags,
-                                    llvm::vfs::FileSystem &VFS) {
+bool CodeGenAction::BeginInvocation(CompilerInvocation &Inv,
+                                    FrontendInputFile &Input,
+                                    CompilerInstance &CI) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
   // and start observing it through their const LangOptions& references. Note
   // that the parent's BeginInvocation resets CompilingModule to None as a
   // per-input precondition, so we have to override it after chaining.
-  if (!ASTFrontendAction::BeginInvocation(Invocation, Diags, VFS))
+  if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
     return false;
-  if (Invocation.getFrontendOpts().GenReducedBMI)
-    Invocation.getMutLangOpts().setCompilingModule(
-        LangOptions::CMK_ModuleInterface);
+  if (Inv.getFrontendOpts().GenReducedBMI)
+    Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
   return true;
 }
 

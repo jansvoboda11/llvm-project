@@ -35,9 +35,8 @@ private:
   std::unique_ptr<llvm::Module> loadModule(llvm::MemoryBufferRef MBRef);
 
 protected:
-  bool BeginInvocation(CompilerInvocation &Invocation,
-                       DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
 
   /// Create a new code generation action.  If the optional \p _VMContext
   /// parameter is supplied, the action uses it without taking ownership,

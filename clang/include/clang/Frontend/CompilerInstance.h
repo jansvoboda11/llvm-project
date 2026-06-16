@@ -93,11 +93,12 @@ class CompilerInstance : public ModuleLoader {
   /// constructor, and components such as Preprocessor / ASTContext observe
   /// it through const references.
   ///
-  /// FIXME: \c FrontendAction::BeginSourceFile still mutates the held
-  /// invocation post-construction (CompilingModule for ModuleMap inputs,
-  /// ImplicitPCHInclude path canonicalization, header-unit ModuleName).
-  /// Once those move into the BeginInvocation hook, this member will become
-  /// \c shared_ptr<const CompilerInvocation>.
+  /// FIXME: A handful of sites still reach into the held invocation post-
+  /// construction via friend access on \c FrontendAction (the
+  /// \c BeginInvocation hook is the documented per-input mutation point;
+  /// the AST-replay path inside \c BeginSourceFile populates the invocation
+  /// from an \c ASTUnit). Once those mutations are split off the held
+  /// member, this will become \c shared_ptr<const CompilerInvocation>.
   std::shared_ptr<CompilerInvocation> Invocation;
 
   /// The virtual file system instance.

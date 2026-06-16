@@ -113,8 +113,10 @@ void FixItAction::EndSourceFileAction() {
 }
 
 bool FixItRecompile::BeginInvocation(CompilerInvocation &Invocation,
-                                     DiagnosticsEngine &Diags,
-                                     llvm::vfs::FileSystem &VFS) {
+                                     FrontendInputFile &Input,
+                                     CompilerInstance &CI) {
+  DiagnosticsEngine &Diags = CI.getDiagnostics();
+  llvm::vfs::FileSystem &VFS = CI.getVirtualFileSystem();
   // Run a SyntaxOnly fix-it pass on a separate CompilerInstance with a copy
   // of the outer invocation, then forward the rewritten files into the outer
   // invocation as remapped inputs so the wrapped action sees them.
@@ -270,6 +272,7 @@ public:
     // Don't recursively rewrite imports. We handle them all at the top level.
     NewInvocation->getMutPreprocessorOutputOpts().RewriteImports = false;
 
+    CompilerInvocation &MutNewInv = *NewInvocation;
     CompilerInstance Instance(std::move(NewInvocation),
                               CI.getPCHContainerOperations(),
                               CI.getModuleCachePtr());
@@ -277,6 +280,12 @@ public:
     Instance.createDiagnostics(
         new ForwardingDiagnosticConsumer(CI.getDiagnosticClient()),
         /*ShouldOwnClient=*/true);
+
+    CompilerInstance::TargetCreationResult TR;
+    if (!CompilerInstance::createTarget(Instance.getDiagnostics(), MutNewInv,
+                                        TR))
+      return;
+    Instance.installTarget(std::move(TR));
 
     llvm::CrashRecoveryContext().RunSafelyOnThread([&]() {
       RewriteIncludesAction Action;

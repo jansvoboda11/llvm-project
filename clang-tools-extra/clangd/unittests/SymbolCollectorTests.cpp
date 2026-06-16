@@ -295,11 +295,10 @@ public:
                                          CI.getPreprocessorPtr());
       }
 
-      bool BeginInvocation(CompilerInvocation &Invocation,
-                           DiagnosticsEngine &Diags,
-                           llvm::vfs::FileSystem &VFS) override {
+      bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                           CompilerInstance &CI) override {
         // Make the compiler parse all comments.
-        Invocation.getMutLangOpts().CommentOpts.ParseAllComments = true;
+        Inv.getMutLangOpts().CommentOpts.ParseAllComments = true;
         return true;
       }
 

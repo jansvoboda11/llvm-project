@@ -81,20 +81,46 @@ protected:
                                                          StringRef InFile) = 0;
 
   /// Callback before starting processing a single input, giving the
-  /// opportunity to modify the CompilerInvocation or do some other action
+  /// opportunity to mutate the CompilerInvocation or do some other action
   /// before BeginSourceFileAction is called.
   ///
-  /// The default implementation walks the FrontendPluginRegistry and clears
-  /// CodeGenOptions::ClearASTBeforeBackend if any plugin would attach an
-  /// after-main consumer to the action — those consumers run after codegen
-  /// and need the AST to still be alive. Overrides that want this behavior
-  /// must chain to FrontendAction::BeginInvocation.
+  /// This is the documented per-input mutation point: it runs after the
+  /// CompilerInstance has its VFS / FileManager / SourceManager / Target
+  /// set up, but before \c Preprocessor / \c ASTContext are constructed —
+  /// so the invocation is still effectively mutable. Once this hook
+  /// returns, the invocation is treated as frozen for the rest of the
+  /// per-input lifecycle.
   ///
-  /// \return True on success; on failure BeginSourceFileAction(),
-  /// ExecuteAction() and EndSourceFileAction() will not be called.
-  virtual bool BeginInvocation(CompilerInvocation &Invocation,
-                               DiagnosticsEngine &Diags,
-                               llvm::vfs::FileSystem &VFS);
+  /// The default implementation:
+  ///   * resets \c LangOpts.CompilingModule to \c CMK_None and, for
+  ///     \c InputKind::ModuleMap inputs, sets it to \c CMK_ModuleMap;
+  ///   * canonicalizes \c PreprocessorOpts.ImplicitPCHInclude (resolving
+  ///     a directory entry to a single AST file when needed);
+  ///   * resolves the C++20 header-unit file path and seeds
+  ///     \c LangOpts.ModuleName / \c CurrentModule for both
+  ///     non-preprocessed and preprocessed header-unit inputs (the latter
+  ///     reads the original path from the input's first-line linemarker);
+  ///   * clears \c CodeGenOptions::ClearASTBeforeBackend if any registered
+  ///     plugin would attach an after-main-action consumer (those consumers
+  ///     run after codegen and need the AST alive).
+  ///
+  /// Overrides that need this behavior must chain to
+  /// \c FrontendAction::BeginInvocation.
+  ///
+  /// \param Inv The (still mutable) \c CompilerInvocation that the
+  /// \c CompilerInstance will treat as frozen after this call.
+  /// \param Input The current input. Header-unit lookup may rewrite this
+  /// to use the resolved absolute path.
+  /// \param CI The \c CompilerInstance whose VFS / FileManager /
+  /// SourceManager / Target may be consulted. The hook must not access
+  /// \c Preprocessor / \c ASTContext / \c Sema (they are not yet
+  /// constructed) and must not mutate the invocation through \c CI.
+  ///
+  /// \return True on success; on failure \c BeginSourceFileAction(),
+  /// \c ExecuteAction() and \c EndSourceFileAction() will not be called.
+  virtual bool BeginInvocation(CompilerInvocation &Inv,
+                               FrontendInputFile &Input,
+                               CompilerInstance &CI);
 
   /// Callback at the start of processing a single input.
   ///
@@ -353,9 +379,8 @@ protected:
   bool PrepareToExecuteAction(CompilerInstance &CI) override;
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
-  bool BeginInvocation(CompilerInvocation &Invocation,
-                       DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
   void ExecuteAction() override;
   void EndSourceFile() override;

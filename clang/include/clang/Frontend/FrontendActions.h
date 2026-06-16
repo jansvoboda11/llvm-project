@@ -177,9 +177,8 @@ public:
 /// files) for C++20 Named Modules.
 class GenerateModuleInterfaceAction : public GenerateModuleAction {
 protected:
-  bool BeginInvocation(CompilerInvocation &Invocation,
-                       DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
   bool PrepareToExecuteAction(CompilerInstance &CI) override;
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
@@ -202,9 +201,8 @@ private:
 class GenerateHeaderUnitAction : public GenerateModuleAction {
 
 private:
-  bool BeginInvocation(CompilerInvocation &Invocation,
-                       DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
 
   std::unique_ptr<raw_pwrite_stream>
   CreateOutputFile(CompilerInstance &CI, StringRef InFile) override;
@@ -229,9 +227,8 @@ class DumpModuleInfoAction : public ASTFrontendAction {
 protected:
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
-  bool BeginInvocation(CompilerInvocation &Invocation,
-                       DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override;
   void ExecuteAction() override;
 
 public:

@@ -377,14 +377,21 @@ CompilerInvocation &FrontendAction::getMutInvocation(CompilerInstance &CI) {
   return *CI.Invocation;
 }
 
-bool FrontendAction::BeginInvocation(CompilerInvocation &Invocation,
-                                     DiagnosticsEngine &Diags,
-                                     llvm::vfs::FileSystem &VFS) {
+bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
+                                     FrontendInputFile &Input,
+                                     CompilerInstance &CI) {
+  DiagnosticsEngine &Diags = CI.getDiagnostics();
+
   // Reset per-input state on the invocation. CompilingModule is per-input,
   // so each input has to clear it back to None and then let any override
   // below override it before Preprocessor/ASTContext start observing
   // CodeGenOptions / LangOptions through their const references.
-  Invocation.getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+  Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+
+  // For module-map inputs, mark the invocation as compiling a module before
+  // any consumer (Preprocessor, ASTContext, ...) is created.
+  if (Input.getKind().getFormat() == InputKind::ModuleMap)
+    Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
 
   // If any registered plugin will attach an after-main-action AST consumer,
   // the AST must remain alive through codegen so that consumer can read it.
@@ -403,14 +410,149 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Invocation,
     std::unique_ptr<PluginASTAction> P = Plugin.instantiate();
     PluginASTAction::ActionType ActionType = P->getActionType();
     if (ActionType == PluginASTAction::CmdlineAfterMainAction &&
-        llvm::is_contained(Invocation.getFrontendOpts().AddPluginActions,
+        llvm::is_contained(Inv.getFrontendOpts().AddPluginActions,
                            Plugin.getName()))
       ActionType = PluginASTAction::AddAfterMainAction;
     if (ActionType == PluginASTAction::AddAfterMainAction) {
-      Invocation.getMutCodeGenOpts().ClearASTBeforeBackend = false;
+      Inv.getMutCodeGenOpts().ClearASTBeforeBackend = false;
       break;
     }
   }
+
+  // The remaining per-input mutations only apply to the regular
+  // (non-Precompiled, non-LLVM-IR) compilation path. Skip them for
+  // input formats that bypass createPreprocessor entirely.
+  if (Input.getKind().getFormat() == InputKind::Precompiled ||
+      Input.getKind().getLanguage() == Language::LLVM_IR)
+    return true;
+
+  // Canonicalize ImplicitPCHInclude so the ASTWriter and other downstream
+  // consumers receive an absolute path; if the entry resolves to a directory,
+  // pick a suitable AST file from within it.
+  if (!Inv.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
+    FileManager &FileMgr = CI.getFileManager();
+    PreprocessorOptions &PPOpts = Inv.getMutPreprocessorOpts();
+
+    SmallString<128> PCHIncludePath(PPOpts.ImplicitPCHInclude);
+    FileMgr.makeAbsolutePath(PCHIncludePath);
+    llvm::sys::path::remove_dots(PCHIncludePath, true);
+    PPOpts.ImplicitPCHInclude = PCHIncludePath.str();
+    StringRef PCHInclude = PPOpts.ImplicitPCHInclude;
+
+    if (auto PCHDir = FileMgr.getOptionalDirectoryRef(PCHInclude)) {
+      std::error_code EC;
+      SmallString<128> DirNative;
+      llvm::sys::path::native(PCHDir->getName(), DirNative);
+      bool Found = false;
+      llvm::vfs::FileSystem &FS = FileMgr.getVirtualFileSystem();
+      std::string SpecificModuleCachePath = createSpecificModuleCachePath(
+          FileMgr, Inv.getHeaderSearchOpts().ModuleCachePath,
+          Inv.getHeaderSearchOpts().DisableModuleHash,
+          Inv.computeContextHash());
+      for (llvm::vfs::directory_iterator Dir = FS.dir_begin(DirNative, EC),
+                                         DirEnd;
+           Dir != DirEnd && !EC; Dir.increment(EC)) {
+        if (ASTReader::isAcceptableASTFile(
+                Dir->path(), FileMgr, CI.getModuleCache(),
+                CI.getPCHContainerReader(), Inv.getLangOpts(),
+                Inv.getCodeGenOpts(), Inv.getTargetOpts(),
+                Inv.getPreprocessorOpts(), Inv.getHeaderSearchOpts(),
+                SpecificModuleCachePath,
+                /*RequireStrictOptionMatches=*/true)) {
+          PPOpts.ImplicitPCHInclude = std::string(Dir->path());
+          Found = true;
+          break;
+        }
+      }
+
+      if (!Found) {
+        Diags.Report(diag::err_fe_no_pch_in_dir) << PCHInclude;
+        return false;
+      }
+    }
+  }
+
+  // Handle C++20 header units. Resolve the file path BEFORE the
+  // Preprocessor is created so the resulting module name can land on the
+  // (still-mutable) invocation while LangOptions is observable through
+  // const references only.
+  if (Inv.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
+      !Input.getKind().isPreprocessed()) {
+    StringRef FileName = Input.getFile();
+    InputKind Kind = Input.getKind();
+    if (Kind.getHeaderUnitKind() != InputKind::HeaderUnit_Abs) {
+      // Build a temporary HeaderSearch so the lookup uses the configured
+      // search paths without forcing us to create the real Preprocessor first.
+      HeaderSearch TmpHS(Inv.getHeaderSearchOpts(), CI.getSourceManager(),
+                         Diags, Inv.getLangOpts(), &CI.getTarget());
+      ApplyHeaderSearchOptions(TmpHS, Inv.getHeaderSearchOpts(),
+                               Inv.getLangOpts(), CI.getTarget().getTriple());
+      // Relative searches begin from CWD.
+      auto Dir = CI.getFileManager().getOptionalDirectoryRef(".");
+      SmallVector<std::pair<OptionalFileEntryRef, DirectoryEntryRef>, 1> CWD;
+      CWD.push_back({std::nullopt, *Dir});
+      OptionalFileEntryRef FE =
+          TmpHS.LookupFile(FileName, SourceLocation(),
+                           /*Angled*/ Input.getKind().getHeaderUnitKind() ==
+                               InputKind::HeaderUnit_System,
+                           nullptr, nullptr, CWD, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr);
+      if (!FE) {
+        Diags.Report(diag::err_module_header_file_not_found) << FileName;
+        return false;
+      }
+      FileName = FE->getName();
+      Kind = Input.getKind().withHeaderUnit(InputKind::HeaderUnit_Abs);
+      Input = FrontendInputFile(FileName, Kind, Input.isSystem());
+    }
+    if (Inv.getLangOpts().ModuleName.empty())
+      Inv.getMutLangOpts().ModuleName = std::string(FileName);
+    Inv.getMutLangOpts().CurrentModule = Inv.getLangOpts().ModuleName;
+  }
+
+  // Preprocessed C++20 header units record the original .h pathname as a
+  // `# 1 "FILE"` linemarker on the first line. Read that linemarker pre-
+  // Preprocessor so the module name lands on the invocation while LangOptions
+  // is still effectively mutable. The full SourceManager-backed
+  // ReadOriginalFileName runs again later for non-header-unit preprocessed
+  // input that doesn't need pre-Preprocessor module-name resolution.
+  if (Inv.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
+      Input.getKind().isPreprocessed() && !usesPreprocessorOnly() &&
+      Inv.getLangOpts().ModuleName.empty()) {
+    StringRef FirstLine;
+    std::unique_ptr<llvm::MemoryBuffer> OwnedBuffer;
+    if (Input.isFile()) {
+      auto BufferOrErr = CI.getFileManager().getBufferForFile(Input.getFile());
+      if (BufferOrErr) {
+        OwnedBuffer = std::move(*BufferOrErr);
+        FirstLine = OwnedBuffer->getBuffer();
+      }
+    } else {
+      FirstLine = Input.getBuffer().getBuffer();
+    }
+    if (size_t NL = FirstLine.find('\n'); NL != StringRef::npos)
+      FirstLine = FirstLine.substr(0, NL);
+    StringRef PresumedInputFile;
+    StringRef Rest = FirstLine.ltrim();
+    if (Rest.consume_front("#")) {
+      Rest = Rest.ltrim();
+      while (!Rest.empty() && llvm::isDigit(Rest.front()))
+        Rest = Rest.drop_front();
+      Rest = Rest.ltrim();
+      if (Rest.consume_front("\"")) {
+        if (size_t Close = Rest.find('"'); Close != StringRef::npos)
+          PresumedInputFile = Rest.substr(0, Close);
+      }
+    }
+    if (PresumedInputFile.empty()) {
+      PresumedInputFile = Input.isFile()
+                              ? Input.getFile()
+                              : Input.getBuffer().getBufferIdentifier();
+    }
+    Inv.getMutLangOpts().ModuleName = PresumedInputFile.str();
+    Inv.getMutLangOpts().CurrentModule = Inv.getLangOpts().ModuleName;
+  }
+
   return true;
 }
 
@@ -892,17 +1034,30 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     setCompilerInstance(nullptr);
   });
 
-  if (!BeginInvocation(*CI.Invocation, CI.getDiagnostics(),
-                       CI.getVirtualFileSystem()))
-    return false;
+  // Set up the file system, file and source managers up front so the
+  // BeginInvocation hook below can consult FileManager / SourceManager
+  // for per-input setup that depends on them (PCH path canonicalization,
+  // C++20 header-unit lookup). The Precompiled / ReplayAST paths below
+  // replace these with the AST's own instances.
+  if (!CI.hasVirtualFileSystem())
+    CI.createVirtualFileSystem();
+  if (!CI.hasFileManager())
+    CI.createFileManager();
+  if (!CI.hasSourceManager()) {
+    CI.createSourceManager();
+    if (CI.getDiagnosticOpts().getFormat() == DiagnosticOptions::SARIF) {
+      static_cast<SARIFDiagnosticPrinter *>(&CI.getDiagnosticClient())
+          ->setSarifWriter(
+              std::make_unique<SarifDocumentWriter>(CI.getSourceManager()));
+    }
+  }
 
-  // For module map files, mark the invocation as compiling a module before
-  // any consumer (Preprocessor, ASTContext, ...) is created. This was
-  // previously done late, inside the ModuleMap branch below, after
-  // createPreprocessor had already captured a reference to LangOptions.
-  if (Input.getKind().getFormat() == InputKind::ModuleMap)
-    CI.Invocation->getMutLangOpts().setCompilingModule(
-        LangOptions::CMK_ModuleMap);
+  if (!BeginInvocation(*CI.Invocation, Input, CI))
+    return false;
+  // BeginInvocation may have rewritten CurrentInput (e.g. C++20 header-unit
+  // resolution rewrites HeaderUnit_Name → HeaderUnit_Abs). Update the action's
+  // stored CurrentInput so getCurrentFile() reports the resolved path.
+  setCurrentInput(Input);
 
   // The list of module files the input AST file depends on. This is separate
   // from FrontendOptions::ModuleFiles, because those only represent explicit
@@ -1015,20 +1170,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     return true;
   }
 
-  // Set up the file system, file and source managers, if needed.
-  if (!CI.hasVirtualFileSystem())
-    CI.createVirtualFileSystem();
-  if (!CI.hasFileManager())
-    CI.createFileManager();
-  if (!CI.hasSourceManager()) {
-    CI.createSourceManager();
-    if (CI.getDiagnosticOpts().getFormat() == DiagnosticOptions::SARIF) {
-      static_cast<SARIFDiagnosticPrinter *>(&CI.getDiagnosticClient())
-          ->setSarifWriter(
-              std::make_unique<SarifDocumentWriter>(CI.getSourceManager()));
-    }
-  }
-
   // Set up embedding for any specified files. Do this before we load any
   // source files, including the primary module map for the compilation.
   for (const auto &F : CI.getFrontendOpts().ModulesEmbedFiles) {
@@ -1062,149 +1203,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
 
     FailureCleanup.release();
     return true;
-  }
-
-  if (!CI.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
-    FileManager &FileMgr = CI.getFileManager();
-    PreprocessorOptions &PPOpts = CI.Invocation->getMutPreprocessorOpts();
-
-    // Canonicalize ImplicitPCHInclude. This way, all the downstream code,
-    // including the ASTWriter, will receive the absolute path to the included
-    // PCH.
-    SmallString<128> PCHIncludePath(PPOpts.ImplicitPCHInclude);
-    FileMgr.makeAbsolutePath(PCHIncludePath);
-    llvm::sys::path::remove_dots(PCHIncludePath, true);
-    PPOpts.ImplicitPCHInclude = PCHIncludePath.str();
-    StringRef PCHInclude = PPOpts.ImplicitPCHInclude;
-
-    // If the implicit PCH include is actually a directory, rather than
-    // a single file, search for a suitable PCH file in that directory.
-    if (auto PCHDir = FileMgr.getOptionalDirectoryRef(PCHInclude)) {
-      std::error_code EC;
-      SmallString<128> DirNative;
-      llvm::sys::path::native(PCHDir->getName(), DirNative);
-      bool Found = false;
-      llvm::vfs::FileSystem &FS = FileMgr.getVirtualFileSystem();
-      std::string SpecificModuleCachePath = createSpecificModuleCachePath(
-          CI.getFileManager(), CI.getHeaderSearchOpts().ModuleCachePath,
-          CI.getHeaderSearchOpts().DisableModuleHash,
-          CI.getInvocation().computeContextHash());
-      for (llvm::vfs::directory_iterator Dir = FS.dir_begin(DirNative, EC),
-                                         DirEnd;
-           Dir != DirEnd && !EC; Dir.increment(EC)) {
-        // Check whether this is an acceptable AST file.
-        if (ASTReader::isAcceptableASTFile(
-                Dir->path(), FileMgr, CI.getModuleCache(),
-                CI.getPCHContainerReader(), CI.getLangOpts(),
-                CI.getCodeGenOpts(), CI.getTargetOpts(),
-                CI.getPreprocessorOpts(), CI.getHeaderSearchOpts(),
-                SpecificModuleCachePath,
-                /*RequireStrictOptionMatches=*/true)) {
-          PPOpts.ImplicitPCHInclude = std::string(Dir->path());
-          Found = true;
-          break;
-        }
-      }
-
-      if (!Found) {
-        CI.getDiagnostics().Report(diag::err_fe_no_pch_in_dir) << PCHInclude;
-        return false;
-      }
-    }
-  }
-
-  // Handle C++20 header units.
-  // Here, the user has the option to specify that the header name should be
-  // looked up in the pre-processor search paths (and the main filename as
-  // passed by the driver might therefore be incomplete until that look-up).
-  // Resolve the file BEFORE creating the Preprocessor so that the resulting
-  // module name can be set on the invocation while the *Options are still
-  // mutable; otherwise the Preprocessor would already hold a const reference
-  // to LangOptions when we mutate ModuleName/CurrentModule below.
-  if (CI.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
-      !Input.getKind().isPreprocessed()) {
-    StringRef FileName = Input.getFile();
-    InputKind Kind = Input.getKind();
-    if (Kind.getHeaderUnitKind() != InputKind::HeaderUnit_Abs) {
-      // Build a temporary HeaderSearch so the lookup uses the configured
-      // search paths without forcing us to create the real Preprocessor first.
-      HeaderSearch TmpHS(CI.getHeaderSearchOpts(), CI.getSourceManager(),
-                         CI.getDiagnostics(), CI.getLangOpts(), &CI.getTarget());
-      ApplyHeaderSearchOptions(TmpHS, CI.getHeaderSearchOpts(),
-                               CI.getLangOpts(),
-                               CI.getTarget().getTriple());
-      // Relative searches begin from CWD.
-      auto Dir = CI.getFileManager().getOptionalDirectoryRef(".");
-      SmallVector<std::pair<OptionalFileEntryRef, DirectoryEntryRef>, 1> CWD;
-      CWD.push_back({std::nullopt, *Dir});
-      OptionalFileEntryRef FE =
-          TmpHS.LookupFile(FileName, SourceLocation(),
-                           /*Angled*/ Input.getKind().getHeaderUnitKind() ==
-                               InputKind::HeaderUnit_System,
-                           nullptr, nullptr, CWD, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr);
-      if (!FE) {
-        CI.getDiagnostics().Report(diag::err_module_header_file_not_found)
-            << FileName;
-        return false;
-      }
-      // We now have the filename...
-      FileName = FE->getName();
-      // ... still a header unit, but now use the path as written.
-      Kind = Input.getKind().withHeaderUnit(InputKind::HeaderUnit_Abs);
-      Input = FrontendInputFile(FileName, Kind, Input.isSystem());
-    }
-    // Unless the user has overridden the name, the header unit module name is
-    // the pathname for the file.
-    if (CI.getLangOpts().ModuleName.empty())
-      CI.Invocation->getMutLangOpts().ModuleName = std::string(FileName);
-    CI.Invocation->getMutLangOpts().CurrentModule =
-        CI.getLangOpts().ModuleName;
-  }
-
-  // For preprocessed C++20 header units, the input is something like foo.iih
-  // and the original .h pathname is recorded as a `# 1 "FILE"` linemarker on
-  // the first line. We resolve that pre-createPreprocessor by reading the
-  // input directly through the FileManager (or the supplied memory buffer),
-  // so the resulting module name can be set on the invocation while LangOpts
-  // is still considered mutable. The full SourceManager-backed
-  // ReadOriginalFileName runs again later for non-header-unit preprocessed
-  // input that doesn't need pre-Preprocessor module-name resolution.
-  if (CI.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
-      Input.getKind().isPreprocessed() && !usesPreprocessorOnly() &&
-      CI.getLangOpts().ModuleName.empty()) {
-    StringRef FirstLine;
-    std::unique_ptr<llvm::MemoryBuffer> OwnedBuffer;
-    if (Input.isFile()) {
-      auto BufferOrErr =
-          CI.getFileManager().getBufferForFile(Input.getFile());
-      if (BufferOrErr) {
-        OwnedBuffer = std::move(*BufferOrErr);
-        FirstLine = OwnedBuffer->getBuffer();
-      }
-    } else {
-      FirstLine = Input.getBuffer().getBuffer();
-    }
-    if (size_t NL = FirstLine.find('\n'); NL != StringRef::npos)
-      FirstLine = FirstLine.substr(0, NL);
-    StringRef PresumedInputFile;
-    // Match `# NUM "FILENAME"` (possibly with leading/trailing whitespace).
-    StringRef Rest = FirstLine.ltrim();
-    if (Rest.consume_front("#")) {
-      Rest = Rest.ltrim();
-      while (!Rest.empty() && llvm::isDigit(Rest.front()))
-        Rest = Rest.drop_front();
-      Rest = Rest.ltrim();
-      if (Rest.consume_front("\"")) {
-        if (size_t Close = Rest.find('"'); Close != StringRef::npos)
-          PresumedInputFile = Rest.substr(0, Close);
-      }
-    }
-    if (PresumedInputFile.empty())
-      PresumedInputFile = StringRef(getCurrentFileOrBufferName());
-    CI.Invocation->getMutLangOpts().ModuleName = PresumedInputFile.str();
-    CI.Invocation->getMutLangOpts().CurrentModule =
-        CI.getLangOpts().ModuleName;
   }
 
   // Set up the preprocessor if needed. When parsing model files the
@@ -1557,10 +1555,10 @@ WrapperFrontendAction::CreateASTConsumer(CompilerInstance &CI,
                                          StringRef InFile) {
   return WrappedAction->CreateASTConsumer(CI, InFile);
 }
-bool WrapperFrontendAction::BeginInvocation(CompilerInvocation &Invocation,
-                                            DiagnosticsEngine &Diags,
-                                            llvm::vfs::FileSystem &VFS) {
-  return WrappedAction->BeginInvocation(Invocation, Diags, VFS);
+bool WrapperFrontendAction::BeginInvocation(CompilerInvocation &Inv,
+                                            FrontendInputFile &Input,
+                                            CompilerInstance &CI) {
+  return WrappedAction->BeginInvocation(Inv, Input, CI);
 }
 bool WrapperFrontendAction::BeginSourceFileAction(CompilerInstance &CI) {
   WrappedAction->setCurrentInput(getCurrentInput());

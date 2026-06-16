@@ -127,9 +127,9 @@ public:
   CodeCompleteAction(ParsedSourceLocation P, CodeCompleteConsumer *Consumer)
       : CompletePosition(std::move(P)), Consumer(Consumer) {}
 
-  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override {
-    Invocation.getMutFrontendOpts().CodeCompletionAt = CompletePosition;
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override {
+    Inv.getMutFrontendOpts().CodeCompletionAt = CompletePosition;
     return true;
   }
 

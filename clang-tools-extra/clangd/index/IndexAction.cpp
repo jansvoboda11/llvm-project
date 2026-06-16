@@ -164,19 +164,19 @@ public:
                                             CI.getPreprocessorPtr());
   }
 
-  bool BeginInvocation(CompilerInvocation &Invocation, DiagnosticsEngine &Diags,
-                       llvm::vfs::FileSystem &VFS) override {
+  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+                       CompilerInstance &CI) override {
     // We want all comments, not just the doxygen ones.
-    Invocation.getMutLangOpts().CommentOpts.ParseAllComments = true;
-    Invocation.getMutLangOpts().RetainCommentsFromSystemHeaders = true;
+    Inv.getMutLangOpts().CommentOpts.ParseAllComments = true;
+    Inv.getMutLangOpts().RetainCommentsFromSystemHeaders = true;
     // Index the whole file even if there are warnings and -Werror is set.
     // Avoids some analyses too. Set in two places as we're late to the party.
-    Invocation.getMutDiagnosticOpts().IgnoreWarnings = true;
-    Diags.setIgnoreAllWarnings(true);
+    Inv.getMutDiagnosticOpts().IgnoreWarnings = true;
+    CI.getDiagnostics().setIgnoreAllWarnings(true);
     // Instruct the parser to ask our ASTConsumer if it should skip function
     // bodies. The ASTConsumer will take care of skipping only functions inside
     // the files that we have already processed.
-    Invocation.getMutFrontendOpts().SkipFunctionBodies = true;
+    Inv.getMutFrontendOpts().SkipFunctionBodies = true;
     return true;
   }
 
