@@ -1,0 +1,41 @@
+//===--- APINotesOptions.def - API-notes option database --------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the API-notes options. Users of this file must define
+// the TYPED_APINOTESOPT macro to make use of this information. The arguments
+// to the macro are:
+//
+//   TYPED_APINOTESOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_APINOTESOPT(Type, Name, Bits, Default)
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_APINOTESOPT
+#  error Define the TYPED_APINOTESOPT macro to handle API-notes options
+#endif
+
+#ifndef BITFIELD_APINOTESOPT
+#  define BITFIELD_APINOTESOPT(Type, Name, Bits, Default)
+#  define BITFIELD_APINOTESOPT_DEFAULTED
+#endif
+
+TYPED_APINOTESOPT(llvm::VersionTuple, SwiftVersion, {})
+///< The Swift version which should be used for API notes.
+TYPED_APINOTESOPT(std::vector<std::string>, ModuleSearchPaths, {})
+///< The set of search paths where API notes can be found for particular
+///< modules. The API notes in this directory are stored as
+///< `<ModuleName>.apinotes`, and are only applied when building the module
+///< `<ModuleName>`.
+
+#ifdef BITFIELD_APINOTESOPT_DEFAULTED
+#  undef BITFIELD_APINOTESOPT
+#  undef BITFIELD_APINOTESOPT_DEFAULTED
+#endif

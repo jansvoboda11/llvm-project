@@ -18,15 +18,9 @@ namespace clang {
 /// Tracks various options which control how API notes are found and handled.
 class APINotesOptions {
 public:
-  /// The Swift version which should be used for API notes.
-  llvm::VersionTuple SwiftVersion;
-
-  /// The set of search paths where we API notes can be found for particular
-  /// modules.
-  ///
-  /// The API notes in this directory are stored as <ModuleName>.apinotes, and
-  /// are only applied when building the module <ModuleName>.
-  std::vector<std::string> ModuleSearchPaths;
+#define TYPED_APINOTESOPT(Type, Name, Default) Type Name = Default;
+#include "clang/APINotes/APINotesOptions.def"
+#undef TYPED_APINOTESOPT
 };
 
 } // namespace clang
