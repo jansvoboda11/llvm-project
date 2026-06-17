@@ -48,6 +48,24 @@ define both 'ANALYZER_OPTION' and 'ANALYZER_OPTION_DEPENDS_ON_USER_MODE' macros!
 #define ANALYZER_OPTION(TYPE, NAME, CMDFLAG, DESC, DEFAULT_VAL)
 #endif
 
+#ifndef TYPED_ANALYZEROPT
+/// Declare a non-bitfield option of arbitrary type stored in AnalyzerOptions.
+///   Type - The C++ type of the field.
+///   Name - The C++ identifier of the field.
+///   Default - A C++ initializer expression. Use {} for value initialization.
+#  define TYPED_ANALYZEROPT(Type, Name, Default)
+#  define TYPED_ANALYZEROPT_DEFAULTED
+#endif
+
+#ifndef BITFIELD_ANALYZEROPT
+/// Declare a bitfield option stored in AnalyzerOptions. Bit width is fixed
+/// for command-line marshalling and the field is initialized to Default in
+/// the class's default constructor (the .def is re-included with the
+/// appropriate definition).
+#  define BITFIELD_ANALYZEROPT(Type, Name, Bits, Default)
+#  define BITFIELD_ANALYZEROPT_DEFAULTED
+#endif
+
 #ifndef ANALYZER_OPTION_DEPENDS_ON_USER_MODE
 /// Create a new analyzer option, but dont generate a method for it in
 /// AnalyzerOptions. It's value depends on the option "user-mode".
@@ -599,6 +617,69 @@ ANALYZER_OPTION_DEPENDS_ON_USER_MODE(
     "Controls the mode of inter-procedural analysis. Value: \"none\", "
     "\"basic-inlining\", \"inlining\", \"dynamic\", \"dynamic-bifurcate\".",
     /* SHALLOW_VAL */ "inlining", /* DEEP_VAL */ "dynamic-bifurcate")
+
+//===----------------------------------------------------------------------===//
+// Hand-declared (non-analyzer-config) AnalyzerOptions fields.
+//===----------------------------------------------------------------------===//
+
+TYPED_ANALYZEROPT(std::vector<CheckerOrPackagePair>, CheckersAndPackages, {})
+///< Pairs of checker/package name and enable/disable.
+TYPED_ANALYZEROPT(std::vector<std::string>, SilencedCheckersAndPackages, {})
+///< Vector of checker/package names which will not emit warnings.
+TYPED_ANALYZEROPT(ConfigTable, Config, {})
+///< A key-value table of use-specified configuration values.
+TYPED_ANALYZEROPT(AnalysisConstraints, AnalysisConstraintsOpt,
+                  RangeConstraintsModel)
+TYPED_ANALYZEROPT(AnalysisDiagClients, AnalysisDiagOpt, PD_HTML)
+TYPED_ANALYZEROPT(AnalysisPurgeMode, AnalysisPurgeOpt, PurgeStmt)
+TYPED_ANALYZEROPT(std::string, AnalyzeSpecificFunction, {})
+TYPED_ANALYZEROPT(std::string, DumpExplodedGraphTo, {})
+///< File path to which the exploded graph should be dumped.
+TYPED_ANALYZEROPT(std::string, FullCompilerInvocation, {})
+///< Store full compiler invocation for reproducible instructions in the
+///< generated report.
+TYPED_ANALYZEROPT(unsigned, maxBlockVisitOnPath, 0)
+///< The maximum number of times the analyzer visits a block.
+TYPED_ANALYZEROPT(unsigned, InlineMaxStackDepth, 0)
+///< The inlining stack depth limit.
+TYPED_ANALYZEROPT(AnalysisInliningMode, InliningMode, NoRedundancy)
+///< The mode of function selection used during inlining.
+
+BITFIELD_ANALYZEROPT(bool, DisableAllCheckers, 1, false)
+///< Disable all analyzer checkers. This flag allows one to disable
+///< analyzer checkers on the code processed by the given analysis
+///< consumer. Note, the code will get parsed and the command-line options
+///< will get checked.
+BITFIELD_ANALYZEROPT(bool, ShowCheckerHelp, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowCheckerHelpAlpha, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowCheckerHelpDeveloper, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowCheckerOptionList, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowCheckerOptionAlphaList, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowCheckerOptionDeveloperList, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowEnabledCheckerList, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShowConfigOptionsList, 1, false)
+BITFIELD_ANALYZEROPT(bool, ShouldEmitErrorsOnInvalidConfigValue, 1, false)
+BITFIELD_ANALYZEROPT(bool, AnalyzeAll, 1, false)
+BITFIELD_ANALYZEROPT(bool, AnalyzerDisplayProgress, 1, false)
+BITFIELD_ANALYZEROPT(bool, AnalyzerNoteAnalysisEntryPoints, 1, false)
+BITFIELD_ANALYZEROPT(bool, TrimGraph, 1, false)
+BITFIELD_ANALYZEROPT(bool, visualizeExplodedGraphWithGraphViz, 1, false)
+BITFIELD_ANALYZEROPT(bool, UnoptimizedCFG, 1, false)
+BITFIELD_ANALYZEROPT(bool, PrintStats, 1, false)
+BITFIELD_ANALYZEROPT(bool, NoRetryExhausted, 1, false)
+///< Do not re-analyze paths leading to exhausted nodes with a different
+///< strategy. We get better code coverage when retry is enabled.
+BITFIELD_ANALYZEROPT(bool, AnalyzerWerror, 1, false)
+///< Emit analyzer warnings as errors.
+
+#ifdef TYPED_ANALYZEROPT_DEFAULTED
+#  undef TYPED_ANALYZEROPT
+#  undef TYPED_ANALYZEROPT_DEFAULTED
+#endif
+#ifdef BITFIELD_ANALYZEROPT_DEFAULTED
+#  undef BITFIELD_ANALYZEROPT
+#  undef BITFIELD_ANALYZEROPT_DEFAULTED
+#endif
 
 #undef ANALYZER_OPTION_DEPENDS_ON_USER_MODE
 #undef ANALYZER_OPTION

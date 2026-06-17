@@ -213,71 +213,17 @@ public:
                                   size_t InitialPad, size_t EntryWidth,
                                   size_t MinLineWidth = 0);
 
-  /// Pairs of checker/package name and enable/disable.
-  std::vector<std::pair<std::string, bool>> CheckersAndPackages;
+  /// Aliases used to keep TYPED_ANALYZEROPT lines free of nested commas in
+  /// template arguments.
+  using CheckerOrPackagePair = std::pair<std::string, bool>;
 
-  /// Vector of checker/package names which will not emit warnings.
-  std::vector<std::string> SilencedCheckersAndPackages;
-
-  /// A key-value table of use-specified configuration values.
-  // TODO: This shouldn't be public.
-  ConfigTable Config;
-  AnalysisConstraints AnalysisConstraintsOpt = RangeConstraintsModel;
-  AnalysisDiagClients AnalysisDiagOpt = PD_HTML;
-  AnalysisPurgeMode AnalysisPurgeOpt = PurgeStmt;
-
-  std::string AnalyzeSpecificFunction;
-
-  /// File path to which the exploded graph should be dumped.
-  std::string DumpExplodedGraphTo;
-
-  /// Store full compiler invocation for reproducible instructions in the
-  /// generated report.
-  std::string FullCompilerInvocation;
-
-  /// The maximum number of times the analyzer visits a block.
-  unsigned maxBlockVisitOnPath;
-
-  /// Disable all analyzer checkers.
-  ///
-  /// This flag allows one to disable analyzer checkers on the code processed by
-  /// the given analysis consumer. Note, the code will get parsed and the
-  /// command-line options will get checked.
-  unsigned DisableAllCheckers : 1;
-
-  unsigned ShowCheckerHelp : 1;
-  unsigned ShowCheckerHelpAlpha : 1;
-  unsigned ShowCheckerHelpDeveloper : 1;
-
-  unsigned ShowCheckerOptionList : 1;
-  unsigned ShowCheckerOptionAlphaList : 1;
-  unsigned ShowCheckerOptionDeveloperList : 1;
-
-  unsigned ShowEnabledCheckerList : 1;
-  unsigned ShowConfigOptionsList : 1;
-  unsigned ShouldEmitErrorsOnInvalidConfigValue : 1;
-  unsigned AnalyzeAll : 1;
-  unsigned AnalyzerDisplayProgress : 1;
-  unsigned AnalyzerNoteAnalysisEntryPoints : 1;
-
-  unsigned TrimGraph : 1;
-  unsigned visualizeExplodedGraphWithGraphViz : 1;
-  unsigned UnoptimizedCFG : 1;
-  unsigned PrintStats : 1;
-
-  /// Do not re-analyze paths leading to exhausted nodes with a different
-  /// strategy. We get better code coverage when retry is enabled.
-  unsigned NoRetryExhausted : 1;
-
-  /// Emit analyzer warnings as errors.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned AnalyzerWerror : 1;
-
-  /// The inlining stack depth limit.
-  unsigned InlineMaxStackDepth;
-
-  /// The mode of function selection used during inlining.
-  AnalysisInliningMode InliningMode = NoRedundancy;
+  // Define the hand-declared (non-analyzer-config) fields.
+#define TYPED_ANALYZEROPT(Type, Name, Default) Type Name = Default;
+#define BITFIELD_ANALYZEROPT(Type, Name, Bits, Default)                        \
+  LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;
+#include "clang/StaticAnalyzer/Core/AnalyzerOptions.def"
+#undef TYPED_ANALYZEROPT
+#undef BITFIELD_ANALYZEROPT
 
   // Create a field for each -analyzer-config option.
 #define ANALYZER_OPTION_DEPENDS_ON_USER_MODE(TYPE, NAME, CMDFLAG, DESC,        \
@@ -314,17 +260,13 @@ public:
     return !llvm::binary_search(AnalyzerConfigCmdFlags, Name);
   }
 
-  AnalyzerOptions()
-      : DisableAllCheckers(false), ShowCheckerHelp(false),
-        ShowCheckerHelpAlpha(false), ShowCheckerHelpDeveloper(false),
-        ShowCheckerOptionList(false), ShowCheckerOptionAlphaList(false),
-        ShowCheckerOptionDeveloperList(false), ShowEnabledCheckerList(false),
-        ShowConfigOptionsList(false),
-        ShouldEmitErrorsOnInvalidConfigValue(false), AnalyzeAll(false),
-        AnalyzerDisplayProgress(false), AnalyzerNoteAnalysisEntryPoints(false),
-        TrimGraph(false), visualizeExplodedGraphWithGraphViz(false),
-        UnoptimizedCFG(false), PrintStats(false), NoRetryExhausted(false),
-        AnalyzerWerror(false) {}
+  AnalyzerOptions() {
+#define TYPED_ANALYZEROPT(Type, Name, Default)
+#define BITFIELD_ANALYZEROPT(Type, Name, Bits, Default) Name = Default;
+#include "clang/StaticAnalyzer/Core/AnalyzerOptions.def"
+#undef TYPED_ANALYZEROPT
+#undef BITFIELD_ANALYZEROPT
+  }
 
   /// Interprets an option's string value as a boolean. The "true" string is
   /// interpreted as true and the "false" string is interpreted as false.
