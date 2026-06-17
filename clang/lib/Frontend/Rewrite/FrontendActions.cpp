@@ -13,6 +13,7 @@
 #include "clang/Config/config.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
@@ -112,7 +113,7 @@ void FixItAction::EndSourceFileAction() {
   ASTFrontendAction::EndSourceFileAction();
 }
 
-bool FixItRecompile::BeginInvocation(CompilerInvocation &Invocation,
+bool FixItRecompile::BeginInvocation(const CompilerInvocation &Invocation,
                                      FrontendInputFile &Input,
                                      CompilerInstance &CI) {
   DiagnosticsEngine &Diags = CI.getDiagnostics();
@@ -172,10 +173,18 @@ bool FixItRecompile::BeginInvocation(CompilerInvocation &Invocation,
   // does not need to be reset.
   Diags.getClient()->clear();
 
-  PreprocessorOptions &PPOpts = Invocation.getMutPreprocessorOpts();
-  PPOpts.RemappedFiles.insert(PPOpts.RemappedFiles.end(),
-                              RewrittenFiles.begin(), RewrittenFiles.end());
-  PPOpts.RemappedFilesKeepOriginalName = false;
+  // Append the freshly rewritten files to PreprocessorOpts.RemappedFiles
+  // through the scoped handle. We seed the new vector from the existing
+  // entries because the handle's setter takes a value, not an appender.
+  std::vector<std::pair<std::string, std::string>> NewRemapped =
+      Invocation.getPreprocessorOpts().RemappedFiles;
+  NewRemapped.insert(NewRemapped.end(), RewrittenFiles.begin(),
+                     RewrittenFiles.end());
+  Invocation.withMutPreprocessorOpts(
+      [&](MutPreprocessorOptsHandle &H) {
+        H.setRemappedFiles(std::move(NewRemapped));
+        H.setRemappedFilesKeepOriginalName(false);
+      });
 
   return true;
 }

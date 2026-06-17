@@ -10,6 +10,7 @@
 #include "clang/AST/ASTConsumer.h"
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/Frontend/MultiplexConsumer.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/SerializationFormatRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummary.h"
@@ -171,7 +172,7 @@ TUSummaryExtractorFrontendAction::TUSummaryExtractorFrontendAction(
     std::unique_ptr<FrontendAction> WrappedAction)
     : WrapperFrontendAction(std::move(WrappedAction)) {}
 
-bool TUSummaryExtractorFrontendAction::BeginInvocation(CompilerInvocation &Inv,
+bool TUSummaryExtractorFrontendAction::BeginInvocation(const CompilerInvocation &Inv,
                                                        FrontendInputFile &Input,
                                                        CompilerInstance &CI) {
   if (!WrapperFrontendAction::BeginInvocation(Inv, Input, CI))
@@ -182,7 +183,8 @@ bool TUSummaryExtractorFrontendAction::BeginInvocation(CompilerInvocation &Inv,
   // CreateASTConsumer where the held invocation is treated as frozen.
   if (!Inv.getFrontendOpts().SSAFCompilationUnitId.empty() &&
       !Inv.getFrontendOpts().SSAFTUSummaryFile.empty())
-    Inv.getMutCodeGenOpts().ClearASTBeforeBackend = false;
+    Inv.withMutCodeGenOpts(
+        [](MutCodeGenOptsHandle &H) { H.setClearASTBeforeBackend(false); });
   return true;
 }
 

@@ -179,6 +179,11 @@ class MutAnalyzerOptsHandle : public MutOptsHandleBase<AnalyzerOptions> {
 public:
   using ConfigTable = AnalyzerOptions::ConfigTable;
   using CheckerOrPackagePair = AnalyzerOptions::CheckerOrPackagePair;
+#define ANALYZER_OPTION(TYPE, NAME, CMDFLAG, DESC, DEFAULT_VAL)                \
+  void set##NAME(TYPE V) { O.NAME = std::move(V); }
+#define ANALYZER_OPTION_DEPENDS_ON_USER_MODE(TYPE, NAME, CMDFLAG, DESC,        \
+                                             SHALLOW_VAL, DEEP_VAL)            \
+  ANALYZER_OPTION(TYPE, NAME, CMDFLAG, DESC, SHALLOW_VAL)
 #define TYPED_ANALYZEROPT(Type, Name, Default)                                 \
   void set##Name(Type V) { O.Name = std::move(V); }
 #define BITFIELD_ANALYZEROPT(Type, Name, Bits, Default)                        \

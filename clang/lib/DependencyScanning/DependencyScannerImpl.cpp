@@ -15,6 +15,7 @@
 #include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/DependencyScanning/DependencyScanningWorker.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Option/Option.h"
@@ -569,7 +570,7 @@ struct SingleModuleWithAsyncModuleCompiles : PreprocessOnlyAction {
                                       AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
 };
@@ -686,11 +687,12 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
                                   AsyncModuleCompiles &Compiles)
       : Service(Service), Controller(Controller), Compiles(Compiles) {}
 
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override {
     if (!PreprocessOnlyAction::BeginInvocation(Inv, Input, CI))
       return false;
-    Inv.getMutPreprocessorOpts().SingleModuleParseMode = true;
+    Inv.withMutPreprocessorOpts(
+        [](MutPreprocessorOptsHandle &H) { H.setSingleModuleParseMode(true); });
     return true;
   }
 
@@ -702,10 +704,12 @@ struct SingleTUWithAsyncModuleCompiles : PreprocessOnlyAction {
 };
 
 bool SingleModuleWithAsyncModuleCompiles::BeginInvocation(
-    CompilerInvocation &Inv, FrontendInputFile &Input, CompilerInstance &CI) {
+    const CompilerInvocation &Inv, FrontendInputFile &Input,
+    CompilerInstance &CI) {
   if (!PreprocessOnlyAction::BeginInvocation(Inv, Input, CI))
     return false;
-  Inv.getMutPreprocessorOpts().SingleModuleParseMode = true;
+  Inv.withMutPreprocessorOpts(
+      [](MutPreprocessorOptsHandle &H) { H.setSingleModuleParseMode(true); });
   return true;
 }
 

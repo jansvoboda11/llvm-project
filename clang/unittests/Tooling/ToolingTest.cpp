@@ -16,6 +16,7 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Testing/CommandLineArgs.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
@@ -557,11 +558,12 @@ struct SkipBodyConsumer : public clang::ASTConsumer {
 };
 
 struct SkipBodyAction : public clang::ASTFrontendAction {
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override {
     if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
       return false;
-    Inv.getMutFrontendOpts().SkipFunctionBodies = true;
+    Inv.withMutFrontendOpts(
+        [](clang::MutFrontendOptsHandle &H) { H.setSkipFunctionBodies(true); });
     return true;
   }
 

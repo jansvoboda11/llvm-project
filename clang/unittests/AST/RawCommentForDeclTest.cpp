@@ -11,6 +11,7 @@
 #include "clang/AST/DeclGroup.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendAction.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Tooling/Tooling.h"
 
 #include "gmock/gmock-matchers.h"
@@ -39,11 +40,15 @@ public:
   CollectCommentsAction(std::vector<FoundComment> &Comments)
       : Comments(Comments) {}
 
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override {
     if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
       return false;
-    Inv.getMutLangOpts().CommentOpts.ParseAllComments = true;
+    auto NewCommentOpts = Inv.getLangOpts().CommentOpts;
+    NewCommentOpts.ParseAllComments = true;
+    Inv.withMutLangOpts([&](MutLangOptsHandle &H) {
+      H.setCommentOpts(std::move(NewCommentOpts));
+    });
     return true;
   }
 

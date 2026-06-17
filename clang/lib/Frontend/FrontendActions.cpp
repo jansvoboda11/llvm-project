@@ -16,6 +16,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/ASTConsumers.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Frontend/MultiplexConsumer.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/DependencyDirectivesScanner.h"
@@ -281,14 +282,17 @@ bool GenerateModuleInterfaceAction::PrepareToExecuteAction(
 }
 
 bool GenerateModuleInterfaceAction::BeginInvocation(
-    CompilerInvocation &Inv, FrontendInputFile &Input, CompilerInstance &CI) {
+    const CompilerInvocation &Inv, FrontendInputFile &Input,
+    CompilerInstance &CI) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
   // and start observing it through their const LangOptions& references. Note
   // that the parent's BeginInvocation resets CompilingModule to None as a
   // per-input precondition, so we have to override it after chaining.
   if (!GenerateModuleAction::BeginInvocation(Inv, Input, CI))
     return false;
-  Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+  Inv.withMutLangOpts([](MutLangOptsHandle &H) {
+    H.setCompilingModule(LangOptions::CMK_ModuleInterface);
+  });
   return true;
 }
 
@@ -338,7 +342,7 @@ GenerateReducedModuleInterfaceAction::CreateASTConsumer(CompilerInstance &CI,
       CI.getFrontendOpts().OutputFile, CI.getCodeGenOpts());
 }
 
-bool GenerateHeaderUnitAction::BeginInvocation(CompilerInvocation &Inv,
+bool GenerateHeaderUnitAction::BeginInvocation(const CompilerInvocation &Inv,
                                                FrontendInputFile &Input,
                                                CompilerInstance &CI) {
   if (!Inv.getLangOpts().CPlusPlusModules) {
@@ -347,7 +351,9 @@ bool GenerateHeaderUnitAction::BeginInvocation(CompilerInvocation &Inv,
   }
   if (!GenerateModuleAction::BeginInvocation(Inv, Input, CI))
     return false;
-  Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_HeaderUnit);
+  Inv.withMutLangOpts([](MutLangOptsHandle &H) {
+    H.setCompilingModule(LangOptions::CMK_HeaderUnit);
+  });
   return true;
 }
 
@@ -883,12 +889,13 @@ namespace {
   };
 }
 
-bool DumpModuleInfoAction::BeginInvocation(CompilerInvocation &Inv,
+bool DumpModuleInfoAction::BeginInvocation(const CompilerInvocation &Inv,
                                            FrontendInputFile &Input,
                                            CompilerInstance &CI) {
   // The Object file reader also supports raw ast files and there is no point in
   // being strict about the module file format in -module-file-info mode.
-  Inv.getMutHeaderSearchOpts().ModuleFormat = "obj";
+  Inv.withMutHeaderSearchOpts(
+      [](MutHeaderSearchOptsHandle &H) { H.setModuleFormat("obj"); });
   return true;
 }
 

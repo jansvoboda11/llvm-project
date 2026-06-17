@@ -53,7 +53,7 @@ public:
     : WrapperFrontendAction(std::move(WrappedAction)) {}
 
 protected:
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override;
 };
 

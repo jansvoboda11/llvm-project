@@ -26,6 +26,7 @@
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/MultiplexConsumer.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/Hashing.h"
@@ -946,7 +947,7 @@ CodeGenerator *CodeGenAction::getCodeGenerator() const {
   return BEConsumer->getCodeGenerator();
 }
 
-bool CodeGenAction::BeginInvocation(CompilerInvocation &Inv,
+bool CodeGenAction::BeginInvocation(const CompilerInvocation &Inv,
                                     FrontendInputFile &Input,
                                     CompilerInstance &CI) {
   // Configure the invocation BEFORE Preprocessor/ASTContext are constructed
@@ -956,7 +957,9 @@ bool CodeGenAction::BeginInvocation(CompilerInvocation &Inv,
   if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
     return false;
   if (Inv.getFrontendOpts().GenReducedBMI)
-    Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleInterface);
+    Inv.withMutLangOpts([](MutLangOptsHandle &H) {
+      H.setCompilingModule(LangOptions::CMK_ModuleInterface);
+    });
   return true;
 }
 

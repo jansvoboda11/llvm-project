@@ -27,6 +27,7 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/LayoutOverrideSource.h"
 #include "clang/Frontend/MultiplexConsumer.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Frontend/SARIFDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -374,7 +375,7 @@ FrontendAction::getInputs(CompilerInstance &CI) {
   return CI.getFrontendOpts().Inputs;
 }
 
-bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
+bool FrontendAction::BeginInvocation(const CompilerInvocation &Inv,
                                      FrontendInputFile &Input,
                                      CompilerInstance &CI) {
   DiagnosticsEngine &Diags = CI.getDiagnostics();
@@ -383,12 +384,16 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
   // so each input has to clear it back to None and then let any override
   // below override it before Preprocessor/ASTContext start observing
   // CodeGenOptions / LangOptions through their const references.
-  Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_None);
+  Inv.withMutLangOpts([](MutLangOptsHandle &H) {
+    H.setCompilingModule(LangOptions::CMK_None);
+  });
 
   // For module-map inputs, mark the invocation as compiling a module before
   // any consumer (Preprocessor, ASTContext, ...) is created.
   if (Input.getKind().getFormat() == InputKind::ModuleMap)
-    Inv.getMutLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
+    Inv.withMutLangOpts([](MutLangOptsHandle &H) {
+      H.setCompilingModule(LangOptions::CMK_ModuleMap);
+    });
 
   // If any registered plugin will attach an after-main-action AST consumer,
   // the AST must remain alive through codegen so that consumer can read it.
@@ -411,7 +416,8 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
                            Plugin.getName()))
       ActionType = PluginASTAction::AddAfterMainAction;
     if (ActionType == PluginASTAction::AddAfterMainAction) {
-      Inv.getMutCodeGenOpts().ClearASTBeforeBackend = false;
+      Inv.withMutCodeGenOpts(
+          [](MutCodeGenOptsHandle &H) { H.setClearASTBeforeBackend(false); });
       break;
     }
   }
@@ -425,16 +431,17 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
 
   // Canonicalize ImplicitPCHInclude so the ASTWriter and other downstream
   // consumers receive an absolute path; if the entry resolves to a directory,
-  // pick a suitable AST file from within it.
+  // pick a suitable AST file from within it. Compute the result on a local
+  // before committing it back through the scoped handle.
   if (!Inv.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
     FileManager &FileMgr = CI.getFileManager();
-    PreprocessorOptions &PPOpts = Inv.getMutPreprocessorOpts();
 
-    SmallString<128> PCHIncludePath(PPOpts.ImplicitPCHInclude);
+    SmallString<128> PCHIncludePath(
+        Inv.getPreprocessorOpts().ImplicitPCHInclude);
     FileMgr.makeAbsolutePath(PCHIncludePath);
     llvm::sys::path::remove_dots(PCHIncludePath, true);
-    PPOpts.ImplicitPCHInclude = PCHIncludePath.str();
-    StringRef PCHInclude = PPOpts.ImplicitPCHInclude;
+    std::string CanonPCHInclude(PCHIncludePath);
+    StringRef PCHInclude = CanonPCHInclude;
 
     if (auto PCHDir = FileMgr.getOptionalDirectoryRef(PCHInclude)) {
       std::error_code EC;
@@ -456,7 +463,7 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
                 Inv.getPreprocessorOpts(), Inv.getHeaderSearchOpts(),
                 SpecificModuleCachePath,
                 /*RequireStrictOptionMatches=*/true)) {
-          PPOpts.ImplicitPCHInclude = std::string(Dir->path());
+          CanonPCHInclude = std::string(Dir->path());
           Found = true;
           break;
         }
@@ -467,12 +474,15 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
         return false;
       }
     }
+    Inv.withMutPreprocessorOpts(
+        [&](MutPreprocessorOptsHandle &H) {
+          H.setImplicitPCHInclude(std::move(CanonPCHInclude));
+        });
   }
 
   // Handle C++20 header units. Resolve the file path BEFORE the
   // Preprocessor is created so the resulting module name can land on the
-  // (still-mutable) invocation while LangOptions is observable through
-  // const references only.
+  // invocation while LangOptions is observable through const references only.
   if (Inv.getLangOpts().CPlusPlusModules && Input.getKind().isHeaderUnit() &&
       !Input.getKind().isPreprocessed()) {
     StringRef FileName = Input.getFile();
@@ -502,9 +512,17 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
       Kind = Input.getKind().withHeaderUnit(InputKind::HeaderUnit_Abs);
       Input = FrontendInputFile(FileName, Kind, Input.isSystem());
     }
+    std::string FileNameStr(FileName);
+    Inv.withMutLangOpts([&](MutLangOptsHandle &H) {
+      // Keep an existing ModuleName but always re-seed CurrentModule from it.
+    });
     if (Inv.getLangOpts().ModuleName.empty())
-      Inv.getMutLangOpts().ModuleName = std::string(FileName);
-    Inv.getMutLangOpts().CurrentModule = Inv.getLangOpts().ModuleName;
+      Inv.withMutLangOpts(
+          [&](MutLangOptsHandle &H) { H.setModuleName(FileNameStr); });
+    std::string CurrentModule = Inv.getLangOpts().ModuleName;
+    Inv.withMutLangOpts([&](MutLangOptsHandle &H) {
+      H.setCurrentModule(std::move(CurrentModule));
+    });
   }
 
   // Preprocessed C++20 header units record the original .h pathname as a
@@ -546,8 +564,11 @@ bool FrontendAction::BeginInvocation(CompilerInvocation &Inv,
                               ? Input.getFile()
                               : Input.getBuffer().getBufferIdentifier();
     }
-    Inv.getMutLangOpts().ModuleName = PresumedInputFile.str();
-    Inv.getMutLangOpts().CurrentModule = Inv.getLangOpts().ModuleName;
+    std::string ModuleName = PresumedInputFile.str();
+    Inv.withMutLangOpts([&](MutLangOptsHandle &H) {
+      H.setModuleName(ModuleName);
+      H.setCurrentModule(std::move(ModuleName));
+    });
   }
 
   return true;
@@ -1049,12 +1070,12 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     }
   }
 
-  // The held invocation is stored as shared_ptr<const>; this is the
-  // documented mutation window — BeginInvocation runs before any const
-  // observer (Preprocessor / ASTContext) reads it.
-  CompilerInvocation &MutInv =
-      const_cast<CompilerInvocation &>(*CI.Invocation);
-  if (!BeginInvocation(MutInv, Input, CI))
+  // The held invocation is stored as shared_ptr<const>. The BeginInvocation
+  // hook receives it through a const reference; mutations the hook needs go
+  // through the scoped CompilerInvocation::withMut*Opts() handles, which
+  // expose only setters and never hand out a non-const reference that could
+  // outlive the call.
+  if (!BeginInvocation(*CI.Invocation, Input, CI))
     return false;
   // BeginInvocation may have rewritten CurrentInput (e.g. C++20 header-unit
   // resolution rewrites HeaderUnit_Name → HeaderUnit_Abs). Update the action's
@@ -1073,12 +1094,12 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     StringRef InputFile = Input.getFile();
 
     // The AST-replay path overwrites HeaderSearchOpts/PreprocessorOpts/
-    // LangOpts on the invocation with whatever the AST recorded; this is
-    // the second documented mutation window on the held invocation.
+    // LangOpts on the invocation with whatever the AST recorded. The
+    // mutations route through the scoped withMut*Opts handles, which take
+    // values and don't expose any reference back to the caller.
     std::unique_ptr<ASTUnit> AST = clang::loadAndApplyASTUnitOptions(
-        const_cast<CompilerInvocation &>(*CI.Invocation), InputFile,
-        CI.getPCHContainerReader(), CI.getVirtualFileSystemPtr(),
-        CI.getDiagnosticsPtr());
+        *CI.Invocation, InputFile, CI.getPCHContainerReader(),
+        CI.getVirtualFileSystemPtr(), CI.getDiagnosticsPtr());
     if (!AST)
       return false;
 
@@ -1100,11 +1121,18 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
         if (&MF != &PrimaryModule)
           ModuleFiles.emplace_back(MF.FileName);
 
+      // Collect the AST's top-level module-map paths into a fresh vector
+      // (seeded from the invocation's existing list) and write the result
+      // back through the scoped handle in one shot.
+      std::vector<std::string> NewModuleMapFiles =
+          CI.getInvocation().getFrontendOpts().ModuleMapFiles;
       ASTReader->visitTopLevelModuleMaps(PrimaryModule, [&](FileEntryRef FE) {
-        const_cast<CompilerInvocation &>(*CI.Invocation)
-            .getMutFrontendOpts()
-            .ModuleMapFiles.push_back(std::string(FE.getName()));
+        NewModuleMapFiles.emplace_back(FE.getName());
       });
+      CI.getInvocation().withMutFrontendOpts(
+          [&](MutFrontendOptsHandle &H) {
+            H.setModuleMapFiles(std::move(NewModuleMapFiles));
+          });
     }
 
     // Set up the input file for replay purposes.
@@ -1562,7 +1590,7 @@ WrapperFrontendAction::CreateASTConsumer(CompilerInstance &CI,
                                          StringRef InFile) {
   return WrappedAction->CreateASTConsumer(CI, InFile);
 }
-bool WrapperFrontendAction::BeginInvocation(CompilerInvocation &Inv,
+bool WrapperFrontendAction::BeginInvocation(const CompilerInvocation &Inv,
                                             FrontendInputFile &Input,
                                             CompilerInstance &CI) {
   return WrappedAction->BeginInvocation(Inv, Input, CI);
@@ -1610,7 +1638,7 @@ WrapperFrontendAction::WrapperFrontendAction(
   : WrappedAction(std::move(WrappedAction)) {}
 
 std::unique_ptr<ASTUnit> clang::loadAndApplyASTUnitOptions(
-    CompilerInvocation &Invocation, StringRef InputFile,
+    const CompilerInvocation &Invocation, StringRef InputFile,
     const PCHContainerReader &PCHContainerOps,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags) {
@@ -1628,8 +1656,11 @@ std::unique_ptr<ASTUnit> clang::loadAndApplyASTUnitOptions(
 
   // Options relating to how we treat the input (but not what we do with it)
   // are inherited from the AST unit.
-  Invocation.getMutHeaderSearchOpts() = AST->getHeaderSearchOpts();
-  Invocation.getMutPreprocessorOpts() = AST->getPreprocessorOpts();
-  Invocation.getMutLangOpts() = AST->getLangOpts();
+  Invocation.withMutHeaderSearchOpts(
+      [&](MutHeaderSearchOptsHandle &H) { H.replace(AST->getHeaderSearchOpts()); });
+  Invocation.withMutPreprocessorOpts(
+      [&](MutPreprocessorOptsHandle &H) { H.replace(AST->getPreprocessorOpts()); });
+  Invocation.withMutLangOpts(
+      [&](MutLangOptsHandle &H) { H.replace(AST->getLangOpts()); });
   return AST;
 }

@@ -8,6 +8,7 @@
 
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/ParseAST.h"
 #include "clang/Sema/Sema.h"
@@ -127,9 +128,11 @@ public:
   CodeCompleteAction(ParsedSourceLocation P, CodeCompleteConsumer *Consumer)
       : CompletePosition(std::move(P)), Consumer(Consumer) {}
 
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override {
-    Inv.getMutFrontendOpts().CodeCompletionAt = CompletePosition;
+    Inv.withMutFrontendOpts([this](MutFrontendOptsHandle &H) {
+      H.setCodeCompletionAt(CompletePosition);
+    });
     return true;
   }
 

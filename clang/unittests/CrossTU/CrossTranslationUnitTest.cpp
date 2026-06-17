@@ -11,6 +11,7 @@
 #include "clang/AST/ParentMapContext.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendAction.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -123,13 +124,15 @@ public:
       : Success(Success), OverrideLimit(OverrideLimit) {}
 
 protected:
-  bool BeginInvocation(clang::CompilerInvocation &Inv,
+  bool BeginInvocation(const clang::CompilerInvocation &Inv,
                        clang::FrontendInputFile &Input,
                        clang::CompilerInstance &CI) override {
     if (!ASTFrontendAction::BeginInvocation(Inv, Input, CI))
       return false;
-    Inv.getMutAnalyzerOpts().CTUImportThreshold = OverrideLimit;
-    Inv.getMutAnalyzerOpts().CTUImportCppThreshold = OverrideLimit;
+    Inv.withMutAnalyzerOpts([this](clang::MutAnalyzerOptsHandle &H) {
+      H.setCTUImportThreshold(OverrideLimit);
+      H.setCTUImportCppThreshold(OverrideLimit);
+    });
     return true;
   }
 

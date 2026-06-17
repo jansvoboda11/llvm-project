@@ -118,7 +118,7 @@ protected:
   ///
   /// \return True on success; on failure \c BeginSourceFileAction(),
   /// \c ExecuteAction() and \c EndSourceFileAction() will not be called.
-  virtual bool BeginInvocation(CompilerInvocation &Inv,
+  virtual bool BeginInvocation(const CompilerInvocation &Inv,
                                FrontendInputFile &Input,
                                CompilerInstance &CI);
 
@@ -373,7 +373,7 @@ protected:
   bool PrepareToExecuteAction(CompilerInstance &CI) override;
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override;
-  bool BeginInvocation(CompilerInvocation &Inv, FrontendInputFile &Input,
+  bool BeginInvocation(const CompilerInvocation &Inv, FrontendInputFile &Input,
                        CompilerInstance &CI) override;
   bool BeginSourceFileAction(CompilerInstance &CI) override;
   void ExecuteAction() override;
@@ -404,7 +404,7 @@ public:
 ///
 /// Returns nullptr on failure (errors reported via \p Diags).
 std::unique_ptr<ASTUnit> loadAndApplyASTUnitOptions(
-    CompilerInvocation &Invocation, StringRef InputFile,
+    const CompilerInvocation &Invocation, StringRef InputFile,
     const PCHContainerReader &PCHContainerOps,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags);
