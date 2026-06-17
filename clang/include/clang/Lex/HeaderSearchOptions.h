@@ -13,8 +13,10 @@
 #include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/HashBuilder.h"
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -93,220 +95,27 @@ public:
         : Prefix(Prefix), IsSystemHeader(IsSystemHeader) {}
   };
 
-  /// If non-empty, the directory to use as a "virtual system root" for include
-  /// paths.
-  std::string Sysroot;
+  /// Aliased to keep TYPED_HEADERSEARCHOPT lines free of nested commas in
+  /// template arguments.
+  using PrebuiltModuleFilesMap =
+      std::map<std::string, std::string, std::less<>>;
+  using ModulesIgnoreMacrosSet =
+      llvm::SmallSetVector<llvm::CachedHashString, 16>;
 
-  /// User specified include entries.
-  std::vector<Entry> UserEntries;
+#define TYPED_HEADERSEARCHOPT(Type, Name, Default) Type Name = Default;
+#define BITFIELD_HEADERSEARCHOPT(Type, Name, Bits, Default)                    \
+  LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;
+#include "clang/Lex/HeaderSearchOptions.def"
+#undef TYPED_HEADERSEARCHOPT
+#undef BITFIELD_HEADERSEARCHOPT
 
-  /// User-specified system header prefixes.
-  std::vector<SystemHeaderPrefix> SystemHeaderPrefixes;
-
-  /// The directory which holds the compiler resource files (builtin includes,
-  /// etc.).
-  std::string ResourceDir;
-
-  /// The directory used for the module cache.
-  std::string ModuleCachePath;
-
-  /// The directory used for a user build.
-  std::string ModuleUserBuildPath;
-
-  /// The mapping of module names to prebuilt module files.
-  std::map<std::string, std::string, std::less<>> PrebuiltModuleFiles;
-
-  /// The directories used to load prebuilt module files.
-  std::vector<std::string> PrebuiltModulePaths;
-
-  /// The module/pch container format.
-  std::string ModuleFormat;
-
-  /// Whether we should disable the use of the hash string within the
-  /// module cache.
-  ///
-  /// Note: Only used for testing!
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned DisableModuleHash : 1;
-
-  /// Implicit module maps.  This option is enabld by default when
-  /// modules is enabled.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ImplicitModuleMaps : 1;
-
-  /// Set the 'home directory' of a module map file to the current
-  /// working directory (or the home directory of the module map file that
-  /// contained the 'extern module' directive importing this module map file
-  /// if any) rather than the directory containing the module map file.
-  //
-  /// The home directory is where we look for files named in the module map
-  /// file.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModuleMapFileHomeIsCwd : 1;
-
-  /// Set the base path of a built module file to be the current working
-  /// directory. This is useful for sharing module files across machines
-  /// that build with different paths without having to rewrite all
-  /// modulemap files to have working directory relative paths.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModuleFileHomeIsCwd : 1;
-
-  /// Also search for prebuilt implicit modules in the prebuilt module cache
-  /// path.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned EnablePrebuiltImplicitModules : 1;
-
-  /// The interval (in seconds) between pruning operations.
-  ///
-  /// This operation is expensive, because it requires Clang to walk through
-  /// the directory structure of the module cache, stat()'ing and removing
-  /// files.
-  ///
-  /// The default value is large, e.g., the operation runs once a week.
-  unsigned ModuleCachePruneInterval = 7 * 24 * 60 * 60;
-
-  /// The time (in seconds) after which an unused module file will be
-  /// considered unused and will, therefore, be pruned.
-  ///
-  /// When the module cache is pruned, any module file that has not been
-  /// accessed in this many seconds will be removed. The default value is
-  /// large, e.g., a month, to avoid forcing infrequently-used modules to be
-  /// regenerated often.
-  unsigned ModuleCachePruneAfter = 31 * 24 * 60 * 60;
-
-  /// The time in seconds when the build session started.
-  ///
-  /// This time is used by other optimizations in header search and module
-  /// loading.
-  uint64_t BuildSessionTimestamp = 0;
-
-  /// The set of macro names that should be ignored for the purposes
-  /// of computing the module hash.
-  llvm::SmallSetVector<llvm::CachedHashString, 16> ModulesIgnoreMacros;
-
-  /// The set of user-provided virtual filesystem overlay files.
-  std::vector<std::string> VFSOverlayFiles;
-
-  /// Include the compiler builtin includes.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UseBuiltinIncludes : 1;
-
-  /// Include the system standard include search directories.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UseStandardSystemIncludes : 1;
-
-  /// Include the system standard C++ library include search directories.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UseStandardCXXIncludes : 1;
-
-  /// Use libc++ instead of the default libstdc++.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UseLibcxx : 1;
-
-  /// Whether header search information should be output as for -v.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned Verbose : 1;
-
-  /// If true, skip verifying input files used by modules if the
-  /// module was already verified during this build session (see
-  /// \c BuildSessionTimestamp).
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesValidateOncePerBuildSession : 1;
-
-  /// Whether to validate system input files when a module is loaded.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesValidateSystemHeaders : 1;
-
-  /// Whether to force the validation of user input files when a module is
-  /// loaded (even despite the build session saying that is not necessary).
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesForceValidateUserHeaders : 1;
-
-  // Whether the content of input files should be hashed and used to
-  // validate consistency.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ValidateASTInputFilesContent : 1;
-
-  // Whether the input files from C++20 Modules should be checked.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ForceCheckCXX20ModulesInputFiles : 1;
-
-  /// Whether the module includes debug information (-gmodules).
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UseDebugInfo : 1;
-
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesValidateDiagnosticOptions : 1;
-
-  /// Whether to entirely skip writing diagnostic options.
-  /// Primarily used to speed up deserialization during dependency scanning.
-  /// FIXME: Consider moving these into separate `SerializationOptions` class.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesSkipDiagnosticOptions : 1;
-
-  /// Whether to entirely skip writing header search paths.
-  /// Primarily used to speed up deserialization during dependency scanning.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesSkipHeaderSearchPaths : 1;
-
-  /// Whether to entirely skip writing pragma diagnostic mappings.
-  /// Primarily used to speed up deserialization during dependency scanning.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesSkipPragmaDiagnosticMappings : 1;
-
-  /// Whether to prune non-affecting module map files from PCM files.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesPruneNonAffectingModuleMaps : 1;
-
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesHashContent : 1;
-
-  /// Whether AST files should only contain the preprocessor information.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesSerializeOnlyPreprocessor : 1;
-
-  /// Whether we should include all things that could impact the module in the
-  /// hash.
-  ///
-  /// This includes things like the full header search path, and enabled
-  /// diagnostics.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesStrictContextHash : 1;
-
-  /// Whether to include ivfsoverlay usage information in written AST files.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ModulesIncludeVFSUsage : 1;
-
-  /// Whether we should look for a module in module maps only in provided
-  /// header search paths or if we are allowed to look for module maps in
-  /// subdirectories of provided paths too.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned AllowModuleMapSubdirectorySearch : 1;
-
-  /// Whether modules from module maps should only be loaded when used, not just
-  /// when parsed.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned LazyLoadModuleMaps : 1;
-
-  HeaderSearchOptions(StringRef _Sysroot = "/")
-      : Sysroot(_Sysroot), ModuleFormat("raw"), DisableModuleHash(false),
-        ImplicitModuleMaps(false), ModuleMapFileHomeIsCwd(false),
-        ModuleFileHomeIsCwd(false), EnablePrebuiltImplicitModules(false),
-        UseBuiltinIncludes(true), UseStandardSystemIncludes(true),
-        UseStandardCXXIncludes(true), UseLibcxx(false), Verbose(false),
-        ModulesValidateOncePerBuildSession(false),
-        ModulesValidateSystemHeaders(false),
-        ModulesForceValidateUserHeaders(true),
-        ValidateASTInputFilesContent(false),
-        ForceCheckCXX20ModulesInputFiles(false), UseDebugInfo(false),
-        ModulesValidateDiagnosticOptions(true),
-        ModulesSkipDiagnosticOptions(false),
-        ModulesSkipHeaderSearchPaths(false),
-        ModulesSkipPragmaDiagnosticMappings(false),
-        ModulesPruneNonAffectingModuleMaps(true), ModulesHashContent(false),
-        ModulesSerializeOnlyPreprocessor(false),
-        ModulesStrictContextHash(false), ModulesIncludeVFSUsage(false),
-        AllowModuleMapSubdirectorySearch(true), LazyLoadModuleMaps(false) {}
+  HeaderSearchOptions(StringRef _Sysroot = "/") : Sysroot(_Sysroot) {
+#define TYPED_HEADERSEARCHOPT(Type, Name, Default)
+#define BITFIELD_HEADERSEARCHOPT(Type, Name, Bits, Default) Name = Default;
+#include "clang/Lex/HeaderSearchOptions.def"
+#undef TYPED_HEADERSEARCHOPT
+#undef BITFIELD_HEADERSEARCHOPT
+  }
 
   /// AddPath - Add the \p Path path to the specified \p Group list.
   void AddPath(StringRef Path, frontend::IncludeDirGroup Group,

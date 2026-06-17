@@ -1,0 +1,147 @@
+//===--- HeaderSearchOptions.def - Header-search option database -*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the header-search options. Users of this file must
+// define the TYPED_HEADERSEARCHOPT macro to make use of this information. The
+// arguments to the macro are:
+//
+//   TYPED_HEADERSEARCHOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_HEADERSEARCHOPT(Type, Name, Bits, Default)
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_HEADERSEARCHOPT
+#  error Define the TYPED_HEADERSEARCHOPT macro to handle header-search options
+#endif
+
+#ifndef BITFIELD_HEADERSEARCHOPT
+#  define BITFIELD_HEADERSEARCHOPT(Type, Name, Bits, Default)
+#  define BITFIELD_HEADERSEARCHOPT_DEFAULTED
+#endif
+
+TYPED_HEADERSEARCHOPT(std::string, Sysroot, {})
+///< If non-empty, the directory to use as a "virtual system root" for include
+///< paths. Defaulted to "/" by the class's default constructor.
+TYPED_HEADERSEARCHOPT(std::vector<Entry>, UserEntries, {})
+///< User specified include entries.
+TYPED_HEADERSEARCHOPT(std::vector<SystemHeaderPrefix>, SystemHeaderPrefixes, {})
+///< User-specified system header prefixes.
+TYPED_HEADERSEARCHOPT(std::string, ResourceDir, {})
+///< The directory which holds the compiler resource files (builtin includes,
+///< etc.).
+TYPED_HEADERSEARCHOPT(std::string, ModuleCachePath, {})
+///< The directory used for the module cache.
+TYPED_HEADERSEARCHOPT(std::string, ModuleUserBuildPath, {})
+///< The directory used for a user build.
+TYPED_HEADERSEARCHOPT(PrebuiltModuleFilesMap, PrebuiltModuleFiles, {})
+///< The mapping of module names to prebuilt module files.
+TYPED_HEADERSEARCHOPT(std::vector<std::string>, PrebuiltModulePaths, {})
+///< The directories used to load prebuilt module files.
+TYPED_HEADERSEARCHOPT(std::string, ModuleFormat, "raw")
+///< The module/pch container format.
+BITFIELD_HEADERSEARCHOPT(bool, DisableModuleHash, 1, false)
+///< Whether we should disable the use of the hash string within the module
+///< cache. Note: Only used for testing!
+BITFIELD_HEADERSEARCHOPT(bool, ImplicitModuleMaps, 1, false)
+///< Implicit module maps. This option is enabled by default when modules are
+///< enabled.
+BITFIELD_HEADERSEARCHOPT(bool, ModuleMapFileHomeIsCwd, 1, false)
+///< Set the 'home directory' of a module map file to the current working
+///< directory (or the home directory of the module map file that contained
+///< the 'extern module' directive importing this module map file if any)
+///< rather than the directory containing the module map file. The home
+///< directory is where we look for files named in the module map file.
+BITFIELD_HEADERSEARCHOPT(bool, ModuleFileHomeIsCwd, 1, false)
+///< Set the base path of a built module file to be the current working
+///< directory. This is useful for sharing module files across machines that
+///< build with different paths without having to rewrite all modulemap files
+///< to have working directory relative paths.
+BITFIELD_HEADERSEARCHOPT(bool, EnablePrebuiltImplicitModules, 1, false)
+///< Also search for prebuilt implicit modules in the prebuilt module cache
+///< path.
+TYPED_HEADERSEARCHOPT(unsigned, ModuleCachePruneInterval, 7 * 24 * 60 * 60)
+///< The interval (in seconds) between pruning operations. This operation is
+///< expensive, because it requires Clang to walk through the directory
+///< structure of the module cache, stat()'ing and removing files. The default
+///< value is large, e.g., the operation runs once a week.
+TYPED_HEADERSEARCHOPT(unsigned, ModuleCachePruneAfter, 31 * 24 * 60 * 60)
+///< The time (in seconds) after which an unused module file will be
+///< considered unused and will, therefore, be pruned. When the module cache
+///< is pruned, any module file that has not been accessed in this many
+///< seconds will be removed. The default value is large, e.g., a month, to
+///< avoid forcing infrequently-used modules to be regenerated often.
+TYPED_HEADERSEARCHOPT(uint64_t, BuildSessionTimestamp, 0)
+///< The time in seconds when the build session started. This time is used by
+///< other optimizations in header search and module loading.
+TYPED_HEADERSEARCHOPT(ModulesIgnoreMacrosSet, ModulesIgnoreMacros, {})
+///< The set of macro names that should be ignored for the purposes of
+///< computing the module hash.
+TYPED_HEADERSEARCHOPT(std::vector<std::string>, VFSOverlayFiles, {})
+///< The set of user-provided virtual filesystem overlay files.
+BITFIELD_HEADERSEARCHOPT(bool, UseBuiltinIncludes, 1, true)
+///< Include the compiler builtin includes.
+BITFIELD_HEADERSEARCHOPT(bool, UseStandardSystemIncludes, 1, true)
+///< Include the system standard include search directories.
+BITFIELD_HEADERSEARCHOPT(bool, UseStandardCXXIncludes, 1, true)
+///< Include the system standard C++ library include search directories.
+BITFIELD_HEADERSEARCHOPT(bool, UseLibcxx, 1, false)
+///< Use libc++ instead of the default libstdc++.
+BITFIELD_HEADERSEARCHOPT(bool, Verbose, 1, false)
+///< Whether header search information should be output as for -v.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesValidateOncePerBuildSession, 1, false)
+///< If true, skip verifying input files used by modules if the module was
+///< already verified during this build session (see
+///< \c BuildSessionTimestamp).
+BITFIELD_HEADERSEARCHOPT(bool, ModulesValidateSystemHeaders, 1, false)
+///< Whether to validate system input files when a module is loaded.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesForceValidateUserHeaders, 1, true)
+///< Whether to force the validation of user input files when a module is
+///< loaded (even despite the build session saying that is not necessary).
+BITFIELD_HEADERSEARCHOPT(bool, ValidateASTInputFilesContent, 1, false)
+///< Whether the content of input files should be hashed and used to validate
+///< consistency.
+BITFIELD_HEADERSEARCHOPT(bool, ForceCheckCXX20ModulesInputFiles, 1, false)
+///< Whether the input files from C++20 Modules should be checked.
+BITFIELD_HEADERSEARCHOPT(bool, UseDebugInfo, 1, false)
+///< Whether the module includes debug information (-gmodules).
+BITFIELD_HEADERSEARCHOPT(bool, ModulesValidateDiagnosticOptions, 1, true)
+BITFIELD_HEADERSEARCHOPT(bool, ModulesSkipDiagnosticOptions, 1, false)
+///< Whether to entirely skip writing diagnostic options. Primarily used to
+///< speed up deserialization during dependency scanning.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesSkipHeaderSearchPaths, 1, false)
+///< Whether to entirely skip writing header search paths. Primarily used to
+///< speed up deserialization during dependency scanning.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesSkipPragmaDiagnosticMappings, 1, false)
+///< Whether to entirely skip writing pragma diagnostic mappings. Primarily
+///< used to speed up deserialization during dependency scanning.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesPruneNonAffectingModuleMaps, 1, true)
+///< Whether to prune non-affecting module map files from PCM files.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesHashContent, 1, false)
+BITFIELD_HEADERSEARCHOPT(bool, ModulesSerializeOnlyPreprocessor, 1, false)
+///< Whether AST files should only contain the preprocessor information.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesStrictContextHash, 1, false)
+///< Whether we should include all things that could impact the module in the
+///< hash. This includes things like the full header search path, and enabled
+///< diagnostics.
+BITFIELD_HEADERSEARCHOPT(bool, ModulesIncludeVFSUsage, 1, false)
+///< Whether to include ivfsoverlay usage information in written AST files.
+BITFIELD_HEADERSEARCHOPT(bool, AllowModuleMapSubdirectorySearch, 1, true)
+///< Whether we should look for a module in module maps only in provided
+///< header search paths or if we are allowed to look for module maps in
+///< subdirectories of provided paths too.
+BITFIELD_HEADERSEARCHOPT(bool, LazyLoadModuleMaps, 1, false)
+///< Whether modules from module maps should only be loaded when used, not
+///< just when parsed.
+
+#ifdef BITFIELD_HEADERSEARCHOPT_DEFAULTED
+#  undef BITFIELD_HEADERSEARCHOPT
+#  undef BITFIELD_HEADERSEARCHOPT_DEFAULTED
+#endif
