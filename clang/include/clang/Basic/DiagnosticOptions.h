@@ -111,6 +111,7 @@ public:
 #define DIAGOPT(Name, Bits, Default)
 #define TYPED_DIAGOPT(Type, Name, Default) Type Name = Default;
 #include "clang/Basic/DiagnosticOptions.def"
+#undef TYPED_DIAGOPT
 
   DiagnosticOptions() {
 #define DIAGOPT(Name, Bits, Default) Name = Default;

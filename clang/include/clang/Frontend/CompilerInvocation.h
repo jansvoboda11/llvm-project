@@ -89,6 +89,20 @@ unsigned getOptimizationLevelSize(const llvm::opt::ArgList &Args);
 /// \c *Options objects. A subsequent mutation through \c getMut*Opts() may
 /// silently re-bind the invocation's storage to a fresh copy, leaving any such
 /// reference pointing at the previous (now-shared) object.
+class MutAPINotesOptsHandle;
+class MutAnalyzerOptsHandle;
+class MutCodeGenOptsHandle;
+class MutDependencyOutputOptsHandle;
+class MutDiagnosticOptsHandle;
+class MutFileSystemOptsHandle;
+class MutFrontendOptsHandle;
+class MutHeaderSearchOptsHandle;
+class MutLangOptsHandle;
+class MutMigratorOptsHandle;
+class MutPreprocessorOptsHandle;
+class MutPreprocessorOutputOptsHandle;
+class MutTargetOptsHandle;
+
 class CompilerInvocation {
 protected:
   /// Options controlling the language variant.
@@ -193,6 +207,44 @@ public:
   FrontendOptions &getMutFrontendOpts();
   DependencyOutputOptions &getMutDependencyOutputOpts();
   PreprocessorOutputOptions &getMutPreprocessorOutputOpts();
+  /// @}
+
+  /// Scoped mutator handles.
+  ///
+  /// These let a holder of a const \c CompilerInvocation (e.g., callers
+  /// observing the invocation through \c CompilerInstance::getInvocation())
+  /// mutate a single \c *Options object inside a callback that receives a
+  /// non-copyable, non-movable \c Mut*OptsHandle. The handle exposes only the
+  /// per-field setters generated from the corresponding \c *Options.def, so
+  /// the underlying options reference cannot escape. CoW semantics match
+  /// \c getMut*Opts(): if the options object is shared with another
+  /// \c CompilerInvocation, it is cloned before the callback runs.
+  /// @{
+  void withMutLangOpts(llvm::function_ref<void(MutLangOptsHandle &)> F) const;
+  void
+  withMutTargetOpts(llvm::function_ref<void(MutTargetOptsHandle &)> F) const;
+  void withMutDiagnosticOpts(
+      llvm::function_ref<void(MutDiagnosticOptsHandle &)> F) const;
+  void withMutHeaderSearchOpts(
+      llvm::function_ref<void(MutHeaderSearchOptsHandle &)> F) const;
+  void withMutPreprocessorOpts(
+      llvm::function_ref<void(MutPreprocessorOptsHandle &)> F) const;
+  void withMutAnalyzerOpts(
+      llvm::function_ref<void(MutAnalyzerOptsHandle &)> F) const;
+  void withMutMigratorOpts(
+      llvm::function_ref<void(MutMigratorOptsHandle &)> F) const;
+  void withMutAPINotesOpts(
+      llvm::function_ref<void(MutAPINotesOptsHandle &)> F) const;
+  void
+  withMutCodeGenOpts(llvm::function_ref<void(MutCodeGenOptsHandle &)> F) const;
+  void withMutFileSystemOpts(
+      llvm::function_ref<void(MutFileSystemOptsHandle &)> F) const;
+  void withMutFrontendOpts(
+      llvm::function_ref<void(MutFrontendOptsHandle &)> F) const;
+  void withMutDependencyOutputOpts(
+      llvm::function_ref<void(MutDependencyOutputOptsHandle &)> F) const;
+  void withMutPreprocessorOutputOpts(
+      llvm::function_ref<void(MutPreprocessorOutputOptsHandle &)> F) const;
   /// @}
 
   /// Visitation.

@@ -31,6 +31,7 @@
 #include "clang/Frontend/DependencyOutputOptions.h"
 #include "clang/Frontend/FrontendOptions.h"
 #include "clang/Frontend/MigratorOptions.h"
+#include "clang/Frontend/MutOptsHandle.h"
 #include "clang/Frontend/PreprocessorOutputOptions.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Frontend/Utils.h"
@@ -233,6 +234,39 @@ DependencyOutputOptions &CompilerInvocation::getMutDependencyOutputOpts() {
 PreprocessorOutputOptions &CompilerInvocation::getMutPreprocessorOutputOpts() {
   return ensureOwned(PreprocessorOutputOpts);
 }
+
+// Each withMut*Opts() routes through the corresponding non-const getMut*Opts()
+// to preserve CoW; the const_cast is the implementation detail that lets a
+// const-qualified CompilerInvocation invoke the CoW path. Callers see only
+// the scoped, non-copyable handle, so the underlying options reference cannot
+// escape the callback.
+#define WITH_MUT_OPTS(Suffix, OptsType, HandleName, GetterSuffix)              \
+  void CompilerInvocation::withMut##Suffix##Opts(                              \
+      llvm::function_ref<void(HandleName &)> F) const {                        \
+    HandleName H{                                                              \
+        const_cast<CompilerInvocation *>(this)->getMut##GetterSuffix##Opts()}; \
+    F(H);                                                                      \
+  }
+WITH_MUT_OPTS(Lang, LangOptions, MutLangOptsHandle, Lang)
+WITH_MUT_OPTS(Target, TargetOptions, MutTargetOptsHandle, Target)
+WITH_MUT_OPTS(Diagnostic, DiagnosticOptions, MutDiagnosticOptsHandle,
+              Diagnostic)
+WITH_MUT_OPTS(HeaderSearch, HeaderSearchOptions, MutHeaderSearchOptsHandle,
+              HeaderSearch)
+WITH_MUT_OPTS(Preprocessor, PreprocessorOptions, MutPreprocessorOptsHandle,
+              Preprocessor)
+WITH_MUT_OPTS(Analyzer, AnalyzerOptions, MutAnalyzerOptsHandle, Analyzer)
+WITH_MUT_OPTS(Migrator, MigratorOptions, MutMigratorOptsHandle, Migrator)
+WITH_MUT_OPTS(APINotes, APINotesOptions, MutAPINotesOptsHandle, APINotes)
+WITH_MUT_OPTS(CodeGen, CodeGenOptions, MutCodeGenOptsHandle, CodeGen)
+WITH_MUT_OPTS(FileSystem, FileSystemOptions, MutFileSystemOptsHandle,
+              FileSystem)
+WITH_MUT_OPTS(Frontend, FrontendOptions, MutFrontendOptsHandle, Frontend)
+WITH_MUT_OPTS(DependencyOutput, DependencyOutputOptions,
+              MutDependencyOutputOptsHandle, DependencyOutput)
+WITH_MUT_OPTS(PreprocessorOutput, PreprocessorOutputOptions,
+              MutPreprocessorOutputOptsHandle, PreprocessorOutput)
+#undef WITH_MUT_OPTS
 
 //===----------------------------------------------------------------------===//
 // Normalizers
