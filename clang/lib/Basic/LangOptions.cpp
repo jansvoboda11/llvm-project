@@ -17,7 +17,7 @@
 
 using namespace clang;
 
-LangOptions::LangOptions() : LangStd(LangStandard::lang_unspecified) {
+LangOptions::LangOptions() {
 #define LANGOPT(Name, Bits, Default, Compatibility, Description) Name = Default;
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Compatibility, Description)    \
   set##Name(Default);

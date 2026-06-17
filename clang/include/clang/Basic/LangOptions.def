@@ -37,6 +37,10 @@
      LANGOPT(Name, Bits, Default, Compatibility, Description)
 #endif
 
+#ifndef TYPED_LANGOPT
+#  define TYPED_LANGOPT(Type, Name, Default)
+#endif
+
 // FIXME: A lot of the Benign options should be Compatible instead.
 LANGOPT(C99               , 1, 0, NotCompatible, "C99")
 LANGOPT(C11               , 1, 0, NotCompatible, "C11")
@@ -530,6 +534,57 @@ LANGOPT(EnableLifetimeSafetyTUAnalysis, 1, 0, NotCompatible, "Lifetime safety at
 LANGOPT(PreserveVec3Type, 1, 0, NotCompatible, "Preserve 3-component vector type")
 LANGOPT(Reflection      , 1, 0, NotCompatible, "C++26 Reflection")
 
+//===----------------------------------------------------------------------===//
+// Hand-declared (non-bitfield) LangOptions fields.
+//===----------------------------------------------------------------------===//
+
+TYPED_LANGOPT(LangStandard::Kind, LangStd, LangStandard::lang_unspecified)
+TYPED_LANGOPT(SanitizerSet, Sanitize, {})
+TYPED_LANGOPT(bool, SanitizeCoverage, false)
+TYPED_LANGOPT(SanitizerSet, UBSanFeatureIgnoredSanitize, {})
+TYPED_LANGOPT(std::vector<std::string>, NoSanitizeFiles, {})
+TYPED_LANGOPT(std::vector<std::string>, XRayAlwaysInstrumentFiles, {})
+TYPED_LANGOPT(std::vector<std::string>, XRayNeverInstrumentFiles, {})
+TYPED_LANGOPT(std::vector<std::string>, XRayAttrListFiles, {})
+TYPED_LANGOPT(std::vector<std::string>, ProfileListFiles, {})
+TYPED_LANGOPT(clang::ObjCRuntime, ObjCRuntime, {})
+TYPED_LANGOPT(CoreFoundationABI, CFRuntime, CoreFoundationABI::Unspecified)
+TYPED_LANGOPT(std::string, ObjCConstantStringClass, {})
+TYPED_LANGOPT(std::string, ObjCConstantArrayClass, {})
+TYPED_LANGOPT(std::string, ObjCConstantDictionaryClass, {})
+TYPED_LANGOPT(std::string, ObjCConstantIntegerNumberClass, {})
+TYPED_LANGOPT(std::string, ObjCConstantFloatNumberClass, {})
+TYPED_LANGOPT(std::string, ObjCConstantDoubleNumberClass, {})
+TYPED_LANGOPT(std::string, OverflowHandler, {})
+TYPED_LANGOPT(std::string, ModuleName, {})
+TYPED_LANGOPT(std::string, CurrentModule, {})
+TYPED_LANGOPT(std::vector<std::string>, ModuleFeatures, {})
+TYPED_LANGOPT(CommentOptions, CommentOpts, {})
+TYPED_LANGOPT(std::vector<std::string>, NoBuiltinFuncs, {})
+TYPED_LANGOPT(MacroPrefixMapType, MacroPrefixMap, {})
+TYPED_LANGOPT(std::vector<llvm::Triple>, OMPTargetTriples, {})
+TYPED_LANGOPT(std::string, OMPHostIRFile, {})
+TYPED_LANGOPT(std::string, CUID, {})
+TYPED_LANGOPT(std::optional<TargetCXXABI::Kind>, CXXABI, {})
+TYPED_LANGOPT(bool, IsHeaderFile, false)
+TYPED_LANGOPT(GPUDefaultStreamKind, GPUDefaultStream,
+              GPUDefaultStreamKind::Legacy)
+TYPED_LANGOPT(unsigned, OverflowPatternExclusionMask, 0)
+TYPED_LANGOPT(std::vector<std::string>, OverflowPatternExclusionValues, {})
+TYPED_LANGOPT(std::string, RandstructSeed, {})
+TYPED_LANGOPT(bool, UseTargetPathSeparator, false)
+TYPED_LANGOPT(bool, CheckNew, false)
+TYPED_LANGOPT(llvm::dxbc::RootSignatureVersion, HLSLRootSigVer,
+              llvm::dxbc::RootSignatureVersion::V1_1)
+TYPED_LANGOPT(std::string, HLSLRootSigOverride, {})
+TYPED_LANGOPT(bool, NoWasmOpt, false)
+TYPED_LANGOPT(bool, AtomicRemoteMemory, false)
+TYPED_LANGOPT(bool, AtomicFineGrainedMemory, false)
+TYPED_LANGOPT(bool, AtomicIgnoreDenormalMode, false)
+TYPED_LANGOPT(std::optional<uint64_t>, AllocTokenMax, {})
+TYPED_LANGOPT(std::optional<llvm::AllocTokenMode>, AllocTokenMode, {})
+
 #undef LANGOPT
 #undef ENUM_LANGOPT
 #undef VALUE_LANGOPT
+#undef TYPED_LANGOPT
