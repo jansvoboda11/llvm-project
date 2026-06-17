@@ -1,0 +1,45 @@
+//===--- FileSystemOptions.def - File system option database ---*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the file-system options. Users of this file must define
+// the TYPED_FILESYSTEMOPT macro to make use of this information. The
+// arguments to the macro are:
+//
+//   TYPED_FILESYSTEMOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_FILESYSTEMOPT(Type, Name, Bits, Default)
+//
+// Bitfields are stored as `LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;`
+// and are initialized in the class's default constructor (so that
+// re-including this file with `BITFIELD_*` defined as `Name = Default;`
+// produces the constructor body).
+//
+// \c Default is a C++ initializer expression. Use \c {} for value
+// initialization.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_FILESYSTEMOPT
+#  error Define the TYPED_FILESYSTEMOPT macro to handle file-system options
+#endif
+
+#ifndef BITFIELD_FILESYSTEMOPT
+#  define BITFIELD_FILESYSTEMOPT(Type, Name, Bits, Default)
+#  define BITFIELD_FILESYSTEMOPT_DEFAULTED
+#endif
+
+TYPED_FILESYSTEMOPT(std::string, WorkingDir, {})
+///< If set, paths are resolved as if the working directory was set to its
+///< value.
+
+#ifdef BITFIELD_FILESYSTEMOPT_DEFAULTED
+#  undef BITFIELD_FILESYSTEMOPT
+#  undef BITFIELD_FILESYSTEMOPT_DEFAULTED
+#endif
