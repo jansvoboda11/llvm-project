@@ -1,0 +1,39 @@
+//===--- MigratorOptions.def - Migrator option database ---------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the migrator options. Users of this file must define
+// the TYPED_MIGRATOROPT macro to make use of this information. The arguments
+// to the macro are:
+//
+//   TYPED_MIGRATOROPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_MIGRATOROPT(Type, Name, Bits, Default)
+//
+// Bitfields are stored as `LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;`
+// and are initialized in the class's default constructor.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_MIGRATOROPT
+#  error Define the TYPED_MIGRATOROPT macro to handle migrator options
+#endif
+
+#ifndef BITFIELD_MIGRATOROPT
+#  define BITFIELD_MIGRATOROPT(Type, Name, Bits, Default)
+#  define BITFIELD_MIGRATOROPT_DEFAULTED
+#endif
+
+BITFIELD_MIGRATOROPT(bool, NoNSAllocReallocError, 1, false)
+BITFIELD_MIGRATOROPT(bool, NoFinalizeRemoval, 1, false)
+
+#ifdef BITFIELD_MIGRATOROPT_DEFAULTED
+#  undef BITFIELD_MIGRATOROPT
+#  undef BITFIELD_MIGRATOROPT_DEFAULTED
+#endif

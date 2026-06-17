@@ -20,15 +20,21 @@ namespace clang {
 
 class MigratorOptions {
 public:
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned NoNSAllocReallocError : 1;
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned NoFinalizeRemoval : 1;
+#define TYPED_MIGRATOROPT(Type, Name, Default) Type Name = Default;
+#define BITFIELD_MIGRATOROPT(Type, Name, Bits, Default)                        \
+  LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;
+#include "clang/Frontend/MigratorOptions.def"
+#undef TYPED_MIGRATOROPT
+#undef BITFIELD_MIGRATOROPT
+
   MigratorOptions() {
-    NoNSAllocReallocError = 0;
-    NoFinalizeRemoval = 0;
+#define TYPED_MIGRATOROPT(Type, Name, Default)
+#define BITFIELD_MIGRATOROPT(Type, Name, Bits, Default) Name = Default;
+#include "clang/Frontend/MigratorOptions.def"
+#undef TYPED_MIGRATOROPT
+#undef BITFIELD_MIGRATOROPT
   }
 };
 
-}
+} // namespace clang
 #endif
