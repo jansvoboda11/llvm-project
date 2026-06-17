@@ -1,0 +1,79 @@
+//===--- DependencyOutputOptions.def ----------------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the dependency-output options. Users of this file must
+// define the TYPED_DEPOUTPUTOPT macro to make use of this information. The
+// arguments to the macro are:
+//
+//   TYPED_DEPOUTPUTOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_DEPOUTPUTOPT(Type, Name, Bits, Default)
+//
+// Bitfields are stored as `LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;`
+// and are initialized in the class's default constructor.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_DEPOUTPUTOPT
+#  error Define the TYPED_DEPOUTPUTOPT macro to handle dependency-output options
+#endif
+
+#ifndef BITFIELD_DEPOUTPUTOPT
+#  define BITFIELD_DEPOUTPUTOPT(Type, Name, Bits, Default)
+#  define BITFIELD_DEPOUTPUTOPT_DEFAULTED
+#endif
+
+BITFIELD_DEPOUTPUTOPT(bool, IncludeSystemHeaders, 1, false)
+///< Include system header dependencies.
+BITFIELD_DEPOUTPUTOPT(bool, ShowHeaderIncludes, 1, false)
+///< Show header inclusions (-H).
+BITFIELD_DEPOUTPUTOPT(bool, UsePhonyTargets, 1, false)
+///< Include phony targets for each dependency, which can avoid some 'make'
+///< problems.
+BITFIELD_DEPOUTPUTOPT(bool, AddMissingHeaderDeps, 1, false)
+///< Add missing headers to dependency list.
+BITFIELD_DEPOUTPUTOPT(ModuleFileDepsKind, IncludeModuleFiles, 2, MFDK_None)
+///< Include module file dependencies.
+BITFIELD_DEPOUTPUTOPT(bool, ShowSkippedHeaderIncludes, 1, false)
+///< With \c ShowHeaderIncludes, also show includes that were skipped due to
+///< the "include guard optimization" or `#pragma once`.
+TYPED_DEPOUTPUTOPT(HeaderIncludeFormatKind, HeaderIncludeFormat, HIFMT_Textual)
+///< The format of header information.
+TYPED_DEPOUTPUTOPT(HeaderIncludeFilteringKind, HeaderIncludeFiltering,
+                   HIFIL_None)
+///< Determines whether header information should be filtered.
+TYPED_DEPOUTPUTOPT(ShowIncludesDestination, ShowIncludesDest,
+                   ShowIncludesDestination::None)
+///< Destination of cl.exe style /showIncludes info.
+TYPED_DEPOUTPUTOPT(DependencyOutputFormat, OutputFormat,
+                   DependencyOutputFormat::Make)
+///< The format for the dependency file.
+TYPED_DEPOUTPUTOPT(std::string, OutputFile, {})
+///< The file to write dependency output to.
+TYPED_DEPOUTPUTOPT(std::string, HeaderIncludeOutputFile, {})
+///< The file to write header include output to. This is orthogonal to
+///< \c ShowHeaderIncludes (-H) and will include headers mentioned in the
+///< predefines buffer. If the output file is "-", output will be sent to
+///< stderr.
+TYPED_DEPOUTPUTOPT(std::vector<std::string>, Targets, {})
+///< A list of names to use as the targets in the dependency file; this list
+///< must contain at least one entry.
+TYPED_DEPOUTPUTOPT(std::vector<ExtraDep>, ExtraDeps, {})
+///< A list of extra dependencies (filename and kind) to be used for every
+///< target.
+TYPED_DEPOUTPUTOPT(std::string, DOTOutputFile, {})
+///< The file to write GraphViz-formatted header dependencies to.
+TYPED_DEPOUTPUTOPT(std::string, ModuleDependencyOutputDir, {})
+///< The directory to copy module dependencies to when collecting them.
+
+#ifdef BITFIELD_DEPOUTPUTOPT_DEFAULTED
+#  undef BITFIELD_DEPOUTPUTOPT
+#  undef BITFIELD_DEPOUTPUTOPT_DEFAULTED
+#endif

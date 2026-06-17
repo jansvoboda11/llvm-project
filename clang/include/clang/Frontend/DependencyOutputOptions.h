@@ -10,7 +10,9 @@
 #define LLVM_CLANG_FRONTEND_DEPENDENCYOUTPUTOPTIONS_H
 
 #include "clang/Basic/HeaderInclude.h"
+#include "llvm/Support/Compiler.h"
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace clang {
@@ -40,65 +42,24 @@ enum ModuleFileDepsKind {
 /// file generation.
 class DependencyOutputOptions {
 public:
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned IncludeSystemHeaders : 1; ///< Include system header dependencies.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ShowHeaderIncludes : 1;   ///< Show header inclusions (-H).
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned UsePhonyTargets : 1;      ///< Include phony targets for each
-                                     /// dependency, which can avoid some 'make'
-                                     /// problems.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned AddMissingHeaderDeps : 1; ///< Add missing headers to dependency list
-  LLVM_PREFERRED_TYPE(ModuleFileDepsKind)
-  unsigned IncludeModuleFiles : 2; ///< Include module file dependencies.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned ShowSkippedHeaderIncludes : 1; ///< With ShowHeaderIncludes, show
-                                          /// also includes that were skipped
-                                          /// due to the "include guard
-                                          /// optimization" or #pragma once.
+  /// One entry of the \c ExtraDeps list. Aliased to keep the
+  /// \c TYPED_DEPOUTPUTOPT lines free of nested commas in template arguments.
+  using ExtraDep = std::pair<std::string, ExtraDepKind>;
 
-  /// The format of header information.
-  HeaderIncludeFormatKind HeaderIncludeFormat = HIFMT_Textual;
+#define TYPED_DEPOUTPUTOPT(Type, Name, Default) Type Name = Default;
+#define BITFIELD_DEPOUTPUTOPT(Type, Name, Bits, Default)                       \
+  LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;
+#include "clang/Frontend/DependencyOutputOptions.def"
+#undef TYPED_DEPOUTPUTOPT
+#undef BITFIELD_DEPOUTPUTOPT
 
-  /// Determine whether header information should be filtered.
-  HeaderIncludeFilteringKind HeaderIncludeFiltering = HIFIL_None;
-
-  /// Destination of cl.exe style /showIncludes info.
-  ShowIncludesDestination ShowIncludesDest = ShowIncludesDestination::None;
-
-  /// The format for the dependency file.
-  DependencyOutputFormat OutputFormat = DependencyOutputFormat::Make;
-
-  /// The file to write dependency output to.
-  std::string OutputFile;
-
-  /// The file to write header include output to. This is orthogonal to
-  /// ShowHeaderIncludes (-H) and will include headers mentioned in the
-  /// predefines buffer. If the output file is "-", output will be sent to
-  /// stderr.
-  std::string HeaderIncludeOutputFile;
-
-  /// A list of names to use as the targets in the dependency file; this list
-  /// must contain at least one entry.
-  std::vector<std::string> Targets;
-
-  /// A list of extra dependencies (filename and kind) to be used for every
-  /// target.
-  std::vector<std::pair<std::string, ExtraDepKind>> ExtraDeps;
-
-  /// The file to write GraphViz-formatted header dependencies to.
-  std::string DOTOutputFile;
-
-  /// The directory to copy module dependencies to when collecting them.
-  std::string ModuleDependencyOutputDir;
-
-public:
-  DependencyOutputOptions()
-      : IncludeSystemHeaders(0), ShowHeaderIncludes(0), UsePhonyTargets(0),
-        AddMissingHeaderDeps(0), IncludeModuleFiles(MFDK_None),
-        ShowSkippedHeaderIncludes(0), HeaderIncludeFormat(HIFMT_Textual),
-        HeaderIncludeFiltering(HIFIL_None) {}
+  DependencyOutputOptions() {
+#define TYPED_DEPOUTPUTOPT(Type, Name, Default)
+#define BITFIELD_DEPOUTPUTOPT(Type, Name, Bits, Default) Name = Default;
+#include "clang/Frontend/DependencyOutputOptions.def"
+#undef TYPED_DEPOUTPUTOPT
+#undef BITFIELD_DEPOUTPUTOPT
+  }
 };
 
 }  // end namespace clang
