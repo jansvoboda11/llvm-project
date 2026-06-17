@@ -27,6 +27,10 @@ CODEGENOPT(Name, Bits, Default, Compatibility)
 CODEGENOPT(Name, Bits, Default, Compatibility)
 #endif
 
+#ifndef TYPED_CODEGENOPT
+#  define TYPED_CODEGENOPT(Type, Name, Default)
+#endif
+
 CODEGENOPT(DisableIntegratedAS, 1, 0, Benign) ///< -no-integrated-as
 CODEGENOPT(ExperimentalABILowering, 1, 0, Benign) ///< -fexperimental-abi-lowering:
                                                   ///< route function ABI lowering
@@ -535,6 +539,100 @@ CODEGENOPT(DisableOutlining, 1, 0, Benign)
 /// FIXME: Make DebugOptions its own top-level .def file.
 #include "DebugOptions.def"
 
+//===----------------------------------------------------------------------===//
+// Hand-declared (non-bitfield) CodeGenOptions fields.
+//===----------------------------------------------------------------------===//
+
+TYPED_CODEGENOPT(std::string, BBSections, {})
+TYPED_CODEGENOPT(std::string, BinutilsVersion, {})
+TYPED_CODEGENOPT(std::string, CodeModel, {})
+TYPED_CODEGENOPT(uint64_t, LargeDataThreshold, 0)
+TYPED_CODEGENOPT(std::string, CoverageDataFile, {})
+TYPED_CODEGENOPT(std::string, CoverageNotesFile, {})
+TYPED_CODEGENOPT(std::string, ProfileFilterFiles, {})
+TYPED_CODEGENOPT(std::string, ProfileExcludeFiles, {})
+// CoverageVersion is intentionally hand-declared in CodeGenOptions.h: a raw
+// `char[4]` brace-initializer can't be passed through a function-like macro
+// because of the embedded commas.
+TYPED_CODEGENOPT(std::string, DebugPass, {})
+TYPED_CODEGENOPT(std::string, DebugCompilationDir, {})
+TYPED_CODEGENOPT(std::string, CoverageCompilationDir, {})
+TYPED_CODEGENOPT(std::string, DwarfDebugFlags, {})
+TYPED_CODEGENOPT(std::string, RecordCommandLine, {})
+TYPED_CODEGENOPT(StringPairList, DebugPrefixMap, {})
+TYPED_CODEGENOPT(StringPairList, CoveragePrefixMap, {})
+TYPED_CODEGENOPT(std::string, FloatABI, {})
+TYPED_CODEGENOPT(std::string, DIBugsReportFilePath, {})
+TYPED_CODEGENOPT(llvm::DenormalMode, FPDenormalMode,
+                 llvm::DenormalMode::getIEEE())
+TYPED_CODEGENOPT(llvm::DenormalMode, FP32DenormalMode,
+                 llvm::DenormalMode::getIEEE())
+TYPED_CODEGENOPT(std::string, LimitFloatPrecision, {})
+TYPED_CODEGENOPT(std::vector<BitcodeFileToLink>, LinkBitcodeFiles, {})
+TYPED_CODEGENOPT(std::string, MainFileName, {})
+TYPED_CODEGENOPT(std::string, SplitDwarfFile, {})
+TYPED_CODEGENOPT(std::string, SplitDwarfOutput, {})
+TYPED_CODEGENOPT(std::string, ObjectFilenameForDebug, {})
+TYPED_CODEGENOPT(llvm::Reloc::Model, RelocationModel, llvm::Reloc::PIC_)
+TYPED_CODEGENOPT(std::string, TrapFuncName, {})
+TYPED_CODEGENOPT(std::vector<std::string>, DependentLibraries, {})
+TYPED_CODEGENOPT(std::vector<std::string>, LinkerOptions, {})
+TYPED_CODEGENOPT(std::string, InstrProfileOutput, {})
+TYPED_CODEGENOPT(std::string, PatchableFunctionEntrySection, {})
+TYPED_CODEGENOPT(std::string, SampleProfileFile, {})
+TYPED_CODEGENOPT(std::string, MemoryProfileOutput, {})
+TYPED_CODEGENOPT(std::string, MemoryProfileUsePath, {})
+TYPED_CODEGENOPT(std::string, ProfileInstrumentUsePath, {})
+TYPED_CODEGENOPT(std::string, ProfileRemappingFile, {})
+TYPED_CODEGENOPT(std::string, ThinLTOIndexFile, {})
+TYPED_CODEGENOPT(std::string, ThinLinkBitcodeFile, {})
+TYPED_CODEGENOPT(std::string, SaveTempsFilePrefix, {})
+TYPED_CODEGENOPT(std::string, CudaGpuBinaryFileName, {})
+TYPED_CODEGENOPT(std::vector<std::string>, OffloadObjects, {})
+TYPED_CODEGENOPT(std::string, OptRecordFile, {})
+TYPED_CODEGENOPT(std::string, OptRecordPasses, {})
+TYPED_CODEGENOPT(std::string, OptRecordFormat, {})
+TYPED_CODEGENOPT(std::string, SymbolPartition, {})
+TYPED_CODEGENOPT(std::string, UniqueSourceFileIdentifier, {})
+TYPED_CODEGENOPT(OptRemark, OptimizationRemark, {})
+TYPED_CODEGENOPT(OptRemark, OptimizationRemarkMissed, {})
+TYPED_CODEGENOPT(OptRemark, OptimizationRemarkAnalysis, {})
+TYPED_CODEGENOPT(SanitizerSet, SanitizeRecover, {})
+TYPED_CODEGENOPT(SanitizerSet, SanitizeTrap, {})
+TYPED_CODEGENOPT(SanitizerSet, SanitizeMergeHandlers, {})
+TYPED_CODEGENOPT(SanitizerMaskCutoffs, SanitizeSkipHotCutoffs, {})
+TYPED_CODEGENOPT(SanitizerSet, SanitizeAnnotateDebugInfo, {})
+TYPED_CODEGENOPT(std::optional<double>, AllowRuntimeCheckSkipHotCutoff, {})
+TYPED_CODEGENOPT(std::vector<uint8_t>, CmdArgs, {})
+TYPED_CODEGENOPT(std::vector<std::string>, NoBuiltinFuncs, {})
+TYPED_CODEGENOPT(std::vector<std::string>, Reciprocals, {})
+TYPED_CODEGENOPT(PointerAuthOptions, PointerAuth, {})
+TYPED_CODEGENOPT(std::string, PreferVectorWidth, {})
+TYPED_CODEGENOPT(XRayInstrSet, XRayInstrumentationBundle, {})
+TYPED_CODEGENOPT(std::vector<std::string>, DefaultFunctionAttrs, {})
+TYPED_CODEGENOPT(std::vector<std::string>, PassPlugins, {})
+TYPED_CODEGENOPT(PassBuilderCallbackList, PassBuilderCallbacks, {})
+TYPED_CODEGENOPT(std::vector<std::string>, TocDataVarsUserSpecified, {})
+TYPED_CODEGENOPT(std::vector<std::string>, NoTocDataVars, {})
+TYPED_CODEGENOPT(std::vector<std::string>, SanitizeCoverageAllowlistFiles, {})
+TYPED_CODEGENOPT(std::string, StackProtectorGuard, {})
+TYPED_CODEGENOPT(std::string, StackProtectorGuardReg, {})
+TYPED_CODEGENOPT(std::string, StackProtectorGuardSymbol, {})
+TYPED_CODEGENOPT(std::vector<std::string>, SanitizeCoverageIgnorelistFiles, {})
+TYPED_CODEGENOPT(std::vector<std::string>, SanitizeMetadataIgnorelistFiles, {})
+TYPED_CODEGENOPT(llvm::KCFIHashAlgorithm, SanitizeKcfiHash,
+                 llvm::KCFIHashAlgorithm::xxHash64)
+TYPED_CODEGENOPT(std::string, StackUsageFile, {})
+TYPED_CODEGENOPT(const char *, Argv0, nullptr)
+TYPED_CODEGENOPT(std::vector<std::string>, CommandLineArgs, {})
+TYPED_CODEGENOPT(std::optional<uint64_t>, DiagnosticsHotnessThreshold, 0)
+TYPED_CODEGENOPT(std::optional<uint32_t>, DiagnosticsMisExpectTolerance, 0)
+TYPED_CODEGENOPT(std::string, AsSecureLogFile, {})
+TYPED_CODEGENOPT(std::vector<std::string>, LoaderReplaceableFunctionNames, {})
+TYPED_CODEGENOPT(std::string, MSSecureHotPatchFunctionsFile, {})
+TYPED_CODEGENOPT(std::vector<std::string>, MSSecureHotPatchFunctionsList, {})
+
 #undef CODEGENOPT
 #undef ENUM_CODEGENOPT
 #undef VALUE_CODEGENOPT
+#undef TYPED_CODEGENOPT

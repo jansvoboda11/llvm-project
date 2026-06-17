@@ -15,8 +15,6 @@ CodeGenOptions::CodeGenOptions() {
 #define ENUM_CODEGENOPT(Name, Type, Bits, Default, Compatibility)              \
   set##Name(Default);
 #include "clang/Basic/CodeGenOptions.def"
-
-  RelocationModel = llvm::Reloc::PIC_;
 }
 
 void CodeGenOptions::resetNonModularOptions(StringRef ModuleFormat) {

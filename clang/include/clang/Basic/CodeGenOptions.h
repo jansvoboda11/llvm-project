@@ -140,22 +140,8 @@ public:
     DSH_NONE,
   };
 
-  // This field stores one of the allowed values for the option
-  // -fbasic-block-sections=.  The allowed values with this option are:
-  // {"all", "list=<file>", "none"}.
-  //
-  // "all" :        Generate basic block sections for all basic blocks.
-  // "list=<file>": Generate basic block sections for a subset of basic blocks.
-  //                The functions and the machine basic block ids are specified
-  //                in the file.
-  // "none":        Disable sections for basic blocks.
-  std::string BBSections;
-
-  // If set, override the default value of MCAsmInfo::BinutilsVersion. If
-  // DisableIntegratedAS is specified, the assembly output will consider GNU as
-  // support. "none" means that all ELF features can be used, regardless of
-  // binutils support.
-  std::string BinutilsVersion;
+  // BBSections and BinutilsVersion are migrated to TYPED_CODEGENOPT below;
+  // see clang/Basic/CodeGenOptions.def.
 
   enum class FramePointerKind {
     NonLeafNoReserve, // Keep non-leaf frame pointers, allow the FP to be used
@@ -226,69 +212,6 @@ public:
     NonStrictDefault = NonZero
   };
 
-  /// The code model to use (-mcmodel).
-  std::string CodeModel;
-
-  /// The code model-specific large data threshold to use
-  /// (-mlarge-data-threshold).
-  uint64_t LargeDataThreshold;
-
-  /// The filename with path we use for coverage data files. The runtime
-  /// allows further manipulation with the GCOV_PREFIX and GCOV_PREFIX_STRIP
-  /// environment variables.
-  std::string CoverageDataFile;
-
-  /// The filename with path we use for coverage notes files.
-  std::string CoverageNotesFile;
-
-  /// Regexes separated by a semi-colon to filter the files to instrument.
-  std::string ProfileFilterFiles;
-
-  /// Regexes separated by a semi-colon to filter the files to not instrument.
-  std::string ProfileExcludeFiles;
-
-  /// The version string to put into coverage files.
-  char CoverageVersion[4] = {'0', '0', '0', '0'};
-
-  /// Enable additional debugging information.
-  std::string DebugPass;
-
-  /// The string to embed in debug information as the current working directory.
-  std::string DebugCompilationDir;
-
-  /// The string to embed in coverage mapping as the current working directory.
-  std::string CoverageCompilationDir;
-
-  /// The string to embed in the debug information for the compile unit, if
-  /// non-empty.
-  std::string DwarfDebugFlags;
-
-  /// The string containing the commandline for the llvm.commandline metadata,
-  /// if non-empty.
-  std::string RecordCommandLine;
-
-  llvm::SmallVector<std::pair<std::string, std::string>, 0> DebugPrefixMap;
-
-  /// Prefix replacement map for source-based code coverage to remap source
-  /// file paths in coverage mapping.
-  llvm::SmallVector<std::pair<std::string, std::string>, 0> CoveragePrefixMap;
-
-  /// The ABI to use for passing floating point arguments.
-  std::string FloatABI;
-
-  /// The file to use for dumping bug report by `Debugify` for original
-  /// debug info.
-  std::string DIBugsReportFilePath;
-
-  /// The floating-point denormal mode to use.
-  llvm::DenormalMode FPDenormalMode = llvm::DenormalMode::getIEEE();
-
-  /// The floating-point denormal mode to use, for float.
-  llvm::DenormalMode FP32DenormalMode = llvm::DenormalMode::getIEEE();
-
-  /// The float precision limit to use, if non-empty.
-  std::string LimitFloatPrecision;
-
   struct BitcodeFileToLink {
     /// The filename of the bitcode file to link in.
     std::string Filename;
@@ -301,100 +224,6 @@ public:
     /// Bitwise combination of llvm::Linker::Flags, passed to the LLVM linker.
     unsigned LinkFlags = 0;
   };
-
-  /// The files specified here are linked in to the module before optimizations.
-  std::vector<BitcodeFileToLink> LinkBitcodeFiles;
-
-  /// The user provided name for the "main file", if non-empty. This is useful
-  /// in situations where the input file name does not match the original input
-  /// file, for example with -save-temps.
-  std::string MainFileName;
-
-  /// The name for the split debug info file used for the DW_AT_[GNU_]dwo_name
-  /// attribute in the skeleton CU.
-  std::string SplitDwarfFile;
-
-  /// Output filename for the split debug info, not used in the skeleton CU.
-  std::string SplitDwarfOutput;
-
-  /// Output filename used in the COFF debug information.
-  std::string ObjectFilenameForDebug;
-
-  /// The name of the relocation model to use.
-  llvm::Reloc::Model RelocationModel;
-
-  /// If not an empty string, trap intrinsics are lowered to calls to this
-  /// function instead of to trap instructions.
-  std::string TrapFuncName;
-
-  /// A list of dependent libraries.
-  std::vector<std::string> DependentLibraries;
-
-  /// A list of linker options to embed in the object file.
-  std::vector<std::string> LinkerOptions;
-
-  /// Name of the profile file to use as output for -fprofile-instr-generate,
-  /// -fprofile-generate, and -fcs-profile-generate.
-  std::string InstrProfileOutput;
-
-  /// Name of the patchable function entry section with
-  /// -fpatchable-function-entry.
-  std::string PatchableFunctionEntrySection;
-
-  /// Name of the profile file to use with -fprofile-sample-use.
-  std::string SampleProfileFile;
-
-  /// Name of the profile file to use as output for with -fmemory-profile.
-  std::string MemoryProfileOutput;
-
-  /// Name of the profile file to use as input for -fmemory-profile-use.
-  std::string MemoryProfileUsePath;
-
-  /// Name of the profile file to use as input for -fprofile-instr-use
-  std::string ProfileInstrumentUsePath;
-
-  /// Name of the profile remapping file to apply to the profile data supplied
-  /// by -fprofile-sample-use or -fprofile-instr-use.
-  std::string ProfileRemappingFile;
-
-  /// Name of the function summary index file to use for ThinLTO function
-  /// importing.
-  std::string ThinLTOIndexFile;
-
-  /// Name of a file that can optionally be written with minimized bitcode
-  /// to be used as input for the ThinLTO thin link step, which only needs
-  /// the summary and module symbol table (and not, e.g. any debug metadata).
-  std::string ThinLinkBitcodeFile;
-
-  /// Prefix to use for -save-temps output.
-  std::string SaveTempsFilePrefix;
-
-  /// Name of file passed with -fcuda-include-gpubinary option to forward to
-  /// CUDA runtime back-end for incorporating them into host-side object file.
-  std::string CudaGpuBinaryFileName;
-
-  /// List of filenames passed in using the -fembed-offload-object option. These
-  /// are offloading binaries containing device images and metadata.
-  std::vector<std::string> OffloadObjects;
-
-  /// The name of the file to which the backend should save YAML optimization
-  /// records.
-  std::string OptRecordFile;
-
-  /// The regex that filters the passes that should be saved to the optimization
-  /// records.
-  std::string OptRecordPasses;
-
-  /// The format used for serializing remarks (default: YAML)
-  std::string OptRecordFormat;
-
-  /// The name of the partition that symbols are assigned to, specified with
-  /// -fsymbol-partition (see https://lld.llvm.org/Partitions.html).
-  std::string SymbolPartition;
-
-  /// If non-empty, allow the compiler to assume that the given source file
-  /// identifier is unique at link time.
-  std::string UniqueSourceFileIdentifier;
 
   enum RemarkKind {
     RK_Missing,            // Remark argument not present on the command line.
@@ -424,153 +253,22 @@ public:
     }
   };
 
-  /// Selected optimizations for which we should enable optimization remarks.
-  /// Transformation passes whose name matches the contained (optional) regular
-  /// expression (and support this feature), will emit a diagnostic whenever
-  /// they perform a transformation.
-  OptRemark OptimizationRemark;
+  /// Aliases used to keep TYPED_CODEGENOPT lines free of nested commas in
+  /// template arguments and to expose array types behind a single identifier.
+  using StringPairList =
+      llvm::SmallVector<std::pair<std::string, std::string>, 0>;
+  using PassBuilderCallbackList =
+      std::vector<std::function<void(llvm::PassBuilder &)>>;
 
-  /// Selected optimizations for which we should enable missed optimization
-  /// remarks. Transformation passes whose name matches the contained (optional)
-  /// regular expression (and support this feature), will emit a diagnostic
-  /// whenever they tried but failed to perform a transformation.
-  OptRemark OptimizationRemarkMissed;
+  /// The version string to put into coverage files. Hand-declared because a
+  /// `char[4]` brace-initializer can't be passed through a function-like macro
+  /// (the commas in `{'0','0','0','0'}` would split into separate macro args).
+  char CoverageVersion[4] = {'0', '0', '0', '0'};
 
-  /// Selected optimizations for which we should enable optimization analyses.
-  /// Transformation passes whose name matches the contained (optional) regular
-  /// expression (and support this feature), will emit a diagnostic whenever
-  /// they want to explain why they decided to apply or not apply a given
-  /// transformation.
-  OptRemark OptimizationRemarkAnalysis;
-
-  /// Set of sanitizer checks that are non-fatal (i.e. execution should be
-  /// continued when possible).
-  SanitizerSet SanitizeRecover;
-
-  /// Set of sanitizer checks that trap rather than diagnose.
-  SanitizerSet SanitizeTrap;
-
-  /// Set of sanitizer checks that can merge handlers (smaller code size at
-  /// the expense of debuggability).
-  SanitizerSet SanitizeMergeHandlers;
-
-  /// Set of thresholds in a range [0.0, 1.0]: the top hottest code responsible
-  /// for the given fraction of PGO counters will be excluded from sanitization
-  /// (0.0 [default] to skip none, 1.0 to skip all).
-  SanitizerMaskCutoffs SanitizeSkipHotCutoffs;
-
-  /// Set of sanitizer checks, for which the instrumentation will be annotated
-  /// with extra debug info.
-  SanitizerSet SanitizeAnnotateDebugInfo;
-
-  std::optional<double> AllowRuntimeCheckSkipHotCutoff;
-
-  /// List of backend command-line options for -fembed-bitcode.
-  std::vector<uint8_t> CmdArgs;
-
-  /// A list of all -fno-builtin-* function names (e.g., memset).
-  std::vector<std::string> NoBuiltinFuncs;
-
-  std::vector<std::string> Reciprocals;
-
-  /// Configuration for pointer-signing.
-  PointerAuthOptions PointerAuth;
-
-  /// The preferred width for auto-vectorization transforms. This is intended to
-  /// override default transforms based on the width of the architected vector
-  /// registers.
-  std::string PreferVectorWidth;
-
-  /// Set of XRay instrumentation kinds to emit.
-  XRayInstrSet XRayInstrumentationBundle;
-
-  std::vector<std::string> DefaultFunctionAttrs;
-
-  /// List of dynamic shared object files to be loaded as pass plugins.
-  std::vector<std::string> PassPlugins;
-
-  /// List of pass builder callbacks.
-  std::vector<std::function<void(llvm::PassBuilder &)>> PassBuilderCallbacks;
-
-  /// List of global variables explicitly specified by the user as toc-data.
-  std::vector<std::string> TocDataVarsUserSpecified;
-
-  /// List of global variables that over-ride the toc-data default.
-  std::vector<std::string> NoTocDataVars;
-
-  /// Path to allowlist file specifying which objects
-  /// (files, functions) should exclusively be instrumented
-  /// by sanitizer coverage pass.
-  std::vector<std::string> SanitizeCoverageAllowlistFiles;
-
-  /// The guard style used for stack protector to get a initial value, this
-  /// value usually be gotten from TLS or get from __stack_chk_guard, or some
-  /// other styles we may implement in the future.
-  std::string StackProtectorGuard;
-
-  /// The TLS base register when StackProtectorGuard is "tls", or register used
-  /// to store the stack canary for "sysreg".
-  /// On x86 this can be "fs" or "gs".
-  /// On AArch64 this can only be "sp_el0".
-  std::string StackProtectorGuardReg;
-
-  /// Specify a symbol to be the guard value.
-  std::string StackProtectorGuardSymbol;
-
-  /// Path to ignorelist file specifying which objects
-  /// (files, functions) listed for instrumentation by sanitizer
-  /// coverage pass should actually not be instrumented.
-  std::vector<std::string> SanitizeCoverageIgnorelistFiles;
-
-  /// Path to ignorelist file specifying which objects
-  /// (files, functions) listed for instrumentation by sanitizer
-  /// binary metadata pass should not be instrumented.
-  std::vector<std::string> SanitizeMetadataIgnorelistFiles;
-
-  /// Hash algorithm to use for KCFI type IDs.
-  llvm::KCFIHashAlgorithm SanitizeKcfiHash;
-
-  /// Name of the stack usage file (i.e., .su file) if user passes
-  /// -fstack-usage. If empty, it can be implied that -fstack-usage is not
-  /// passed on the command line.
-  std::string StackUsageFile;
-
-  /// Executable and command-line used to create a given CompilerInvocation.
-  /// Most of the time this will be the full -cc1 command.
-  const char *Argv0 = nullptr;
-  std::vector<std::string> CommandLineArgs;
-
-  /// The minimum hotness value a diagnostic needs in order to be included in
-  /// optimization diagnostics.
-  ///
-  /// The threshold is an Optional value, which maps to one of the 3 states:
-  /// 1. 0            => threshold disabled. All remarks will be printed.
-  /// 2. positive int => manual threshold by user. Remarks with hotness exceed
-  ///                    threshold will be printed.
-  /// 3. None         => 'auto' threshold by user. The actual value is not
-  ///                    available at command line, but will be synced with
-  ///                    hotness threshold from profile summary during
-  ///                    compilation.
-  ///
-  /// If threshold option is not specified, it is disabled by default.
-  std::optional<uint64_t> DiagnosticsHotnessThreshold = 0;
-
-  /// The maximum percentage profiling weights can deviate from the expected
-  /// values in order to be included in misexpect diagnostics.
-  std::optional<uint32_t> DiagnosticsMisExpectTolerance = 0;
-
-  /// The name of a file to use with \c .secure_log_unique directives.
-  std::string AsSecureLogFile;
-
-  /// A list of functions that are replacable by the loader.
-  std::vector<std::string> LoaderReplaceableFunctionNames;
-  /// The name of a file that contains functions which will be compiled for
-  /// hotpatching. See -fms-secure-hotpatch-functions-file.
-  std::string MSSecureHotPatchFunctionsFile;
-
-  /// A list of functions which will be compiled for hotpatching.
-  /// See -fms-secure-hotpatch-functions-list.
-  std::vector<std::string> MSSecureHotPatchFunctionsList;
+#define CODEGENOPT(Name, Bits, Default, Compatibility)
+#define ENUM_CODEGENOPT(Name, Type, Bits, Default, Compatibility)
+#define TYPED_CODEGENOPT(Type, Name, Default) Type Name = Default;
+#include "clang/Basic/CodeGenOptions.def"
 
 public:
   // Define accessors/mutators for code generation options of enumeration type.
