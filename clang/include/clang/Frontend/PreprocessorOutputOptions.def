@@ -1,0 +1,68 @@
+//===--- PreprocessorOutputOptions.def - Output option database -*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the preprocessor-output options. Users of this file
+// must define the TYPED_PPOUTPUTOPT macro to make use of this information.
+// The arguments to the macro are:
+//
+//   TYPED_PPOUTPUTOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_PPOUTPUTOPT(Type, Name, Bits, Default)
+//
+// Bitfields are stored as `LLVM_PREFERRED_TYPE(Type) unsigned Name : Bits;`
+// and are initialized in the class's default constructor (so that
+// re-including this file with `BITFIELD_*` defined as `Name = Default;`
+// produces the constructor body).
+//
+// \c Default is a C++ initializer expression. Use \c {} for value
+// initialization.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_PPOUTPUTOPT
+#  error Define the TYPED_PPOUTPUTOPT macro to handle preprocessor-output options
+#endif
+
+#ifndef BITFIELD_PPOUTPUTOPT
+#  define BITFIELD_PPOUTPUTOPT(Type, Name, Bits, Default)
+#  define BITFIELD_PPOUTPUTOPT_DEFAULTED
+#endif
+
+BITFIELD_PPOUTPUTOPT(bool, ShowCPP, 1, false)
+///< Print normal preprocessed output.
+BITFIELD_PPOUTPUTOPT(bool, ShowComments, 1, false)
+///< Show comments.
+BITFIELD_PPOUTPUTOPT(bool, ShowLineMarkers, 1, true)
+///< Show \#line markers.
+BITFIELD_PPOUTPUTOPT(bool, UseLineDirectives, 1, false)
+///< Use \#line instead of GCC-style \# N.
+BITFIELD_PPOUTPUTOPT(bool, ShowMacroComments, 1, false)
+///< Show comments, even in macros.
+BITFIELD_PPOUTPUTOPT(bool, ShowMacros, 1, false)
+///< Print macro definitions.
+BITFIELD_PPOUTPUTOPT(bool, ShowIncludeDirectives, 1, false)
+///< Print includes, imports etc. within preprocessed output.
+BITFIELD_PPOUTPUTOPT(bool, ShowEmbedDirectives, 1, false)
+///< Print embeds, etc. within preprocessed output.
+BITFIELD_PPOUTPUTOPT(bool, RewriteIncludes, 1, false)
+///< Preprocess include directives only.
+BITFIELD_PPOUTPUTOPT(bool, RewriteImports, 1, false)
+///< Include contents of transitively-imported modules.
+BITFIELD_PPOUTPUTOPT(bool, MinimizeWhitespace, 1, false)
+///< Ignore whitespace from input.
+BITFIELD_PPOUTPUTOPT(bool, DirectivesOnly, 1, false)
+///< Process directives but do not expand macros.
+BITFIELD_PPOUTPUTOPT(bool, KeepSystemIncludes, 1, false)
+///< Do not expand system headers.
+
+#ifdef BITFIELD_PPOUTPUTOPT_DEFAULTED
+#  undef BITFIELD_PPOUTPUTOPT
+#  undef BITFIELD_PPOUTPUTOPT_DEFAULTED
+#endif
