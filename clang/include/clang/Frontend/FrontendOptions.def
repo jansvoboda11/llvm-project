@@ -1,0 +1,207 @@
+//===--- FrontendOptions.def - Frontend option database ---------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the frontend options. Users of this file must define
+// the TYPED_FRONTENDOPT macro to make use of this information. The arguments
+// to the macro are:
+//
+//   TYPED_FRONTENDOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_FRONTENDOPT(Type, Name, Bits, Default)
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_FRONTENDOPT
+#  error Define the TYPED_FRONTENDOPT macro to handle frontend options
+#endif
+
+#ifndef BITFIELD_FRONTENDOPT
+#  define BITFIELD_FRONTENDOPT(Type, Name, Bits, Default)
+#  define BITFIELD_FRONTENDOPT_DEFAULTED
+#endif
+
+BITFIELD_FRONTENDOPT(bool, DisableFree, 1, false)
+///< Disable memory freeing on exit.
+BITFIELD_FRONTENDOPT(bool, RelocatablePCH, 1, false)
+///< When generating PCH files, instruct the AST writer to create relocatable
+///< PCH files.
+BITFIELD_FRONTENDOPT(bool, ShowHelp, 1, false)
+///< Show the -help text.
+BITFIELD_FRONTENDOPT(bool, ShowStats, 1, false)
+///< Show frontend performance metrics and statistics.
+BITFIELD_FRONTENDOPT(bool, AppendStats, 1, false)
+BITFIELD_FRONTENDOPT(bool, PrintSupportedCPUs, 1, false)
+///< Print the supported cpus for the current target.
+BITFIELD_FRONTENDOPT(bool, PrintSupportedExtensions, 1, false)
+///< Print the supported extensions for the current target.
+BITFIELD_FRONTENDOPT(bool, PrintEnabledExtensions, 1, false)
+///< Print the extensions enabled for the current target.
+BITFIELD_FRONTENDOPT(bool, ShowVersion, 1, false)
+///< Show the -version text.
+BITFIELD_FRONTENDOPT(bool, FixWhatYouCan, 1, false)
+///< Apply fixes even if there are unfixable errors.
+BITFIELD_FRONTENDOPT(bool, FixOnlyWarnings, 1, false)
+///< Apply fixes only for warnings.
+BITFIELD_FRONTENDOPT(bool, FixAndRecompile, 1, false)
+///< Apply fixes and recompile.
+BITFIELD_FRONTENDOPT(bool, FixToTemporaries, 1, false)
+///< Apply fixes to temporary files.
+BITFIELD_FRONTENDOPT(bool, SkipFunctionBodies, 1, false)
+///< Skip over function bodies to speed up parsing in cases you do not need
+///< them (e.g. with code completion).
+BITFIELD_FRONTENDOPT(bool, UseGlobalModuleIndex, 1, true)
+///< Whether we can use the global module index if available.
+BITFIELD_FRONTENDOPT(bool, GenerateGlobalModuleIndex, 1, true)
+///< Whether we can generate the global module index if needed.
+BITFIELD_FRONTENDOPT(bool, ASTDumpDecls, 1, false)
+///< Whether we include declaration dumps in AST dumps.
+BITFIELD_FRONTENDOPT(bool, ASTDumpAll, 1, false)
+///< Whether we deserialize all decls when forming AST dumps.
+BITFIELD_FRONTENDOPT(bool, ASTDumpLookups, 1, false)
+///< Whether we include lookup table dumps in AST dumps.
+BITFIELD_FRONTENDOPT(bool, ASTDumpDeclTypes, 1, false)
+///< Whether we include declaration type dumps in AST dumps.
+BITFIELD_FRONTENDOPT(bool, BuildingImplicitModule, 1, false)
+///< Whether we are performing an implicit module build.
+BITFIELD_FRONTENDOPT(bool, BuildingImplicitModuleUsesLock, 1, true)
+///< Whether to use a filesystem lock when building implicit modules.
+BITFIELD_FRONTENDOPT(bool, ModulesEmbedAllFiles, 1, false)
+///< Whether we should embed all used files into the PCM file.
+BITFIELD_FRONTENDOPT(bool, IncludeTimestamps, 1, true)
+///< Whether timestamps should be written to the produced PCH file.
+BITFIELD_FRONTENDOPT(bool, UseTemporary, 1, true)
+///< Should a temporary file be used during compilation.
+BITFIELD_FRONTENDOPT(bool, IsSystemModule, 1, false)
+///< When using -emit-module, treat the modulemap as a system module.
+BITFIELD_FRONTENDOPT(bool, AllowPCMWithCompilerErrors, 1, false)
+///< Output (and read) PCM files regardless of compiler errors.
+BITFIELD_FRONTENDOPT(bool, ModulesShareFileManager, 1, true)
+///< Whether to share the FileManager when building modules.
+BITFIELD_FRONTENDOPT(bool, EmitSymbolGraph, 1, false)
+///< Whether to emit symbol graph files as a side effect of compilation.
+BITFIELD_FRONTENDOPT(bool, EmitExtensionSymbolGraphs, 1, false)
+///< Whether to emit additional symbol graphs for extended modules.
+BITFIELD_FRONTENDOPT(bool, EmitSymbolGraphSymbolLabelsForTesting, 1, false)
+///< Whether to emit symbol labels for testing in generated symbol graphs.
+BITFIELD_FRONTENDOPT(bool, EmitPrettySymbolGraphs, 1, false)
+///< Whether to emit pretty-printed symbol graphs.
+BITFIELD_FRONTENDOPT(bool, GenReducedBMI, 1, false)
+///< Whether to generate reduced BMI for C++20 named modules.
+BITFIELD_FRONTENDOPT(bool, UseClangIRPipeline, 1, false)
+///< Use Clang IR pipeline to emit code.
+BITFIELD_FRONTENDOPT(bool, ClangIRDisablePasses, 1, false)
+///< Disable Clang IR specific (CIR) passes.
+BITFIELD_FRONTENDOPT(bool, ClangIRDisableCIRVerifier, 1, false)
+///< Disable Clang IR (CIR) verifier.
+BITFIELD_FRONTENDOPT(bool, ClangIREnableIdiomRecognizer, 1, false)
+///< Enable Clang IR (CIR) idiom recognizer.
+TYPED_FRONTENDOPT(CodeCompleteOptions, CodeCompleteOpts, {})
+TYPED_FRONTENDOPT(ASTDumpOutputFormat, ASTDumpFormat, ADOF_Default)
+///< Specifies the output format of the AST.
+TYPED_FRONTENDOPT(InputKind, DashX, {})
+///< The input kind, either specified via -x argument or deduced from the
+///< input file name.
+TYPED_FRONTENDOPT(InputsList, Inputs, {})
+///< The input files and their types.
+TYPED_FRONTENDOPT(std::string, OriginalModuleMap, {})
+///< When the input is a module map, the original module map file from which
+///< that map was inferred, if any (for umbrella modules).
+TYPED_FRONTENDOPT(std::string, OutputFile, {})
+///< The output file, if any.
+TYPED_FRONTENDOPT(std::string, FixItSuffix, {})
+///< If given, the new suffix for fix-it rewritten files.
+TYPED_FRONTENDOPT(std::string, ASTDumpFilter, {})
+///< If given, filter dumped AST Decl nodes by this substring.
+TYPED_FRONTENDOPT(ParsedSourceLocation, CodeCompletionAt, {})
+///< If given, enable code completion at the provided location.
+TYPED_FRONTENDOPT(frontend::ActionKind, ProgramAction,
+                  frontend::ParseSyntaxOnly)
+///< The frontend action to perform.
+TYPED_FRONTENDOPT(std::string, ActionName, {})
+///< The name of the action to run when using a plugin action.
+TYPED_FRONTENDOPT(std::string, ProductName, {})
+///< Currently this is only used as part of the `-extract-api` action. The
+///< name of the product the input files belong too.
+TYPED_FRONTENDOPT(std::vector<std::string>, ExtractAPIIgnoresFileList, {})
+///< Currently this is only used as part of the `-extract-api` action. A
+///< comma separated list of files providing a list of APIs to ignore when
+///< extracting documentation.
+TYPED_FRONTENDOPT(std::string, SymbolGraphOutputDir, {})
+///< Location of output directory where symbol graph information would be
+///< dumped. This overrides regular -o output file specification.
+TYPED_FRONTENDOPT(PluginArgsMap, PluginArgs, {})
+///< Args to pass to the plugins.
+TYPED_FRONTENDOPT(std::vector<std::string>, AddPluginActions, {})
+///< The list of plugin actions to run in addition to the normal action.
+TYPED_FRONTENDOPT(std::vector<std::string>, Plugins, {})
+///< The list of plugins to load.
+TYPED_FRONTENDOPT(ModuleFileExtensionList, ModuleFileExtensions, {})
+///< The list of module file extensions.
+TYPED_FRONTENDOPT(std::vector<std::string>, ModuleMapFiles, {})
+///< The list of module map files to load before processing the input.
+TYPED_FRONTENDOPT(std::vector<std::string>, ModuleFiles, {})
+///< The list of additional prebuilt module files to load before processing
+///< the input.
+TYPED_FRONTENDOPT(std::vector<std::string>, ModulesEmbedFiles, {})
+///< The list of files to embed into the compiled module file.
+TYPED_FRONTENDOPT(unsigned, ImplicitModulesLockTimeoutSeconds, 90)
+///< The time in seconds to wait on an implicit module lock before timing
+///< out.
+TYPED_FRONTENDOPT(std::vector<std::string>, ASTMergeFiles, {})
+///< The list of AST files to merge.
+TYPED_FRONTENDOPT(std::vector<std::string>, LLVMArgs, {})
+///< A list of arguments to forward to LLVM's option processing; this should
+///< only be used for debugging and experimental features.
+TYPED_FRONTENDOPT(std::vector<std::string>, MLIRArgs, {})
+///< A list of arguments to forward to MLIR's option processing; this should
+///< only be used for debugging and experimental features.
+TYPED_FRONTENDOPT(std::string, OverrideRecordLayoutsFile, {})
+///< File name of the file that will provide record layouts (in the format
+///< produced by -fdump-record-layouts).
+TYPED_FRONTENDOPT(std::string, AuxTriple, {})
+///< Auxiliary triple for CUDA/HIP/SYCL compilation.
+TYPED_FRONTENDOPT(std::optional<std::string>, AuxTargetCPU, {})
+///< Auxiliary target CPU for CUDA/HIP compilation.
+TYPED_FRONTENDOPT(std::optional<std::vector<std::string>>, AuxTargetFeatures,
+                  {})
+///< Auxiliary target features for CUDA/HIP compilation.
+TYPED_FRONTENDOPT(std::string, StatsFile, {})
+///< Filename to write statistics to.
+TYPED_FRONTENDOPT(unsigned, TimeTraceGranularity, 500)
+///< Minimum time granularity (in microseconds) traced by time profiler.
+BITFIELD_FRONTENDOPT(bool, TimeTraceVerbose, 1, false)
+///< Make time trace capture verbose event details (e.g. source filenames).
+///< This can increase the size of the output by 2-3 times.
+TYPED_FRONTENDOPT(std::string, TimeTracePath, {})
+///< Path which stores the output files for -ftime-trace.
+TYPED_FRONTENDOPT(std::string, ModuleOutputPath, {})
+///< Output Path for module output file.
+TYPED_FRONTENDOPT(std::string, DumpMinimizationHintsPath, {})
+///< Output path to dump ranges of deserialized declarations to use as
+///< minimization hints.
+TYPED_FRONTENDOPT(std::vector<std::string>, SSAFExtractSummaries, {})
+///< List of SSAF extractors to enable.
+TYPED_FRONTENDOPT(std::string, SSAFTUSummaryFile, {})
+///< The TU summary output file with the file extension representing the file
+///< format.
+TYPED_FRONTENDOPT(std::string, SSAFCompilationUnitId, {})
+///< Stable identifier for this translation unit, used as the name of the
+///< `CompilationUnit` `BuildNamespace` of every produced TU summary. The
+///< caller (typically the build system) supplies a value that is constant
+///< across stages of the SSAF pipeline.
+BITFIELD_FRONTENDOPT(bool, SSAFShowExtractors, 1, false)
+///< Show available SSAF summary extractors.
+BITFIELD_FRONTENDOPT(bool, SSAFShowFormats, 1, false)
+///< Show available SSAF serialization formats.
+
+#ifdef BITFIELD_FRONTENDOPT_DEFAULTED
+#  undef BITFIELD_FRONTENDOPT
+#  undef BITFIELD_FRONTENDOPT_DEFAULTED
+#endif
