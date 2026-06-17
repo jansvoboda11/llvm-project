@@ -100,41 +100,16 @@ protected:
 #include "clang/Basic/DiagnosticOptions.def"
 
 public:
-  /// The file to log diagnostic output to.
-  std::string DiagnosticLogFile;
-
-  /// The file to serialize diagnostics to (non-appending).
-  std::string DiagnosticSerializationFile;
-
-  /// Path for the file that defines diagnostic suppression mappings.
-  std::string DiagnosticSuppressionMappingsFile;
-
-  /// The list of -W... options used to alter the diagnostic mappings, with the
-  /// prefixes removed.
-  std::vector<std::string> Warnings;
-
-  /// The list of prefixes from -Wundef-prefix=... used to generate warnings
-  /// for undefined macros.
-  std::vector<std::string> UndefPrefixes;
-
-  /// The list of -R... options used to alter the diagnostic mappings, with the
-  /// prefixes removed.
-  std::vector<std::string> Remarks;
-
-  /// The prefixes for comment directives sought by -verify ("expected" by
-  /// default).
-  std::vector<std::string> VerifyPrefixes;
-
-  /// The list of -Wsystem-headers-in-module=... options used to override
-  /// whether -Wsystem-headers is enabled on a per-module basis.
-  std::vector<std::string> SystemHeaderWarningsModules;
-
-public:
   // Define accessors/mutators for diagnostic options of enumeration type.
 #define DIAGOPT(Name, Bits, Default)
 #define ENUM_DIAGOPT(Name, Type, Bits, Default) \
   Type get##Name() const { return static_cast<Type>(Name); } \
   void set##Name(Type Value) { Name = static_cast<unsigned>(Value); }
+#include "clang/Basic/DiagnosticOptions.def"
+
+  // Define complex (non-bitfield) options.
+#define DIAGOPT(Name, Bits, Default)
+#define TYPED_DIAGOPT(Type, Name, Default) Type Name = Default;
 #include "clang/Basic/DiagnosticOptions.def"
 
   DiagnosticOptions() {

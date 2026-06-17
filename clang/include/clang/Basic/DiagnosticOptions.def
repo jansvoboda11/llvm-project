@@ -43,6 +43,11 @@ DIAGOPT(Name, Bits, Default)
      ENUM_DIAGOPT(Name, Type, Bits, Default)
 #endif
 
+#ifndef TYPED_DIAGOPT
+#  define TYPED_DIAGOPT(Type, Name, Default)
+#  define TYPED_DIAGOPT_DEFAULTED
+#endif
+
 SEMANTIC_DIAGOPT(IgnoreWarnings, 1, 0)   /// -w
 DIAGOPT(NoRewriteMacros, 1, 0)  /// -Wno-rewrite-macros
 DIAGOPT(Pedantic, 1, 0)         /// -pedantic
@@ -100,6 +105,33 @@ VALUE_DIAGOPT(TabStop, 32, DefaultTabStop) /// The distance between tab stops.
 VALUE_DIAGOPT(MessageLength, 32, 0)
 
 DIAGOPT(ShowSafeBufferUsageSuggestions, 1, 0)
+
+TYPED_DIAGOPT(std::string, DiagnosticLogFile, {})
+///< The file to log diagnostic output to.
+TYPED_DIAGOPT(std::string, DiagnosticSerializationFile, {})
+///< The file to serialize diagnostics to (non-appending).
+TYPED_DIAGOPT(std::string, DiagnosticSuppressionMappingsFile, {})
+///< Path for the file that defines diagnostic suppression mappings.
+TYPED_DIAGOPT(std::vector<std::string>, Warnings, {})
+///< The list of -W... options used to alter the diagnostic mappings, with
+///< the prefixes removed.
+TYPED_DIAGOPT(std::vector<std::string>, UndefPrefixes, {})
+///< The list of prefixes from -Wundef-prefix=... used to generate warnings
+///< for undefined macros.
+TYPED_DIAGOPT(std::vector<std::string>, Remarks, {})
+///< The list of -R... options used to alter the diagnostic mappings, with
+///< the prefixes removed.
+TYPED_DIAGOPT(std::vector<std::string>, VerifyPrefixes, {})
+///< The prefixes for comment directives sought by -verify ("expected" by
+///< default).
+TYPED_DIAGOPT(std::vector<std::string>, SystemHeaderWarningsModules, {})
+///< The list of -Wsystem-headers-in-module=... options used to override
+///< whether -Wsystem-headers is enabled on a per-module basis.
+
+#ifdef TYPED_DIAGOPT_DEFAULTED
+#  undef TYPED_DIAGOPT
+#  undef TYPED_DIAGOPT_DEFAULTED
+#endif
 
 #undef DIAGOPT
 #undef ENUM_DIAGOPT
