@@ -1,0 +1,99 @@
+//===--- TargetOptions.def - Target option database -------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file enumerates the target options. Users of this file must define
+// the TYPED_TARGETOPT macro to make use of this information. The arguments
+// to the macro are:
+//
+//   TYPED_TARGETOPT(Type, Name, Default)
+//
+// Optionally, the user may also define:
+//
+//   BITFIELD_TARGETOPT(Type, Name, Bits, Default)
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef TYPED_TARGETOPT
+#  error Define the TYPED_TARGETOPT macro to handle target options
+#endif
+
+#ifndef BITFIELD_TARGETOPT
+#  define BITFIELD_TARGETOPT(Type, Name, Bits, Default)
+#  define BITFIELD_TARGETOPT_DEFAULTED
+#endif
+
+TYPED_TARGETOPT(std::string, Triple, {})
+///< The name of the target triple to compile for.
+TYPED_TARGETOPT(std::string, HostTriple, {})
+///< When compiling for the device side, contains the triple used to compile
+///< for the host.
+TYPED_TARGETOPT(std::string, CPU, {})
+///< If given, the name of the target CPU to generate code for.
+TYPED_TARGETOPT(std::string, TuneCPU, {})
+///< If given, the name of the target CPU to tune code for.
+TYPED_TARGETOPT(std::string, FPMath, {})
+///< If given, the unit to use for floating point math.
+TYPED_TARGETOPT(std::string, ABI, {})
+///< If given, the name of the target ABI to use.
+TYPED_TARGETOPT(llvm::EABI, EABIVersion, llvm::EABI::Default)
+///< The EABI version to use.
+TYPED_TARGETOPT(std::string, LinkerVersion, {})
+///< If given, the version string of the linker in use.
+TYPED_TARGETOPT(std::vector<std::string>, FeaturesAsWritten, {})
+///< The list of target specific features to enable or disable, as written
+///< on the command line.
+TYPED_TARGETOPT(std::vector<std::string>, Features, {})
+///< The list of target specific features to enable or disable -- this should
+///< be a list of strings starting with by '+' or '-'.
+TYPED_TARGETOPT(StringBoolMap, FeatureMap, {})
+///< The map of which features have been enabled disabled based on the
+///< command line.
+TYPED_TARGETOPT(std::vector<std::string>, OpenCLExtensionsAsWritten, {})
+///< The list of OpenCL extensions to enable or disable, as written on the
+///< command line. The TargetInfo derives the resolved feature map from
+///< these (combined with the target's defaults) at construction time.
+TYPED_TARGETOPT(bool, ForceEnableInt128, false)
+///< If given, enables support for `__int128_t` and `__uint128_t` types.
+TYPED_TARGETOPT(bool, NVPTXUseShortPointers, false)
+///< If enabled, use 32-bit pointers for accessing const/local/shared
+///< address space.
+TYPED_TARGETOPT(llvm::CodeObjectVersionKind, CodeObjectVersion,
+                llvm::CodeObjectVersionKind::COV_None)
+///< Code object version for AMDGPU.
+TYPED_TARGETOPT(AMDGPUPrintfKind, AMDGPUPrintfKindVal,
+                AMDGPUPrintfKind::Hostcall)
+///< AMDGPU printf lowering scheme.
+TYPED_TARGETOPT(std::string, CodeModel, {})
+///< The code model to be used as specified by the user. Corresponds to
+///< `CodeModel::Model` enum defined in `include/llvm/Support/CodeGen.h`,
+///< plus "default" for the case when the user has not explicitly specified
+///< a code model.
+TYPED_TARGETOPT(uint64_t, LargeDataThreshold, 0)
+///< The large data threshold used for certain code models on certain
+///< architectures.
+TYPED_TARGETOPT(llvm::VersionTuple, SDKVersion, {})
+///< The version of the SDK which was used during the compilation. The
+///< option is used for two different purposes:
+///< * on darwin the version is propagated to LLVM where it's used to
+///<   support SDK Version metadata (See D55673).
+///< * CUDA compilation uses it to control parts of CUDA compilation in
+///<   clang that depend on specific version of the CUDA SDK.
+TYPED_TARGETOPT(std::string, DarwinTargetVariantTriple, {})
+///< The name of the darwin target-variant triple to compile for.
+TYPED_TARGETOPT(llvm::VersionTuple, DarwinTargetVariantSDKVersion, {})
+///< The version of the darwin target variant SDK which was used during the
+///< compilation.
+TYPED_TARGETOPT(std::string, DxilValidatorVersion, {})
+///< The validator version for dxil.
+TYPED_TARGETOPT(std::string, HLSLEntry, {})
+///< The entry point name for HLSL shader being compiled as specified by -E.
+
+#ifdef BITFIELD_TARGETOPT_DEFAULTED
+#  undef BITFIELD_TARGETOPT
+#  undef BITFIELD_TARGETOPT_DEFAULTED
+#endif
