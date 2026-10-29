@@ -471,6 +471,8 @@ public:
                          Visibility VisibilityMask = Visibility(),
                          ArrayRef<unsigned> EOLIndices = {}) const;
 
+  [[deprecated("Use the overload taking a Visibility mask instead; this "
+               "overload has no remaining callers and will be removed")]]
   InputArgList ParseArgs(ArrayRef<const char *> Args, unsigned &MissingArgIndex,
                          unsigned &MissingArgCount, unsigned FlagsToInclude,
                          unsigned FlagsToExclude = 0) const;
