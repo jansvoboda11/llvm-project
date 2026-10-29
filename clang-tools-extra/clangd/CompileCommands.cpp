@@ -16,6 +16,7 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -242,7 +243,8 @@ void CommandMangler::operator()(tooling::CompileCommand &Command,
   // indices are actually of by one between ArgList and OriginalArgs.
   llvm::opt::InputArgList ArgList;
   ArgList = OptTable.ParseArgs(
-      llvm::ArrayRef(OriginalArgs).drop_front(), IgnoredCount, IgnoredCount,
+      llvm::ArrayRefOfStringRef(llvm::ArrayRef(OriginalArgs).drop_front()),
+      IgnoredCount, IgnoredCount,
       llvm::opt::Visibility(IsCLMode ? options::CLOption
                                      : options::ClangOption));
 
@@ -296,7 +298,7 @@ void CommandMangler::operator()(tooling::CompileCommand &Command,
     Cmd.resize(DashDashIndex);
   }
 
-  llvm::SmallVector<const char *, 16> UnknownArgs;
+  llvm::SmallVector<llvm::StringRef, 16> UnknownArgs;
 
   for (auto *UnknownArg : ArgList.filtered(options::OPT_UNKNOWN)) {
     UnknownArgs.push_back(UnknownArg->getValue());
