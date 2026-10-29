@@ -564,7 +564,7 @@ llvm::sys::writeFileWithEncoding(StringRef FileName, StringRef Contents,
 }
 
 bool llvm::sys::commandLineFitsWithinSystemLimits(StringRef Program,
-                                                  ArrayRef<StringRef> Args) {
+                                                  ArrayRefOfStringRef Args) {
   // The documentation on CreateProcessW states that the size of the argument
   // lpCommandLine must not be greater than 32767 characters, including the
   // Unicode terminating null character. We use smaller value to reduce risk

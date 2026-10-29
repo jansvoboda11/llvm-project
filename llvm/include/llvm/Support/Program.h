@@ -14,6 +14,7 @@
 #define LLVM_SUPPORT_PROGRAM_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Compiler.h"
@@ -161,12 +162,7 @@ LLVM_ABI ProcessInfo ExecuteNoWait(
 /// Return true if the given arguments fit within system-specific
 /// argument length limits.
 LLVM_ABI bool commandLineFitsWithinSystemLimits(StringRef Program,
-                                                ArrayRef<StringRef> Args);
-
-/// Return true if the given arguments fit within system-specific
-/// argument length limits.
-LLVM_ABI bool commandLineFitsWithinSystemLimits(StringRef Program,
-                                                ArrayRef<const char *> Args);
+                                                ArrayRefOfStringRef Args);
 
 /// File encoding options when writing contents that a non-UTF8 tool will
 /// read (on Windows systems). For UNIX, we always use UTF-8.
