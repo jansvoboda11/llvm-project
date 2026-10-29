@@ -716,11 +716,6 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
 
   const InvocationListTy::mapped_type &InvocationCommand = Invocation->second;
 
-  SmallVector<const char *, 32> CommandLineArgs(InvocationCommand.size());
-  std::transform(InvocationCommand.begin(), InvocationCommand.end(),
-                 CommandLineArgs.begin(),
-                 [](auto &&CmdPart) { return CmdPart.c_str(); });
-
   auto DiagOpts = std::make_shared<DiagnosticOptions>(CI.getDiagnosticOpts());
   auto *DiagClient = new ForwardingDiagnosticConsumer{CI.getDiagnosticClient()};
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID{
@@ -731,8 +726,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
   // This runs the driver which isn't expected to be free of sandbox violations.
   auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
   return CreateASTUnitFromCommandLine(
-      CommandLineArgs.begin(), (CommandLineArgs.end()),
-      CI.getPCHContainerOperations(), DiagOpts, Diags,
+      InvocationCommand, CI.getPCHContainerOperations(), DiagOpts, Diags,
       CI.getHeaderSearchOpts().ResourceDir);
 }
 

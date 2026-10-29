@@ -84,6 +84,9 @@ public:
   ArrayRefOfStringRef(const SmallVectorImpl<StringRef> &Args)
       : DataAndKind(Args.data(), Kind::StringRef), Length(Args.size()) {}
 
+  ArrayRefOfStringRef(const SmallVectorImpl<std::string> &Args)
+      : DataAndKind(Args.data(), Kind::StdString), Length(Args.size()) {}
+
   ArrayRefOfStringRef(std::initializer_list<const char *> Args)
       : DataAndKind(Args.begin(), Kind::CharPtr), Length(Args.size()) {}
 

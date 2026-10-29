@@ -214,7 +214,7 @@ TEST_F(ASTUnitTest, LoadFromCommandLineEarlyError) {
   std::unique_ptr<clang::ASTUnit> ErrUnit;
 
   std::unique_ptr<ASTUnit> AST = CreateASTUnitFromCommandLine(
-      &Args[0], &Args[4], PCHContainerOps, DiagOpts, Diags, "", false, "",
+      Args, PCHContainerOps, DiagOpts, Diags, "", false, "",
       false, CaptureDiagsKind::All, {}, true, 0, TU_Complete, false, false,
       false, SkipFunctionBodiesScope::None, false, true, false, false,
       std::nullopt, &ErrUnit, nullptr);
@@ -242,7 +242,7 @@ TEST_F(ASTUnitTest, LoadFromCommandLineWorkingDirectory) {
   std::unique_ptr<clang::ASTUnit> ErrUnit;
 
   std::unique_ptr<ASTUnit> AST = CreateASTUnitFromCommandLine(
-      &Args[0], &Args[4], PCHContainerOps, DiagOpts, Diags, "", false, "",
+      Args, PCHContainerOps, DiagOpts, Diags, "", false, "",
       false, CaptureDiagsKind::All, {}, true, 0, TU_Complete, false, false,
       false, SkipFunctionBodiesScope::None, false, true, false, false,
       std::nullopt, &ErrUnit, nullptr);

@@ -14,15 +14,14 @@
 #define LLVM_CLANG_DRIVER_CREATEASTUNITFROMARGS_H
 
 #include "clang/Frontend/ASTUnit.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 
 namespace clang {
 
 /// Create an ASTUnit from a vector of command line arguments, which must
 /// specify exactly one source file.
 ///
-/// \param ArgBegin - The beginning of the argument vector.
-///
-/// \param ArgEnd - The end of the argument vector.
+/// \param Args - The argument vector. Args[0] should be the driver name.
 ///
 /// \param PCHContainerOps - The PCHContainerOperations to use for loading and
 /// creating modules.
@@ -54,7 +53,7 @@ namespace clang {
 // FIXME: Move OnlyLocalDecls, UseBumpAllocator to setters on the ASTUnit, we
 // shouldn't need to specify them at construction time.
 std::unique_ptr<ASTUnit> CreateASTUnitFromCommandLine(
-    const char **ArgBegin, const char **ArgEnd,
+    llvm::ArrayRefOfStringRef Args,
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     std::shared_ptr<DiagnosticOptions> DiagOpts,
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags, StringRef ResourceFilesPath,

@@ -4434,8 +4434,7 @@ clang_parseTranslationUnit_Impl(CXIndex CIdx, const char *source_filename,
       *CXXIdx, LibclangInvocationReporter::OperationKind::ParseOperation,
       options, llvm::ArrayRef(*Args), /*InvocationArgs=*/{}, unsaved_files);
   std::unique_ptr<ASTUnit> Unit = CreateASTUnitFromCommandLine(
-      Args->data(), Args->data() + Args->size(),
-      CXXIdx->getPCHContainerOperations(), DiagOpts, Diags,
+      *Args, CXXIdx->getPCHContainerOperations(), DiagOpts, Diags,
       CXXIdx->getClangResourcesPath(), CXXIdx->getStorePreamblesInMemory(),
       CXXIdx->getPreambleStoragePath(), CXXIdx->getOnlyLocalDecls(),
       CaptureDiagnostics, *RemappedFiles,
