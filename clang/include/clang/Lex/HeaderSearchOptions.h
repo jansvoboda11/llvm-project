@@ -13,6 +13,7 @@
 #include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/HashBuilder.h"
 #include <cstdint>
 #include <map>
