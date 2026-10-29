@@ -15,6 +15,7 @@
 #include "index/Relation.h"
 #include "index/Serialization.h"
 #include "index/remote/Client.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -100,12 +101,11 @@ protected:
 
 public:
   virtual ~Command() = default;
-  bool parseAndRun(llvm::ArrayRef<const char *> Argv, const char *Overview,
+  bool parseAndRun(llvm::ArrayRefOfStringRef Argv, const char *Overview,
                    const SymbolIndex &Index) {
     std::string ParseErrs;
     llvm::raw_string_ostream OS(ParseErrs);
-    bool Ok = llvm::cl::ParseCommandLineOptions(Argv.size(), Argv.data(),
-                                                Overview, &OS);
+    bool Ok = llvm::cl::ParseCommandLineOptions(Argv, Overview, &OS);
     // must do this before opts are destroyed
     llvm::scope_exit Cleanup(llvm::cl::ResetCommandLineParser);
     if (Help.getNumOccurrences() > 0) {
@@ -400,8 +400,7 @@ bool runCommand(std::string Request, const SymbolIndex &Index) {
 
   for (const auto &Cmd : CommandInfo) {
     if (Cmd.Name == Args.front())
-      return Cmd.Implementation()->parseAndRun(FakeArgv, Cmd.Description,
-                                               Index);
+      return Cmd.Implementation()->parseAndRun(Args, Cmd.Description, Index);
   }
   llvm::errs() << "Unknown command. Try 'help'.\n";
   return false;
