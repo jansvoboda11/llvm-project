@@ -212,7 +212,7 @@ int main(int argc, const char **argv) {
   llvm::StringRef ToolHeading = "SSAF Linker";
 
   InitLLVM X(argc, argv);
-  initTool(argc, argv, "0.1", SsafLinkerCategory, ToolHeading);
+  initTool({argc, argv}, "0.1", SsafLinkerCategory, ToolHeading);
 
   llvm::TimerGroup Timers(getToolName(), ToolHeading);
 

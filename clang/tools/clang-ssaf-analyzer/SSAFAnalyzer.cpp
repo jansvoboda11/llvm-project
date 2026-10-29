@@ -123,7 +123,7 @@ int main(int argc, const char **argv) {
   llvm::StringRef ToolHeading = "SSAF Analyzer";
 
   InitLLVM X(argc, argv);
-  initTool(argc, argv, "0.1", SsafAnalyzerCategory, ToolHeading);
+  initTool({argc, argv}, "0.1", SsafAnalyzerCategory, ToolHeading);
 
   loadPlugins(LoadPlugins);
 

@@ -18,6 +18,7 @@
 
 #include "clang/ScalableStaticAnalysis/Core/Serialization/SerializationFormatRegistry.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
@@ -74,7 +75,7 @@ void loadPlugins(llvm::ArrayRef<std::string> Paths);
 
 /// Sets ToolName, ToolVersion, and the version printer, hides unrelated
 /// command-line options, and parses arguments. Must be called after InitLLVM.
-void initTool(int argc, const char **argv, llvm::StringRef Version,
+void initTool(llvm::ArrayRefOfStringRef Argv, llvm::StringRef Version,
               llvm::cl::OptionCategory &Category, llvm::StringRef ToolHeading);
 
 //===----------------------------------------------------------------------===//

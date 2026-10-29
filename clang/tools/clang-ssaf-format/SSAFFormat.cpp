@@ -353,7 +353,7 @@ int main(int argc, const char **argv) {
   llvm::StringRef ToolHeading = "SSAF Format";
 
   InitLLVM X(argc, argv);
-  initTool(argc, argv, "0.1", SsafFormatCategory, ToolHeading);
+  initTool({argc, argv}, "0.1", SsafFormatCategory, ToolHeading);
 
   loadPlugins(LoadPlugins);
 

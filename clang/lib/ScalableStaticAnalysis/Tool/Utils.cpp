@@ -169,11 +169,11 @@ llvm::Triple clang::ssaf::parseTargetTripleOrFail(llvm::StringRef FlagName,
   return T;
 }
 
-void clang::ssaf::initTool(int argc, const char **argv, llvm::StringRef Version,
+void clang::ssaf::initTool(llvm::ArrayRefOfStringRef Argv, llvm::StringRef Version,
                            llvm::cl::OptionCategory &Category,
                            llvm::StringRef ToolHeading) {
   // path::stem strips the .exe extension on Windows so ToolName is consistent.
-  ToolName = path::stem(argv[0]);
+  ToolName = path::stem(Argv[0]);
 
   // Set tool version for the version printer.
   ToolVersion = Version;
@@ -186,7 +186,7 @@ void clang::ssaf::initTool(int argc, const char **argv, llvm::StringRef Version,
 
   // Parse command-line arguments and exit with an error if they are invalid.
   std::string Overview = (ToolHeading + "\n").str();
-  llvm::cl::ParseCommandLineOptions(argc, argv, Overview);
+  llvm::cl::ParseCommandLineOptions(Argv, Overview);
 }
 
 clang::ssaf::FormatFile
