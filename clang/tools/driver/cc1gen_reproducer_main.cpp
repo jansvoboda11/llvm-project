@@ -16,6 +16,7 @@
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Driver.h"
 #include "llvm/Support/FileSystem.h"
@@ -113,7 +114,7 @@ static std::string generateReproducerMetaInfo(const ClangInvocationInfo &Info) {
 /// Generates a reproducer for a set of arguments from a specific invocation.
 static std::optional<driver::Driver::CompilationDiagnosticReport>
 generateReproducerForInvocationArguments(
-    ArrayRef<const char *> Argv, const ClangInvocationInfo &Info,
+    llvm::ArrayRefOfStringRef Argv, const ClangInvocationInfo &Info,
     const llvm::ToolContext &ToolContext,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
   // The driver is not expected to be free of sandbox violations.
@@ -189,14 +190,11 @@ int cc1gen_reproducer_main(llvm::ArrayRefOfStringRef Argv, StringRef Argv0,
     InvocationInfo.Dump = true;
 
   // Create an invocation that will produce the reproducer.
-  std::vector<const char *> DriverArgs;
-  for (const auto &Arg : InvocationInfo.Arguments)
-    DriverArgs.push_back(Arg.c_str());
-  std::string Path = GetExecutablePath(Argv0, /*CanonicalPrefixes=*/true);
-  DriverArgs[0] = Path.c_str();
+  InvocationInfo.Arguments[0] = GetExecutablePath(Argv0, /*CanonicalPrefixes=*/true);
   std::optional<driver::Driver::CompilationDiagnosticReport> Report =
-      generateReproducerForInvocationArguments(DriverArgs, InvocationInfo,
-                                               ToolContext, VFS);
+      generateReproducerForInvocationArguments(InvocationInfo.Arguments,
+                                               InvocationInfo, ToolContext,
+                                               VFS);
 
   // Emit the information about the reproduce files to stdout.
   int Result = 1;
