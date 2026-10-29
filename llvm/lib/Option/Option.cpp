@@ -199,7 +199,7 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
       return nullptr;
     auto A = std::make_unique<Arg>(*this, CurArg, Index++);
     while (Index < Args.getNumInputArgStrings() &&
-           Args.getArgString(Index).data() != nullptr)
+           !Args.isResponseFileEOL(Index))
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }
@@ -228,7 +228,7 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
     }
     Index++;
     while (Index < Args.getNumInputArgStrings() &&
-           Args.getArgString(Index).data() != nullptr)
+           !Args.isResponseFileEOL(Index))
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }

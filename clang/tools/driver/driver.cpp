@@ -263,7 +263,9 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
 
   auto VFS = llvm::vfs::getRealFileSystem();
 
-  if (llvm::Error Err = expandResponseFiles(Args, ClangCLMode, A, VFS.get())) {
+  SmallVector<unsigned, 0> EOLIndices;
+  if (llvm::Error Err = expandResponseFiles(Args, ClangCLMode, A, VFS.get(),
+                                            &EOLIndices)) {
     llvm::errs() << toString(std::move(Err)) << '\n';
     return 1;
   }
@@ -389,7 +391,7 @@ int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
         /*NeedsPOSIXUtilitySignalHandling=*/true);
   }
 
-  std::unique_ptr<Compilation> C(TheDriver.BuildCompilation(Args));
+  std::unique_ptr<Compilation> C(TheDriver.BuildCompilation(Args, EOLIndices));
 
   Driver::ReproLevel ReproLevel = Driver::ReproLevel::OnCrash;
   if (Arg *A = C->getArgs().getLastArg(options::OPT_gen_reproducer_eq)) {

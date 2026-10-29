@@ -107,8 +107,9 @@ buildCompilation(ArrayRef<std::string> ArgStrs, DiagnosticsEngine &Diags,
       driver::getDriverMode(Argv[0], ArrayRef(Argv).slice(1)));
 
   SmallVector<StringRef, 256> ArgvRefs(Argv.begin(), Argv.end());
-  if (llvm::Error E =
-          driver::expandResponseFiles(ArgvRefs, CLMode, Alloc, FS.get())) {
+  SmallVector<unsigned, 0> EOLIndices;
+  if (llvm::Error E = driver::expandResponseFiles(ArgvRefs, CLMode, Alloc,
+                                                  FS.get(), &EOLIndices)) {
     Diags.Report(diag::err_drv_expand_response_file)
         << llvm::toString(std::move(E));
     return std::make_pair(nullptr, nullptr);
@@ -118,7 +119,7 @@ buildCompilation(ArrayRef<std::string> ArgStrs, DiagnosticsEngine &Diags,
     Argv.push_back(A.data());
 
   std::unique_ptr<driver::Compilation> Compilation(
-      Driver->BuildCompilation(Argv));
+      Driver->BuildCompilation(Argv, EOLIndices));
   if (!Compilation)
     return std::make_pair(nullptr, nullptr);
 

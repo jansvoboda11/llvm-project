@@ -11,6 +11,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -281,6 +282,14 @@ public:
   /// list.
   virtual unsigned getNumInputArgStrings() const = 0;
 
+  /// Returns whether \p Index marks a response-file line boundary, i.e.
+  /// whether option classes that consume all remaining arguments (such as
+  /// RemainingArgsClass) must stop consuming values at this position instead
+  /// of continuing past it. Always false unless the ArgList was built from
+  /// arguments that went through response-file expansion with EOL tracking
+  /// requested.
+  virtual bool isResponseFileEOL(unsigned Index) const { return false; }
+
   /// getSubCommand - Find subcommand from the arguments if the usage is valid.
   ///
   /// \param AllSubCommands - A list of all valid subcommands.
@@ -438,20 +447,25 @@ private:
   /// The number of original input argument strings.
   unsigned NumInputArgStrings;
 
+  /// Sorted indices into ArgStrings at which a response-file line boundary
+  /// occurs. See ArgList::isResponseFileEOL.
+  SmallVector<unsigned, 0> EOLIndices;
+
   /// Release allocated arguments.
   void releaseMemory();
 
 public:
   InputArgList() : NumInputArgStrings(0) {}
 
-  InputArgList(ArrayRefOfStringRef Args);
+  InputArgList(ArrayRefOfStringRef Args, ArrayRef<unsigned> EOLIndices = {});
 
   InputArgList(const char* const *ArgBegin, const char* const *ArgEnd);
 
   InputArgList(InputArgList &&RHS)
       : ArgList(std::move(RHS)), ArgStrings(std::move(RHS.ArgStrings)),
         SynthesizedStrings(std::move(RHS.SynthesizedStrings)),
-        NumInputArgStrings(RHS.NumInputArgStrings) {}
+        NumInputArgStrings(RHS.NumInputArgStrings),
+        EOLIndices(std::move(RHS.EOLIndices)) {}
 
   InputArgList &operator=(InputArgList &&RHS) {
     if (this == &RHS)
@@ -461,6 +475,7 @@ public:
     ArgStrings = std::move(RHS.ArgStrings);
     SynthesizedStrings = std::move(RHS.SynthesizedStrings);
     NumInputArgStrings = RHS.NumInputArgStrings;
+    EOLIndices = std::move(RHS.EOLIndices);
     return *this;
   }
 
@@ -476,6 +491,10 @@ public:
 
   unsigned getNumInputArgStrings() const override {
     return NumInputArgStrings;
+  }
+
+  bool isResponseFileEOL(unsigned Index) const override {
+    return llvm::is_contained(EOLIndices, Index);
   }
 
   /// @name Arg Synthesis

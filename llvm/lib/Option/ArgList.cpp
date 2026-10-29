@@ -246,8 +246,10 @@ void InputArgList::releaseMemory() {
     delete A;
 }
 
-InputArgList::InputArgList(ArrayRefOfStringRef Args)
-    : NumInputArgStrings(Args.size()) {
+InputArgList::InputArgList(ArrayRefOfStringRef Args,
+                           ArrayRef<unsigned> EOLIndices)
+    : NumInputArgStrings(Args.size()),
+      EOLIndices(EOLIndices.begin(), EOLIndices.end()) {
   ArgStrings.append(Args.begin(), Args.end());
 }
 

@@ -502,12 +502,14 @@ std::unique_ptr<Arg> OptTable::internalParseOneArg(
 InputArgList OptTable::ParseArgs(ArrayRefOfStringRef Args,
                                  unsigned &MissingArgIndex,
                                  unsigned &MissingArgCount,
-                                 Visibility VisibilityMask) const {
+                                 Visibility VisibilityMask,
+                                 ArrayRef<unsigned> EOLIndices) const {
   return internalParseArgs(
       Args, MissingArgIndex, MissingArgCount,
       [VisibilityMask](const Option &Opt) {
         return !Opt.hasVisibilityFlag(VisibilityMask);
-      });
+      },
+      EOLIndices);
 }
 
 InputArgList OptTable::ParseArgs(ArrayRef<const char *> Args,
@@ -529,21 +531,16 @@ InputArgList OptTable::ParseArgs(ArrayRef<const char *> Args,
 InputArgList OptTable::internalParseArgs(
     ArrayRefOfStringRef ArgArr, unsigned &MissingArgIndex,
     unsigned &MissingArgCount,
-    std::function<bool(const Option &)> ExcludeOption) const {
-  InputArgList Args(ArgArr);
+    std::function<bool(const Option &)> ExcludeOption,
+    ArrayRef<unsigned> EOLIndices) const {
+  InputArgList Args(ArgArr, EOLIndices);
 
   // FIXME: Handle '@' args (or at least error on them).
 
   MissingArgIndex = MissingArgCount = 0;
   unsigned Index = 0, End = ArgArr.size();
   while (Index < End) {
-    // Ignore nullptr-like sentinels, they are response files' EOL markers
-    // (distinct from a legitimate empty argument, e.g. a literal "").
     StringRef Str = Args.getArgString(Index);
-    if (Str.data() == nullptr) {
-      ++Index;
-      continue;
-    }
     // Ignore empty arguments (other things may still take them as arguments).
     if (Str == "") {
       ++Index;

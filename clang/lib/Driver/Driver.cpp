@@ -268,15 +268,16 @@ void Driver::setDriverMode(StringRef Value) {
 }
 
 InputArgList Driver::ParseArgStrings(llvm::ArrayRefOfStringRef ArgStrings,
-                                     bool UseDriverMode,
-                                     bool &ContainsError) const {
+                                     bool UseDriverMode, bool &ContainsError,
+                                     llvm::ArrayRef<unsigned> EOLIndices) const {
   llvm::PrettyStackTraceString CrashInfo("Command line argument parsing");
   ContainsError = false;
 
   llvm::opt::Visibility VisibilityMask = getOptionVisibilityMask(UseDriverMode);
   unsigned MissingArgIndex, MissingArgCount;
-  InputArgList Args = getOpts().ParseArgs(ArgStrings, MissingArgIndex,
-                                          MissingArgCount, VisibilityMask);
+  InputArgList Args =
+      getOpts().ParseArgs(ArgStrings, MissingArgIndex, MissingArgCount,
+                         VisibilityMask, EOLIndices);
 
   // Check for missing argument error.
   if (MissingArgCount) {
@@ -1531,7 +1532,8 @@ bool Driver::loadDefaultConfigFiles(llvm::cl::ExpansionContext &ExpCtx) {
   return false;
 }
 
-Compilation *Driver::BuildCompilation(llvm::ArrayRefOfStringRef ArgList) {
+Compilation *Driver::BuildCompilation(llvm::ArrayRefOfStringRef ArgList,
+                                      llvm::ArrayRef<unsigned> EOLIndices) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   // FIXME: Handle environment options which affect driver behavior, somewhere
@@ -1546,10 +1548,17 @@ Compilation *Driver::BuildCompilation(llvm::ArrayRefOfStringRef ArgList) {
 
   // FIXME: What are we going to do with -V and -b?
 
-  // Arguments specified in command line.
+  // Arguments specified in command line. EOLIndices is relative to ArgList
+  // (which includes argv[0]); shift it to be relative to the sliced range
+  // passed to ParseArgStrings.
+  SmallVector<unsigned, 0> SlicedEOLIndices;
+  for (unsigned Idx : EOLIndices)
+    if (Idx >= 1)
+      SlicedEOLIndices.push_back(Idx - 1);
   bool ContainsError;
-  CLOptions = std::make_unique<InputArgList>(
-      ParseArgStrings(ArgList.slice(1), /*UseDriverMode=*/true, ContainsError));
+  CLOptions = std::make_unique<InputArgList>(ParseArgStrings(
+      ArgList.slice(1), /*UseDriverMode=*/true, ContainsError,
+      SlicedEOLIndices));
 
   // Try parsing configuration file.
   if (!ContainsError)
@@ -6600,7 +6609,8 @@ bool driver::IsClangCL(StringRef DriverMode) { return DriverMode == "cl"; }
 llvm::Error driver::expandResponseFiles(SmallVectorImpl<StringRef> &Args,
                                         bool ClangCLMode,
                                         llvm::BumpPtrAllocator &Alloc,
-                                        llvm::vfs::FileSystem *FS) {
+                                        llvm::vfs::FileSystem *FS,
+                                        SmallVectorImpl<unsigned> *EOLIndices) {
   // Parse response files using the GNU syntax, unless we're in CL mode. There
   // are two ways to put clang in CL compatibility mode: ProgName is either
   // clang-cl or cl, or --driver-mode=cl is on the command line. The normal
@@ -6616,8 +6626,8 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<StringRef> &Args,
       RSPQuoting = Windows;
   }
 
-  // Determines whether we want nullptr markers in Args to indicate response
-  // files end-of-lines. We only use this for the /LINK driver argument with
+  // Determines whether we want to track response file end-of-lines in \p
+  // EOLIndices. We only use this for the /LINK driver argument with
   // clang-cl.exe on Windows.
   bool MarkEOLs = ClangCLMode;
 
@@ -6634,34 +6644,14 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<StringRef> &Args,
   if (FS)
     ECtx.setVFS(FS);
 
-  llvm::SmallVector<size_t, 0> EOLIndices;
-  if (llvm::Error Err =
-          ECtx.expandResponseFiles(Args, MarkEOLs ? &EOLIndices : nullptr))
+  llvm::SmallVector<size_t, 0> RawEOLIndices;
+  if (llvm::Error Err = ECtx.expandResponseFiles(
+          Args, MarkEOLs ? &RawEOLIndices : nullptr))
     return Err;
 
-  // Insert empty-string sentinels at each response file end-of-line so that
-  // RemainingArgsClass options (e.g. clang-cl's /LINK) stop consuming
-  // arguments at the response file boundary instead of the whole command
-  // line.
-  if (MarkEOLs && !EOLIndices.empty()) {
-    llvm::sort(EOLIndices);
-    for (size_t Idx : llvm::reverse(EOLIndices))
-      Args.insert(Args.begin() + Idx, StringRef());
-  }
-
-  // If -cc1 came from a response file, remove the EOL sentinels.
-  auto FirstArg =
-      llvm::find_if(llvm::drop_begin(Args),
-                    [](StringRef A) { return A.data() != nullptr; });
-  if (FirstArg != Args.end() && FirstArg->starts_with("-cc1")) {
-    // If -cc1 came from a response file, remove the EOL sentinels.
-    if (MarkEOLs) {
-      auto newEnd = std::remove_if(
-          Args.begin(), Args.end(),
-          [](StringRef A) { return A.data() == nullptr; });
-      Args.resize(newEnd - Args.begin());
-    }
-  }
+  if (MarkEOLs && EOLIndices)
+    for (size_t Idx : RawEOLIndices)
+      EOLIndices->push_back(Idx);
 
   return llvm::Error::success();
 }

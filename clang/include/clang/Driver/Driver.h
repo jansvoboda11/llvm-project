@@ -464,17 +464,26 @@ public:
   /// BuildCompilation - Construct a compilation object for a command
   /// line argument vector.
   ///
+  /// \param EOLIndices - Sorted indices into \p Args marking response-file
+  /// line boundaries (see ParseArgStrings), used so that clang-cl's /LINK
+  /// stops consuming arguments at the response-file boundary rather than the
+  /// rest of the command line.
   /// \return A compilation, or 0 if none was built for the given
   /// argument vector. A null return value does not necessarily
   /// indicate an error condition, the diagnostics should be queried
   /// to determine if an error occurred.
-  Compilation *BuildCompilation(llvm::ArrayRefOfStringRef Args);
+  Compilation *BuildCompilation(llvm::ArrayRefOfStringRef Args,
+                                llvm::ArrayRef<unsigned> EOLIndices = {});
 
   /// ParseArgStrings - Parse the given list of strings into an
   /// ArgList.
-  llvm::opt::InputArgList ParseArgStrings(llvm::ArrayRefOfStringRef Args,
-                                          bool UseDriverMode,
-                                          bool &ContainsError) const;
+  ///
+  /// \param EOLIndices - Sorted indices into \p Args at which a
+  /// response-file line boundary occurs; see llvm::opt::OptTable::ParseArgs.
+  llvm::opt::InputArgList
+  ParseArgStrings(llvm::ArrayRefOfStringRef Args, bool UseDriverMode,
+                 bool &ContainsError,
+                 llvm::ArrayRef<unsigned> EOLIndices = {}) const;
 
   /// BuildInputs - Construct the list of inputs and their types from
   /// the given arguments.
@@ -841,9 +850,14 @@ bool IsClangCL(StringRef DriverMode);
 /// \param ClangCLMode Whether clang is in CL mode.
 /// \param Alloc Allocator for new arguments.
 /// \param FS Filesystem to use when expanding files.
+/// \param EOLIndices If non-null, filled with indices into \p Args marking
+/// response-file line boundaries, so that RemainingArgsClass options (e.g.
+/// clang-cl's /LINK) can stop consuming arguments at the response-file
+/// boundary. Only populated when \p ClangCLMode is true.
 llvm::Error expandResponseFiles(SmallVectorImpl<llvm::StringRef> &Args,
                                 bool ClangCLMode, llvm::BumpPtrAllocator &Alloc,
-                                llvm::vfs::FileSystem *FS = nullptr);
+                                llvm::vfs::FileSystem *FS = nullptr,
+                                SmallVectorImpl<unsigned> *EOLIndices = nullptr);
 
 /// Apply a space separated list of edits to the input argument lists.
 /// See applyOneOverrideOption.

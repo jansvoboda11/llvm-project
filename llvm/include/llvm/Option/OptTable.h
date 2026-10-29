@@ -460,11 +460,16 @@ public:
   /// \param MissingArgCount - On error, the number of missing options.
   /// \param VisibilityMask - Only include options with any of these
   /// visibility flags set.
+  /// \param EOLIndices - Sorted indices into \p Args at which a
+  /// response-file line boundary occurs, if \p Args was produced by response
+  /// file expansion with EOL tracking requested. Options that consume all
+  /// remaining arguments (e.g. RemainingArgsClass) stop at these boundaries.
   /// \return An InputArgList; on error this will contain all the options
   /// which could be parsed.
   InputArgList ParseArgs(ArrayRefOfStringRef Args, unsigned &MissingArgIndex,
                          unsigned &MissingArgCount,
-                         Visibility VisibilityMask = Visibility()) const;
+                         Visibility VisibilityMask = Visibility(),
+                         ArrayRef<unsigned> EOLIndices = {}) const;
 
   InputArgList ParseArgs(ArrayRef<const char *> Args, unsigned &MissingArgIndex,
                          unsigned &MissingArgCount, unsigned FlagsToInclude,
@@ -474,7 +479,8 @@ private:
   InputArgList
   internalParseArgs(ArrayRefOfStringRef Args, unsigned &MissingArgIndex,
                     unsigned &MissingArgCount,
-                    std::function<bool(const Option &)> ExcludeOption) const;
+                    std::function<bool(const Option &)> ExcludeOption,
+                    ArrayRef<unsigned> EOLIndices = {}) const;
 
 public:
   /// A convenience helper which handles optional initial options populated from
