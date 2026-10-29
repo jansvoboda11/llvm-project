@@ -1555,7 +1555,7 @@ int llvm_ar_main(int argc, char **argv, const llvm::ToolContext &) {
   };
 
   if (Is("dlltool"))
-    return dlltoolDriverMain(ArrayRef(argv, argc));
+    return dlltoolDriverMain({argc, argv});
   if (Is("ranlib"))
     return ranlib_main(argc, argv);
   if (Is("lib"))

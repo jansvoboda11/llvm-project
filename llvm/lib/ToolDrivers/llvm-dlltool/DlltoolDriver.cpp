@@ -285,7 +285,7 @@ int doIdentify(StringRef File, bool IdentifyStrict) {
 
 } // namespace
 
-int llvm::dlltoolDriverMain(llvm::ArrayRef<const char *> ArgsArr) {
+int llvm::dlltoolDriverMain(llvm::ArrayRefOfStringRef ArgsArr) {
   DllOptTable Table;
   unsigned MissingIndex;
   unsigned MissingCount;
