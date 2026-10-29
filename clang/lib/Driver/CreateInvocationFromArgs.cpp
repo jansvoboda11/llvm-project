@@ -30,7 +30,7 @@ using namespace llvm::opt;
 namespace clang {
 
 std::unique_ptr<CompilerInvocation>
-createInvocation(ArrayRef<const char *> ArgList, CreateInvocationOptions Opts) {
+createInvocation(llvm::ArrayRefOfStringRef ArgList, CreateInvocationOptions Opts) {
   assert(!ArgList.empty());
   std::optional<DiagnosticOptions> LocalDiagOpts;
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
@@ -42,12 +42,11 @@ createInvocation(ArrayRef<const char *> ArgList, CreateInvocationOptions Opts) {
         Opts.VFS ? *Opts.VFS : *llvm::vfs::getRealFileSystem(), *LocalDiagOpts);
   }
 
-  SmallVector<const char *, 16> Args(ArgList);
+  SmallVector<StringRef, 16> Args(ArgList.begin(), ArgList.end());
 
   // FIXME: Find a cleaner way to force the driver into restricted modes.
   Args.insert(
-      llvm::find_if(
-          Args, [](const char *Elem) { return llvm::StringRef(Elem) == "--"; }),
+      llvm::find_if(Args, [](StringRef Elem) { return Elem == "--"; }),
       "-fsyntax-only");
 
   // FIXME: We shouldn't have to pass in the path info.

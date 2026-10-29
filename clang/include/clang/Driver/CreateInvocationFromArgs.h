@@ -16,6 +16,7 @@
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <memory>
 #include <string>
@@ -68,7 +69,7 @@ struct CreateInvocationOptions {
 /// May return nullptr if an invocation could not be determined.
 /// See CreateInvocationOptions::RecoverOnError to try harder!
 std::unique_ptr<CompilerInvocation>
-createInvocation(ArrayRef<const char *> Args,
+createInvocation(llvm::ArrayRefOfStringRef Args,
                  CreateInvocationOptions Opts = {});
 
 } // namespace clang
