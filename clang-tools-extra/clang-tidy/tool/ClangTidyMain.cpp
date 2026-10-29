@@ -606,7 +606,7 @@ static llvm::IntrusiveRefCntPtr<vfs::OverlayFileSystem> createBaseFS() {
 
 int clangTidyMain(int argc, const char **argv) {
   const llvm::InitLLVM X(argc, argv);
-  SmallVector<const char *> Args{argv, argv + argc};
+  SmallVector<StringRef> Args{argv, argv + argc};
 
   // expand parameters file to argc and argv.
   llvm::BumpPtrAllocator Alloc;
@@ -619,8 +619,15 @@ int clangTidyMain(int argc, const char **argv) {
     llvm::WithColor::error() << llvm::toString(std::move(Err)) << "\n";
     return 1;
   }
-  argc = static_cast<int>(Args.size());
-  argv = Args.data();
+  // CommonOptionsParser::create() still works in terms of a raw argv, so
+  // materialize the (possibly response-file-expanded) args as C strings
+  // backed by Alloc, which outlives the rest of this function.
+  SmallVector<const char *> CArgs;
+  CArgs.reserve(Args.size());
+  for (StringRef Arg : Args)
+    CArgs.push_back(Arg.data());
+  argc = static_cast<int>(CArgs.size());
+  argv = CArgs.data();
 
   // Enable help for -load option, if plugins are enabled.
   if (cl::Option *LoadOpt = cl::getRegisteredOptions().lookup("load"))
