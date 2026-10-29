@@ -35,9 +35,9 @@ void LibraryOptionsParser::forEachOption(
   }
 }
 
-Error LibraryOptionsParser::parse(void *Opts, ArrayRef<const char *> Args,
+Error LibraryOptionsParser::parse(void *Opts, ArrayRefOfStringRef Args,
                                   unsigned &Consumed, BumpPtrAllocator &Alloc) {
-  InputArgList List(Args.begin(), Args.end());
+  InputArgList List(Args);
   Consumed = 0;
   std::unique_ptr<Arg> A = Table().ParseOneArg(List, Consumed);
   Consumed = std::min<unsigned>(Consumed, Args.size());

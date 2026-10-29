@@ -10,8 +10,10 @@
 #define LLVM_SUPPORT_LIBRARYOPTIONSCONTEXT_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 
@@ -32,11 +34,11 @@ public:
   void assign(const LibraryOptionsContext &Other);
 
   // Parses the option of L that Args[0] spells, keeping the other values.
-  Error parse(LibraryOptions &L, ArrayRef<const char *> Args,
+  Error parse(LibraryOptions &L, ArrayRefOfStringRef Args,
               unsigned &Consumed);
 
   // The arguments assigned so far.
-  ArrayRef<const char *> args() const { return SavedArgs; }
+  ArrayRef<StringRef> args() const { return SavedArgs; }
 
   // T's values, or T::Default if none of its options is parsed.
   template <typename T> const T &get() const {
@@ -52,7 +54,7 @@ public:
 
 private:
   DenseMap<const void *, void *> Values;
-  SmallVector<const char *, 0> SavedArgs;
+  SmallVector<StringRef, 0> SavedArgs;
   BumpPtrAllocator Alloc;
 };
 

@@ -204,17 +204,16 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
   }
   case FlagOrEqClass:
   case SeparateOrEqClass: {
-    const char *Rest = Args.getArgString(Index) + SpellingSize;
-    if (*Rest == '=')
-      return std::make_unique<Arg>(*this, CurArg, Index++, Rest + 1);
-    if (*Rest)
+    StringRef Rest = Args.getArgString(Index).drop_front(SpellingSize);
+    if (Rest.consume_front("="))
+      return std::make_unique<Arg>(*this, CurArg, Index++, Rest);
+    if (!Rest.empty())
       return nullptr;
     if (getKind() == FlagOrEqClass)
       return std::make_unique<Arg>(*this, CurArg, Index++);
 
     Index += 2;
-    if (Index > Args.getNumInputArgStrings() ||
-        Args.getArgString(Index - 1) == nullptr)
+    if (Index > Args.getNumInputArgStrings())
       return nullptr;
     return std::make_unique<Arg>(*this, CurArg, Index - 2,
                                  Args.getArgString(Index - 1));

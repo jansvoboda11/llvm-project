@@ -446,14 +446,14 @@ static CommandLineParser &globalParser() {
 // separate value, into Opts. Opts may refer to the arguments, so they are
 // copied into Alloc, and appended to Record if given.
 static Error
-parseLibraryOption(LibraryOptions &L, void *Opts, ArrayRef<const char *> Args,
+parseLibraryOption(LibraryOptions &L, void *Opts, ArrayRefOfStringRef Args,
                    unsigned &Consumed, BumpPtrAllocator &Alloc,
-                   SmallVectorImpl<const char *> *Record = nullptr) {
+                   SmallVectorImpl<StringRef> *Record = nullptr) {
   StringSaver Saver(Alloc);
-  const char *Saved[2];
+  StringRef Saved[2];
   unsigned NumArgs = std::min<size_t>(Args.size(), 2);
   for (unsigned J = 0; J != NumArgs; ++J)
-    Saved[J] = Saver.save(Args[J]).data();
+    Saved[J] = Saver.save(Args[J]);
   Consumed = 1;
   if (Error E = L.parse(Opts, ArrayRef(Saved, NumArgs), Consumed, Alloc))
     return E;
@@ -706,9 +706,6 @@ static bool CommaSeparateAndAddOccurrence(Option *Handler, unsigned pos,
 static inline bool ProvideOption(Option *Handler, StringRef ArgName,
                                  StringRef Value, int argc,
                                  const StringRef *argv, int &i) {
-  // Is this a multi-argument option?
-  unsigned NumAdditionalVals = Handler->getNumAdditionalVals();
-
   // Enforce value requirements
   switch (Handler->getValueExpectedFlag()) {
   case ValueRequired:
@@ -1684,7 +1681,7 @@ bool CommandLineParser::ParseCommandLineOptions(
 
       if (!Handler) {
         if (LibraryOptions *L = lookupLibraryOption(ArgName.split('=').first)) {
-          ArrayRef<const char *> Rest(argv + i, argc - i);
+          ArrayRef<StringRef> Rest(newArgv.data() + i, NewArgc - i);
           unsigned N;
           if (Error E = Context && L->isPerContext()
                             ? Context->parse(*L, Rest, N)
@@ -2942,7 +2939,7 @@ void LibraryOptionsContext::assign(const LibraryOptionsContext &Other) {
   assert(this != &Other);
   Values.clear();
   SavedArgs.clear();
-  ArrayRef<const char *> Args = Other.SavedArgs;
+  ArrayRef<StringRef> Args = Other.SavedArgs;
   for (size_t I = 0, E = Args.size(); I != E;) {
     StringRef Name = Args[I];
     Name.consume_front("-");
@@ -2956,7 +2953,7 @@ void LibraryOptionsContext::assign(const LibraryOptionsContext &Other) {
 }
 
 Error LibraryOptionsContext::parse(LibraryOptions &L,
-                                   ArrayRef<const char *> Args,
+                                   ArrayRefOfStringRef Args,
                                    unsigned &Consumed) {
   auto [It, Inserted] = Values.try_emplace(L.getDefault());
   if (Inserted)

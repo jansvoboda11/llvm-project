@@ -16,6 +16,7 @@
 #define LLVM_OPTION_LIBRARYOPTIONS_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ArrayRefOfStringRef.h"
 #include "llvm/ADT/BoolOrDefault.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -137,7 +138,7 @@ public:
 
   void forEachOption(
       function_ref<void(StringRef, StringRef, StringRef)> Fn) const override;
-  Error parse(void *Opts, ArrayRef<const char *> Args, unsigned &Consumed,
+  Error parse(void *Opts, ArrayRefOfStringRef Args, unsigned &Consumed,
               BumpPtrAllocator &Alloc) override;
   void *global() override { return Global; }
   const void *getDefault() const override { return Default; }

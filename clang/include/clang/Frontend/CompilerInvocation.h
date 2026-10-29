@@ -335,7 +335,7 @@ public:
   /// be canonical.
   ///
   /// \return false if there are any errors.
-  static bool checkCC1RoundTrip(ArrayRef<const char *> Args,
+  static bool checkCC1RoundTrip(ArrayRef<StringRef> Args,
                                 DiagnosticsEngine &Diags,
                                 const char *Argv0 = nullptr);
 
@@ -349,7 +349,7 @@ public:
 
 private:
   static bool CreateFromArgsImpl(CompilerInvocation &Res,
-                                 ArrayRef<const char *> CommandLineArgs,
+                                 ArrayRef<StringRef> CommandLineArgs,
                                  DiagnosticsEngine &Diags, const char *Argv0);
 
   /// Parse command line options that map to LangOptions.

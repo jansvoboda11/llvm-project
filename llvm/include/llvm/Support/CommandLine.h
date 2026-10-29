@@ -71,14 +71,12 @@ LLVM_ABI bool ParseCommandLineOptions(ArrayRefOfStringRef Argv,
                                       StringRef Overview = "",
                                       raw_ostream *Errs = nullptr,
                                       vfs::FileSystem *VFS = nullptr,
-                                      const char *EnvVar = nullptr,
-                                      bool LongOptionsUseDoubleDash = false);
+                                      const char *EnvVar = nullptr);
 LLVM_ABI inline bool ParseCommandLineOptions(
     int argc, const char *const *argv, StringRef Overview = "",
     raw_ostream *Errs = nullptr, vfs::FileSystem *VFS = nullptr,
-    const char *EnvVar = nullptr, bool LongOptionsUseDoubleDash = false) {
-  return ParseCommandLineOptions({argc, argv}, Overview, Errs, VFS, EnvVar,
-                                 LongOptionsUseDoubleDash);
+    const char *EnvVar = nullptr) {
+  return ParseCommandLineOptions({argc, argv}, Overview, Errs, VFS, EnvVar);
 }
 
 // Like ParseCommandLineOptions, but sets per-context libraries' options in
@@ -2193,7 +2191,7 @@ public:
   /// value, into \p Opts, which is global() or a context's values, and sets
   /// \p Consumed to the number of arguments it spans. The strings in \p Args
   /// and the memory from \p Alloc remain valid as long as \p Opts is used.
-  virtual Error parse(void *Opts, ArrayRef<const char *> Args,
+  virtual Error parse(void *Opts, ArrayRefOfStringRef Args,
                       unsigned &Consumed, BumpPtrAllocator &Alloc) = 0;
 
   /// Returns the values that ParseCommandLineOptions sets.
