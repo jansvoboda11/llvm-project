@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
   LLVMContext Context;
   SMDiagnostic Err;
   cl::HideUnrelatedOptions({&SplitCategory, &getColorCategory()});
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "LLVM module splitter\n");
 
   Triple TT(MTriple);

@@ -318,7 +318,7 @@ int mlir::JitRunnerMain(int argc, char **argv, const DialectRegistry &registry,
   // runner. This must come before the command line options are parsed.
   Options options;
   llvm::cl::LibraryOptionsContext libraryOptions;
-  llvm::cl::parseCommandLineOptions(libraryOptions, ArrayRef(argv, argc),
+  llvm::cl::parseCommandLineOptions(libraryOptions, {argc, argv},
                                     "MLIR CPU execution driver\n");
 
   if (options.hostSupportsJit) {

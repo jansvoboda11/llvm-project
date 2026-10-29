@@ -187,8 +187,9 @@ DerivedArgList *ClangCLArgs::translateArgs(const DerivedArgList &Args,
   return DAL;
 }
 
-const char *ClangCLArgs::translateMacroDefinition(const char *Value,
-                                                  const ArgList &Args) {
+llvm::StringRef
+ClangCLArgs::translateMacroDefinition(llvm::StringRef Value,
+                                      const ArgList &Args) {
   llvm::StringRef Val = Value;
   size_t Hash = Val.find('#');
   if (Hash == llvm::StringRef::npos || Hash > Val.find('='))

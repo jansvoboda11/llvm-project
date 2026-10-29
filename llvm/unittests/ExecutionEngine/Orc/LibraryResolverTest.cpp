@@ -102,7 +102,7 @@ public:
     if (!sys::fs::exists(InputDirPath))
       return;
 
-    SmallString<512> ExecPath(sys::fs::getMainExecutable(nullptr, nullptr));
+    SmallString<512> ExecPath(sys::fs::getMainExecutable(StringRef(), nullptr));
     sys::path::remove_filename(ExecPath);
     SmallString<128> UniqueDir(ExecPath);
     std::error_code EC = sys::fs::createUniqueDirectory(UniqueDir, DirPath);

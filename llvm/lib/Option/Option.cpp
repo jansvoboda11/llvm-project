@@ -198,7 +198,8 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
     if (SpellingSize != ArgStringSize)
       return nullptr;
     auto A = std::make_unique<Arg>(*this, CurArg, Index++);
-    while (Index < Args.getNumInputArgStrings())
+    while (Index < Args.getNumInputArgStrings() &&
+           Args.getArgString(Index).data() != nullptr)
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }
@@ -226,7 +227,8 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
           Args.getArgString(Index).drop_front(SpellingSize));
     }
     Index++;
-    while (Index < Args.getNumInputArgStrings())
+    while (Index < Args.getNumInputArgStrings() &&
+           Args.getArgString(Index).data() != nullptr)
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }

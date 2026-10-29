@@ -13,6 +13,7 @@
 
 namespace llvm {
 class Triple;
+class StringRef;
 namespace opt {
 class Arg;
 class ArgList;
@@ -48,8 +49,9 @@ public:
   /// Normalize MSVC's '#' macro separator, also used by Clang targeting MSVC
   /// and by arguments parsed after host/device filtering. Any replacement
   /// string has the lifetime of Args; otherwise return Value unchanged.
-  static const char *translateMacroDefinition(const char *Value,
-                                              const llvm::opt::ArgList &Args);
+  static llvm::StringRef
+  translateMacroDefinition(llvm::StringRef Value,
+                           const llvm::opt::ArgList &Args);
 };
 
 } // namespace clang::driver

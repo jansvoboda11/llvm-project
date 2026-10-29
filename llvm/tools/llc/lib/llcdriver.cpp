@@ -400,7 +400,7 @@ extern "C" int llcMain(int argc, char **argv) {
   cl::AddExtraVersionPrinter(TargetRegistry::printRegisteredTargetsForVersion);
 
   LLVMContext Context;
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "llvm system compiler\n");
 
   SmallVector<PassPlugin, 1> PluginList;

@@ -186,7 +186,7 @@ int main(int argc, const char *argv[]) {
 
   cl::HideUnrelatedOptions({&ProfGenCategory, &getColorCategory()});
   cl::LibraryOptionsContext LibraryOptions;
-  cl::parseCommandLineOptions(LibraryOptions, ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(LibraryOptions, {argc, argv},
                               "llvm SPGO profile generator\n");
   validateCommandLine();
 

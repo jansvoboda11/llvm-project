@@ -57,10 +57,10 @@ void freebsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
     mips::getMipsCPUAndABI(Args, Triple, CPUName, ABIName);
 
     CmdArgs.push_back("-march");
-    CmdArgs.push_back(CPUName.data());
+    CmdArgs.push_back(CPUName);
 
     CmdArgs.push_back("-mabi");
-    CmdArgs.push_back(mips::getGnuCompatibleMipsABIName(ABIName).data());
+    CmdArgs.push_back(mips::getGnuCompatibleMipsABIName(ABIName));
 
     if (Triple.isLittleEndian())
       CmdArgs.push_back("-EL");

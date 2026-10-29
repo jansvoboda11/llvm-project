@@ -1232,7 +1232,8 @@ Error ExpansionContext::expandResponseFile(
 
 /// Expand response files on a command line recursively using the given
 /// StringSaver and tokenization strategy.
-Error ExpansionContext::expandResponseFiles(SmallVectorImpl<StringRef> &Argv) {
+Error ExpansionContext::expandResponseFiles(
+    SmallVectorImpl<StringRef> &Argv, SmallVectorImpl<size_t> *EOLIndices) {
   struct ResponseFileRecord {
     std::string File;
     size_t End;
@@ -1322,13 +1323,28 @@ Error ExpansionContext::expandResponseFiles(SmallVectorImpl<StringRef> &Argv) {
     // Replace this response file argument with the tokenization of its
     // contents.  Nested response files are expanded in subsequent iterations.
     SmallVector<StringRef, 0> ExpandedArgv;
-    if (Error Err = expandResponseFile(FName, ExpandedArgv))
+    SmallVector<size_t, 0> ExpandedEOLIndices;
+    if (Error Err = expandResponseFile(FName, ExpandedArgv,
+                                       EOLIndices ? &ExpandedEOLIndices
+                                                  : nullptr))
       return Err;
 
     for (ResponseFileRecord &Record : FileStack) {
       // Increase the end of all active records by the number of newly expanded
       // arguments, minus the response file itself.
       Record.End += ExpandedArgv.size() - 1;
+    }
+
+    if (EOLIndices) {
+      // Shift any already-collected indices that come after the replaced
+      // response file argument by the change in Argv's length.
+      ptrdiff_t Delta = static_cast<ptrdiff_t>(ExpandedArgv.size()) - 1;
+      if (Delta != 0)
+        for (size_t &Idx : *EOLIndices)
+          if (Idx > I)
+            Idx += Delta;
+      for (size_t LocalIdx : ExpandedEOLIndices)
+        EOLIndices->push_back(I + LocalIdx);
     }
 
     FileStack.push_back({FName.str(), I + ExpandedArgv.size()});
@@ -1545,8 +1561,9 @@ bool CommandLineParser::ParseCommandLineOptions(
   int FirstArg = 1;
   SubCommand *ChosenSubCommand = &SubCommand::getTopLevel();
   std::string NearestSubCommandString;
-  bool MaybeNamedSubCommand =
-      NewArgc >= 2 && newArgv[FirstArg][0] != '-' && hasNamedSubCommands();
+  bool MaybeNamedSubCommand = NewArgc >= 2 && !newArgv[FirstArg].empty() &&
+                              newArgv[FirstArg][0] != '-' &&
+                              hasNamedSubCommands();
   if (MaybeNamedSubCommand) {
     // If the first argument specifies a valid subcommand, start processing
     // options from the second argument.
@@ -1648,8 +1665,7 @@ bool CommandLineParser::ParseCommandLineOptions(
         // Delay processing positional arguments until the end...
         continue;
       }
-    } else if (newArgv[i][0] == '-' && newArgv[i][1] == '-' &&
-               newArgv[i][2] == 0 && !DashDashFound) {
+    } else if (newArgv[i] == "--" && !DashDashFound) {
       DashDashFound = true; // This is the mythical "--"?
       continue;             // Don't try to process it as an argument itself.
     } else if (ActivePositionalArg &&

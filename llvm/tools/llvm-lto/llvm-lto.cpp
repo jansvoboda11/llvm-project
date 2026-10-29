@@ -1017,7 +1017,7 @@ int main(int argc, char **argv) {
   InitializeAllAsmParsers();
 
   cl::LibraryOptionsContext LibraryOptions;
-  cl::parseCommandLineOptions(LibraryOptions, ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(LibraryOptions, {argc, argv},
                               "llvm LTO linker\n");
 
   if (OptLevel < '0' || OptLevel > '3')

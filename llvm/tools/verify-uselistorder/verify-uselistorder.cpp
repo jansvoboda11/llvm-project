@@ -559,7 +559,7 @@ int main(int argc, char **argv) {
 
   cl::HideUnrelatedOptions(Cat);
   LLVMContext Context;
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "llvm tool to verify use-list order\n");
 
   SMDiagnostic Err;

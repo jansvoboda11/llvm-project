@@ -2121,7 +2121,13 @@ public:
                                 SmallVectorImpl<StringRef> &Argv);
 
   /// Expands constructs "@file" in the provided array of arguments recursively.
-  LLVM_ABI Error expandResponseFiles(SmallVectorImpl<StringRef> &Argv);
+  ///
+  /// \param [out] EOLIndices If non-null, filled with indices into \c Argv
+  /// that denote the last argument in a response file before a newline, for
+  /// every response file expanded (including nested ones).
+  LLVM_ABI Error
+  expandResponseFiles(SmallVectorImpl<StringRef> &Argv,
+                      SmallVectorImpl<size_t> *EOLIndices = nullptr);
 };
 
 /// A convenience helper which supports the typical use case of expansion

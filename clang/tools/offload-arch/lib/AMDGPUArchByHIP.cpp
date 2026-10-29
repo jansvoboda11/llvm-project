@@ -111,7 +111,7 @@ static std::vector<std::string> getSearchPaths() {
   std::vector<std::string> Paths;
 
   // Get the directory of the current executable
-  if (auto MainExe = sys::fs::getMainExecutable(nullptr, nullptr);
+  if (auto MainExe = sys::fs::getMainExecutable(StringRef(), nullptr);
       !MainExe.empty()) {
     StringRef ExeDir = sys::path::parent_path(MainExe);
     auto BinPaths = getCandidateBinPaths(ExeDir);

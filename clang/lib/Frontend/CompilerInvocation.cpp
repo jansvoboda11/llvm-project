@@ -738,7 +738,6 @@ static void GenerateArg(ArgumentConsumer Consumer,
 
 // Parse command line arguments into CompilerInvocation.
 using ParseFn =
-using ParseFn =
     llvm::function_ref<bool(CompilerInvocation &, llvm::ArrayRefOfStringRef,
                             DiagnosticsEngine &, StringRef)>;
 
@@ -5128,7 +5127,6 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
-bool CompilerInvocation::CreateFromArgsImpl(
 bool CompilerInvocation::CreateFromArgsImpl(
     CompilerInvocation &Res, llvm::ArrayRefOfStringRef CommandLineArgs,
     DiagnosticsEngine &Diags, StringRef Argv0) {

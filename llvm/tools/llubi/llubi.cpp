@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
   LLVMContext Context;
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "llvm ub-aware interpreter\n");
 
   if (EntryFunc.empty()) {

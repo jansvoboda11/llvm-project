@@ -469,7 +469,7 @@ int main(int argc, char **argv) {
 
   cl::HideUnrelatedOptions({&LinkCategory, &getColorCategory()});
   LLVMContext Context;
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "llvm linker\n");
 
   Context.setDiagnosticHandler(std::make_unique<LLVMLinkDiagnosticHandler>(),

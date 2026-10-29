@@ -321,7 +321,7 @@ void sys::symbolizeAddresses(AddressSet &Addresses,
 
   // Try to guess the main executable name, since we don't have argv0 available
   // here.
-  std::string MainExecutableName = sys::fs::getMainExecutable(nullptr, nullptr);
+  std::string MainExecutableName = sys::fs::getMainExecutable(StringRef(), nullptr);
 
   auto SymbolizedAddressesOpt =
       collectAddressSymbols(AddressList.begin(), AddressList.size(),

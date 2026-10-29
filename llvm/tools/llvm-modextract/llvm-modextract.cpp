@@ -47,7 +47,7 @@ static cl::opt<unsigned> ModuleIndex("n", cl::Required,
 int main(int argc, char **argv) {
   cl::HideUnrelatedOptions({&ModextractCategory, &getColorCategory()});
   LLVMContext Context;
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "Module extractor");
 
   ExitOnError ExitOnErr("llvm-modextract: error: ");

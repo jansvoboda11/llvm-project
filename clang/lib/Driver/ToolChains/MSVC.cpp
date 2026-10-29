@@ -506,13 +506,13 @@ void tools::ARM64XObjcopy::ConstructJob(Compilation &C, const JobAction &JA,
                                         const InputInfo &Output,
                                         const InputInfoList &Inputs,
                                         const ArgList &Args,
-                                        const char *LinkingOutput) const {
+                                        StringRef LinkingOutput) const {
   // Assume llvm-objcopy is only used for hybrid ARM64X object files.
   if (Inputs.size() != 2)
     return;
 
   std::string ObjcopyPath = getToolChain().GetProgramPath("llvm-objcopy");
-  const char *Exec = Args.MakeArgString(ObjcopyPath);
+  StringRef Exec = Args.MakeArgString(ObjcopyPath);
 
   // Embed the hybrid object in the .obj.arm64ec section.
   ArgStringList CmdArgs;

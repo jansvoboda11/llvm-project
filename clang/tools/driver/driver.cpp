@@ -243,7 +243,6 @@ static int ExecuteCC1Tool(SmallVectorImpl<StringRef> &ArgV,
 int clang_main(int Argc, char **Argv, const llvm::ToolContext &ToolContext) {
   noteBottomOfStack();
   llvm::setBugReportMsg("PLEASE submit a bug report to " BUG_REPORT_URL
-  llvm::setBugReportMsg("PLEASE submit a bug report to " BUG_REPORT_URL
                         " and include the crash backtrace and"
                         " dumped files.\n");
   SmallVector<StringRef, 256> Args(Argv, Argv + Argc);

@@ -381,7 +381,7 @@ int main(int argc, char **argv) {
 
   // Parse flags and initialize target options.
   cl::LibraryOptionsContext LibraryOptions;
-  cl::parseCommandLineOptions(LibraryOptions, ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(LibraryOptions, {argc, argv},
                               "llvm machine code performance analyzer.\n");
 
   Triple TheTriple(TripleNameOpt.empty()

@@ -266,7 +266,7 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   // Erase the command-line arguments. These don't make it into the final set of
   // compilation arguments and will be re-populated during compilation itself.
   // Keeping them around would make copies of the invocation expensive.
-  CI.getCodeGenOpts().Argv0 = nullptr;
+  CI.getCodeGenOpts().Argv0 = std::nullopt;
   CI.getCodeGenOpts().CommandLineArgs.clear();
 
   // Map output paths that affect behaviour to "-" so their existence is in the

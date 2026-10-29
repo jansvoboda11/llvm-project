@@ -2344,16 +2344,16 @@ struct TestLibrary final : cl::LibraryOptions {
     Fn("library-flag", "", "A flag");
     Fn("library-int", " <int>", "");
   }
-  Error parse(void *, ArrayRef<const char *> Argv, unsigned &Consumed,
+  Error parse(void *, ArrayRefOfStringRef Argv, unsigned &Consumed,
               BumpPtrAllocator &) override {
     Consumed = 1;
-    Args.push_back(Argv[0]);
-    if (StringRef(Argv[0]).ltrim('-') != "library-int")
+    Args.push_back(Argv[0].str());
+    if (Argv[0].ltrim('-') != "library-int")
       return Error::success();
     if (Argv.size() < 2)
       return createStringError("missing value");
     Consumed = 2;
-    Args.push_back(Argv[1]);
+    Args.push_back(Argv[1].str());
     if (Args.back() == "bad")
       return createStringError("bad value");
     return Error::success();

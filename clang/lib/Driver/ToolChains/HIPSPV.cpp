@@ -66,12 +66,12 @@ static const char *runHipSpvPasses(Compilation &C, const JobAction &JA,
   auto PassPluginPath = findPassPlugin(C.getDriver(), Args);
   if (PassPluginPath.empty())
     return TempFile;
-  const char *PassPathCStr = C.getArgs().MakeArgString(PassPluginPath);
+  StringRef PassPathCStr = C.getArgs().MakeArgString(PassPluginPath);
   const char *OptOutput = HIP::getTempFile(C, Name.str() + "-lower", "bc");
   ArgStringList OptArgs{TempFile,     "-load-pass-plugin",
                         PassPathCStr, "-passes=hip-post-link-passes",
                         "-o",         OptOutput};
-  const char *Opt = Args.MakeArgString(TC.GetProgramPath("opt"));
+  StringRef Opt = Args.MakeArgString(TC.GetProgramPath("opt"));
   C.addCommand(std::make_unique<Command>(
       JA, Creator, ResponseFileSupport::None(), Opt, OptArgs, Inputs, Output));
   return OptOutput;

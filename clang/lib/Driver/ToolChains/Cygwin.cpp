@@ -121,7 +121,7 @@ void cygwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
-                                  const char *LinkingOutput) const {
+                                  StringRef LinkingOutput) const {
   const auto &ToolChain = getToolChain();
   const Driver &D = ToolChain.getDriver();
 
@@ -235,7 +235,7 @@ void cygwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   // that lacks an extension.
   // GCC used to do this only when the compiler itself runs on windows, but
   // since GCC 8 it does the same when cross compiling as well.
-  if (const char *OutputFile = Output.getFilename();
+  if (StringRef OutputFile = Output.getFilename();
       !llvm::sys::path::has_extension(OutputFile))
     CmdArgs.push_back(Args.MakeArgString(Twine(OutputFile) + ".exe"));
   else
@@ -386,7 +386,7 @@ void cygwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.addAllArgs(CmdArgs, {options::OPT_T, options::OPT_t});
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
+  StringRef Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));

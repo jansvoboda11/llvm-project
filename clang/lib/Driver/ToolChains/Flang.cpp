@@ -81,7 +81,7 @@ static void renderDependencyGenerationOptions(Compilation &C,
   };
 
   // Decide where to write the dependency file.
-  const char *DepFile;
+  StringRef DepFile;
   if (Arg *MF = Args.getLastArg(options::OPT_MF)) {
     // -MF gives the path explicitly.
     DepFile = MF->getValue();
@@ -1223,7 +1223,7 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
 
   if (!Format.empty()) {
     CmdArgs.push_back("-opt-record-format");
-    CmdArgs.push_back(Format.data());
+    CmdArgs.push_back(Format);
   }
 }
 

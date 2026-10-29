@@ -1353,7 +1353,7 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
 
   if (!Format.empty()) {
     CmdArgs.push_back("-opt-record-format");
-    CmdArgs.push_back(Format.data());
+    CmdArgs.push_back(Format);
   }
 }
 
@@ -1830,8 +1830,7 @@ void Clang::AddLoongArchTargetArgs(const ArgList &Args,
 
   CmdArgs.push_back("-target-abi");
   CmdArgs.push_back(
-      loongarch::getLoongArchABI(getToolChain().getDriver(), Args, Triple)
-          .data());
+      loongarch::getLoongArchABI(getToolChain().getDriver(), Args, Triple));
 
   // Handle -mtune.
   if (const Arg *A = Args.getLastArg(options::OPT_mtune_EQ)) {
@@ -1859,7 +1858,7 @@ void Clang::AddMIPSTargetArgs(const ArgList &Args,
   mips::getMipsCPUAndABI(Args, Triple, CPUName, ABIName);
 
   CmdArgs.push_back("-target-abi");
-  CmdArgs.push_back(ABIName.data());
+  CmdArgs.push_back(ABIName);
 
   mips::FloatABI ABI = mips::getMipsFloatABI(D, Args, Triple);
   if (ABI == mips::FloatABI::Soft) {
@@ -2092,7 +2091,7 @@ void Clang::AddRISCVTargetArgs(const ArgList &Args,
   StringRef ABIName = riscv::getRISCVABI(Args, Triple);
 
   CmdArgs.push_back("-target-abi");
-  CmdArgs.push_back(ABIName.data());
+  CmdArgs.push_back(ABIName);
 
   if (Arg *A = Args.getLastArg(options::OPT_G)) {
     CmdArgs.push_back("-msmall-data-limit");
@@ -2668,7 +2667,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
 
     for (StringRef Value : A->getValues()) {
       if (TakeNextArg) {
-        CmdArgs.push_back(Value.data());
+        CmdArgs.push_back(Value);
         TakeNextArg = false;
         continue;
       }
@@ -2831,7 +2830,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
                  Value.starts_with("--compress-debug-sections") ||
                  Value == "-nocompress-debug-sections" ||
                  Value == "--nocompress-debug-sections") {
-        CmdArgs.push_back(Value.data());
+        CmdArgs.push_back(Value);
       } else if (Value == "--crel") {
         Crel = true;
       } else if (Value == "--no-crel") {
@@ -2841,7 +2840,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
       } else if (Value.starts_with("--reloc-section-sym=")) {
         RelocSectionSym = Value.substr(strlen("--reloc-section-sym="));
       } else if (Value.starts_with("-I")) {
-        CmdArgs.push_back(Value.data());
+        CmdArgs.push_back(Value);
         // We need to consume the next argument if the current arg is a plain
         // -I. The next arg will be the include directory.
         if (Value == "-I")
@@ -2850,7 +2849,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         // "-gdwarf-N" options are not cc1as options.
         unsigned DwarfVersion = DwarfVersionNum(Value);
         if (DwarfVersion == 0) { // Send it onward, and let cc1as complain.
-          CmdArgs.push_back(Value.data());
+          CmdArgs.push_back(Value);
         } else {
           RenderDebugEnablingArgs(Args, CmdArgs,
                                   llvm::codegenoptions::DebugInfoConstructor,
@@ -2892,7 +2891,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         // parse the argument, so this isn't automatically aliased to
         // -fdebug-compilation-dir (without '=') here.
         CmdArgs.push_back("-fdebug-compilation-dir");
-        CmdArgs.push_back(Value.data());
+        CmdArgs.push_back(Value);
       } else if (Value == "--version") {
         D.PrintVersion(C, llvm::outs());
       } else {
@@ -5211,7 +5210,7 @@ static void ProcessVSRuntimeLibrary(const ToolChain &TC, const ArgList &Args,
   if (Args.hasArg(options::OPT_fms_omit_default_lib)) {
     CmdArgs.push_back("-D_VC_NODEFAULTLIB");
   } else {
-    CmdArgs.push_back(FlagForCRT.data());
+    CmdArgs.push_back(FlagForCRT);
 
     // This provides POSIX compatibility (maps 'open' to '_open'), which most
     // users want.  The /Za flag to cl.exe turns this off, but it's not
@@ -7796,7 +7795,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         D.Diag(clang::diag::warn_drv_unused_argument)
             << StdArg->getAsString(Args);
     }
-    CmdArgs.push_back(LanguageStandard.data());
+    CmdArgs.push_back(LanguageStandard);
   }
   if (ImplyVCPPCXXVer) {
     StringRef LanguageStandard;
@@ -7847,7 +7846,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         LanguageStandard = "-std=c++11";
     }
 
-    CmdArgs.push_back(LanguageStandard.data());
+    CmdArgs.push_back(LanguageStandard);
   }
 
   Args.addOptInFlag(CmdArgs, options::OPT_fborland_extensions,
@@ -9272,7 +9271,7 @@ void ClangAs::AddMIPSTargetArgs(const ArgList &Args,
   mips::getMipsCPUAndABI(Args, Triple, CPUName, ABIName);
 
   CmdArgs.push_back("-target-abi");
-  CmdArgs.push_back(ABIName.data());
+  CmdArgs.push_back(ABIName);
 }
 
 void ClangAs::AddX86TargetArgs(const ArgList &Args,
@@ -9296,8 +9295,7 @@ void ClangAs::AddLoongArchTargetArgs(const ArgList &Args,
                                      ArgStringList &CmdArgs) const {
   CmdArgs.push_back("-target-abi");
   CmdArgs.push_back(loongarch::getLoongArchABI(getToolChain().getDriver(), Args,
-                                               getToolChain().getTriple())
-                        .data());
+                                               getToolChain().getTriple()));
 }
 
 void ClangAs::AddRISCVTargetArgs(const ArgList &Args,
@@ -9306,7 +9304,7 @@ void ClangAs::AddRISCVTargetArgs(const ArgList &Args,
   StringRef ABIName = riscv::getRISCVABI(Args, Triple);
 
   CmdArgs.push_back("-target-abi");
-  CmdArgs.push_back(ABIName.data());
+  CmdArgs.push_back(ABIName);
 
   if (Args.hasFlag(options::OPT_mdefault_build_attributes,
                    options::OPT_mno_default_build_attributes, true)) {

@@ -495,7 +495,7 @@ DerivedArgList *Driver::TranslateInputArgs(const InputArgList &Args,
     // Preserve MSVC macro syntax for Clang's other driver modes as well.
     if ((CLArgs || Triple.isWindowsMSVCEnvironment()) &&
         A->getOption().matches(options::OPT_D)) {
-      const char *Value =
+      StringRef Value =
           ClangCLArgs::translateMacroDefinition(A->getValue(), Args);
       if (Value == A->getValue())
         DAL->append(A);
@@ -6634,16 +6634,31 @@ llvm::Error driver::expandResponseFiles(SmallVectorImpl<StringRef> &Args,
   if (FS)
     ECtx.setVFS(FS);
 
-  if (llvm::Error Err = ECtx.expandResponseFiles(Args))
+  llvm::SmallVector<size_t, 0> EOLIndices;
+  if (llvm::Error Err =
+          ECtx.expandResponseFiles(Args, MarkEOLs ? &EOLIndices : nullptr))
     return Err;
 
+  // Insert empty-string sentinels at each response file end-of-line so that
+  // RemainingArgsClass options (e.g. clang-cl's /LINK) stop consuming
+  // arguments at the response file boundary instead of the whole command
+  // line.
+  if (MarkEOLs && !EOLIndices.empty()) {
+    llvm::sort(EOLIndices);
+    for (size_t Idx : llvm::reverse(EOLIndices))
+      Args.insert(Args.begin() + Idx, StringRef());
+  }
+
   // If -cc1 came from a response file, remove the EOL sentinels.
-  auto FirstArg = llvm::find_if(llvm::drop_begin(Args),
-                                [](StringRef A) { return !A.empty(); });
+  auto FirstArg =
+      llvm::find_if(llvm::drop_begin(Args),
+                    [](StringRef A) { return A.data() != nullptr; });
   if (FirstArg != Args.end() && FirstArg->starts_with("-cc1")) {
     // If -cc1 came from a response file, remove the EOL sentinels.
     if (MarkEOLs) {
-      auto newEnd = std::remove(Args.begin(), Args.end(), StringRef());
+      auto newEnd = std::remove_if(
+          Args.begin(), Args.end(),
+          [](StringRef A) { return A.data() == nullptr; });
       Args.resize(newEnd - Args.begin());
     }
   }
@@ -6697,7 +6712,8 @@ static void applyOneOverrideOption(raw_ostream &OS,
     const char *Str = GetStableCStr(SavedStrings, Edit.substr(1));
     OS << "### Adding argument " << Str << " at end\n";
     Args.push_back(Str);
-  } else if (Edit[0] == 's' && Edit[1] == '/' && Edit.ends_with("/") &&
+  } else if (Edit.size() >= 2 && Edit[0] == 's' && Edit[1] == '/' &&
+             Edit.ends_with("/") &&
              Edit.slice(2, Edit.size() - 1).contains('/')) {
     StringRef MatchPattern = Edit.substr(2).split('/').first;
     StringRef ReplPattern = Edit.substr(2).split('/').second;
@@ -6730,9 +6746,10 @@ static void applyOneOverrideOption(raw_ostream &OS,
   } else if (Edit[0] == 'O') {
     for (unsigned i = 1; i < Args.size();) {
       StringRef A = Args[i];
-      if (A[0] == '-' && A[1] == 'O' &&
-          (A[2] == '\0' || (A[3] == '\0' && (A[2] == 's' || A[2] == 'z' ||
-                                             ('0' <= A[2] && A[2] <= '9'))))) {
+      if (A.size() >= 2 && A[0] == '-' && A[1] == 'O' &&
+          (A.size() == 2 || (A.size() == 3 &&
+                             (A[2] == 's' || A[2] == 'z' ||
+                              ('0' <= A[2] && A[2] <= '9'))))) {
         OS << "### Deleting argument " << Args[i] << '\n';
         Args.erase(Args.begin() + i);
       } else

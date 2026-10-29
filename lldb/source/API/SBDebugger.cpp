@@ -195,7 +195,7 @@ void SBDebugger::PrintStackTraceOnError() {
 
   llvm::EnablePrettyStackTrace();
   static std::string executable =
-      llvm::sys::fs::getMainExecutable(nullptr, nullptr);
+      llvm::sys::fs::getMainExecutable(StringRef(), nullptr);
   llvm::sys::PrintStackTraceOnErrorSignal(executable);
 }
 

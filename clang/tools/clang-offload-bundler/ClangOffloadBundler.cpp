@@ -155,7 +155,7 @@ int main(int argc, const char **argv) {
   cl::SetVersionPrinter(PrintVersion);
   cl::LibraryOptionsContext LibraryOptions;
   cl::parseCommandLineOptions(
-      LibraryOptions, ArrayRef(argv, argc),
+      LibraryOptions, {argc, argv},
       "A tool to bundle several input files of the specified type <type> \n"
       "referring to the same source file but different targets into a single \n"
       "one. The resulting file can also be unbundled into different files by \n"

@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 
   cl::HideUnrelatedOptions({&DisCategory, &getColorCategory()});
   cl::LibraryOptionsContext LibraryOptions;
-  cl::parseCommandLineOptions(LibraryOptions, ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(LibraryOptions, {argc, argv},
                               "llvm .bc -> .ll disassembler\n");
 
   if (InputFilenames.size() < 1) {

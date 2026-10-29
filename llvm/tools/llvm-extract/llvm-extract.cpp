@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
 
   LLVMContext Context;
   cl::HideUnrelatedOptions(ExtractCat);
-  cl::parseCommandLineOptions(Context.getLibraryOptions(), ArrayRef(argv, argc),
+  cl::parseCommandLineOptions(Context.getLibraryOptions(), {argc, argv},
                               "llvm extractor\n");
 
   // Use lazy loading, since we only care about selected global values.

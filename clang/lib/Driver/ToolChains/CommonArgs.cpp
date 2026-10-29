@@ -973,7 +973,7 @@ void tools::getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
 
   for (auto Feature : unifyTargetFeatures(Features)) {
     CmdArgs.push_back(IsAux ? "-aux-target-feature" : "-target-feature");
-    CmdArgs.push_back(Feature.data());
+    CmdArgs.push_back(Feature);
   }
 }
 

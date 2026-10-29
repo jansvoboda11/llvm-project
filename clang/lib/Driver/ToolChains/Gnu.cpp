@@ -697,7 +697,7 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
   case llvm::Triple::riscv64be: {
     StringRef ABIName = riscv::getRISCVABI(Args, getToolChain().getTriple());
     CmdArgs.push_back("-mabi");
-    CmdArgs.push_back(ABIName.data());
+    CmdArgs.push_back(ABIName);
     std::string MArchName =
         riscv::getRISCVArch(Args, getToolChain().getTriple());
     CmdArgs.push_back("-march");
@@ -795,10 +795,10 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
     ABIName = mips::getGnuCompatibleMipsABIName(ABIName);
 
     CmdArgs.push_back("-march");
-    CmdArgs.push_back(CPUName.data());
+    CmdArgs.push_back(CPUName);
 
     CmdArgs.push_back("-mabi");
-    CmdArgs.push_back(ABIName.data());
+    CmdArgs.push_back(ABIName);
 
     // -mno-shared should be emitted unless -fpic, -fpie, -fPIC, -fPIE,
     // or -mshared (not implemented) is in effect.

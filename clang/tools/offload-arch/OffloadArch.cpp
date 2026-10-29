@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   cl::SetVersionPrinter(PrintVersion);
   cl::LibraryOptionsContext LibraryOptions;
   cl::parseCommandLineOptions(
-      LibraryOptions, ArrayRef(argv, argc),
+      LibraryOptions, {argc, argv},
       "A tool to detect the presence of offloading devices on the system. \n\n"
       "The tool will output each detected GPU architecture separated by a\n"
       "newline character. If multiple GPUs of the same architecture are found\n"

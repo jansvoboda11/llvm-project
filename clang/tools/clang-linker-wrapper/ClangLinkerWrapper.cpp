@@ -1557,7 +1557,7 @@ int main(int Argc, char **Argv) {
   for (const opt::Arg *Arg : Args.filtered(OPT_mllvm))
     NewArgv.push_back(Arg->getValue().data());
   for (const opt::Arg *Arg : Args.filtered(OPT_offload_opt_eq_minus))
-    NewArgv.push_back(Arg->getValue());
+    NewArgv.push_back(Arg->getValue().data());
   cl::LibraryOptionsContext LibraryOptions;
   cl::parseCommandLineOptions(LibraryOptions, NewArgv);
 
