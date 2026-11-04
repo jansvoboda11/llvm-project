@@ -18,6 +18,9 @@ class TestingConfig:
         environment = {
             "PATH": os.pathsep.join(litConfig.path + [os.environ.get("PATH", "")]),
             "LLVM_DISABLE_CRASH_REPORT": "1",
+            # A lit that a test runs is part of this run; it must not go
+            # through LIT_LAUNCHER (see lit.main.run_through_launcher).
+            "LIT_LAUNCHED": "1",
         }
 
         pass_vars = [

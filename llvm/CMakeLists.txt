@@ -851,6 +851,8 @@ if(LLVM_INDIVIDUAL_TEST_COVERAGE)
    set(LIT_ARGS_DEFAULT "${LIT_ARGS_DEFAULT} --per-test-coverage")
 endif()
 set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}" CACHE STRING "Default options for lit")
+set(LLVM_LIT_LAUNCHER "" CACHE STRING
+  "Command that bin/llvm-lit runs lit through, unless LIT_LAUNCHER is set")
 
 # On Win32 hosts, provide an option to specify the path to the Unix tools.
 if( WIN32 AND NOT CYGWIN )

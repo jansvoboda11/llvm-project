@@ -1,0 +1,2 @@
+# What a lit started by this test would see.
+# RUN: %{python} -c "import os; print('nested: LIT_LAUNCHED=' + os.environ.get('LIT_LAUNCHED', ''))"

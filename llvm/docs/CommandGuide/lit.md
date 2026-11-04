@@ -41,6 +41,19 @@ parsing options from the command line. `LIT_OPTS` is primarily useful for
 supplementing or overriding the command-line options supplied to {program}`lit`
 by `check` targets defined by a project's build system.
 
+If the environment variable `LIT_LAUNCHER` is set to a command,
+{program}`lit` runs itself through it, the way a build runs compilers through
+a compiler launcher. The command is split like a shell command line and run
+with the Python interpreter, the path of the lit script and all of
+{program}`lit`'s arguments appended, with `LIT_LAUNCHED=1` in its environment.
+The launcher can then run that command as it sees fit, for example split into
+shards (`--num-shards` and `--run-shard`) on several machines. Since
+`LIT_LAUNCHED` is set, the {program}`lit` processes the launcher starts run
+the tests themselves. Tests always get `LIT_LAUNCHED=1` in their environment,
+so a {program}`lit` run by a test never goes through the launcher. `LIT_LAUNCHER` has no effect when {program}`lit` is run
+with `python -m lit`. The `LLVM_LIT_LAUNCHER` CMake variable sets a default for
+`bin/llvm-lit`.
+
 {program}`lit` can also read options from response files which are specified as
 inputs using the `@path/to/file.rsp` syntax. Arguments read from a file must
 be one per line and are treated as if they were in the same place as the

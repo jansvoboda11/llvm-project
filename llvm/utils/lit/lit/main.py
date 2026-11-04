@@ -7,6 +7,8 @@ See lit.pod for more information.
 import itertools
 import os
 import platform
+import shlex
+import subprocess
 import sys
 import time
 
@@ -23,6 +25,7 @@ from lit.TestTimes import record_test_times
 
 
 def main(builtin_params={}):
+    run_through_launcher()
     opts = lit.cl_arguments.parse_args()
     params = create_params(builtin_params, opts.user_params)
     is_windows = platform.system() == "Windows"
@@ -156,6 +159,38 @@ def main(builtin_params={}):
             )
         else:
             sys.exit(1)
+
+
+def run_through_launcher():
+    """
+    If LIT_LAUNCHER is set, run this lit invocation through it instead, like a
+    compiler launcher: the launcher is given the full command (the Python
+    interpreter, the lit script and the arguments) and runs it, for example
+    split up across several machines. LIT_LAUNCHED is set for the launcher and
+    everything it starts, so the lit processes it runs don't launch again.
+    """
+    launcher = os.environ.get("LIT_LAUNCHER")
+    if not launcher or os.environ.get("LIT_LAUNCHED"):
+        return
+    # Re-running the script restores its builtin parameters (llvm-lit's config
+    # map). There is no script to re-run for "python -m lit" or "python -c".
+    script = os.path.abspath(sys.argv[0])
+    if getattr(sys.modules["__main__"], "__spec__", None) or not os.path.isfile(
+        script
+    ):
+        return
+    os.environ["LIT_LAUNCHED"] = "1"
+    command = shlex.split(launcher) + [sys.executable, script] + sys.argv[1:]
+    try:
+        if platform.system() == "Windows":
+            # exec on Windows starts a new process and returns to the caller.
+            sys.exit(subprocess.call(command))
+        os.execvp(command[0], command)
+    except OSError as e:
+        sys.stderr.write(
+            "lit: error: cannot run LIT_LAUNCHER %s: %s\n" % (command[0], e.strerror)
+        )
+        sys.exit(2)
 
 
 def create_params(builtin_params, user_params):

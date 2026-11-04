@@ -891,6 +891,15 @@ sub-projects. Nearly all of these variable names begin with `LLVM_`.
     default, `'-sv --no-progress-bar'` on Visual C++ and Xcode, `'-sv'` on
     others.
 
+**LLVM_LIT_LAUNCHER**:STRING
+
+:   A command that `bin/llvm-lit` runs lit through, for example to distribute
+    tests across machines; `check` targets run `bin/llvm-lit` and are affected
+    too. It's used as the default of the `LIT_LAUNCHER` environment variable,
+    so setting that variable overrides it, and setting it to an empty string
+    turns the launcher off. See the {program}`lit` documentation of
+    `LIT_LAUNCHER` for how the launcher is called. Empty by default.
+
 **LLVM_LIT_TOOLS_DIR**:PATH
 
 :   The path to the [Git for Windows](https://git-scm.com/) tools for tests.
