@@ -512,8 +512,9 @@ def parse_args():
         "--run-shard",
         dest="runShard",
         metavar="N",
-        help="Run shard #N of the testsuite",
-        type=_positive_int,
+        help="Run shard #N of the testsuite, or several shards given as a "
+        "comma-separated list of numbers and ranges (e.g. 1,3-5)",
+        type=_shard_list,
         default=os.environ.get("LIT_RUN_SHARD"),
     )
 
@@ -562,7 +563,7 @@ def parse_args():
     if opts.numShards or opts.runShard:
         if not opts.numShards or not opts.runShard:
             parser.error("--num-shards and --run-shard must be used together")
-        if opts.runShard > opts.numShards:
+        if opts.runShard[-1] > opts.numShards:
             parser.error("--run-shard must be between 1 and --num-shards (inclusive)")
         opts.shard = (opts.runShard, opts.numShards)
     else:
@@ -589,6 +590,21 @@ def parse_args():
 
 def _positive_int(arg):
     return _int(arg, "positive", lambda i: i > 0)
+
+
+def _shard_list(arg):
+    # "N", or numbers and ranges like "1,3-5"; returns the sorted shard numbers.
+    shards = set()
+    for part in arg.split(","):
+        first, sep, last = part.partition("-")
+        first = _positive_int(first)
+        last = _positive_int(last) if sep else first
+        if last < first:
+            raise argparse.ArgumentTypeError(
+                "requires an ascending range of shards, but found '%s'" % part
+            )
+        shards.update(range(first, last + 1))
+    return tuple(sorted(shards))
 
 
 def _time_tests_count(arg):

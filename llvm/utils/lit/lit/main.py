@@ -103,8 +103,8 @@ def main(builtin_params={}):
     # When running multiple shards, don't include skipped tests in the xunit
     # output since merging the files will result in duplicates.
     if opts.shard:
-        (run, shards) = opts.shard
-        selected_tests = filter_by_shard(selected_tests, run, shards, lit_config)
+        (runs, shards) = opts.shard
+        selected_tests = filter_by_shard(selected_tests, runs, shards, lit_config)
         if not selected_tests:
             sys.stderr.write(
                 "warning: shard does not contain any tests.  "
@@ -243,8 +243,10 @@ def determine_order(tests, order):
         )
 
 
-def filter_by_shard(tests, run, shards, lit_config):
-    test_ixs = range(run - 1, len(tests), shards)
+def filter_by_shard(tests, runs, shards, lit_config):
+    # Several shards together are the union of their tests, in the original
+    # order, so that one lit process can run them with one pool of workers.
+    test_ixs = [i for i in range(len(tests)) if i % shards + 1 in runs]
     selected_tests = [tests[i] for i in test_ixs]
 
     # For clarity, generate a preview of the first few test indices in the shard
@@ -253,10 +255,16 @@ def filter_by_shard(tests, run, shards, lit_config):
     preview = ", ".join([str(i + 1) for i in test_ixs[:preview_len]])
     if len(test_ixs) > preview_len:
         preview += ", ..."
+    if len(runs) == 1:
+        label = "shard %d" % runs[0]
+        offsets = str(runs[0])
+    else:
+        label = "shards %s" % ",".join(map(str, runs))
+        offsets = "{%s}" % ",".join(map(str, runs))
     msg = (
-        f"Selecting shard {run}/{shards} = "
+        f"Selecting {label}/{shards} = "
         f"size {len(selected_tests)}/{len(tests)} = "
-        f"tests #({shards}*k)+{run} = [{preview}]"
+        f"tests #({shards}*k)+{offsets} = [{preview}]"
     )
     lit_config.note(msg)
     return selected_tests

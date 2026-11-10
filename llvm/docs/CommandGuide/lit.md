@@ -50,9 +50,9 @@ The launcher can then run that command as it sees fit, for example split into
 shards (`--num-shards` and `--run-shard`) on several machines. Since
 `LIT_LAUNCHED` is set, the {program}`lit` processes the launcher starts run
 the tests themselves. Tests always get `LIT_LAUNCHED=1` in their environment,
-so a {program}`lit` run by a test never goes through the launcher. `LIT_LAUNCHER` has no effect when {program}`lit` is run
-with `python -m lit`. The `LLVM_LIT_LAUNCHER` CMake variable sets a default for
-`bin/llvm-lit`.
+so a {program}`lit` run by a test never goes through the launcher.
+`LIT_LAUNCHER` has no effect when {program}`lit` is run with `python -m lit`.
+The `LLVM_LIT_LAUNCHER` CMake variable sets a default for `bin/llvm-lit`.
 
 {program}`lit` can also read options from response files which are specified as
 inputs using the `@path/to/file.rsp` syntax. Arguments read from a file must
@@ -420,7 +420,9 @@ testing farm).
 :::{option} --run-shard N
 Select which shard to run, assuming the `--num-shards=M` option was
 provided. The two options must be used together, and the value of `N`
-must be in the range `1..M`. The environment variable
+must be in the range `1..M`. `N` can also be a comma-separated list of shard
+numbers and ranges, such as `1,3-5`, to run several shards in one
+{program}`lit` process, with one pool of workers. The environment variable
 `LIT_RUN_SHARD` can also be used in place of this option.
 :::
 

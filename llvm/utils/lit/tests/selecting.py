@@ -111,3 +111,28 @@
 # RUN: not %{lit} --num-shards 3 --run-shard 4 %{inputs}/discovery >%t.out 2>%t.err
 # RUN: FileCheck --check-prefix=CHECK-SHARD-ERR2 < %t.err %s
 # CHECK-SHARD-ERR2: error: --run-shard must be between 1 and --num-shards (inclusive)
+
+# Check that several shards can run together, as one selection in the original
+# order.
+#
+# RUN: %{lit} --num-shards 3 --run-shard 1,3 %{inputs}/discovery >%t.out 2>%t.err
+# RUN: FileCheck --check-prefix=CHECK-SHARDS13 < %t.out %s
+# RUN: FileCheck --check-prefix=CHECK-SHARDS13-ERR < %t.err %s
+# CHECK-SHARDS13: -- Testing: 3 of 5 tests
+# CHECK-SHARDS13-ERR: note: Selecting shards 1,3/3 = size 3/5 = tests #(3*k)+{1,3} = [1, 3, 4]
+#
+# RUN: %{lit} --num-shards 3 --run-shard 2-3 %{inputs}/discovery >%t.out 2>%t.err
+# RUN: FileCheck --check-prefix=CHECK-SHARDS23-ERR < %t.err %s
+# CHECK-SHARDS23-ERR: note: Selecting shards 2,3/3 = size 3/5 = tests #(3*k)+{2,3} = [2, 3, 5]
+#
+# RUN: env LIT_NUM_SHARDS=3 LIT_RUN_SHARD=1-3 %{lit} %{inputs}/discovery >%t.out 2>%t.err
+# RUN: FileCheck --check-prefix=CHECK-SHARDS-ALL < %t.out %s
+# CHECK-SHARDS-ALL: -- Testing: 5 tests
+#
+# RUN: not %{lit} --num-shards 3 --run-shard 3-1 %{inputs}/discovery >%t.out 2>%t.err
+# RUN: FileCheck --check-prefix=CHECK-SHARDS-ERR < %t.err %s
+# CHECK-SHARDS-ERR: error: argument --run-shard: requires an ascending range of shards, but found '3-1'
+#
+# RUN: not %{lit} --num-shards 3 --run-shard 1,4 %{inputs}/discovery >%t.out 2>%t.err
+# RUN: FileCheck --check-prefix=CHECK-SHARDS-ERR2 < %t.err %s
+# CHECK-SHARDS-ERR2: error: --run-shard must be between 1 and --num-shards (inclusive)
