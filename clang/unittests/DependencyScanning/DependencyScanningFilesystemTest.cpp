@@ -12,6 +12,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gtest/gtest.h"
+#include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -71,6 +73,71 @@ runConcurrentWorkers(DependencyScanningService &Service,
     T.join();
   return Results;
 }
+
+/// Holds the first thread calling \c openFileForRead() until another thread
+/// calls it as well, or until a timeout expires. This forces concurrent reads
+/// of the same file to overlap whenever the filesystem lets them happen.
+class OpenRendezvousFileSystem : public llvm::vfs::ProxyFileSystem {
+public:
+  using ProxyFileSystem::ProxyFileSystem;
+
+  std::atomic<unsigned> NumOpenFileForReadCalls = 0;
+
+  llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+  openFileForRead(const llvm::Twine &Path) override {
+    {
+      std::unique_lock<std::mutex> Lock(M);
+      ++NumOpenFileForReadCalls;
+      CV.notify_all();
+      CV.wait_for(Lock, std::chrono::milliseconds(500),
+                  [&] { return NumOpenFileForReadCalls >= 2; });
+    }
+    return ProxyFileSystem::openFileForRead(Path);
+  }
+
+private:
+  std::mutex M;
+  std::condition_variable CV;
+};
+
+/// Holds the first \c status() call inside the filesystem until \c release()
+/// is called, so that concurrent lookups pile up behind it.
+class HoldFirstStatusFileSystem : public llvm::vfs::ProxyFileSystem {
+public:
+  using ProxyFileSystem::ProxyFileSystem;
+
+  std::atomic<unsigned> NumStatusCalls = 0;
+
+  llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &Path) override {
+    {
+      std::unique_lock<std::mutex> Lock(M);
+      if (++NumStatusCalls == 1) {
+        CV.notify_all();
+        CV.wait(Lock, [&] { return Released; });
+      }
+    }
+    return ProxyFileSystem::status(Path);
+  }
+
+  /// Waits until the first \c status() call is being held.
+  void waitForFirstStatus() {
+    std::unique_lock<std::mutex> Lock(M);
+    CV.wait(Lock, [&] { return NumStatusCalls >= 1; });
+  }
+
+  void release() {
+    {
+      std::lock_guard<std::mutex> Lock(M);
+      Released = true;
+    }
+    CV.notify_all();
+  }
+
+private:
+  std::mutex M;
+  std::condition_variable CV;
+  bool Released = false;
+};
 
 } // namespace
 
@@ -549,6 +616,143 @@ TEST(DependencyScanningWorkerFilesystem,
   DependencyScanningWorkerFilesystem PostWorker(Service, TracingFS);
   EXPECT_FALSE(PostWorker.status(MissingPath));
   EXPECT_EQ(TracingFS->NumStatusCalls.load(), StatsAfterBurst + 1);
+}
+
+TEST(DependencyScanningWorkerFilesystem, SameUIDInDifferentShardsSharesEntry) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/real.h", 0, llvm::MemoryBuffer::getMemBuffer("hi"));
+  auto TracingFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(InMemoryFS);
+
+  DependencyScanningService Service({});
+  auto &SharedCache = Service.getSharedCache();
+
+  // Pick a hard link name that lands in a different filename shard than the
+  // original, so that only the unique ID ties the two filenames together.
+  std::string AliasPath;
+  for (unsigned I = 0;; ++I) {
+    AliasPath = "/alias" + std::to_string(I) + ".h";
+    if (&SharedCache.getShardForFilename(AliasPath) !=
+        &SharedCache.getShardForFilename("/real.h"))
+      break;
+  }
+  ASSERT_TRUE(InMemoryFS->addHardLink(AliasPath, "/real.h"));
+
+  DependencyScanningWorkerFilesystem DepFS(Service, TracingFS);
+  auto Real = DepFS.getOrCreateFileSystemEntry("/real.h");
+  auto Alias = DepFS.getOrCreateFileSystemEntry(AliasPath);
+  ASSERT_TRUE(Real);
+  ASSERT_TRUE(Alias);
+  EXPECT_EQ(Real->getStatus().getUniqueID(), Alias->getStatus().getUniqueID());
+
+  // The second filename resolves to the entry cached under the unique ID.
+  EXPECT_EQ(TracingFS->NumOpenFileForReadCalls, 1u);
+  EXPECT_EQ(Real->getContents().data(), Alias->getContents().data());
+}
+
+// See ConcurrentSameUIDDifferentFilenamesDeduplicatesOpen for why this doesn't
+// work on Windows.
+#ifndef _WIN32
+TEST(DependencyScanningWorkerFilesystem,
+     ConcurrentSameUIDDifferentFilenamesReadsOnce) {
+  llvm::unittest::TempDir TmpDir("dswf-same-uid-rendezvous", /*Unique=*/true);
+  llvm::SmallString<128> RealPath = TmpDir.path("real.c");
+  llvm::SmallString<128> AliasPath = TmpDir.path("alias.c");
+  llvm::unittest::TempFile TmpFile(RealPath, /*Suffix=*/"", /*Contents=*/"hi");
+  llvm::unittest::TempLink TmpLink(RealPath, AliasPath);
+
+  // The first read waits for a second one. If the scanning VFS lets lookups of
+  // the same file via different filenames read concurrently, both reads will
+  // happen. Otherwise, the first read times out and the other lookup reuses
+  // its result.
+  auto RendezvousFS = llvm::makeIntrusiveRefCnt<OpenRendezvousFileSystem>(
+      llvm::vfs::getRealFileSystem());
+  DependencyScanningService Service({});
+
+  auto Results = runConcurrentWorkers<llvm::ErrorOr<EntryRef>>(
+      Service, RendezvousFS, /*NumWorkers=*/2, std::error_code{},
+      [&](DependencyScanningWorkerFilesystem &W, unsigned I) {
+        return W.getOrCreateFileSystemEntry(I == 0 ? RealPath : AliasPath);
+      });
+
+  EXPECT_EQ(RendezvousFS->NumOpenFileForReadCalls.load(), 1u);
+  ASSERT_TRUE(Results[0]);
+  ASSERT_TRUE(Results[1]);
+  EXPECT_EQ(Results[0]->getContents().data(), Results[1]->getContents().data());
+}
+#endif // !_WIN32
+
+TEST(DependencyScanningWorkerFilesystem,
+     ConcurrentUncachedNegativeStatIsSharedWithWaiters) {
+  llvm::unittest::TempDir TmpDir("dswf-uncached-negative-hold",
+                                 /*Unique=*/true);
+  llvm::SmallString<128> MissingPath = TmpDir.path("missing.h");
+
+  auto HoldFS = llvm::makeIntrusiveRefCnt<HoldFirstStatusFileSystem>(
+      llvm::vfs::getRealFileSystem());
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+
+  // Hold the first stat until the other workers had plenty of time to start
+  // waiting for it.
+  std::thread Releaser([&] {
+    HoldFS->waitForFirstStatus();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    HoldFS->release();
+  });
+
+  constexpr unsigned NumWorkers = 8;
+  auto Results = runConcurrentWorkers<llvm::ErrorOr<llvm::vfs::Status>>(
+      Service, HoldFS, NumWorkers, std::error_code{},
+      [&](DependencyScanningWorkerFilesystem &W, unsigned) {
+        return W.status(MissingPath);
+      });
+  Releaser.join();
+
+  // Workers that waited for the held stat adopt its result instead of each
+  // re-running the stat after the previous one finished. Only workers that
+  // arrived after the stat was released may stat again, so the count can
+  // reach the number of workers only if lookups are serialized.
+  EXPECT_LT(HoldFS->NumStatusCalls.load(), NumWorkers);
+  for (unsigned I = 0; I < NumWorkers; ++I)
+    EXPECT_FALSE(Results[I]) << "worker " << I << " unexpectedly succeeded";
+}
+
+TEST(DependencyScanningFilesystemSharedCache, OutOfDateEntriesDuringScan) {
+  // Only fails reliably under ThreadSanitizer: getOutOfDateEntries() must
+  // synchronize with workers publishing entries.
+  llvm::unittest::TempDir TmpDir("dswf-out-of-date-during-scan",
+                                 /*Unique=*/true);
+  constexpr unsigned NumFiles = 64;
+  std::vector<std::unique_ptr<llvm::unittest::TempFile>> Files;
+  for (unsigned I = 0; I < NumFiles; ++I)
+    Files.push_back(std::make_unique<llvm::unittest::TempFile>(
+        TmpDir.path(std::to_string(I) + ".h"), /*Suffix=*/"",
+        /*Contents=*/"x"));
+
+  auto FS = llvm::vfs::getRealFileSystem();
+  DependencyScanningService Service({});
+
+  std::atomic<bool> Done = false;
+  std::thread Checker([&] {
+    while (!Done)
+      (void)Service.getSharedCache().getOutOfDateEntries(*FS);
+  });
+
+  // Not using bool to avoid std::vector<bool> racing on the results.
+  runConcurrentWorkers<int>(
+      Service, FS, /*NumWorkers=*/4, 0,
+      [&](DependencyScanningWorkerFilesystem &W, unsigned) {
+        for (auto &File : Files)
+          (void)W.status(File->path());
+        return 0;
+      });
+  Done = true;
+  Checker.join();
+
+  EXPECT_TRUE(Service.getSharedCache().getOutOfDateEntries(*FS).empty());
 }
 
 TEST(DependencyScanningWorkerFilesystem, LocalFS) {
