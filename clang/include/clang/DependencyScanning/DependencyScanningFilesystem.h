@@ -12,10 +12,12 @@
 #include "clang/Basic/LLVM.h"
 #include "clang/Lex/DependencyDirectivesScanner.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -71,7 +73,7 @@ public:
 
   /// Creates an entry representing a file with contents.
   CachedFileSystemEntry(llvm::ErrorOr<llvm::vfs::Status> Stat,
-                        std::unique_ptr<CachedFileContents> Contents)
+                        CachedFileContents *Contents)
       : MaybeStat(std::move(Stat)), Contents(std::move(Contents)) {
     clearStatName();
   }
@@ -124,7 +126,7 @@ public:
   CachedFileContents *getCachedContents() const {
     assert(!isError() && "error");
     assert(!isDirectory() && "not a file");
-    return Contents.get();
+    return Contents;
   }
 
 private:
@@ -137,10 +139,12 @@ private:
   /// The filename is empty and only materialized by \c EntryRef.
   llvm::ErrorOr<llvm::vfs::Status> MaybeStat;
 
+  /// Non-owning pointer to the file contents.
+  ///
   /// We're using pointer here to keep the size of this class small. Instances
   /// representing directories and filesystem errors don't hold any contents
   /// anyway.
-  std::unique_ptr<CachedFileContents> Contents;
+  CachedFileContents *Contents;
 };
 
 using CachedRealPath = llvm::ErrorOr<std::string>;
@@ -153,24 +157,66 @@ using CachedRealPath = llvm::ErrorOr<std::string>;
 /// the worker threads.
 class DependencyScanningFilesystemSharedCache {
 public:
+  /// A lazily computed entry of the shared cache.
+  ///
+  /// Lookups of an entry that's already computed don't take any locks.
+  /// Concurrent lookups of an entry that's not computed yet are serialized, so
+  /// that only one of them computes it and the others reuse the result.
+  class EntrySlot {
+  public:
+    /// Either the entry to store in the slot, or an error that's not cached.
+    using ComputeResult = llvm::ErrorOr<const CachedFileSystemEntry *>;
+
+    /// Returns the entry in this slot, computing it with \p Compute first if
+    /// needed. An error returned by \p Compute is not stored in the slot, but
+    /// is returned to lookups that were already waiting for \p Compute to
+    /// finish, so that they don't re-run it one after another.
+    ComputeResult getOrCompute(llvm::function_ref<ComputeResult()> Compute);
+
+    /// Returns the entry in this slot or nullptr if it's not computed yet.
+    const CachedFileSystemEntry *get() const {
+      return Entry.load(std::memory_order_acquire);
+    }
+
+  private:
+    std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
+
+    /// Serializes calls to \c Compute. Must not be acquired while holding
+    /// \c CacheShard::CacheLock.
+    std::mutex Mutex;
+
+    /// Incremented every time \c Compute returns an error.
+    std::atomic<unsigned> UncachedErrorGeneration = 0;
+    /// The error most recently returned by \c Compute. Guarded by \c Mutex.
+    std::error_code UncachedError;
+  };
+
   struct CacheShard {
-    /// The mutex that needs to be locked before mutation of any member.
+    /// The mutex that needs to be locked before mutation of the maps and
+    /// allocators (but not the slots). Only held for short periods of time and
+    /// never while doing IO.
     mutable std::mutex CacheLock;
 
-    struct SharedEntry {
-      std::mutex Mutex;
-      std::shared_ptr<CachedFileSystemEntry> File = nullptr;
-
+    /// Cache state per filename: the entry and the real path.
+    struct FilenameCacheState {
+      EntrySlot Entry;
       const CachedRealPath *RealPath = nullptr;
     };
 
-    /// Map from filenames to cached entries and real paths.
-    llvm::StringMap<SharedEntry, llvm::BumpPtrAllocator> CacheByFilename;
+    /// Map from filenames to their cached state.
+    llvm::StringMap<FilenameCacheState, llvm::BumpPtrAllocator> CacheByFilename;
 
     /// Map from unique IDs to cached entries.
-    llvm::DenseMap<llvm::sys::fs::UniqueID,
-                   std::unique_ptr<std::shared_ptr<CachedFileSystemEntry>>>
-        EntriesByUID;
+    llvm::DenseMap<llvm::sys::fs::UniqueID, EntrySlot *> EntriesByUID;
+
+    /// The backing storage for slots in \c EntriesByUID.
+    llvm::SpecificBumpPtrAllocator<EntrySlot> UIDSlotStorage;
+
+    /// The backing storage for cached entries.
+    llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> EntryStorage;
+
+    /// The backing storage for cached contents.
+    llvm::SpecificBumpPtrAllocator<CachedFileContents> ContentsStorage;
 
     /// The backing storage for cached real paths.
     llvm::SpecificBumpPtrAllocator<CachedRealPath> RealPathStorage;
@@ -185,6 +231,17 @@ public:
     const CachedRealPath &
     getOrEmplaceRealPathForFilename(StringRef Filename,
                                     llvm::ErrorOr<StringRef> RealPath);
+
+    /// Returns the entry slot for the filename, creating it if needed.
+    EntrySlot &getSlotForFilename(StringRef Filename);
+
+    /// Returns the entry slot for the unique ID, creating it if needed.
+    EntrySlot &getSlotForUID(llvm::sys::fs::UniqueID UID);
+
+    /// Allocates a new entry with the given status and contents.
+    const CachedFileSystemEntry *
+    createEntry(llvm::ErrorOr<llvm::vfs::Status> Stat,
+                std::unique_ptr<llvm::MemoryBuffer> Contents = nullptr);
   };
 
   DependencyScanningFilesystemSharedCache();
@@ -324,6 +381,30 @@ public:
   bool exists(const Twine &Path) override;
 
 private:
+  /// Resolves the cache entry for \p FilenameForLookup through the shared
+  /// cache: returns an entry already produced by another worker, or computes
+  /// the entry via the underlying filesystem.
+  /// \p FilenameForLookup is always absolute, and may differ from
+  /// \p OriginalFilename if the latter is relative.
+  llvm::ErrorOr<const CachedFileSystemEntry *>
+  resolveFilenameThroughSharedCache(StringRef OriginalFilename,
+                                    StringRef FilenameForLookup);
+
+  /// Resolves the cache entry for the on-disk file identified by \p Stat
+  /// through the UID-keyed shared cache. Reads the file's contents if no other
+  /// worker did so yet. Always returns a non-null entry (which may carry a
+  /// readFile error).
+  const CachedFileSystemEntry *
+  resolveUIDThroughSharedCache(StringRef OriginalFilename,
+                               const llvm::vfs::Status &Stat);
+
+  /// Resolves the cache entry through the local VFS and without going through
+  /// the global shared cache. Only relevant if \c LocalFS is non-null and
+  /// \p OriginalFilename exists in \c LocalFS.
+  const CachedFileSystemEntry *
+  createCachedFSEntryForLocal(StringRef OriginalFilename,
+                              const llvm::vfs::Status &Stat);
+
   /// Represents a filesystem entry that has been stat-ed (and potentially read)
   /// and that's about to be inserted into the cache as `CachedFileSystemEntry`.
   struct TentativeEntry {
@@ -340,10 +421,6 @@ private:
   static llvm::ErrorOr<TentativeEntry> readFile(StringRef Filename,
                                                 llvm::vfs::FileSystem &FS);
 
-  /// Creates a cache entry out of the result of \c readFile().
-  static std::shared_ptr<CachedFileSystemEntry>
-  createEntry(llvm::ErrorOr<TentativeEntry> &TEntry);
-
   void printImpl(raw_ostream &OS, PrintType Type,
                  unsigned IndentLevel) const override {
     printIndent(OS, IndentLevel);
@@ -355,11 +432,12 @@ private:
   DependencyScanningService &Service;
 
   /// Per-filename state cached locally by this worker thread, so repeated
-  /// queries can be served without touching the shared cache. The real path is
-  /// arena-owned by the shared cache and outlives this worker, so borrowing a
-  /// raw pointer here is safe.
+  /// queries can be served without touching the shared cache. The entry and
+  /// real path are arena-owned by the shared cache (or by this worker for
+  /// entries from \c LocalFS) and outlive the local cache, so borrowing raw
+  /// pointers here is safe.
   struct LocalEntry {
-    std::shared_ptr<CachedFileSystemEntry> File = nullptr;
+    const CachedFileSystemEntry *File = nullptr;
     const CachedRealPath *RealPath = nullptr;
   };
 
@@ -378,6 +456,12 @@ private:
 
   /// The FS that is used for queries going through the global shared cache.
   IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS;
+
+  /// The backing storage for cached entries resolved from local FS only.
+  llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> LocalEntryStorage;
+
+  /// The backing storage for cached contents resolved from local FS only.
+  llvm::SpecificBumpPtrAllocator<CachedFileContents> LocalContentsStorage;
 
   void updateWorkingDirForCacheLookup();
 

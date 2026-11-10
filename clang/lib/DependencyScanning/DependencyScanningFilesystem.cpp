@@ -117,8 +117,9 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     const CacheShard &Shard = CacheShards[i];
     std::lock_guard<std::mutex> LockGuard(Shard.CacheLock);
     for (const auto &[Path, State] : Shard.CacheByFilename) {
-      const auto &Entry = State.File;
-      // Stat failure that wasn't cached.
+      const CachedFileSystemEntry *Entry = State.Entry.get();
+      // Skip slots without an entry: real-path-only entries from getRealPath,
+      // or uncached negative stats.
       if (!Entry)
         continue;
       llvm::ErrorOr<llvm::vfs::Status> Status = UnderlyingFS.status(Path);
@@ -184,6 +185,74 @@ const CachedRealPath &DependencyScanningFilesystemSharedCache::CacheShard::
   return *StoredRealPath;
 }
 
+DependencyScanningFilesystemSharedCache::EntrySlot::ComputeResult
+DependencyScanningFilesystemSharedCache::EntrySlot::getOrCompute(
+    llvm::function_ref<ComputeResult()> Compute) {
+  if (const CachedFileSystemEntry *Cached = get())
+    return Cached;
+
+  // Errors returned by Compute after this point were computed while we were
+  // waiting, so we can adopt them.
+  unsigned Generation = UncachedErrorGeneration.load(std::memory_order_relaxed);
+
+  std::lock_guard<std::mutex> SlotLock(Mutex);
+  if (const CachedFileSystemEntry *Cached =
+          Entry.load(std::memory_order_relaxed))
+    return Cached;
+  if (UncachedErrorGeneration.load(std::memory_order_relaxed) != Generation)
+    return UncachedError;
+
+  ComputeResult Result = Compute();
+  if (Result) {
+    assert(*Result && "computed a null entry");
+    Entry.store(*Result, std::memory_order_release);
+  } else {
+    UncachedError = Result.getError();
+    UncachedErrorGeneration.fetch_add(1, std::memory_order_relaxed);
+  }
+  return Result;
+}
+
+DependencyScanningFilesystemSharedCache::EntrySlot &
+DependencyScanningFilesystemSharedCache::CacheShard::getSlotForFilename(
+    StringRef Filename) {
+  assert(llvm::sys::path::is_absolute_gnu(Filename));
+  std::lock_guard<std::mutex> LockGuard(CacheLock);
+  return CacheByFilename[Filename].Entry;
+}
+
+DependencyScanningFilesystemSharedCache::EntrySlot &
+DependencyScanningFilesystemSharedCache::CacheShard::getSlotForUID(
+    llvm::sys::fs::UniqueID UID) {
+  std::lock_guard<std::mutex> LockGuard(CacheLock);
+  EntrySlot *&Slot = EntriesByUID[UID];
+  if (!Slot)
+    Slot = new (UIDSlotStorage.Allocate()) EntrySlot();
+  return *Slot;
+}
+
+static const CachedFileSystemEntry *createEntry(
+    llvm::ErrorOr<llvm::vfs::Status> Stat,
+    std::unique_ptr<llvm::MemoryBuffer> Contents,
+    llvm::SpecificBumpPtrAllocator<CachedFileContents> &ContentsStorage,
+    llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> &EntryStorage) {
+  CachedFileContents *StoredContents = nullptr;
+  if (Contents)
+    StoredContents = new (ContentsStorage.Allocate())
+        CachedFileContents(std::move(Contents));
+  return new (EntryStorage.Allocate())
+      CachedFileSystemEntry(std::move(Stat), StoredContents);
+}
+
+const CachedFileSystemEntry *
+DependencyScanningFilesystemSharedCache::CacheShard::createEntry(
+    llvm::ErrorOr<llvm::vfs::Status> Stat,
+    std::unique_ptr<llvm::MemoryBuffer> Contents) {
+  std::lock_guard<std::mutex> LockGuard(CacheLock);
+  return ::createEntry(std::move(Stat), std::move(Contents), ContentsStorage,
+                       EntryStorage);
+}
+
 static IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 combineGlobalAndLocalFS(IntrusiveRefCntPtr<llvm::vfs::FileSystem> GlobalFS,
                         IntrusiveRefCntPtr<llvm::vfs::FileSystem> LocalFS) {
@@ -208,18 +277,59 @@ DependencyScanningWorkerFilesystem::DependencyScanningWorkerFilesystem(
   updateWorkingDirForCacheLookup();
 }
 
-std::shared_ptr<CachedFileSystemEntry>
-DependencyScanningWorkerFilesystem::createEntry(
-    llvm::ErrorOr<TentativeEntry> &TEntry) {
-  if (!TEntry)
-    return std::make_shared<CachedFileSystemEntry>(TEntry.getError());
+const CachedFileSystemEntry *
+DependencyScanningWorkerFilesystem::resolveUIDThroughSharedCache(
+    StringRef OriginalFilename, const llvm::vfs::Status &Stat) {
+  auto &UIDShard = Service.getSharedCache().getShardForUID(Stat.getUniqueID());
+  auto Entry = UIDShard.getSlotForUID(Stat.getUniqueID()).getOrCompute([&]() {
+    auto TEntry = Stat.isDirectory() ? TentativeEntry(Stat)
+                                     : readFile(OriginalFilename, *BaseFS);
+    // On read failure, the entry wraps the open error so that lookups of the
+    // same file via other filenames surface it rather than retry the open.
+    if (!TEntry)
+      return UIDShard.createEntry(TEntry.getError());
+    return UIDShard.createEntry(std::move(TEntry->Status),
+                                std::move(TEntry->Contents));
+  });
+  assert(Entry && "UID entries are always cached");
+  return *Entry;
+}
 
-  std::unique_ptr<CachedFileContents> StoredContents =
-      TEntry->Contents
-          ? std::make_unique<CachedFileContents>(std::move(TEntry->Contents))
-          : nullptr;
-  return std::make_shared<CachedFileSystemEntry>(std::move(TEntry->Status),
-                                                 std::move(StoredContents));
+const CachedFileSystemEntry *
+DependencyScanningWorkerFilesystem::createCachedFSEntryForLocal(
+    StringRef OriginalFilename, const llvm::vfs::Status &Stat) {
+  assert(LocalFS);
+  auto TEntry = Stat.isDirectory() ? TentativeEntry(Stat)
+                                   : readFile(OriginalFilename, *LocalFS);
+  if (!TEntry)
+    return createEntry(TEntry.getError(), nullptr, LocalContentsStorage,
+                       LocalEntryStorage);
+  return createEntry(std::move(TEntry->Status), std::move(TEntry->Contents),
+                     LocalContentsStorage, LocalEntryStorage);
+}
+
+llvm::ErrorOr<const CachedFileSystemEntry *>
+DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
+    StringRef OriginalFilename, StringRef FilenameForLookup) {
+  if (LocalFS) {
+    if (auto Stat = LocalFS->status(OriginalFilename)) {
+      return createCachedFSEntryForLocal(OriginalFilename, *Stat);
+    }
+  }
+  auto &FilenameShard =
+      Service.getSharedCache().getShardForFilename(FilenameForLookup);
+  return FilenameShard.getSlotForFilename(FilenameForLookup)
+      .getOrCompute([&]() -> llvm::ErrorOr<const CachedFileSystemEntry *> {
+        auto Stat = BaseFS->status(OriginalFilename);
+        if (Stat)
+          return resolveUIDThroughSharedCache(OriginalFilename, *Stat);
+        // Not caching the error means a later lookup re-runs the stat, so
+        // that a file created mid-scan becomes visible.
+        if (!Service.getOpts().CacheNegativeStats ||
+            !shouldCacheNegativeStatsForPath(OriginalFilename))
+          return Stat.getError();
+        return FilenameShard.createEntry(Stat.getError());
+      });
 }
 
 llvm::ErrorOr<EntryRef>
@@ -230,98 +340,16 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
   if (!FilenameForLookup)
     return FilenameForLookup.getError();
 
-  auto &LocalEntry = LocalCache[*FilenameForLookup];
-  if (LocalEntry.File)
-    return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
+  auto &Local = LocalCache[*FilenameForLookup];
+  if (Local.File)
+    return EntryRef(OriginalFilename, *Local.File).unwrapError();
 
-  // Resolve through the local VFS without going through the shared cache.
-  if (LocalFS) {
-    if (auto Stat = LocalFS->status(OriginalFilename)) {
-      auto TEntry = Stat->isDirectory()
-                        ? llvm::ErrorOr<TentativeEntry>(TentativeEntry(*Stat))
-                        : readFile(OriginalFilename, *LocalFS);
-      LocalEntry.File = createEntry(TEntry);
-      return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
-    }
-  }
-
-  auto &Shard =
-      Service.getSharedCache().getShardForFilename(*FilenameForLookup);
-
-  auto &SharedEntry = [&]()
-      -> DependencyScanningFilesystemSharedCache::CacheShard::SharedEntry & {
-    std::lock_guard<std::mutex> LockGuard(Shard.CacheLock);
-    auto [It, Inserted] = Shard.CacheByFilename.try_emplace(*FilenameForLookup);
-    auto &[Key, Value] = *It;
-    return Value;
-  }();
-
-  // Operations on SharedEntry.Value must be atomic, because here we're trying
-  // to avoid contending the mutex by checking outside the critical section.
-  if (auto SharedEntryValue = std::atomic_load(&SharedEntry.File)) {
-    LocalEntry.File = std::move(SharedEntryValue);
-    return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
-  }
-
-  std::lock_guard<std::mutex> LockGuard(SharedEntry.Mutex);
-  if (auto SharedEntryValue = std::atomic_load(&SharedEntry.File)) {
-    LocalEntry.File = std::move(SharedEntryValue);
-    return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
-  }
-
-  llvm::ErrorOr<llvm::vfs::Status> Stat = BaseFS->status(OriginalFilename);
-
-  if (!Stat) {
-    // Note that we're leaving behind local and shared entry with nullptr File.
-    if (!Service.getOpts().CacheNegativeStats ||
-        !shouldCacheNegativeStatsForPath(OriginalFilename))
-      return Stat.getError();
-
-    std::shared_ptr<CachedFileSystemEntry> Expected = nullptr;
-    std::atomic_compare_exchange_strong(
-        &SharedEntry.File, &Expected,
-        std::make_shared<CachedFileSystemEntry>(std::move(Stat)));
-    assert(Expected == nullptr && "Concurrent FS access for identical path");
-    LocalEntry.File = std::atomic_load(&SharedEntry.File);
-    return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
-  }
-
-  auto &SharedUIDEntry = [&]() -> std::shared_ptr<CachedFileSystemEntry> & {
-    std::lock_guard<std::mutex> LockGuard(Shard.CacheLock);
-    auto &Wrapper = Shard.EntriesByUID[Stat->getUniqueID()];
-    if (!Wrapper)
-      Wrapper = std::make_unique<std::shared_ptr<CachedFileSystemEntry>>();
-    return *Wrapper;
-  }();
-
-  // Operations on SharedUIDEntry must be atomic, because the lock above only
-  // guarantees mutual exclusion for identical paths. If we have concurrent
-  // access to the same file using different file names, we're still doing
-  // this concurrently. This is rare enough that ensuring mutual exclusion is
-  // unlikely beneficial.
-  if (!std::atomic_load(&SharedUIDEntry)) {
-    auto TEntry = Stat->isDirectory()
-                      ? llvm::ErrorOr<TentativeEntry>(TentativeEntry(*Stat))
-                      : readFile(OriginalFilename, *BaseFS);
-
-    std::shared_ptr<CachedFileSystemEntry> NewEntry = createEntry(TEntry);
-
-    std::shared_ptr<CachedFileSystemEntry> Expected = nullptr;
-    std::atomic_compare_exchange_strong(&SharedUIDEntry, &Expected,
-                                        std::move(NewEntry));
-    // If Expected != nullptr, we had a race between two different file names
-    // resolving to the same file.
-  }
-
-  // Propagate the entry from the UID map.
-  std::shared_ptr<CachedFileSystemEntry> Expected = nullptr;
-  std::atomic_compare_exchange_strong(&SharedEntry.File, &Expected,
-                                      std::atomic_load(&SharedUIDEntry));
-  assert(Expected == nullptr && "Concurrent FS access for identical path");
-
-  LocalEntry.File = std::atomic_load(&SharedEntry.File);
-
-  return EntryRef(OriginalFilename, *LocalEntry.File).unwrapError();
+  auto MaybeEntry =
+      resolveFilenameThroughSharedCache(OriginalFilename, *FilenameForLookup);
+  if (!MaybeEntry)
+    return MaybeEntry.getError();
+  Local.File = *MaybeEntry;
+  return EntryRef(OriginalFilename, **MaybeEntry).unwrapError();
 }
 
 llvm::ErrorOr<llvm::vfs::Status>
