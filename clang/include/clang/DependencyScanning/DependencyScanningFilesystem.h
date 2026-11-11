@@ -158,8 +158,9 @@ class DependencyScanningFilesystemSharedCache {
 public:
   struct CacheShard {
     /// The mutex that needs to be locked before mutation of the maps,
-    /// allocators and real paths. Only held for short periods of time, never
-    /// while doing IO or locking any other mutex.
+    /// allocators and real paths. Never held while locking any other mutex.
+    /// Lookups only hold it for short periods of time and never while doing
+    /// IO (unlike \c getOutOfDateEntries(), which runs after the scan).
     mutable std::mutex CacheLock;
 
     /// Cache entry per filename.
