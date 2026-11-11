@@ -342,10 +342,16 @@ public:
   }
 
   std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  operator()(FileEntryRef File) override {
-    llvm::ErrorOr<EntryRef> Entry =
-        DepFS->getOrCreateFileSystemEntry(File.getName());
-    if (!Entry || Entry->isDirectory())
+  operator()(FileEntryRef File, llvm::MemoryBufferRef Buffer) override {
+    // Files that didn't come through the scanning VFS (e.g. from an overlay
+    // on top of it) have no entry and get lexed as usual.
+    const CachedFileSystemEntry *Entry =
+        DepFS->findEntryByUniqueID(File.getUniqueID());
+    if (!Entry || Entry->isError() || Entry->isDirectory())
+      return std::nullopt;
+    // The contents of the file may have been replaced (e.g. by -remap-file),
+    // in which case its directives don't apply to the buffer being lexed.
+    if (Buffer.getBufferStart() != Entry->getOriginalContents().data())
       return std::nullopt;
 
     const auto &Attachment =

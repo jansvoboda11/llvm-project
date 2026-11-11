@@ -213,9 +213,16 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
   // Resolve through the local VFS without going through the shared cache.
   if (LocalFS) {
     if (auto Stat = LocalFS->status(OriginalFilename)) {
-      auto TEntry = Stat->isDirectory() ? TentativeEntry(*Stat)
-                                        : readFile(OriginalFilename, *LocalFS);
-      Local.File = createEntry(TEntry, LocalContentsStorage, LocalEntryStorage);
+      // Filenames that resolve to the same file share one entry.
+      const CachedFileSystemEntry *&UIDEntry =
+          LocalEntriesByUID[Stat->getUniqueID()];
+      if (!UIDEntry) {
+        auto TEntry = Stat->isDirectory()
+                          ? TentativeEntry(*Stat)
+                          : readFile(OriginalFilename, *LocalFS);
+        UIDEntry = createEntry(TEntry, LocalContentsStorage, LocalEntryStorage);
+      }
+      Local.File = UIDEntry;
       return EntryRef(OriginalFilename, *Local.File).unwrapError();
     }
   }
@@ -291,6 +298,26 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
   FilenameEntry.File.store(File);
   Local.File = File;
   return EntryRef(OriginalFilename, *File).unwrapError();
+}
+
+const CachedFileSystemEntry *
+DependencyScanningWorkerFilesystem::findEntryByUniqueID(
+    llvm::sys::fs::UniqueID UID) {
+  if (const CachedFileSystemEntry *Entry = LocalEntriesByUID.lookup(UID))
+    return Entry;
+
+  auto &UIDShard = Service.getSharedCache().getShardForUID(UID);
+  const CachedFileSystemEntry *Entry = [&]() -> const CachedFileSystemEntry * {
+    std::lock_guard<std::mutex> ShardLock(UIDShard.CacheLock);
+    auto It = UIDShard.EntriesByUID.find(UID);
+    if (It == UIDShard.EntriesByUID.end())
+      return nullptr;
+    return It->second->File.load();
+  }();
+
+  if (Entry)
+    LocalEntriesByUID[UID] = Entry;
+  return Entry;
 }
 
 llvm::ErrorOr<llvm::vfs::Status>

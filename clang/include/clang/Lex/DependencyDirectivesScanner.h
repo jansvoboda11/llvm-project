@@ -19,6 +19,7 @@
 
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/MemoryBufferRef.h"
 
 namespace clang {
 class FileManager;
@@ -173,9 +174,10 @@ public:
   virtual std::unique_ptr<DependencyDirectivesGetter>
   cloneFor(FileManager &FileMgr) = 0;
 
-  /// Get the dependency directives for the given file.
+  /// Get the dependency directives for the given file, whose contents are
+  /// about to be lexed from \p Buffer.
   virtual std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  operator()(FileEntryRef File) = 0;
+  operator()(FileEntryRef File, llvm::MemoryBufferRef Buffer) = 0;
 
   virtual ~DependencyDirectivesGetter() = default;
 };

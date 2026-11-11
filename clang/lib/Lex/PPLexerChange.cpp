@@ -96,7 +96,8 @@ bool Preprocessor::EnterSourceFile(FileID FID, ConstSearchDirIterator CurDir,
       std::make_unique<Lexer>(FID, *InputFile, *this, IsFirstIncludeOfFile);
   if (GetDependencyDirectives && FID != PredefinesFileID)
     if (OptionalFileEntryRef File = SourceMgr.getFileEntryRefForID(FID))
-      if (auto MaybeDepDirectives = (*GetDependencyDirectives)(*File))
+      if (auto MaybeDepDirectives =
+              (*GetDependencyDirectives)(*File, *InputFile))
         TheLexer->DepDirectives = *MaybeDepDirectives;
 
   EnterSourceFileWithLexer(std::move(TheLexer), CurDir);

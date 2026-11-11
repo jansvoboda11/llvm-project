@@ -140,6 +140,20 @@ public:
     return Contents;
   }
 
+  /// Returns the attachment of type \p T to the contents of this file,
+  /// creating it with \p Create first if needed. \p T must derive from
+  /// \c CachedFileAttachment and have a \c static \c const \c char \c ID
+  /// member. See \c CachedFileContents::getOrCreateAttachment().
+  template <typename T>
+  const T &getOrCreateAttachment(
+      llvm::function_ref<std::unique_ptr<T>(StringRef Contents)> Create) const {
+    StringRef OriginalContents = getOriginalContents();
+    return static_cast<const T &>(getCachedContents()->getOrCreateAttachment(
+        &T::ID, [&]() -> std::unique_ptr<CachedFileAttachment> {
+          return Create(OriginalContents);
+        }));
+  }
+
 private:
   void clearStatName() {
     if (MaybeStat)
@@ -292,19 +306,11 @@ public:
 
   StringRef getContents() const { return Entry.getOriginalContents(); }
 
-  /// Returns the attachment of type \p T to the contents of this file,
-  /// creating it with \p Create first if needed. \p T must derive from
-  /// \c CachedFileAttachment and have a \c static \c const \c char \c ID
-  /// member. See \c CachedFileContents::getOrCreateAttachment().
+  /// See \c CachedFileSystemEntry::getOrCreateAttachment().
   template <typename T>
   const T &getOrCreateAttachment(
       llvm::function_ref<std::unique_ptr<T>(StringRef Contents)> Create) const {
-    StringRef Contents = getContents();
-    return static_cast<const T &>(
-        Entry.getCachedContents()->getOrCreateAttachment(
-            &T::ID, [&]() -> std::unique_ptr<CachedFileAttachment> {
-              return Create(Contents);
-            }));
+    return Entry.getOrCreateAttachment<T>(Create);
   }
 };
 
@@ -342,6 +348,11 @@ public:
   /// Attempts to use the local and shared caches first, then falls back to
   /// using the underlying filesystem.
   llvm::ErrorOr<EntryRef> getOrCreateFileSystemEntry(StringRef Filename);
+
+  /// Returns the entry for the file with the given unique ID, if a filename
+  /// resolving to that file was already looked up (by this worker for files
+  /// from \c LocalFS, or by any worker otherwise). Returns nullptr otherwise.
+  const CachedFileSystemEntry *findEntryByUniqueID(llvm::sys::fs::UniqueID UID);
 
   /// Check whether \p Path exists. By default checks cached result of \c
   /// status(), and falls back on FS if unable to do so.
@@ -386,6 +397,12 @@ private:
   /// The local cache is used by the worker thread to cache file system queries
   /// locally instead of querying the global cache every time.
   llvm::StringMap<LocalEntry, llvm::BumpPtrAllocator> LocalCache;
+
+  /// Entries cached locally by this worker thread, keyed by unique ID. Holds
+  /// the entries resolved from \c LocalFS, and caches lookups of entries in the
+  /// shared cache by \c findEntryByUniqueID().
+  llvm::DenseMap<llvm::sys::fs::UniqueID, const CachedFileSystemEntry *>
+      LocalEntriesByUID;
 
   /// The working directory to use for making relative paths absolute before
   /// using them for cache lookups.

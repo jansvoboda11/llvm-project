@@ -103,23 +103,19 @@ struct DepDirectives {
 };
 
 class TestDependencyDirectivesGetter : public DependencyDirectivesGetter {
-  FileManager &FileMgr;
   SmallVector<std::unique_ptr<DepDirectives>> DepDirectivesObjects;
 
 public:
-  TestDependencyDirectivesGetter(FileManager &FileMgr) : FileMgr(FileMgr) {}
-
   std::unique_ptr<DependencyDirectivesGetter>
   cloneFor(FileManager &FileMgr) override {
-    return std::make_unique<TestDependencyDirectivesGetter>(FileMgr);
+    return std::make_unique<TestDependencyDirectivesGetter>();
   }
 
   std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  operator()(FileEntryRef File) override {
+  operator()(FileEntryRef File, llvm::MemoryBufferRef Buffer) override {
     DepDirectivesObjects.push_back(std::make_unique<DepDirectives>());
-    StringRef Input = (*FileMgr.getBufferForFile(File))->getBuffer();
     bool Err = scanSourceForDependencyDirectives(
-        Input, DepDirectivesObjects.back()->Tokens,
+        Buffer.getBuffer(), DepDirectivesObjects.back()->Tokens,
         DepDirectivesObjects.back()->Directives);
     EXPECT_FALSE(Err);
     return DepDirectivesObjects.back()->Directives;
@@ -156,7 +152,7 @@ TEST_F(PPDependencyDirectivesTest, MacroGuard) {
   SourceMgr.setMainFileID(
       SourceMgr.createFileID(*FE, SourceLocation(), SrcMgr::C_User));
 
-  TestDependencyDirectivesGetter GetDependencyDirectives(FileMgr);
+  TestDependencyDirectivesGetter GetDependencyDirectives;
 
   PreprocessorOptions PPOpts;
   HeaderSearchOptions HSOpts;
@@ -225,7 +221,7 @@ TEST_F(PPDependencyDirectivesTest, HeaderNamesStartingWithCompoundTokens) {
   SourceMgr.setMainFileID(
       SourceMgr.createFileID(*FE, SourceLocation(), SrcMgr::C_User));
 
-  TestDependencyDirectivesGetter GetDependencyDirectives(FileMgr);
+  TestDependencyDirectivesGetter GetDependencyDirectives;
   PreprocessorOptions PPOpts;
   HeaderSearchOptions HSOpts;
   TrivialModuleLoader ModLoader;
@@ -322,7 +318,7 @@ TEST_F(PPDependencyDirectivesTest, LexIntoUninitializedToken) {
   SourceMgr.setMainFileID(
       SourceMgr.createFileID(*FE, SourceLocation(), SrcMgr::C_User));
 
-  TestDependencyDirectivesGetter GetDependencyDirectives(FileMgr);
+  TestDependencyDirectivesGetter GetDependencyDirectives;
 
   PreprocessorOptions PPOpts;
   HeaderSearchOptions HSOpts;
