@@ -14,6 +14,7 @@
 #include "clang/DependencyScanning/DependencyConsumer.h"
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Lex/DependencyDirectivesScanner.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/SemaOpenACC.h"
@@ -305,6 +306,21 @@ static void canonicalizeDefines(PreprocessorOptions &PPOpts) {
 }
 
 namespace {
+/// The preprocessor directives of a file that are relevant for dependency
+/// scanning, attached to the cached contents of the file.
+struct DependencyDirectivesAttachment : CachedFileAttachment {
+  static const char ID;
+
+  /// The storage for the tokens referenced by \c Directives.
+  SmallVector<dependency_directives_scan::Token, 10> Tokens;
+
+  /// The directives, or \c std::nullopt if scanning the file failed.
+  std::optional<SmallVector<dependency_directives_scan::Directive, 20>>
+      Directives;
+};
+
+const char DependencyDirectivesAttachment::ID = 0;
+
 class ScanningDependencyDirectivesGetter : public DependencyDirectivesGetter {
   DependencyScanningWorkerFilesystem *DepFS;
 
@@ -327,7 +343,29 @@ public:
 
   std::optional<ArrayRef<dependency_directives_scan::Directive>>
   operator()(FileEntryRef File) override {
-    return DepFS->getDirectiveTokens(File.getName());
+    llvm::ErrorOr<EntryRef> Entry =
+        DepFS->getOrCreateFileSystemEntry(File.getName());
+    if (!Entry || Entry->isDirectory())
+      return std::nullopt;
+
+    const auto &Attachment =
+        Entry->getOrCreateAttachment<DependencyDirectivesAttachment>(
+            [](StringRef Contents) {
+              auto Attachment =
+                  std::make_unique<DependencyDirectivesAttachment>();
+              SmallVector<dependency_directives_scan::Directive, 64> Directives;
+              // FIXME: Propagate the diagnostic if desired by the client.
+              if (scanSourceForDependencyDirectives(
+                      Contents, Attachment->Tokens, Directives))
+                Attachment->Tokens.clear();
+              else
+                Attachment->Directives = std::move(Directives);
+              return Attachment;
+            });
+    if (!Attachment.Directives)
+      return std::nullopt;
+    return ArrayRef<dependency_directives_scan::Directive>(
+        *Attachment.Directives);
   }
 };
 } // namespace

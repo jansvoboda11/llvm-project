@@ -10,8 +10,8 @@
 #define LLVM_CLANG_DEPENDENCYSCANNING_DEPENDENCYSCANNINGFILESYSTEM_H
 
 #include "clang/Basic/LLVM.h"
-#include "clang/Lex/DependencyDirectivesScanner.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorOr.h"
@@ -27,26 +27,53 @@ namespace dependencies {
 
 class DependencyScanningService;
 
-using DependencyDirectivesTy =
-    SmallVector<dependency_directives_scan::Directive, 20>;
+/// Data that a client of the scanning VFS attaches to the contents of a cached
+/// file, e.g. the result of scanning them.
+///
+/// Each kind of attachment is identified by the address of the static \c ID
+/// member of the class deriving from this one. An attachment is created at most
+/// once for the given contents, never changes afterwards, and lives as long as
+/// the contents.
+class CachedFileAttachment {
+public:
+  virtual ~CachedFileAttachment() = default;
 
-/// Contents and directive tokens of a cached file entry. Single instance can
+private:
+  friend struct CachedFileContents;
+
+  /// The kind of this attachment.
+  const void *Kind = nullptr;
+
+  /// The next attachment of the same contents.
+  CachedFileAttachment *Next = nullptr;
+};
+
+/// Contents of a cached file entry and their attachments. Single instance can
 /// be shared between multiple entries.
 struct CachedFileContents {
   CachedFileContents(std::unique_ptr<llvm::MemoryBuffer> Contents)
-      : Original(std::move(Contents)), DepDirectives(nullptr) {}
+      : Original(std::move(Contents)) {}
+
+  ~CachedFileContents();
 
   /// Owning storage for the original contents.
   std::unique_ptr<llvm::MemoryBuffer> Original;
 
-  /// The mutex that must be locked before mutating directive tokens.
-  std::mutex ValueLock;
-  SmallVector<dependency_directives_scan::Token, 10> DepDirectiveTokens;
-  /// Accessor to the directive tokens that's atomic to avoid data races.
-  /// \p CachedFileContents has ownership of the pointer.
-  std::atomic<const std::optional<DependencyDirectivesTy> *> DepDirectives;
+  /// Returns the attachment of the given kind, creating it with \p Create first
+  /// if needed. Concurrent calls for the same kind call \p Create only once.
+  /// \p Create must not create attachments for the same contents.
+  const CachedFileAttachment &getOrCreateAttachment(
+      const void *Kind,
+      llvm::function_ref<std::unique_ptr<CachedFileAttachment>()> Create);
 
-  ~CachedFileContents() { delete DepDirectives.load(); }
+private:
+  /// The list of attachments. Attachments are only ever prepended (while
+  /// holding \c AttachmentsLock), so the list can be read without holding any
+  /// lock.
+  std::atomic<CachedFileAttachment *> Attachments = nullptr;
+
+  /// Serializes creating attachments.
+  std::mutex AttachmentsLock;
 };
 
 /// An in-memory representation of a file system entity that is of interest to
@@ -54,7 +81,6 @@ struct CachedFileContents {
 ///
 /// It represents one of the following:
 /// - opened file with contents and a stat value,
-/// - opened file with contents, directive tokens and a stat value,
 /// - directory entry with its stat value,
 /// - filesystem error.
 ///
@@ -91,20 +117,6 @@ public:
     return Contents->Original->getBuffer();
   }
 
-  /// \returns The scanned preprocessor directive tokens of the file that are
-  /// used to speed up preprocessing, if available.
-  std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  getDirectiveTokens() const {
-    assert(!isError() && "error");
-    assert(!isDirectory() && "not a file");
-    assert(Contents && "contents not initialized");
-    if (auto *Directives = Contents->DepDirectives.load()) {
-      if (Directives->has_value())
-        return ArrayRef<dependency_directives_scan::Directive>(**Directives);
-    }
-    return std::nullopt;
-  }
-
   /// \returns The error.
   std::error_code getError() const { return MaybeStat.getError(); }
 
@@ -121,7 +133,7 @@ public:
     return MaybeStat->getUniqueID();
   }
 
-  /// \returns The data structure holding both contents and directive tokens.
+  /// \returns The data structure holding both contents and their attachments.
   CachedFileContents *getCachedContents() const {
     assert(!isError() && "error");
     assert(!isDirectory() && "not a file");
@@ -249,15 +261,13 @@ private:
 
 /// Reference to a CachedFileSystemEntry.
 /// If the underlying entry is an opened file, this wrapper returns the file
-/// contents and the scanned preprocessor directives.
+/// contents and their attachments.
 class EntryRef {
   /// The filename used to access this entry.
   std::string Filename;
 
   /// The underlying cached entry.
   const CachedFileSystemEntry &Entry;
-
-  friend class DependencyScanningWorkerFilesystem;
 
 public:
   EntryRef(StringRef Name, const CachedFileSystemEntry &Entry)
@@ -282,9 +292,19 @@ public:
 
   StringRef getContents() const { return Entry.getOriginalContents(); }
 
-  std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  getDirectiveTokens() const {
-    return Entry.getDirectiveTokens();
+  /// Returns the attachment of type \p T to the contents of this file,
+  /// creating it with \p Create first if needed. \p T must derive from
+  /// \c CachedFileAttachment and have a \c static \c const \c char \c ID
+  /// member. See \c CachedFileContents::getOrCreateAttachment().
+  template <typename T>
+  const T &getOrCreateAttachment(
+      llvm::function_ref<std::unique_ptr<T>(StringRef Contents)> Create) const {
+    StringRef Contents = getContents();
+    return static_cast<const T &>(
+        Entry.getCachedContents()->getOrCreateAttachment(
+            &T::ID, [&]() -> std::unique_ptr<CachedFileAttachment> {
+              return Create(Contents);
+            }));
   }
 };
 
@@ -322,22 +342,6 @@ public:
   /// Attempts to use the local and shared caches first, then falls back to
   /// using the underlying filesystem.
   llvm::ErrorOr<EntryRef> getOrCreateFileSystemEntry(StringRef Filename);
-
-  /// Ensure the directive tokens are populated for this file entry.
-  ///
-  /// Returns true if the directive tokens are populated for this file entry,
-  /// false if not (i.e. this entry is not a file or its scan fails).
-  bool ensureDirectiveTokensArePopulated(EntryRef Entry);
-
-  /// \returns The scanned preprocessor directive tokens of the file that are
-  /// used to speed up preprocessing, if available.
-  std::optional<ArrayRef<dependency_directives_scan::Directive>>
-  getDirectiveTokens(const Twine &Path) {
-    if (llvm::ErrorOr<EntryRef> Entry = getOrCreateFileSystemEntry(Path.str()))
-      if (ensureDirectiveTokensArePopulated(*Entry))
-        return Entry->getDirectiveTokens();
-    return std::nullopt;
-  }
 
   /// Check whether \p Path exists. By default checks cached result of \c
   /// status(), and falls back on FS if unable to do so.

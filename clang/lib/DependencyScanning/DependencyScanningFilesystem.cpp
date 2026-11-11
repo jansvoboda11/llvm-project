@@ -41,45 +41,44 @@ DependencyScanningWorkerFilesystem::readFile(StringRef Filename,
   return TentativeEntry(Stat, std::move(Buffer));
 }
 
-bool DependencyScanningWorkerFilesystem::ensureDirectiveTokensArePopulated(
-    EntryRef Ref) {
-  auto &Entry = Ref.Entry;
-
-  if (Entry.isError() || Entry.isDirectory())
-    return false;
-
-  CachedFileContents *Contents = Entry.getCachedContents();
-  assert(Contents && "contents not initialized");
-
-  // Double-checked locking.
-  if (Contents->DepDirectives.load())
-    return true;
-
-  std::lock_guard<std::mutex> GuardLock(Contents->ValueLock);
-
-  // Double-checked locking.
-  if (Contents->DepDirectives.load())
-    return true;
-
-  SmallVector<dependency_directives_scan::Directive, 64> Directives;
-  // Scan the file for preprocessor directives that might affect the
-  // dependencies.
-  if (scanSourceForDependencyDirectives(Contents->Original->getBuffer(),
-                                        Contents->DepDirectiveTokens,
-                                        Directives)) {
-    Contents->DepDirectiveTokens.clear();
-    // FIXME: Propagate the diagnostic if desired by the client.
-    Contents->DepDirectives.store(new std::optional<DependencyDirectivesTy>());
-    return false;
+CachedFileContents::~CachedFileContents() {
+  CachedFileAttachment *Attachment = Attachments.load();
+  while (Attachment) {
+    CachedFileAttachment *Next = Attachment->Next;
+    delete Attachment;
+    Attachment = Next;
   }
+}
 
-  // This function performed double-checked locking using `DepDirectives`.
-  // Assigning it must be the last thing this function does, otherwise other
-  // threads may skip the critical section (`DepDirectives != nullptr`), leading
-  // to a data race.
-  Contents->DepDirectives.store(
-      new std::optional<DependencyDirectivesTy>(std::move(Directives)));
-  return true;
+const CachedFileAttachment &CachedFileContents::getOrCreateAttachment(
+    const void *Kind,
+    llvm::function_ref<std::unique_ptr<CachedFileAttachment>()> Create) {
+  auto FindAttachment = [&]() -> const CachedFileAttachment * {
+    for (const CachedFileAttachment *Attachment = Attachments.load();
+         Attachment; Attachment = Attachment->Next)
+      if (Attachment->Kind == Kind)
+        return Attachment;
+    return nullptr;
+  };
+
+  if (const CachedFileAttachment *Attachment = FindAttachment())
+    return *Attachment;
+
+  // Only one call creates attachments at a time. The others wait here and then
+  // reuse the attachment if it's of the kind they're looking for.
+  std::lock_guard<std::mutex> Lock(AttachmentsLock);
+
+  if (const CachedFileAttachment *Attachment = FindAttachment())
+    return *Attachment;
+
+  CachedFileAttachment *Attachment = Create().release();
+  assert(Attachment && "created a null attachment");
+  Attachment->Kind = Kind;
+  Attachment->Next = Attachments.load();
+  // Publishing the attachment must be the last thing this function does, so
+  // that lookups that don't hold the lock only see fully initialized ones.
+  Attachments.store(Attachment);
+  return *Attachment;
 }
 
 DependencyScanningFilesystemSharedCache::

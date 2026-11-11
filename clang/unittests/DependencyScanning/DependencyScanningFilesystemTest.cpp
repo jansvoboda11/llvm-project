@@ -734,3 +734,96 @@ TEST(DependencyScanningWorkerFilesystem, LocalFS) {
     EXPECT_EQ(InstrLocalFS->NumStatusCalls, 2u); // not using global cache.
   }
 }
+
+namespace {
+struct SizeAttachment : CachedFileAttachment {
+  static const char ID;
+  size_t Size;
+  SizeAttachment(size_t Size) : Size(Size) {}
+};
+const char SizeAttachment::ID = 0;
+
+struct FirstCharAttachment : CachedFileAttachment {
+  static const char ID;
+  char FirstChar;
+  FirstCharAttachment(char FirstChar) : FirstChar(FirstChar) {}
+};
+const char FirstCharAttachment::ID = 0;
+} // namespace
+
+TEST(DependencyScanningWorkerFilesystem, Attachments) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/real.h", 0, llvm::MemoryBuffer::getMemBuffer("hello"));
+  ASSERT_TRUE(InMemoryFS->addHardLink("/alias.h", "/real.h"));
+  InMemoryFS->addFile("/other.h", 0, llvm::MemoryBuffer::getMemBuffer("bye"));
+
+  DependencyScanningService Service({});
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS);
+
+  unsigned NumSizeCreates = 0;
+  auto GetSize = [&](llvm::StringRef Path) {
+    auto Entry = DepFS.getOrCreateFileSystemEntry(Path);
+    EXPECT_TRUE(Entry);
+    return &Entry->getOrCreateAttachment<SizeAttachment>(
+        [&](llvm::StringRef Contents) {
+          ++NumSizeCreates;
+          return std::make_unique<SizeAttachment>(Contents.size());
+        });
+  };
+
+  const SizeAttachment *RealSize = GetSize("/real.h");
+  EXPECT_EQ(RealSize->Size, 5u);
+  EXPECT_EQ(NumSizeCreates, 1u);
+
+  // The attachment is created once per contents, which are shared by all
+  // filenames of the same file.
+  EXPECT_EQ(GetSize("/real.h"), RealSize);
+  EXPECT_EQ(GetSize("/alias.h"), RealSize);
+  EXPECT_EQ(NumSizeCreates, 1u);
+
+  const SizeAttachment *OtherSize = GetSize("/other.h");
+  EXPECT_NE(OtherSize, RealSize);
+  EXPECT_EQ(OtherSize->Size, 3u);
+  EXPECT_EQ(NumSizeCreates, 2u);
+
+  // Attachments of different kinds coexist.
+  auto Real = DepFS.getOrCreateFileSystemEntry("/real.h");
+  ASSERT_TRUE(Real);
+  const auto &FirstChar = Real->getOrCreateAttachment<FirstCharAttachment>(
+      [](llvm::StringRef Contents) {
+        return std::make_unique<FirstCharAttachment>(Contents.front());
+      });
+  EXPECT_EQ(FirstChar.FirstChar, 'h');
+  EXPECT_EQ(GetSize("/real.h"), RealSize);
+  EXPECT_EQ(NumSizeCreates, 2u);
+}
+
+TEST(DependencyScanningWorkerFilesystem, ConcurrentAttachmentIsCreatedOnce) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/file.h", 0, llvm::MemoryBuffer::getMemBuffer("hello"));
+
+  DependencyScanningService Service({});
+  std::atomic<unsigned> NumCreates = 0;
+
+  constexpr unsigned NumWorkers = 16;
+  auto Results = runConcurrentWorkers<const SizeAttachment *>(
+      Service, InMemoryFS, NumWorkers, nullptr,
+      [&](DependencyScanningWorkerFilesystem &W,
+          unsigned) -> const SizeAttachment * {
+        auto Entry = W.getOrCreateFileSystemEntry("/file.h");
+        if (!Entry)
+          return nullptr;
+        return &Entry->getOrCreateAttachment<SizeAttachment>(
+            [&](llvm::StringRef Contents) {
+              ++NumCreates;
+              return std::make_unique<SizeAttachment>(Contents.size());
+            });
+      });
+
+  EXPECT_EQ(NumCreates.load(), 1u);
+  ASSERT_NE(Results[0], nullptr);
+  for (unsigned I = 0; I < NumWorkers; ++I)
+    EXPECT_EQ(Results[I], Results[0]) << "worker " << I;
+}
