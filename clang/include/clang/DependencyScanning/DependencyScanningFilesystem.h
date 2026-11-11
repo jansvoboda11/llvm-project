@@ -162,46 +162,39 @@ public:
     /// while doing IO or locking any other mutex.
     mutable std::mutex CacheLock;
 
-    /// Cache state per filename.
-    struct FilenameCacheState {
-      /// The cached entry. Set at most once while holding \c Mutex, and can be
+    /// Cache entry per filename.
+    struct FilenameCacheEntry {
+      /// The cached file. Set at most once while holding \c Mutex, and can be
       /// read without holding any lock.
-      std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
+      std::atomic<const CachedFileSystemEntry *> File = nullptr;
 
-      /// Serializes lookups of this filename that don't find \c Entry, so that
+      /// Serializes lookups of this filename that don't find \c File, so that
       /// only one of them stats the file and the others reuse its result.
       std::mutex Mutex;
-
-      /// The number of lookups whose stat failed with an error that didn't get
-      /// cached in \c Entry, and the last such error (guarded by \c Mutex).
-      /// Lookups waiting on \c Mutex in the meantime return that error instead
-      /// of re-running the stat one after another.
-      std::atomic<unsigned> NumUncachedErrors = 0;
-      std::error_code LastUncachedError;
 
       const CachedRealPath *RealPath = nullptr;
     };
 
-    /// Cache state per unique ID.
-    struct UIDCacheState {
-      /// The cached entry. Set at most once while holding \c Mutex, and can be
+    /// Cache entry per unique ID.
+    struct UIDCacheEntry {
+      /// The cached file. Set at most once while holding \c Mutex, and can be
       /// read without holding any lock.
-      std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
+      std::atomic<const CachedFileSystemEntry *> File = nullptr;
 
       /// Serializes lookups of this file via different filenames that don't
-      /// find \c Entry, so that only one of them reads the file and the others
+      /// find \c File, so that only one of them reads the file and the others
       /// reuse its result.
       std::mutex Mutex;
     };
 
-    /// Map from filenames to their cached state.
-    llvm::StringMap<FilenameCacheState, llvm::BumpPtrAllocator> CacheByFilename;
+    /// Map from filenames to their cache entries.
+    llvm::StringMap<FilenameCacheEntry, llvm::BumpPtrAllocator> CacheByFilename;
 
-    /// Map from unique IDs to their cached state.
-    llvm::DenseMap<llvm::sys::fs::UniqueID, UIDCacheState *> EntriesByUID;
+    /// Map from unique IDs to their cache entries.
+    llvm::DenseMap<llvm::sys::fs::UniqueID, UIDCacheEntry *> EntriesByUID;
 
-    /// The backing storage for the cached state per unique ID.
-    llvm::SpecificBumpPtrAllocator<UIDCacheState> UIDCacheStateStorage;
+    /// The backing storage for cache entries in \c EntriesByUID.
+    llvm::SpecificBumpPtrAllocator<UIDCacheEntry> UIDCacheEntryStorage;
 
     /// The backing storage for cached entries.
     llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> EntryStorage;
@@ -211,17 +204,6 @@ public:
 
     /// The backing storage for cached real paths.
     llvm::SpecificBumpPtrAllocator<CachedRealPath> RealPathStorage;
-
-    /// Returns the real path associated with the filename or nullptr if none is
-    /// found.
-    const CachedRealPath *findRealPathByFilename(StringRef Filename) const;
-
-    /// Returns the real path associated with the filename if there is some.
-    /// Otherwise, constructs new one with the given one, associates it with the
-    /// filename and returns the result.
-    const CachedRealPath &
-    getOrEmplaceRealPathForFilename(StringRef Filename,
-                                    llvm::ErrorOr<StringRef> RealPath);
   };
 
   DependencyScanningFilesystemSharedCache();

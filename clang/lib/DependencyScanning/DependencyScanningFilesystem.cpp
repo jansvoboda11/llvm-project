@@ -116,12 +116,12 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
   for (unsigned i = 0; i < NumShards; i++) {
     const CacheShard &Shard = CacheShards[i];
     std::lock_guard<std::mutex> LockGuard(Shard.CacheLock);
-    for (const auto &[Path, State] : Shard.CacheByFilename) {
-      // Entries are published without holding the shard lock, so this can run
-      // concurrently with lookups. Skip filenames without an entry:
+    for (const auto &[Path, CacheEntry] : Shard.CacheByFilename) {
+      // Files are published without holding the shard lock, so this can run
+      // concurrently with lookups. Skip cache entries without a file:
       // real-path-only ones from getRealPath, uncached negative stats, or
       // lookups that are still in progress.
-      const CachedFileSystemEntry *Entry = State.Entry.load();
+      const CachedFileSystemEntry *Entry = CacheEntry.File.load();
       if (!Entry)
         continue;
       llvm::ErrorOr<llvm::vfs::Status> Status = UnderlyingFS.status(Path);
@@ -156,35 +156,6 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     }
   }
   return InvalidDiagInfo;
-}
-
-const CachedRealPath *
-DependencyScanningFilesystemSharedCache::CacheShard::findRealPathByFilename(
-    StringRef Filename) const {
-  assert(llvm::sys::path::is_absolute_gnu(Filename));
-  std::lock_guard<std::mutex> LockGuard(CacheLock);
-  auto It = CacheByFilename.find(Filename);
-  return It == CacheByFilename.end() ? nullptr : It->getValue().RealPath;
-}
-
-const CachedRealPath &DependencyScanningFilesystemSharedCache::CacheShard::
-    getOrEmplaceRealPathForFilename(StringRef Filename,
-                                    llvm::ErrorOr<llvm::StringRef> RealPath) {
-  std::lock_guard<std::mutex> LockGuard(CacheLock);
-
-  const CachedRealPath *&StoredRealPath = CacheByFilename[Filename].RealPath;
-  if (!StoredRealPath) {
-    auto OwnedRealPath = [&]() -> CachedRealPath {
-      if (!RealPath)
-        return RealPath.getError();
-      return RealPath->str();
-    }();
-
-    StoredRealPath = new (RealPathStorage.Allocate())
-        CachedRealPath(std::move(OwnedRealPath));
-  }
-
-  return *StoredRealPath;
 }
 
 static IntrusiveRefCntPtr<llvm::vfs::FileSystem>
@@ -252,88 +223,75 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
 
   auto &SharedCache = Service.getSharedCache();
   auto &FilenameShard = SharedCache.getShardForFilename(*FilenameForLookup);
-  auto &FilenameState = [&]() -> auto & {
+  auto &FilenameEntry = [&]() -> auto & {
     std::lock_guard<std::mutex> ShardLock(FilenameShard.CacheLock);
     return FilenameShard.CacheByFilename[*FilenameForLookup];
   }();
 
-  // Snapshot the number of uncached errors before checking for the entry, so
-  // that any increment we see after acquiring the mutex below comes from a
-  // stat that finished after this lookup started.
-  unsigned NumUncachedErrors = FilenameState.NumUncachedErrors.load();
-
-  if (const CachedFileSystemEntry *Entry = FilenameState.Entry.load()) {
-    Local.File = Entry;
-    return EntryRef(OriginalFilename, *Entry).unwrapError();
+  if (const CachedFileSystemEntry *File = FilenameEntry.File.load()) {
+    Local.File = File;
+    return EntryRef(OriginalFilename, *File).unwrapError();
   }
 
-  // Only one lookup of this filename computes the entry at a time. The others
-  // wait here and then reuse its result.
-  std::lock_guard<std::mutex> FilenameLock(FilenameState.Mutex);
+  // Only one lookup of this filename stats it at a time. The others wait here
+  // and then reuse its result.
+  std::lock_guard<std::mutex> FilenameLock(FilenameEntry.Mutex);
 
-  if (const CachedFileSystemEntry *Entry = FilenameState.Entry.load()) {
-    Local.File = Entry;
-    return EntryRef(OriginalFilename, *Entry).unwrapError();
+  if (const CachedFileSystemEntry *File = FilenameEntry.File.load()) {
+    Local.File = File;
+    return EntryRef(OriginalFilename, *File).unwrapError();
   }
 
-  // While we were waiting, a stat failed and its error didn't get cached.
-  // Return the same error rather than re-running the stat.
-  if (FilenameState.NumUncachedErrors.load() != NumUncachedErrors)
-    return FilenameState.LastUncachedError;
-
-  const CachedFileSystemEntry *Entry = nullptr;
+  const CachedFileSystemEntry *File = nullptr;
   auto Stat = BaseFS->status(OriginalFilename);
   if (!Stat) {
     // Not caching the error means a later lookup re-runs the stat, so that a
     // file created mid-scan becomes visible.
     if (!Service.getOpts().CacheNegativeStats ||
-        !shouldCacheNegativeStatsForPath(OriginalFilename)) {
-      FilenameState.LastUncachedError = Stat.getError();
-      ++FilenameState.NumUncachedErrors;
+        !shouldCacheNegativeStatsForPath(OriginalFilename))
       return Stat.getError();
-    }
 
     std::lock_guard<std::mutex> ShardLock(FilenameShard.CacheLock);
-    Entry = new (FilenameShard.EntryStorage.Allocate())
+    File = new (FilenameShard.EntryStorage.Allocate())
         CachedFileSystemEntry(Stat.getError());
   } else {
     // The file may be cached already under another filename that resolves to
     // the same unique ID (e.g. a symlink or a hard link).
     auto &UIDShard = SharedCache.getShardForUID(Stat->getUniqueID());
-    auto &UIDState = [&]() -> auto & {
+    auto &UIDEntry = [&]() -> auto & {
       std::lock_guard<std::mutex> ShardLock(UIDShard.CacheLock);
-      auto *&State = UIDShard.EntriesByUID[Stat->getUniqueID()];
-      if (!State)
-        State = new (UIDShard.UIDCacheStateStorage.Allocate())
-            DependencyScanningFilesystemSharedCache::CacheShard::UIDCacheState;
-      return *State;
+      auto *&Entry = UIDShard.EntriesByUID[Stat->getUniqueID()];
+      if (!Entry)
+        Entry = new (UIDShard.UIDCacheEntryStorage.Allocate())
+            DependencyScanningFilesystemSharedCache::CacheShard::UIDCacheEntry;
+      return *Entry;
     }();
 
-    Entry = UIDState.Entry.load();
-    if (!Entry) {
+    File = UIDEntry.File.load();
+    if (!File) {
       // Only one lookup of this file (via any filename) reads it at a time.
       // The others wait here and then reuse its result.
-      std::lock_guard<std::mutex> UIDLock(UIDState.Mutex);
+      std::lock_guard<std::mutex> UIDLock(UIDEntry.Mutex);
 
-      Entry = UIDState.Entry.load();
-      if (!Entry) {
+      File = UIDEntry.File.load();
+      if (!File) {
         auto TEntry = Stat->isDirectory() ? TentativeEntry(*Stat)
                                           : readFile(OriginalFilename, *BaseFS);
         // On read failure, the entry wraps the error so that lookups of the
         // same file via other filenames return it rather than retry the read.
         {
           std::lock_guard<std::mutex> ShardLock(UIDShard.CacheLock);
-          Entry = createEntry(TEntry, UIDShard.ContentsStorage,
-                              UIDShard.EntryStorage);
+          File = createEntry(TEntry, UIDShard.ContentsStorage,
+                             UIDShard.EntryStorage);
         }
-        UIDState.Entry.store(Entry);
+        UIDEntry.File.store(File);
       }
     }
   }
 
-  FilenameState.Entry.store(Entry);
-  Local.File = Entry;
-  return EntryRef(OriginalFilename, *Entry).unwrapError();
+  FilenameEntry.File.store(File);
+  Local.File = File;
+  return EntryRef(OriginalFilename, *File).unwrapError();
 }
 
 llvm::ErrorOr<llvm::vfs::Status>
@@ -443,24 +401,34 @@ DependencyScanningWorkerFilesystem::getRealPath(const Twine &Path,
   // If we have the result in the shared cache, cache it locally.
   auto &Shard =
       Service.getSharedCache().getShardForFilename(*FilenameForLookup);
-  if (const auto *ShardRealPath =
-          Shard.findRealPathByFilename(*FilenameForLookup)) {
-    Local.RealPath = ShardRealPath;
-    return HandleCachedRealPath(*Local.RealPath);
+  {
+    std::lock_guard<std::mutex> ShardLock(Shard.CacheLock);
+    auto It = Shard.CacheByFilename.find(*FilenameForLookup);
+    if (It != Shard.CacheByFilename.end())
+      Local.RealPath = It->getValue().RealPath;
   }
+  if (Local.RealPath)
+    return HandleCachedRealPath(*Local.RealPath);
 
   // If we don't know the real path, compute it...
   std::error_code EC = getUnderlyingFS().getRealPath(OriginalFilename, Output);
-  llvm::ErrorOr<llvm::StringRef> ComputedRealPath = EC;
-  if (!EC)
-    ComputedRealPath = StringRef{Output.data(), Output.size()};
 
   // ...and try to write it into the shared cache. In case some other thread won
   // this race and already wrote its own result there, just adopt it. Write
   // whatever is in the shared cache into the local one.
-  const auto &RealPath = Shard.getOrEmplaceRealPathForFilename(
-      *FilenameForLookup, ComputedRealPath);
-  Local.RealPath = &RealPath;
+  {
+    std::lock_guard<std::mutex> ShardLock(Shard.CacheLock);
+    const CachedRealPath *&SharedRealPath =
+        Shard.CacheByFilename[*FilenameForLookup].RealPath;
+    if (!SharedRealPath) {
+      CachedRealPath ComputedRealPath = EC;
+      if (!EC)
+        ComputedRealPath = std::string(Output.begin(), Output.end());
+      SharedRealPath = new (Shard.RealPathStorage.Allocate())
+          CachedRealPath(std::move(ComputedRealPath));
+    }
+    Local.RealPath = SharedRealPath;
+  }
   return HandleCachedRealPath(*Local.RealPath);
 }
 

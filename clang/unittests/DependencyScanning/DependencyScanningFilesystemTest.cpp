@@ -99,46 +99,6 @@ private:
   std::mutex M;
   std::condition_variable CV;
 };
-
-/// Holds the first \c status() call inside the filesystem until \c release()
-/// is called, so that concurrent lookups pile up behind it.
-class HoldFirstStatusFileSystem : public llvm::vfs::ProxyFileSystem {
-public:
-  using ProxyFileSystem::ProxyFileSystem;
-
-  std::atomic<unsigned> NumStatusCalls = 0;
-
-  llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &Path) override {
-    {
-      std::unique_lock<std::mutex> Lock(M);
-      if (++NumStatusCalls == 1) {
-        CV.notify_all();
-        CV.wait(Lock, [&] { return Released; });
-      }
-    }
-    return ProxyFileSystem::status(Path);
-  }
-
-  /// Waits until the first \c status() call is being held.
-  void waitForFirstStatus() {
-    std::unique_lock<std::mutex> Lock(M);
-    CV.wait(Lock, [&] { return NumStatusCalls >= 1; });
-  }
-
-  void release() {
-    {
-      std::lock_guard<std::mutex> Lock(M);
-      Released = true;
-    }
-    CV.notify_all();
-  }
-
-private:
-  std::mutex M;
-  std::condition_variable CV;
-  bool Released = false;
-};
-
 } // namespace
 
 TEST(DependencyScanningFilesystem, OpenFileAndGetBufferRepeatedly) {
@@ -571,12 +531,10 @@ TEST(DependencyScanningWorkerFilesystem, ConcurrentNegativeStatDeduplicates) {
 }
 
 TEST(DependencyScanningWorkerFilesystem,
-     ConcurrentUncachedNegativeStatIsSharedButNotPersisted) {
-  // Same as above, but with negative-stat caching disabled. Concurrent queries
-  // that overlap the producer's in-flight stat still adopt its negative
-  // result (sharing an answer for overlapping queries is not "caching"), so no
-  // worker opens the missing file. Because the result is not persisted, a
-  // later, separate query must re-run the stat.
+     ConcurrentUncachedNegativeStatIsNotPersisted) {
+  // Same as above, but with negative-stat caching disabled. No worker opens the
+  // missing file, and because the result is not persisted, a later, separate
+  // query must re-run the stat.
   llvm::unittest::TempDir TmpDir("dswf-uncached-negative", /*Unique=*/true);
   llvm::SmallString<128> MissingPath = TmpDir.path("missing.h");
 
@@ -594,10 +552,9 @@ TEST(DependencyScanningWorkerFilesystem,
         return W.status(MissingPath);
       });
 
-  // A negative stat never opens the file, regardless of how many workers
-  // produced versus adopted. Producers are bounded by the worker count;
-  // adopters add none. With caching off the result is not persisted, so the
-  // count is not pinned to one, but it can never exceed one stat per worker.
+  // A negative stat never opens the file. With caching off the result is not
+  // persisted, so the count is not pinned to one, but it can never exceed one
+  // stat per worker.
   EXPECT_EQ(TracingFS->NumOpenFileForReadCalls.load(), 0u);
   unsigned StatsAfterBurst = TracingFS->NumStatusCalls.load();
   EXPECT_GE(StatsAfterBurst, 1u);
@@ -611,8 +568,8 @@ TEST(DependencyScanningWorkerFilesystem,
     EXPECT_EQ(Results[I].getError(), FirstError);
   }
 
-  // The uncached negative was shared, not cached: a later, separate query
-  // re-runs the stat rather than adopting a persisted miss.
+  // The negative stat was not cached: a later, separate query re-runs the stat
+  // rather than adopting a persisted miss.
   DependencyScanningWorkerFilesystem PostWorker(Service, TracingFS);
   EXPECT_FALSE(PostWorker.status(MissingPath));
   EXPECT_EQ(TracingFS->NumStatusCalls.load(), StatsAfterBurst + 1);
@@ -682,43 +639,6 @@ TEST(DependencyScanningWorkerFilesystem,
   EXPECT_EQ(Results[0]->getContents().data(), Results[1]->getContents().data());
 }
 #endif // !_WIN32
-
-TEST(DependencyScanningWorkerFilesystem,
-     ConcurrentUncachedNegativeStatIsSharedWithWaiters) {
-  llvm::unittest::TempDir TmpDir("dswf-uncached-negative-hold",
-                                 /*Unique=*/true);
-  llvm::SmallString<128> MissingPath = TmpDir.path("missing.h");
-
-  auto HoldFS = llvm::makeIntrusiveRefCnt<HoldFirstStatusFileSystem>(
-      llvm::vfs::getRealFileSystem());
-  DependencyScanningServiceOptions Opts;
-  Opts.CacheNegativeStats = false;
-  DependencyScanningService Service(std::move(Opts));
-
-  // Hold the first stat until the other workers had plenty of time to start
-  // waiting for it.
-  std::thread Releaser([&] {
-    HoldFS->waitForFirstStatus();
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    HoldFS->release();
-  });
-
-  constexpr unsigned NumWorkers = 8;
-  auto Results = runConcurrentWorkers<llvm::ErrorOr<llvm::vfs::Status>>(
-      Service, HoldFS, NumWorkers, std::error_code{},
-      [&](DependencyScanningWorkerFilesystem &W, unsigned) {
-        return W.status(MissingPath);
-      });
-  Releaser.join();
-
-  // Workers that waited for the held stat adopt its result instead of each
-  // re-running the stat after the previous one finished. Only workers that
-  // arrived after the stat was released may stat again, so the count can
-  // reach the number of workers only if lookups are serialized.
-  EXPECT_LT(HoldFS->NumStatusCalls.load(), NumWorkers);
-  for (unsigned I = 0; I < NumWorkers; ++I)
-    EXPECT_FALSE(Results[I]) << "worker " << I << " unexpectedly succeeded";
-}
 
 TEST(DependencyScanningFilesystemSharedCache, OutOfDateEntriesDuringScan) {
   // Only fails reliably under ThreadSanitizer: getOutOfDateEntries() must
