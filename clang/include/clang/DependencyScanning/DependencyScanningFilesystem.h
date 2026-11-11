@@ -12,7 +12,6 @@
 #include "clang/Basic/LLVM.h"
 #include "clang/Lex/DependencyDirectivesScanner.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorOr.h"
@@ -157,60 +156,52 @@ using CachedRealPath = llvm::ErrorOr<std::string>;
 /// the worker threads.
 class DependencyScanningFilesystemSharedCache {
 public:
-  /// A lazily computed entry of the shared cache.
-  ///
-  /// Lookups of an entry that's already computed don't take any locks.
-  /// Concurrent lookups of an entry that's not computed yet are serialized, so
-  /// that only one of them computes it and the others reuse the result.
-  class EntrySlot {
-  public:
-    /// Either the entry to store in the slot, or an error that's not cached.
-    using ComputeResult = llvm::ErrorOr<const CachedFileSystemEntry *>;
-
-    /// Returns the entry in this slot, computing it with \p Compute first if
-    /// needed. An error returned by \p Compute is not stored in the slot, but
-    /// is returned to lookups that were already waiting for \p Compute to
-    /// finish, so that they don't re-run it one after another.
-    ComputeResult getOrCompute(llvm::function_ref<ComputeResult()> Compute);
-
-    /// Returns the entry in this slot or nullptr if it's not computed yet.
-    const CachedFileSystemEntry *get() const {
-      return Entry.load(std::memory_order_acquire);
-    }
-
-  private:
-    std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
-
-    /// Serializes calls to \c Compute. Must not be acquired while holding
-    /// \c CacheShard::CacheLock.
-    std::mutex Mutex;
-
-    /// Incremented every time \c Compute returns an error.
-    std::atomic<unsigned> UncachedErrorGeneration = 0;
-    /// The error most recently returned by \c Compute. Guarded by \c Mutex.
-    std::error_code UncachedError;
-  };
-
   struct CacheShard {
-    /// The mutex that needs to be locked before mutation of the maps and
-    /// allocators (but not the slots). Only held for short periods of time and
-    /// never while doing IO.
+    /// The mutex that needs to be locked before mutation of the maps,
+    /// allocators and real paths. Only held for short periods of time, never
+    /// while doing IO or locking any other mutex.
     mutable std::mutex CacheLock;
 
-    /// Cache state per filename: the entry and the real path.
+    /// Cache state per filename.
     struct FilenameCacheState {
-      EntrySlot Entry;
+      /// The cached entry. Set at most once while holding \c Mutex, and can be
+      /// read without holding any lock.
+      std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
+
+      /// Serializes lookups of this filename that don't find \c Entry, so that
+      /// only one of them stats the file and the others reuse its result.
+      std::mutex Mutex;
+
+      /// The number of lookups whose stat failed with an error that didn't get
+      /// cached in \c Entry, and the last such error (guarded by \c Mutex).
+      /// Lookups waiting on \c Mutex in the meantime return that error instead
+      /// of re-running the stat one after another.
+      std::atomic<unsigned> NumUncachedErrors = 0;
+      std::error_code LastUncachedError;
+
       const CachedRealPath *RealPath = nullptr;
+    };
+
+    /// Cache state per unique ID.
+    struct UIDCacheState {
+      /// The cached entry. Set at most once while holding \c Mutex, and can be
+      /// read without holding any lock.
+      std::atomic<const CachedFileSystemEntry *> Entry = nullptr;
+
+      /// Serializes lookups of this file via different filenames that don't
+      /// find \c Entry, so that only one of them reads the file and the others
+      /// reuse its result.
+      std::mutex Mutex;
     };
 
     /// Map from filenames to their cached state.
     llvm::StringMap<FilenameCacheState, llvm::BumpPtrAllocator> CacheByFilename;
 
-    /// Map from unique IDs to cached entries.
-    llvm::DenseMap<llvm::sys::fs::UniqueID, EntrySlot *> EntriesByUID;
+    /// Map from unique IDs to their cached state.
+    llvm::DenseMap<llvm::sys::fs::UniqueID, UIDCacheState *> EntriesByUID;
 
-    /// The backing storage for slots in \c EntriesByUID.
-    llvm::SpecificBumpPtrAllocator<EntrySlot> UIDSlotStorage;
+    /// The backing storage for the cached state per unique ID.
+    llvm::SpecificBumpPtrAllocator<UIDCacheState> UIDCacheStateStorage;
 
     /// The backing storage for cached entries.
     llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> EntryStorage;
@@ -231,17 +222,6 @@ public:
     const CachedRealPath &
     getOrEmplaceRealPathForFilename(StringRef Filename,
                                     llvm::ErrorOr<StringRef> RealPath);
-
-    /// Returns the entry slot for the filename, creating it if needed.
-    EntrySlot &getSlotForFilename(StringRef Filename);
-
-    /// Returns the entry slot for the unique ID, creating it if needed.
-    EntrySlot &getSlotForUID(llvm::sys::fs::UniqueID UID);
-
-    /// Allocates a new entry with the given status and contents.
-    const CachedFileSystemEntry *
-    createEntry(llvm::ErrorOr<llvm::vfs::Status> Stat,
-                std::unique_ptr<llvm::MemoryBuffer> Contents = nullptr);
   };
 
   DependencyScanningFilesystemSharedCache();
@@ -381,30 +361,6 @@ public:
   bool exists(const Twine &Path) override;
 
 private:
-  /// Resolves the cache entry for \p FilenameForLookup through the shared
-  /// cache: returns an entry already produced by another worker, or computes
-  /// the entry via the underlying filesystem.
-  /// \p FilenameForLookup is always absolute, and may differ from
-  /// \p OriginalFilename if the latter is relative.
-  llvm::ErrorOr<const CachedFileSystemEntry *>
-  resolveFilenameThroughSharedCache(StringRef OriginalFilename,
-                                    StringRef FilenameForLookup);
-
-  /// Resolves the cache entry for the on-disk file identified by \p Stat
-  /// through the UID-keyed shared cache. Reads the file's contents if no other
-  /// worker did so yet. Always returns a non-null entry (which may carry a
-  /// readFile error).
-  const CachedFileSystemEntry *
-  resolveUIDThroughSharedCache(StringRef OriginalFilename,
-                               const llvm::vfs::Status &Stat);
-
-  /// Resolves the cache entry through the local VFS and without going through
-  /// the global shared cache. Only relevant if \c LocalFS is non-null and
-  /// \p OriginalFilename exists in \c LocalFS.
-  const CachedFileSystemEntry *
-  createCachedFSEntryForLocal(StringRef OriginalFilename,
-                              const llvm::vfs::Status &Stat);
-
   /// Represents a filesystem entry that has been stat-ed (and potentially read)
   /// and that's about to be inserted into the cache as `CachedFileSystemEntry`.
   struct TentativeEntry {
@@ -433,9 +389,8 @@ private:
 
   /// Per-filename state cached locally by this worker thread, so repeated
   /// queries can be served without touching the shared cache. The entry and
-  /// real path are arena-owned by the shared cache (or by this worker for
-  /// entries from \c LocalFS) and outlive the local cache, so borrowing raw
-  /// pointers here is safe.
+  /// real path are arena-owned by the shared cache and outlive this worker, so
+  /// borrowing raw pointers here is safe.
   struct LocalEntry {
     const CachedFileSystemEntry *File = nullptr;
     const CachedRealPath *RealPath = nullptr;
@@ -462,6 +417,11 @@ private:
 
   /// The backing storage for cached contents resolved from local FS only.
   llvm::SpecificBumpPtrAllocator<CachedFileContents> LocalContentsStorage;
+
+  static const CachedFileSystemEntry *createEntry(
+      llvm::ErrorOr<TentativeEntry> &Entry,
+      llvm::SpecificBumpPtrAllocator<CachedFileContents> &ContentsStorage,
+      llvm::SpecificBumpPtrAllocator<CachedFileSystemEntry> &EntryStorage);
 
   void updateWorkingDirForCacheLookup();
 
