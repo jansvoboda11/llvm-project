@@ -58,6 +58,8 @@ def round_trip_args : F<"round-trip-args", "verify that command-line arguments a
 
 def no_flush_module_cache : F<"no-flush-module-cache", "do not flush the module cache from memory to disk at the end of the scan">;
 
+defm module_cache_memory_limit : Eq<"module-cache-memory-limit", "Spill PCMs built in-process to disk when they take more than this many bytes of memory (0 means unlimited)">;
+
 def verbatim_args : F<"verbatim-args", "Pass commands to the scanner verbatim without adjustments">;
 
 defm log_path : Eq<"log-path", "Write dependency scanning log to file">;

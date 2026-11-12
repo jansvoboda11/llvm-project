@@ -11,6 +11,7 @@
 #include "clang/Basic/AtomicLineLogger.h"
 #include "clang/Serialization/InMemoryModuleCache.h"
 #include "clang/Serialization/ModuleCache.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/AdvisoryLock.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Error.h"
@@ -61,6 +62,83 @@ void ModuleCacheEntries::flush() {
                       /*ReadBack=*/false);
     }
   }
+}
+
+void ModuleCacheEntries::touch(ModuleCacheEntry &Entry) {
+  Entry.LastAccess.store(AccessClock.fetch_add(1, std::memory_order_relaxed),
+                         std::memory_order_relaxed);
+}
+
+void ModuleCacheEntries::addResident(ModuleCacheMapEntry &MapEntry) {
+  ResidentBytes.fetch_add(MapEntry.second->Buffer->getBufferSize(),
+                          std::memory_order_relaxed);
+  std::lock_guard<std::mutex> Lock(ResidentMutex);
+  Resident.push_back(&MapEntry);
+}
+
+void ModuleCacheEntries::maybeSpill(AtomicLineLogger &Logger) {
+  if (!MemoryLimit ||
+      ResidentBytes.load(std::memory_order_relaxed) <= MemoryLimit)
+    return;
+
+  // Some other thread is already spilling, leave the work to them.
+  std::unique_lock<std::mutex> SpillLock(SpillMutex, std::try_to_lock);
+  if (!SpillLock.owns_lock())
+    return;
+
+  std::vector<ModuleCacheMapEntry *> Candidates;
+  {
+    std::lock_guard<std::mutex> Lock(ResidentMutex);
+    std::swap(Candidates, Resident);
+  }
+
+  // Snapshot the access times so that concurrent accesses don't confuse sort.
+  std::vector<std::pair<uint64_t, ModuleCacheMapEntry *>> LRU;
+  LRU.reserve(Candidates.size());
+  for (ModuleCacheMapEntry *MapEntry : Candidates)
+    LRU.emplace_back(
+        MapEntry->second->LastAccess.load(std::memory_order_relaxed), MapEntry);
+  llvm::sort(LRU, llvm::less_first());
+
+  std::vector<ModuleCacheMapEntry *> Remaining;
+  for (auto [LastAccess, MapEntry] : LRU)
+    if (ResidentBytes.load(std::memory_order_relaxed) <= MemoryLimit ||
+        !spill(*MapEntry, Logger))
+      Remaining.push_back(MapEntry);
+
+  std::lock_guard<std::mutex> Lock(ResidentMutex);
+  Resident.insert(Resident.end(), Remaining.begin(), Remaining.end());
+}
+
+bool ModuleCacheEntries::spill(ModuleCacheMapEntry &MapEntry,
+                               AtomicLineLogger &Logger) {
+  StringRef Path = MapEntry.getKey();
+  ModuleCacheEntry &Entry = *MapEntry.second;
+  std::lock_guard<std::mutex> Lock(Entry.Mutex);
+  if (Entry.State != ModuleCacheEntry::S_Written)
+    return true;
+
+  // This is a compiler-internal output, let's bypass the sandbox.
+  auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+  off_t Size;
+  time_t ModTime;
+  auto Written =
+      writeImpl(Path, *Entry.Buffer, Size, ModTime, /*ReadBack=*/true);
+  if (!Written) {
+    // Best-effort: keep the buffer in memory (e.g. read-only cache directory).
+    Logger.log() << "pcm_spill_failed: " << Path;
+    return false;
+  }
+  Logger.log() << "pcm_spill: " << Path;
+
+  // Note: We keep Entry.ModTime, since that's what readers have already seen.
+  // Small files don't get memory-mapped, in which case we keep the original
+  // buffer to avoid churn. Readers keep the original buffer alive on their own.
+  if ((*Written)->getBufferKind() == llvm::MemoryBuffer::MemoryBuffer_MMap)
+    Entry.Buffer = std::move(*Written);
+  ResidentBytes.fetch_sub(Size, std::memory_order_relaxed);
+  Entry.State = ModuleCacheEntry::S_Spilled;
+  return true;
 }
 
 namespace {
@@ -147,12 +225,16 @@ class InProcessModuleCache : public ModuleCache {
   // recreated for each translation unit.
   InMemoryModuleCache InMemory;
 
-  ModuleCacheEntry &getOrCreateEntry(StringRef Filename) {
+  ModuleCacheMapEntry &getOrCreateMapEntry(StringRef Filename) {
     std::lock_guard<std::mutex> Lock(Entries.Mutex);
-    auto &Entry = Entries.Map[Filename];
-    if (!Entry)
-      Entry = std::make_unique<ModuleCacheEntry>();
-    return *Entry;
+    auto &MapEntry = *Entries.Map.try_emplace(Filename).first;
+    if (!MapEntry.second)
+      MapEntry.second = std::make_unique<ModuleCacheEntry>();
+    return MapEntry;
+  }
+
+  ModuleCacheEntry &getOrCreateEntry(StringRef Filename) {
+    return *getOrCreateMapEntry(Filename).second;
   }
 
 public:
@@ -188,6 +270,9 @@ public:
     // FIXME: This only needs to be ran once per build, not in every
     // compilation. Call it once per service.
     maybePruneImpl(Path, PruneInterval, PruneAfter);
+    // This gets called at the start of each top-level compilation, a good
+    // point to get back within the memory limit.
+    Entries.maybeSpill(Logger);
   }
 
   InMemoryModuleCache &getInMemoryModuleCache() override { return InMemory; }
@@ -198,10 +283,13 @@ public:
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer, off_t &Size,
         time_t &ModTime) override {
-    ModuleCacheEntry &Entry = getOrCreateEntry(Path);
+    ModuleCacheMapEntry &MapEntry = getOrCreateMapEntry(Path);
+    ModuleCacheEntry &Entry = *MapEntry.second;
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
     Logger.log() << "pcm_write: " << Path;
-    if (Entry.State == ModuleCacheEntry::S_Written) {
+    Entries.touch(Entry);
+    if (Entry.State == ModuleCacheEntry::S_Written ||
+        Entry.State == ModuleCacheEntry::S_Spilled) {
       assert(Entry.Buffer && "Wrote PCM with no contents");
       assert(Entry.Buffer->getBuffer() == Buffer->getBuffer() &&
              "Wrote the same PCM with different contents");
@@ -213,6 +301,7 @@ public:
     Entry.Buffer = std::move(Buffer);
     Entry.ModTime = llvm::sys::toTimeT(std::chrono::system_clock::now());
     Entry.State = ModuleCacheEntry::S_Written;
+    Entries.addResident(MapEntry);
     Size = Entry.Buffer->getBufferSize();
     ModTime = Entry.ModTime;
     return std::make_unique<SharedMemoryBuffer>(Entry.Buffer);
@@ -223,6 +312,7 @@ public:
     Logger.log() << "pcm_read_disk: " << FileName;
     ModuleCacheEntry &Entry = getOrCreateEntry(FileName);
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
+    Entries.touch(Entry);
     if (Entry.State == ModuleCacheEntry::S_Unknown) {
       // This is a compiler-internal input/output, let's bypass the sandbox.
       auto BypassSandbox = llvm::sys::sandbox::scopedDisable();

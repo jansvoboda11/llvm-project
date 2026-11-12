@@ -116,6 +116,7 @@ static constexpr bool DoRoundTripDefault = false;
 
 static bool RoundTripArgs = DoRoundTripDefault;
 static bool NoFlushModuleCache = false;
+static uint64_t ModuleCacheMemoryLimit = 0;
 static bool VerbatimArgs = false;
 
 static void ParseArgs(int argc, char **argv) {
@@ -265,6 +266,17 @@ static void ParseArgs(int argc, char **argv) {
   RoundTripArgs = Args.hasArg(OPT_round_trip_args);
 
   NoFlushModuleCache = Args.hasArg(OPT_no_flush_module_cache);
+
+  if (const llvm::opt::Arg *A =
+          Args.getLastArg(OPT_module_cache_memory_limit_EQ)) {
+    StringRef S{A->getValue()};
+    if (!llvm::to_integer(S, ModuleCacheMemoryLimit, 0)) {
+      llvm::errs() << ToolName
+                   << ": for the -module-cache-memory-limit option: '" << S
+                   << "' value invalid for uint argument!\n";
+      std::exit(1);
+    }
+  }
 
   VerbatimArgs = Args.hasArg(OPT_verbatim_args);
 
@@ -1178,6 +1190,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   Opts.TraceVFS = Verbose;
   Opts.AsyncScanModules = AsyncScanModules;
   Opts.FlushModuleCache = !NoFlushModuleCache;
+  Opts.ModuleCacheMemoryLimit = ModuleCacheMemoryLimit;
   Opts.CacheNegativeStats = CacheNegativeStats;
   Opts.ValidateAgainstInvalidatedPaths = true;
   Opts.LogPath = LogPath;

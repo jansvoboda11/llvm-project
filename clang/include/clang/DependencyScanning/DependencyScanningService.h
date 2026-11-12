@@ -97,6 +97,10 @@ struct DependencyScanningServiceOptions {
   /// Whether to automatically flush the module cache from memory to disk at the
   /// end of the service lifetime.
   bool FlushModuleCache = true;
+  /// The number of bytes of PCMs built in-process that may be kept in memory.
+  /// When exceeded, the least recently used PCMs get spilled to disk at the
+  /// start of the next translation unit. Zero means unlimited.
+  uint64_t ModuleCacheMemoryLimit = 0;
   /// Whether the caching VFS should cache missing filesystem entries.
   bool CacheNegativeStats = shouldCacheNegativeStatsDefault();
   /// Whether scanning modules validate their directory deps against paths
@@ -116,6 +120,7 @@ public:
       : Opts(std::move(Opts)), Logger(this->Opts.LogPath) {
     ModCacheEntries.ValidateAgainstInvalidatedPaths =
         this->Opts.ValidateAgainstInvalidatedPaths;
+    ModCacheEntries.MemoryLimit = this->Opts.ModuleCacheMemoryLimit;
   }
 
   ~DependencyScanningService() {
