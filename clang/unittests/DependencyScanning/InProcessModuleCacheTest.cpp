@@ -1,12 +1,16 @@
 #include "clang/DependencyScanning/InProcessModuleCache.h"
 
 #include "clang/Basic/AtomicLineLogger.h"
+#include "llvm/Support/AdvisoryLock.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Testing/Support/Error.h"
 
 #include "gtest/gtest.h"
+
+#include <chrono>
+#include <thread>
 
 using namespace clang;
 using namespace clang::dependencies;
@@ -166,4 +170,69 @@ TEST(InProcessModuleCache, FlushInBackground) {
   EXPECT_EQ(ModTime, WrittenModTime);
 
   llvm::sys::fs::remove_directories(Dir);
+}
+
+TEST(InProcessModuleCache, WaitDetectsDeadlock) {
+  ModuleCacheEntries Entries;
+  AtomicLineLogger Logger;
+  // Two compilations, each holding the lock of one PCM and waiting for the
+  // other one.
+  std::shared_ptr<ModuleCache> CacheA =
+      makeInProcessModuleCache(Entries, Logger);
+  std::shared_ptr<ModuleCache> CacheB =
+      makeInProcessModuleCache(Entries, Logger);
+
+  auto LockAM = CacheA->getLock("M.pcm");
+  auto LockBN = CacheB->getLock("N.pcm");
+  ASSERT_THAT_EXPECTED(LockAM->tryLock(), llvm::HasValue(true));
+  ASSERT_THAT_EXPECTED(LockBN->tryLock(), llvm::HasValue(true));
+
+  auto LockAN = CacheA->getLock("N.pcm");
+  auto LockBM = CacheB->getLock("M.pcm");
+  ASSERT_THAT_EXPECTED(LockAN->tryLock(), llvm::HasValue(false));
+  ASSERT_THAT_EXPECTED(LockBM->tryLock(), llvm::HasValue(false));
+
+  // Whoever starts waiting last closes the cycle and must not wait. The other
+  // one gets unblocked when the lock it waits for is released.
+  auto Start = std::chrono::steady_clock::now();
+  llvm::WaitForUnlockResult ResultA;
+  std::thread WaiterA([&] {
+    ResultA = LockAN->waitForUnlockFor(std::chrono::seconds(60));
+    if (ResultA == llvm::WaitForUnlockResult::Timeout)
+      LockAM.reset();
+  });
+  llvm::WaitForUnlockResult ResultB =
+      LockBM->waitForUnlockFor(std::chrono::seconds(60));
+  if (ResultB == llvm::WaitForUnlockResult::Timeout)
+    LockBN.reset();
+  WaiterA.join();
+  auto Elapsed = std::chrono::steady_clock::now() - Start;
+
+  EXPECT_NE(ResultA, ResultB);
+  EXPECT_TRUE(ResultA == llvm::WaitForUnlockResult::Timeout ||
+              ResultB == llvm::WaitForUnlockResult::Timeout);
+  EXPECT_LT(Elapsed, std::chrono::seconds(30));
+}
+
+TEST(InProcessModuleCache, WaitWithoutDeadlock) {
+  ModuleCacheEntries Entries;
+  AtomicLineLogger Logger;
+  std::shared_ptr<ModuleCache> CacheA =
+      makeInProcessModuleCache(Entries, Logger);
+  std::shared_ptr<ModuleCache> CacheB =
+      makeInProcessModuleCache(Entries, Logger);
+
+  // B waits for M held by A, which doesn't wait for anything held by B.
+  auto LockAM = CacheA->getLock("M.pcm");
+  ASSERT_THAT_EXPECTED(LockAM->tryLock(), llvm::HasValue(true));
+  auto LockBM = CacheB->getLock("M.pcm");
+  ASSERT_THAT_EXPECTED(LockBM->tryLock(), llvm::HasValue(false));
+
+  std::thread Releaser([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    LockAM.reset();
+  });
+  EXPECT_EQ(LockBM->waitForUnlockFor(std::chrono::seconds(60)),
+            llvm::WaitForUnlockResult::Success);
+  Releaser.join();
 }

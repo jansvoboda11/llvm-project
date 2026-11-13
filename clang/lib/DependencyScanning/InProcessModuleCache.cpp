@@ -48,6 +48,35 @@ ModuleCacheEntries::isDirectoryInvalidated(StringRef Directory) const {
 
 ModuleCacheEntries::~ModuleCacheEntries() { stopFlushing(); }
 
+void ModuleCacheEntries::setOwner(ModuleCacheEntry &Entry, const void *Task) {
+  std::lock_guard<std::mutex> Lock(WaitsMutex);
+  Entry.Owner = Task;
+}
+
+bool ModuleCacheEntries::beginWait(const void *Task, ModuleCacheEntry &Entry) {
+  std::lock_guard<std::mutex> Lock(WaitsMutex);
+  // Follow the chain of tasks waiting for each other. Each task waits for at
+  // most one lock at a time, so the chain is bounded by the number of waiting
+  // tasks, unless it contains a cycle not involving this task (which is
+  // already deadlocked and will be broken by one of its members).
+  ModuleCacheEntry *Next = &Entry;
+  for (size_t I = 0, E = Waits.size(); I <= E && Next; ++I) {
+    if (!Next->Owner)
+      break;
+    if (Next->Owner == Task)
+      return false;
+    auto It = Waits.find(Next->Owner);
+    Next = It == Waits.end() ? nullptr : It->second;
+  }
+  Waits[Task] = &Entry;
+  return true;
+}
+
+void ModuleCacheEntries::endWait(const void *Task) {
+  std::lock_guard<std::mutex> Lock(WaitsMutex);
+  Waits.erase(Task);
+}
+
 void ModuleCacheEntries::flush() {
   auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
   for (auto &[Path, Entry] : Map) {
@@ -167,11 +196,18 @@ public:
 };
 
 class ReaderWriterLock : public llvm::AdvisoryLock {
+  ModuleCacheEntries &Entries;
   ModuleCacheEntry &Entry;
+  /// Identifies the task this lock is acquired for, see
+  /// \c ModuleCacheEntries::beginWait(). Kept alive by the lock, so that the
+  /// identity can't be reused while the lock is held.
+  std::shared_ptr<const char> Task;
   std::optional<unsigned> OwnedGeneration;
 
 public:
-  ReaderWriterLock(ModuleCacheEntry &Entry) : Entry(Entry) {}
+  ReaderWriterLock(ModuleCacheEntries &Entries, ModuleCacheEntry &Entry,
+                   std::shared_ptr<const char> Task)
+      : Entries(Entries), Entry(Entry), Task(std::move(Task)) {}
 
   Expected<bool> tryLock() override {
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
@@ -179,12 +215,18 @@ public:
       return false;
     Entry.Locked = true;
     OwnedGeneration = Entry.Generation;
+    Entries.setOwner(Entry, Task.get());
     return true;
   }
 
   llvm::WaitForUnlockResult
   waitForUnlockFor(std::chrono::seconds MaxSeconds) override {
     assert(!OwnedGeneration);
+    // Waiting would deadlock, pretend we timed out right away so that the
+    // caller takes over the lock. The module cycle causing this then gets
+    // diagnosed instead of waiting for the timeout first.
+    if (!Entries.beginWait(Task.get(), Entry))
+      return llvm::WaitForUnlockResult::Timeout;
     std::unique_lock<std::mutex> Lock(Entry.Mutex);
     unsigned CurrentGeneration = Entry.Generation;
     bool Success = Entry.CondVar.wait_for(Lock, MaxSeconds, [&] {
@@ -192,6 +234,8 @@ public:
       // of unsafeUnlock() and successful tryLock().
       return !Entry.Locked || Entry.Generation != CurrentGeneration;
     });
+    Lock.unlock();
+    Entries.endWait(Task.get());
     return Success ? llvm::WaitForUnlockResult::Success
                    : llvm::WaitForUnlockResult::Timeout;
   }
@@ -201,6 +245,7 @@ public:
       std::lock_guard<std::mutex> Lock(Entry.Mutex);
       Entry.Generation += 1;
       Entry.Locked = false;
+      Entries.setOwner(Entry, nullptr);
     }
     Entry.CondVar.notify_all();
     return {};
@@ -212,8 +257,10 @@ public:
         std::lock_guard<std::mutex> Lock(Entry.Mutex);
         // Avoid stomping over the state managed by someone else after
         // unsafeUnlock() and successful tryLock().
-        if (*OwnedGeneration == Entry.Generation)
+        if (*OwnedGeneration == Entry.Generation) {
           Entry.Locked = false;
+          Entries.setOwner(Entry, nullptr);
+        }
       }
       Entry.CondVar.notify_all();
     }
@@ -228,6 +275,10 @@ class InProcessModuleCache : public ModuleCache {
   // implementation of the InMemoryModuleCache such that it doesn't need to be
   // recreated for each translation unit.
   InMemoryModuleCache InMemory;
+
+  /// Identifies the task this module cache is used by, see
+  /// \c ModuleCacheEntries::beginWait().
+  std::shared_ptr<const char> Task = std::make_shared<const char>();
 
   ModuleCacheMapEntry &getOrCreateMapEntry(StringRef Filename) {
     std::lock_guard<std::mutex> Lock(Entries.Mutex);
@@ -247,7 +298,7 @@ public:
 
   std::unique_ptr<llvm::AdvisoryLock> getLock(StringRef Filename) override {
     auto &Entry = getOrCreateEntry(Filename);
-    return std::make_unique<ReaderWriterLock>(Entry);
+    return std::make_unique<ReaderWriterLock>(Entries, Entry, Task);
   }
 
   std::time_t getModuleTimestamp(StringRef Filename) override {

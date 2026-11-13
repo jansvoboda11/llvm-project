@@ -11,6 +11,7 @@
 
 #include "clang/Basic/AtomicLineLogger.h"
 #include "clang/Serialization/ModuleCache.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -34,6 +35,9 @@ struct ModuleCacheEntry {
   std::condition_variable CondVar;
   bool Locked = false;
   unsigned Generation = 0;
+  /// The task holding the lock, see \c ModuleCacheEntries::beginWait().
+  /// Guarded by \c ModuleCacheEntries::WaitsMutex.
+  const void *Owner = nullptr;
 
   std::atomic<std::time_t> Timestamp = 0;
 
@@ -67,6 +71,19 @@ struct ModuleCacheEntries {
 
   ~ModuleCacheEntries();
 
+  /// Records that the lock of \p Entry is now held by \p Task (or nobody, if
+  /// null). A task is a compilation and all the module compilations it
+  /// performs synchronously, identified by its module cache.
+  void setOwner(ModuleCacheEntry &Entry, const void *Task);
+
+  /// Records that \p Task is about to wait for the lock of \p Entry, unless
+  /// that would deadlock, i.e. the task holding the lock (transitively) waits
+  /// for a lock held by \p Task. Returns false in that case.
+  bool beginWait(const void *Task, ModuleCacheEntry &Entry);
+
+  /// Records that \p Task stopped waiting for a lock.
+  void endWait(const void *Task);
+
   /// Flushes all PCMs built in-process that haven't been flushed yet to disk.
   void flush();
 
@@ -97,6 +114,11 @@ private:
   std::condition_variable PendingCondVar;
   bool StopFlushing = false;
   std::thread Flusher;
+
+  /// Guards \c ModuleCacheEntry::Owner and \c Waits.
+  std::mutex WaitsMutex;
+  /// The lock each waiting task waits for.
+  llvm::DenseMap<const void *, ModuleCacheEntry *> Waits;
 
   mutable std::mutex InvalidatedPathsMutex;
   llvm::StringSet<> InvalidatedPaths;

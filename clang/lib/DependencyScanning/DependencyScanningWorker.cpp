@@ -625,7 +625,12 @@ struct AsyncModuleCompile : PPCallbacks {
       return;
     }
 
-    auto Lock = ModCache.getLock(ModuleFileName);
+    // Acquire the lock through the module cache of the compilation building
+    // the PCM, so that it's attributed to the right task when detecting
+    // deadlocks between compilations waiting for each other.
+    auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
+                                       Service.getLogger());
+    auto Lock = MC->getLock(ModuleFileName);
     bool Owned;
     llvm::Error LockErr = Lock->tryLock().moveInto(Owned);
     // Someone else is building the PCM right now.
@@ -638,8 +643,6 @@ struct AsyncModuleCompile : PPCallbacks {
     VFS = createVFSFromCompilerInvocation(CI.getInvocation(),
                                           CI.getDiagnostics(), std::move(VFS));
     auto DC = std::make_unique<DiagnosticConsumer>();
-    auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
-                                       Service.getLogger());
     CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
                                                         std::move(MC));
     auto ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
@@ -650,8 +653,9 @@ struct AsyncModuleCompile : PPCallbacks {
     auto ModController = Controller.clone();
 
     // Note: This lock belongs to a module cache that might not outlive the
-    // thread. This works, because the in-process lock only refers to an object
-    // managed by the service, which does outlive the thread.
+    // lock. This works, because the in-process lock only refers to objects
+    // managed by the service, which does outlive the thread, or kept alive by
+    // the lock itself.
     Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
                   ModCI2 = std::move(ModCI2), DC = std::move(DC),
                   ModController = std::move(ModController), Service = &Service,
