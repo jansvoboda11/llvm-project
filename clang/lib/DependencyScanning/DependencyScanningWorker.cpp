@@ -10,6 +10,7 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/Basic/DiagnosticSerialization.h"
+#include "clang/Basic/Stack.h"
 #include "clang/DependencyScanning/DependencyActionController.h"
 #include "clang/DependencyScanning/DependencyConsumer.h"
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/thread.h"
 #include "llvm/TargetParser/Host.h"
 #include <mutex>
 #include <thread>
@@ -518,15 +520,18 @@ class AsyncModuleCompiles {
   std::mutex Mutex;
   bool Stop = false;
   // FIXME: Have the service own a thread pool and use that instead.
-  std::vector<std::thread> Compiles;
+  std::vector<llvm::thread> Compiles;
 
 public:
   /// Registers the module compilation, unless this instance is about to be
   /// destroyed.
   void add(llvm::unique_function<void()> Compile) {
     std::lock_guard<std::mutex> Lock(Mutex);
+    // Like CompilerInstance::compileModule(), build modules on a thread with
+    // the stack size Clang expects, rather than the (much smaller) default.
     if (!Stop)
-      Compiles.emplace_back(std::move(Compile));
+      Compiles.emplace_back(std::optional<unsigned>(DesiredStackSize),
+                            std::move(Compile));
   }
 
   ~AsyncModuleCompiles() {
@@ -534,7 +539,7 @@ public:
       std::lock_guard<std::mutex> Lock(Mutex);
       Stop = true;
     }
-    for (std::thread &Compile : Compiles)
+    for (llvm::thread &Compile : Compiles)
       Compile.join();
   }
 };
