@@ -23,6 +23,7 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Support/AdvisoryLock.h"
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Host.h"
 #include <mutex>
@@ -649,17 +650,39 @@ struct AsyncModuleCompile : PPCallbacks {
     Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
                   ModCI2 = std::move(ModCI2), DC = std::move(DC),
                   ModController = std::move(ModController), Service = &Service,
-                  Compiles = &Compiles] {
+                  Compiles = &Compiles, ModuleFileName = ModuleFileName] {
       llvm::CrashRecoveryContext CRC;
       (void)CRC.RunSafely([&] {
         // Quickly discovers and compiles modules for the real scan below.
         SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
                                                     *Compiles);
         (void)ModCI1->ExecuteAction(Action1);
-        // The real scan below.
+        // The real scan below. Like CompilerInstance::compileModule(), build
+        // the PCM in memory and hand it to the module cache, which decides
+        // whether and when it gets written to disk.
         ModCI2->getPreprocessorOpts().SingleModuleParseMode = false;
-        GenerateModuleFromModuleMapAction Action2;
+        SmallString<0> Buffer;
+        GenerateModuleFromModuleMapAction Action2(
+            std::make_unique<llvm::raw_svector_ostream>(Buffer));
         (void)ModCI2->ExecuteAction(Action2);
+        // Let the regular scan diagnose modules that failed to build.
+        if (Buffer.empty() ||
+            (ModCI2->getDiagnostics().hasErrorOccurred() &&
+             !ModCI2->getFrontendOpts().AllowPCMWithCompilerErrors))
+          return;
+        ModuleCache &ModCache = ModCI2->getModuleCache();
+        off_t Size;
+        time_t ModTime;
+        auto Written = ModCache.write(
+            ModuleFileName,
+            std::make_unique<llvm::SmallVectorMemoryBuffer>(
+                std::move(Buffer), ModCI2->getFrontendOpts().OutputFile),
+            Size, ModTime);
+        if (!Written)
+          return;
+        // The module is built successfully, we can update its timestamp now.
+        if (ModCI2->getHeaderSearchOpts().ModulesValidateOncePerBuildSession)
+          ModCache.updateModuleTimestamp(ModuleFileName);
       });
     });
   }
