@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -125,8 +126,14 @@ private:
   std::atomic<bool> AnyInvalidatedPaths = false;
 };
 
+/// Creates a module cache backed by \p Entries.
+///
+/// If \p ShouldPublish is set and returns false when writing a PCM, the PCM
+/// (and its timestamp) is only made available to the caller, but not to other
+/// users of \p Entries.
 std::shared_ptr<ModuleCache>
-makeInProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger);
+makeInProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger,
+                         std::function<bool()> ShouldPublish = nullptr);
 
 } // namespace dependencies
 } // namespace clang

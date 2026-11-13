@@ -515,6 +515,20 @@ initializeScanInstanceDependencyCollector(
 }
 
 namespace {
+/// Remembers whether any diagnostics were emitted.
+class DiagnosticsTracker : public DiagnosticConsumer {
+  bool Emitted = false;
+
+public:
+  void HandleDiagnostic(DiagnosticsEngine::Level Level,
+                        const Diagnostic &Info) override {
+    DiagnosticConsumer::HandleDiagnostic(Level, Info);
+    Emitted = true;
+  }
+
+  bool emitted() const { return Emitted; }
+};
+
 /// Manages (and terminates) the asynchronous compilation of modules.
 class AsyncModuleCompiles {
   std::mutex Mutex;
@@ -588,6 +602,15 @@ struct AsyncModuleCompile : PPCallbacks {
   void moduleLoadSkipped(Module *M) override {
     M = M->getTopLevelModule();
 
+    // The regular scan reports building a module on the diagnostics of the
+    // importer (e.g. with -Rmodule-build), which can't be reproduced if the
+    // module gets built asynchronously. Leave it to the regular scan instead.
+    DiagnosticsEngine &Diags = CI.getDiagnostics();
+    if (!Diags.isIgnored(diag::remark_module_build, SourceLocation()) ||
+        !Diags.isIgnored(diag::remark_module_build_done, SourceLocation()) ||
+        !Diags.isIgnored(diag::remark_module_lock, SourceLocation()))
+      return;
+
     HeaderSearch &HS = CI.getPreprocessor().getHeaderSearchInfo();
     ModuleCache &ModCache = CI.getModuleCache();
     ModuleFileName ModuleFileName = HS.getCachedModuleFileName(M);
@@ -625,11 +648,17 @@ struct AsyncModuleCompile : PPCallbacks {
       return;
     }
 
+    // Diagnostics of the asynchronous compilation are not reported. To keep
+    // them visible, PCMs (including the ones of modules this compilation
+    // builds synchronously) whose compilation emitted diagnostics don't get
+    // published and are built again by the regular scan, which reports them.
+    auto Tracker = std::make_unique<DiagnosticsTracker>();
     // Acquire the lock through the module cache of the compilation building
     // the PCM, so that it's attributed to the right task when detecting
     // deadlocks between compilations waiting for each other.
-    auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
-                                       Service.getLogger());
+    auto MC = makeInProcessModuleCache(
+        Service.getModuleCacheEntries(), Service.getLogger(),
+        [Tracker = Tracker.get()] { return !Tracker->emitted(); });
     auto Lock = MC->getLock(ModuleFileName);
     bool Owned;
     llvm::Error LockErr = Lock->tryLock().moveInto(Owned);
@@ -642,13 +671,16 @@ struct AsyncModuleCompile : PPCallbacks {
             Service, Service.getOpts().MakeVFS());
     VFS = createVFSFromCompilerInvocation(CI.getInvocation(),
                                           CI.getDiagnostics(), std::move(VFS));
+    // The single-module-parse-mode pass may emit diagnostics the real
+    // compilation wouldn't, keep them separate.
     auto DC = std::make_unique<DiagnosticConsumer>();
-    CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
-                                                        std::move(MC));
+    CompilerInstance::ThreadSafeCloneConfig CloneConfig1(VFS, *DC, MC);
+    CompilerInstance::ThreadSafeCloneConfig CloneConfig2(
+        std::move(VFS), *Tracker, std::move(MC));
     auto ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
+                                           CloneConfig1);
     auto ModCI2 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
+                                           CloneConfig2);
 
     auto ModController = Controller.clone();
 
@@ -658,6 +690,7 @@ struct AsyncModuleCompile : PPCallbacks {
     // the lock itself.
     Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
                   ModCI2 = std::move(ModCI2), DC = std::move(DC),
+                  Tracker = std::move(Tracker),
                   ModController = std::move(ModController), Service = &Service,
                   Compiles = &Compiles, ModuleFileName = ModuleFileName] {
       llvm::CrashRecoveryContext CRC;

@@ -280,6 +280,11 @@ class InProcessModuleCache : public ModuleCache {
   /// \c ModuleCacheEntries::beginWait().
   std::shared_ptr<const char> Task = std::make_shared<const char>();
 
+  /// Whether to make written PCMs available to other users of \c Entries.
+  std::function<bool()> ShouldPublish;
+
+  bool shouldPublish() const { return !ShouldPublish || ShouldPublish(); }
+
   ModuleCacheMapEntry &getOrCreateMapEntry(StringRef Filename) {
     std::lock_guard<std::mutex> Lock(Entries.Mutex);
     auto &MapEntry = *Entries.Map.try_emplace(Filename).first;
@@ -293,8 +298,10 @@ class InProcessModuleCache : public ModuleCache {
   }
 
 public:
-  InProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger)
-      : ModuleCache(Logger), Entries(Entries), InMemory(Logger) {}
+  InProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger,
+                       std::function<bool()> ShouldPublish)
+      : ModuleCache(Logger), Entries(Entries), InMemory(Logger),
+        ShouldPublish(std::move(ShouldPublish)) {}
 
   std::unique_ptr<llvm::AdvisoryLock> getLock(StringRef Filename) override {
     auto &Entry = getOrCreateEntry(Filename);
@@ -309,6 +316,8 @@ public:
   }
 
   void updateModuleTimestamp(StringRef Filename) override {
+    if (!shouldPublish())
+      return;
     // Note: This essentially replaces FS contention with mutex contention.
     auto &Timestamp = getOrCreateEntry(Filename).Timestamp;
 
@@ -348,6 +357,12 @@ public:
       ModTime = Entry.ModTime;
       return std::make_unique<SharedMemoryBuffer>(Entry.Buffer);
     }
+    if (!shouldPublish()) {
+      Logger.log() << "pcm_write_unpublished: " << Path;
+      Size = Buffer->getBufferSize();
+      ModTime = llvm::sys::toTimeT(std::chrono::system_clock::now());
+      return std::move(Buffer);
+    }
     // Readers of the previous buffer (if any) keep it alive on their own.
     Entry.Buffer = std::move(Buffer);
     Entry.ModTime = llvm::sys::toTimeT(std::chrono::system_clock::now());
@@ -384,6 +399,8 @@ public:
 
 std::shared_ptr<ModuleCache>
 dependencies::makeInProcessModuleCache(ModuleCacheEntries &Entries,
-                                       AtomicLineLogger &Logger) {
-  return std::make_shared<InProcessModuleCache>(Entries, Logger);
+                                       AtomicLineLogger &Logger,
+                                       std::function<bool()> ShouldPublish) {
+  return std::make_shared<InProcessModuleCache>(Entries, Logger,
+                                                std::move(ShouldPublish));
 }
