@@ -11,6 +11,7 @@
 
 #include "clang/Basic/LLVM.h"
 #include "clang/Lex/DependencyDirectivesScanner.h"
+#include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
@@ -214,15 +215,19 @@ public:
     llvm::SpecificBumpPtrAllocator<CachedRealPath> RealPathStorage;
 
     /// Returns the real path associated with the filename or nullptr if none is
-    /// found.
-    const CachedRealPath *findRealPathByFilename(StringRef Filename) const;
+    /// found. If found, sets \p StoredFilename to the copy of \p Filename owned
+    /// by this shard, which lives as long as the shard.
+    const CachedRealPath *
+    findRealPathByFilename(StringRef Filename, StringRef &StoredFilename) const;
 
     /// Returns the real path associated with the filename if there is some.
     /// Otherwise, constructs new one with the given one, associates it with the
-    /// filename and returns the result.
+    /// filename and returns the result. Sets \p StoredFilename to the copy of
+    /// \p Filename owned by this shard, which lives as long as the shard.
     const CachedRealPath &
     getOrEmplaceRealPathForFilename(StringRef Filename,
-                                    llvm::ErrorOr<StringRef> RealPath);
+                                    llvm::ErrorOr<StringRef> RealPath,
+                                    StringRef &StoredFilename);
   };
 
   DependencyScanningFilesystemSharedCache();
@@ -367,10 +372,13 @@ private:
   /// or the result of an in-flight wait), or claims the producer slot and
   /// computes the entry via the underlying filesystem.
   /// \p FilenameForLookup is always absolute, and may differ from
-  /// \p OriginalFilename if the latter is relative.
+  /// \p OriginalFilename if the latter is relative. Sets \p StoredFilename to
+  /// a copy of \p FilenameForLookup that outlives this filesystem's local
+  /// caches.
   llvm::ErrorOr<const CachedFileSystemEntry *>
   resolveFilenameThroughSharedCache(StringRef OriginalFilename,
-                                    StringRef FilenameForLookup);
+                                    StringRef FilenameForLookup,
+                                    StringRef &StoredFilename);
 
   /// Resolves the cache entry for the on-disk file identified by \p Stat
   /// through the UID-keyed shared cache. Reads the file's contents on the
@@ -413,19 +421,26 @@ private:
   /// The service associated with this VFS.
   DependencyScanningService &Service;
 
-  /// Per-filename state cached locally by this worker thread, so repeated
-  /// queries can be served without touching the shared cache. The entry and
-  /// real path are arena-owned by the shared cache (or by this worker for
-  /// results from \c LocalFS) and outlive the local cache, so borrowing raw
-  /// pointers here is safe.
-  struct LocalEntry {
-    const CachedFileSystemEntry *File = nullptr;
-    const CachedRealPath *RealPath = nullptr;
-  };
+  /// Per-filename entries and real paths cached locally by this worker thread,
+  /// so repeated queries can be served without touching the shared cache.
+  ///
+  /// The keys are absolute filenames that don't own their characters: they
+  /// point to the keys of the shared cache's filename map, which are never
+  /// freed, or into \c LocalFilenameStorage for results from \c LocalFS. This
+  /// way, the workers don't each keep their own copy of every path. Similarly,
+  /// the entries and real paths are arena-owned by the shared cache (or by this
+  /// worker for results from \c LocalFS) and outlive the local caches, so
+  /// borrowing raw pointers here is safe.
+  ///
+  /// Only results that the shared cache keeps are cached locally; uncached
+  /// negative stats are looked up again every time.
+  llvm::DenseMap<llvm::CachedHashStringRef, const CachedFileSystemEntry *>
+      LocalEntries;
+  llvm::DenseMap<llvm::CachedHashStringRef, const CachedRealPath *>
+      LocalRealPaths;
 
-  /// The local cache is used by the worker thread to cache file system queries
-  /// locally instead of querying the global cache every time.
-  llvm::StringMap<LocalEntry, llvm::BumpPtrAllocator> LocalCache;
+  /// The backing storage for local cache keys resolved from local FS only.
+  llvm::BumpPtrAllocator LocalFilenameStorage;
 
   /// The working directory to use for making relative paths absolute before
   /// using them for cache lookups.
