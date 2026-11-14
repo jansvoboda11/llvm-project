@@ -30,6 +30,21 @@ using namespace clang;
 using namespace clang::dependency_directives_scan;
 using namespace llvm;
 
+static_assert(dependency_directives_scan::Token::PhysicalStartOfLine ==
+                  clang::Token::PhysicalStartOfLine,
+              "PhysicalStartOfLine must be representable");
+static_assert(clang::Token::StartOfLine <=
+                      dependency_directives_scan::Token::DirectFlags &&
+                  clang::Token::LeadingSpace <=
+                      dependency_directives_scan::Token::DirectFlags &&
+                  clang::Token::NeedsCleaning <=
+                      dependency_directives_scan::Token::DirectFlags &&
+                  clang::Token::HasUDSuffix <=
+                      dependency_directives_scan::Token::DirectFlags &&
+                  clang::Token::HasUCN <=
+                      dependency_directives_scan::Token::DirectFlags,
+              "the flags produced by the raw lexer must be representable");
+
 namespace {
 
 struct DirectiveWithTokens {
@@ -38,6 +53,27 @@ struct DirectiveWithTokens {
 
   DirectiveWithTokens(DirectiveKind Kind, unsigned NumTokens)
       : Kind(Kind), NumTokens(NumTokens) {}
+};
+
+/// A token as lexed by the scanner, before it's stored as a (compact)
+/// \c dependency_directives_scan::Token.
+struct ScannedToken {
+  unsigned Offset;
+  unsigned Length;
+  tok::TokenKind Kind;
+  unsigned short Flags;
+
+  ScannedToken(unsigned Offset, unsigned Length, tok::TokenKind Kind,
+               unsigned short Flags)
+      : Offset(Offset), Length(Length), Kind(Kind), Flags(Flags) {}
+
+  unsigned getEnd() const { return Offset + Length; }
+
+  bool is(tok::TokenKind K) const { return Kind == K; }
+  bool isNot(tok::TokenKind K) const { return Kind != K; }
+  template <typename... Ts> bool isOneOf(Ts... Ks) const {
+    return (is(Ks) || ...);
+  }
 };
 
 enum class CXX20ModuleDirectiveKind {
@@ -99,18 +135,18 @@ struct Scanner {
 
 private:
   /// Lexes next token and advances \p First and the \p Lexer.
-  [[nodiscard]] dependency_directives_scan::Token &
-  lexToken(const char *&First, const char *const End);
+  [[nodiscard]] ScannedToken &lexToken(const char *&First,
+                                       const char *const End);
 
-  [[nodiscard]] dependency_directives_scan::Token &
-  lexIncludeFilename(const char *&First, const char *const End);
+  [[nodiscard]] ScannedToken &lexIncludeFilename(const char *&First,
+                                                 const char *const End);
 
   void skipLine(const char *&First, const char *const End);
   void skipDirective(StringRef Name, const char *&First, const char *const End);
 
   /// Returns the spelling of a string literal or identifier after performing
   /// any processing needed to handle \c clang::Token::NeedsCleaning.
-  StringRef cleanStringIfNeeded(const dependency_directives_scan::Token &Tok);
+  StringRef cleanStringIfNeeded(const ScannedToken &Tok);
 
   /// Lexes next token and if it is identifier returns its string, otherwise
   /// it skips the current line and returns \p std::nullopt.
@@ -164,7 +200,21 @@ private:
   void lexPPDirectiveBody(const char *&First, const char *const End);
 
   DirectiveWithTokens &pushDirective(DirectiveKind Kind) {
-    Tokens.append(CurDirToks);
+    for (const ScannedToken &Tok : CurDirToks) {
+      if (LLVM_LIKELY(dependency_directives_scan::Token::isRepresentable(
+              Tok.Length, Tok.Kind, Tok.Flags))) {
+        Tokens.emplace_back(Tok.Offset, Tok.Length, Tok.Kind, Tok.Flags);
+        continue;
+      }
+      // Remember the first token that can't be stored and fail the scan in
+      // the end. Store a placeholder to keep the directive's token count.
+      assert(Tok.Length > dependency_directives_scan::Token::MaxLength &&
+             "the raw lexer produced an unrepresentable kind or flag");
+      if (!TooLongTokenPtr)
+        TooLongTokenPtr = Input.data() + Tok.Offset;
+      Tokens.emplace_back(Tok.Offset, /*Length=*/0, tok::unknown,
+                          /*Flags=*/0);
+    }
     DirsWithToks.emplace_back(Kind, CurDirToks.size());
     CurDirToks.clear();
     return DirsWithToks.back();
@@ -192,10 +242,13 @@ private:
   SourceLocation InputSourceLoc;
 
   const char *LastTokenPtr = nullptr;
+  /// The first token that was pushed but isn't representable as a
+  /// \c dependency_directives_scan::Token, because it is too long.
+  const char *TooLongTokenPtr = nullptr;
   /// Keeps track of the tokens for the currently lexed directive. Once a
   /// directive is fully lexed and "committed" then the tokens get appended to
   /// \p Tokens and \p CurDirToks is cleared for the next directive.
-  SmallVector<dependency_directives_scan::Token, 32> CurDirToks;
+  SmallVector<ScannedToken, 32> CurDirToks;
   /// The directives that were lexed along with the number of tokens that each
   /// directive contains. The tokens of all the directives are kept in \p Tokens
   /// vector, in the same order as the directives order in \p DirsWithToks.
@@ -565,7 +618,7 @@ bool Scanner::lexModuleDirectiveBody(DirectiveKind Kind, const char *&First,
   for (;;) {
     // Keep a copy of the First char incase it needs to be reset.
     const char *Previous = First;
-    const dependency_directives_scan::Token &Tok = lexToken(First, End);
+    const ScannedToken &Tok = lexToken(First, End);
     if ((Tok.is(tok::hash) || Tok.is(tok::at)) &&
         (Tok.Flags & clang::Token::StartOfLine)) {
       CurDirToks.pop_back();
@@ -598,8 +651,7 @@ bool Scanner::lexModuleDirectiveBody(DirectiveKind Kind, const char *&First,
                      diag::err_dep_source_scanner_unexpected_tokens_at_import);
 }
 
-dependency_directives_scan::Token &Scanner::lexToken(const char *&First,
-                                                     const char *const End) {
+ScannedToken &Scanner::lexToken(const char *&First, const char *const End) {
   clang::Token Tok;
   TheLexer.LexFromRawLexer(Tok);
   First = Input.data() + TheLexer.getCurrentBufferOffset();
@@ -611,8 +663,8 @@ dependency_directives_scan::Token &Scanner::lexToken(const char *&First,
   return CurDirToks.back();
 }
 
-dependency_directives_scan::Token &
-Scanner::lexIncludeFilename(const char *&First, const char *const End) {
+ScannedToken &Scanner::lexIncludeFilename(const char *&First,
+                                          const char *const End) {
   clang::Token Tok;
   TheLexer.LexIncludeFilename(Tok);
   First = Input.data() + TheLexer.getCurrentBufferOffset();
@@ -626,14 +678,13 @@ Scanner::lexIncludeFilename(const char *&First, const char *const End) {
 
 void Scanner::lexPPDirectiveBody(const char *&First, const char *const End) {
   while (true) {
-    const dependency_directives_scan::Token &Tok = lexToken(First, End);
+    const ScannedToken &Tok = lexToken(First, End);
     if (Tok.is(tok::eod) || Tok.is(tok::eof))
       break;
   }
 }
 
-StringRef
-Scanner::cleanStringIfNeeded(const dependency_directives_scan::Token &Tok) {
+StringRef Scanner::cleanStringIfNeeded(const ScannedToken &Tok) {
   bool NeedsCleaning = Tok.Flags & clang::Token::NeedsCleaning;
   if (LLVM_LIKELY(!NeedsCleaning))
     return Input.slice(Tok.Offset, Tok.getEnd());
@@ -659,7 +710,7 @@ Scanner::cleanStringIfNeeded(const dependency_directives_scan::Token &Tok) {
 
 std::optional<StringRef>
 Scanner::tryLexIdentifierOrSkipLine(const char *&First, const char *const End) {
-  const dependency_directives_scan::Token &Tok = lexToken(First, End);
+  const ScannedToken &Tok = lexToken(First, End);
   if (Tok.isNot(tok::raw_identifier)) {
     if (!Tok.is(tok::eod))
       skipLine(First, End);
@@ -688,7 +739,7 @@ bool Scanner::isNextIdentifierOrSkipLine(StringRef Id, const char *&First,
 
 bool Scanner::isNextTokenOrSkipLine(tok::TokenKind K, const char *&First,
                                     const char *const End) {
-  const dependency_directives_scan::Token &Tok = lexToken(First, End);
+  const ScannedToken &Tok = lexToken(First, End);
   if (Tok.is(K))
     return true;
   skipLine(First, End);
@@ -698,7 +749,7 @@ bool Scanner::isNextTokenOrSkipLine(tok::TokenKind K, const char *&First,
 std::optional<StringRef>
 Scanner::tryLexStringLiteralOrSkipLine(const char *&First,
                                        const char *const End) {
-  const dependency_directives_scan::Token &Tok = lexToken(First, End);
+  const ScannedToken &Tok = lexToken(First, End);
   if (!tok::isStringLiteral(Tok.Kind)) {
     if (!Tok.is(tok::eod))
       skipLine(First, End);
@@ -712,7 +763,7 @@ bool Scanner::lexAt(const char *&First, const char *const End) {
   // Handle "@import".
 
   // Lex '@'.
-  const dependency_directives_scan::Token &AtTok = lexToken(First, End);
+  const ScannedToken &AtTok = lexToken(First, End);
   assert(AtTok.is(tok::at));
   (void)AtTok;
 
@@ -979,7 +1030,7 @@ bool Scanner::lexPPLine(const char *&First, const char *const End) {
     return lexModule(First, End);
 
   // Lex '#'.
-  const dependency_directives_scan::Token &HashTok = lexToken(First, End);
+  const ScannedToken &HashTok = lexToken(First, End);
   if (HashTok.is(tok::hashhash)) {
     // A \p tok::hashhash at this location is passed by the preprocessor to the
     // parser to interpret, like any other token. So for dependency scanning
@@ -1059,11 +1110,15 @@ bool Scanner::scanImpl(const char *First, const char *const End) {
 bool Scanner::scan(SmallVectorImpl<Directive> &Directives) {
   ScanningPreprocessedModuleFile = clang::isPreprocessedModuleFile(Input);
   bool Error = scanImpl(Input.begin(), Input.end());
+  if (!Error && TooLongTokenPtr)
+    Error = reportError(TooLongTokenPtr,
+                        diag::err_dep_source_scanner_token_too_long);
 
   if (!Error) {
     // Add an EOF on success.
     if (LastTokenPtr &&
-        (Tokens.empty() || LastTokenPtr > Input.begin() + Tokens.back().Offset))
+        (Tokens.empty() ||
+         LastTokenPtr > Input.begin() + Tokens.back().getOffset()))
       pushDirective(tokens_present_before_eof);
     pushDirective(pp_eof);
   }
@@ -1095,18 +1150,18 @@ void clang::printDependencyDirectivesAsSource(
   auto needsSpaceSeparator = [](const dependency_directives_scan::Token &Prev,
                                 const dependency_directives_scan::Token &Tok,
                                 DirectiveKind Kind, unsigned TokIdx) -> bool {
-    if (Prev.Kind == Tok.Kind)
+    if (Prev.getKind() == Tok.getKind())
       return !Tok.isOneOf(tok::l_paren, tok::r_paren, tok::l_square,
                           tok::r_square);
-    if (Prev.Kind == tok::raw_identifier &&
+    if (Prev.getKind() == tok::raw_identifier &&
         Tok.isOneOf(tok::hash, tok::numeric_constant, tok::string_literal,
                     tok::char_constant, tok::header_name))
       return true;
-    if (Prev.Kind == tok::r_paren &&
+    if (Prev.getKind() == tok::r_paren &&
         Tok.isOneOf(tok::raw_identifier, tok::hash, tok::string_literal,
                     tok::char_constant, tok::unknown))
       return true;
-    if (Prev.Kind == tok::comma &&
+    if (Prev.getKind() == tok::comma &&
         Tok.isOneOf(tok::l_paren, tok::string_literal, tok::less))
       return true;
     // For object-like macros that begin with an lparen, preserve a space
@@ -1115,7 +1170,7 @@ void clang::printDependencyDirectivesAsSource(
     constexpr unsigned FirstBodyIdx = 3; // `#`, `define`, <NAME>, <BODY...>
     return Kind == pp_define && TokIdx == FirstBodyIdx &&
            Prev.is(tok::raw_identifier) && Tok.is(tok::l_paren) &&
-           Tok.Offset > Prev.getEnd();
+           Tok.getOffset() > Prev.getEnd();
   };
 
   for (const dependency_directives_scan::Directive &Directive : Directives) {
@@ -1130,7 +1185,7 @@ void clang::printDependencyDirectivesAsSource(
         OS << ' ';
       PrevTok = &Tok;
       ++TokIdx;
-      OS << Source.slice(Tok.Offset, Tok.getEnd());
+      OS << Source.slice(Tok.getOffset(), Tok.getEnd());
     }
   }
 }

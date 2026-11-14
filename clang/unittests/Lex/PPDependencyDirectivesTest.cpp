@@ -200,7 +200,7 @@ TEST_F(PPDependencyDirectivesTest, HeaderNamesStartingWithCompoundTokens) {
   unsigned LessEqualCount = 0;
   unsigned LessLessCount = 0;
   for (const dependency_directives_scan::Token &Tok : Tokens) {
-    StringRef Spelling = Source.slice(Tok.Offset, Tok.getEnd());
+    StringRef Spelling = Source.slice(Tok.getOffset(), Tok.getEnd());
     if (Spelling == "<=") {
       EXPECT_TRUE(Tok.is(tok::lessequal));
       ++LessEqualCount;

@@ -8,6 +8,7 @@
 
 #include "clang/Lex/DependencyDirectivesScanner.h"
 #include "clang/Basic/TokenKinds.h"
+#include "clang/Lex/Token.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -1033,8 +1034,95 @@ TEST(MinimizeSourceToDependencyDirectivesTest, CharacterLiteralInPreprocessor) {
   ASSERT_FALSE(
       minimizeSourceToDependencyDirectives(Source, Out, Tokens, Directives));
   ASSERT_GE(Tokens.size(), 4u);
-  EXPECT_EQ(Tokens[2].Kind, tok::numeric_constant);
-  EXPECT_EQ(Tokens[3].Kind, tok::equalequal);
+  EXPECT_EQ(Tokens[2].getKind(), tok::numeric_constant);
+  EXPECT_EQ(Tokens[3].getKind(), tok::equalequal);
+}
+
+TEST(MinimizeSourceToDependencyDirectivesTest, LongTokens) {
+  SmallVector<char, 128> Out;
+  SmallVector<dependency_directives_scan::Token, 8> Tokens;
+  SmallVector<Directive, 4> Directives;
+  const unsigned MaxLength = dependency_directives_scan::Token::MaxLength;
+  std::string MaxIdent(MaxLength, 'a');
+  std::string LongIdent(70000, 'a');
+  std::string MaxString = "\"" + std::string(MaxLength - 2, 's') + "\"";
+  std::string LongString = "\"" + std::string(70000 - 2, 's') + "\"";
+
+  // Tokens of the maximum length are stored exactly.
+  std::string Source = "#define " + MaxIdent + " " + MaxString + "\n";
+  ASSERT_FALSE(
+      minimizeSourceToDependencyDirectives(Source, Out, Tokens, Directives));
+  EXPECT_EQ(Source, StringRef(Out.data(), Out.size()));
+  ASSERT_EQ(Tokens.size(), 5u);
+  EXPECT_TRUE(Tokens[2].is(tok::raw_identifier));
+  EXPECT_EQ(Tokens[2].getOffset(), 8u);
+  EXPECT_EQ(Tokens[2].getLength(), MaxLength);
+  EXPECT_TRUE(Tokens[3].is(tok::string_literal));
+  EXPECT_EQ(Tokens[3].getOffset(), 8u + MaxLength + 1);
+  EXPECT_EQ(Tokens[3].getLength(), MaxLength);
+
+  // Longer tokens in directives can't be stored, so the scan fails, and clients
+  // fall back to lexing the source.
+  for (const std::string &Directive :
+       {"#define " + LongIdent + " 1\n", "#define X " + LongString + "\n",
+        "#if defined(" + LongIdent + ")\n#include <a.h>\n#endif\n",
+        "#include <a.h> " + LongIdent + "\n", "@import " + LongIdent + ";\n"})
+    EXPECT_TRUE(minimizeSourceToDependencyDirectives(
+        "#include <b.h>\n" + Directive + "#include <c.h>\n", Out, Tokens,
+        Directives));
+
+  // Long tokens outside of the directives don't matter.
+  Source = "#include <a.h>\nint " + LongIdent + " = " + LongString +
+           ";\n#include <b.h>\n";
+  ASSERT_FALSE(minimizeSourceToDependencyDirectives(Source, Out));
+  EXPECT_STREQ("#include <a.h>\n#include <b.h>\n", Out.data());
+
+  // Nor in C++20 module declarations, as far as detecting them is concerned.
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("export module " + LongIdent + ";"));
+}
+
+TEST(MinimizeSourceToDependencyDirectivesTest, TokenFlags) {
+  using clang::Token;
+
+  // Every flag that the raw lexer produces is preserved.
+  for (unsigned short Flags :
+       {Token::StartOfLine, Token::LeadingSpace, Token::NeedsCleaning,
+        Token::HasUDSuffix, Token::HasUCN, Token::PhysicalStartOfLine}) {
+    ASSERT_TRUE(dependency_directives_scan::Token::isRepresentable(
+        1, tok::raw_identifier, Flags));
+    dependency_directives_scan::Token Tok(42, 1, tok::raw_identifier, Flags);
+    EXPECT_EQ(Tok.getFlags(), Flags);
+    EXPECT_EQ(Tok.getOffset(), 42u);
+    EXPECT_EQ(Tok.getLength(), 1u);
+    EXPECT_EQ(Tok.getKind(), tok::raw_identifier);
+  }
+  unsigned short AllFlags = Token::StartOfLine | Token::LeadingSpace |
+                            Token::NeedsCleaning | Token::HasUDSuffix |
+                            Token::HasUCN | Token::PhysicalStartOfLine;
+  EXPECT_EQ(
+      dependency_directives_scan::Token(0, 0, tok::eod, AllFlags).getFlags(),
+      AllFlags);
+  EXPECT_FALSE(dependency_directives_scan::Token::isRepresentable(
+      1, tok::raw_identifier, Token::IsEditorPlaceholder));
+  EXPECT_FALSE(dependency_directives_scan::Token::isRepresentable(
+      1, tok::annot_cxxscope, 0));
+
+  // The flags as produced by the scanner.
+  SmallVector<char, 128> Out;
+  SmallVector<dependency_directives_scan::Token, 8> Tokens;
+  SmallVector<Directive, 4> Directives;
+  StringRef Source = "#define X  a\\\nb\n";
+  ASSERT_FALSE(
+      minimizeSourceToDependencyDirectives(Source, Out, Tokens, Directives));
+  ASSERT_EQ(Tokens.size(), 5u);
+  EXPECT_EQ(Tokens[0].getFlags(),
+            Token::StartOfLine | Token::PhysicalStartOfLine);
+  EXPECT_EQ(Tokens[1].getFlags(), 0);
+  EXPECT_EQ(Tokens[2].getFlags(), Token::LeadingSpace);
+  EXPECT_EQ(Tokens[3].getFlags(), Token::LeadingSpace | Token::NeedsCleaning);
+  EXPECT_EQ(Tokens[3].getLength(), 4u);
+  EXPECT_TRUE(Tokens[4].is(tok::eod));
 }
 
 TEST(MinimizeSourceToDependencyDirectivesTest, PragmaOnce) {
