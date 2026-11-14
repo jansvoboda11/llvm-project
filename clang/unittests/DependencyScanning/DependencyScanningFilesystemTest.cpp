@@ -396,6 +396,60 @@ TEST(DependencyScanningFilesystem, DoNotDiagnoseDirSizeChange) {
   EXPECT_EQ(InvalidEntries.size(), 0u);
 }
 
+TEST(DependencyScanningWorkerFilesystem, DirectiveTokens) {
+  using namespace clang::dependency_directives_scan;
+
+  // Enough directives and tokens to spill the scanner's vectors to the heap.
+  std::string Source;
+  for (unsigned I = 0; I < 200; ++I)
+    Source +=
+        "#define M" + std::to_string(I) + "(x) x + " + std::to_string(I) + "\n";
+  Source += "#include \"bar.h\"\nint x;\n";
+
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/foo.h", 0, llvm::MemoryBuffer::getMemBuffer(Source));
+  InMemoryFS->addFile("/bad.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer("@import A\n"));
+
+  DependencyScanningService Service({});
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS);
+  DependencyScanningWorkerFilesystem DepFS2(Service, InMemoryFS);
+
+  llvm::SmallVector<Token> ExpectedTokens;
+  llvm::SmallVector<Directive> ExpectedDirectives;
+  ASSERT_FALSE(clang::scanSourceForDependencyDirectives(Source, ExpectedTokens,
+                                                        ExpectedDirectives));
+
+  auto Directives = DepFS.getDirectiveTokens("/foo.h");
+  ASSERT_TRUE(Directives);
+  ASSERT_EQ(Directives->size(), ExpectedDirectives.size());
+  const Token *NextToken = Directives->front().Tokens.data();
+  for (auto [D, Expected] : llvm::zip_equal(*Directives, ExpectedDirectives)) {
+    EXPECT_EQ(D.Kind, Expected.Kind);
+    // The tokens of all directives are stored contiguously.
+    EXPECT_EQ(D.Tokens.data(), NextToken);
+    NextToken = D.Tokens.end();
+    ASSERT_EQ(D.Tokens.size(), Expected.Tokens.size());
+    for (auto [T, ExpectedT] : llvm::zip_equal(D.Tokens, Expected.Tokens)) {
+      EXPECT_EQ(T.Offset, ExpectedT.Offset);
+      EXPECT_EQ(T.Length, ExpectedT.Length);
+      EXPECT_EQ(T.Kind, ExpectedT.Kind);
+      EXPECT_EQ(T.Flags, ExpectedT.Flags);
+    }
+  }
+  EXPECT_EQ(Directives->back().Kind, pp_eof);
+
+  // The scanned directives are shared.
+  auto Directives2 = DepFS2.getDirectiveTokens("/foo.h");
+  ASSERT_TRUE(Directives2);
+  EXPECT_EQ(Directives2->data(), Directives->data());
+
+  // Scanning failures are cached too.
+  EXPECT_FALSE(DepFS.getDirectiveTokens("/bad.h"));
+  EXPECT_FALSE(DepFS2.getDirectiveTokens("/bad.h"));
+}
+
 TEST(DependencyScanningWorkerFilesystem, ConcurrentSameFilenameDeduplicates) {
   llvm::unittest::TempDir TmpDir("dswf-same-filename", /*Unique=*/true);
   llvm::unittest::TempFile TmpFile(TmpDir.path("foo.c"), /*Suffix=*/"",

@@ -15,6 +15,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <condition_variable>
 #include <memory>
@@ -27,8 +28,48 @@ namespace dependencies {
 
 class DependencyScanningService;
 
-using DependencyDirectivesTy =
-    SmallVector<dependency_directives_scan::Directive, 20>;
+/// The scanned dependency directives of a file and the tokens they refer to,
+/// stored exactly sized in a single allocation that's never resized.
+class CachedDependencyDirectives final
+    : private llvm::TrailingObjects<CachedDependencyDirectives,
+                                    dependency_directives_scan::Directive,
+                                    dependency_directives_scan::Token> {
+  friend TrailingObjects;
+
+  /// Whether the scan succeeded.
+  bool Success;
+  unsigned NumDirectives;
+
+  CachedDependencyDirectives(bool Success, unsigned NumDirectives)
+      : Success(Success), NumDirectives(NumDirectives) {}
+
+  size_t numTrailingObjects(
+      OverloadToken<dependency_directives_scan::Directive>) const {
+    return NumDirectives;
+  }
+
+public:
+  /// Creates the result of a successful scan. Copies \p Tokens and
+  /// \p Directives, which must refer to \p Tokens, into a single allocation,
+  /// and makes the copied directives refer to the copied tokens.
+  static std::unique_ptr<CachedDependencyDirectives>
+  create(ArrayRef<dependency_directives_scan::Token> Tokens,
+         ArrayRef<dependency_directives_scan::Directive> Directives);
+
+  /// Creates the result of a failed scan.
+  static std::unique_ptr<CachedDependencyDirectives> createFailed();
+
+  /// \returns The directives if the scan succeeded.
+  std::optional<ArrayRef<dependency_directives_scan::Directive>>
+  getDirectives() const {
+    if (!Success)
+      return std::nullopt;
+    return ArrayRef(getTrailingObjects<dependency_directives_scan::Directive>(),
+                    NumDirectives);
+  }
+
+  void operator delete(void *Ptr) { ::operator delete(Ptr); }
+};
 
 /// Contents and directive tokens of a cached file entry. Single instance can
 /// be shared between multiple entries.
@@ -39,12 +80,11 @@ struct CachedFileContents {
   /// Owning storage for the original contents.
   std::unique_ptr<llvm::MemoryBuffer> Original;
 
-  /// The mutex that must be locked before mutating directive tokens.
+  /// The mutex that must be locked before scanning for directives.
   std::mutex ValueLock;
-  SmallVector<dependency_directives_scan::Token, 10> DepDirectiveTokens;
-  /// Accessor to the directive tokens that's atomic to avoid data races.
+  /// Accessor to the scanned directives that's atomic to avoid data races.
   /// \p CachedFileContents has ownership of the pointer.
-  std::atomic<const std::optional<DependencyDirectivesTy> *> DepDirectives;
+  std::atomic<const CachedDependencyDirectives *> DepDirectives;
 
   ~CachedFileContents() { delete DepDirectives.load(); }
 };
@@ -98,10 +138,8 @@ public:
     assert(!isError() && "error");
     assert(!isDirectory() && "not a file");
     assert(Contents && "contents not initialized");
-    if (auto *Directives = Contents->DepDirectives.load()) {
-      if (Directives->has_value())
-        return ArrayRef<dependency_directives_scan::Directive>(**Directives);
-    }
+    if (auto *Directives = Contents->DepDirectives.load())
+      return Directives->getDirectives();
     return std::nullopt;
   }
 

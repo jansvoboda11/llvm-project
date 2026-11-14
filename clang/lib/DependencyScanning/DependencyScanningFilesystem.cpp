@@ -61,25 +61,57 @@ bool DependencyScanningWorkerFilesystem::ensureDirectiveTokensArePopulated(
   if (Contents->DepDirectives.load())
     return true;
 
-  SmallVector<dependency_directives_scan::Directive, 64> Directives;
   // Scan the file for preprocessor directives that might affect the
-  // dependencies.
-  if (scanSourceForDependencyDirectives(Contents->Original->getBuffer(),
-                                        Contents->DepDirectiveTokens,
-                                        Directives)) {
-    Contents->DepDirectiveTokens.clear();
-    // FIXME: Propagate the diagnostic if desired by the client.
-    Contents->DepDirectives.store(new std::optional<DependencyDirectivesTy>());
-    return false;
-  }
+  // dependencies. The vectors grow geometrically, so the result is copied into
+  // exactly sized storage, which lives as long as the cache.
+  SmallVector<dependency_directives_scan::Token, 256> Tokens;
+  SmallVector<dependency_directives_scan::Directive, 64> Directives;
+  bool Failed = scanSourceForDependencyDirectives(
+      Contents->Original->getBuffer(), Tokens, Directives);
+  // FIXME: Propagate the diagnostic if desired by the client.
+  std::unique_ptr<CachedDependencyDirectives> Result =
+      Failed ? CachedDependencyDirectives::createFailed()
+             : CachedDependencyDirectives::create(Tokens, Directives);
 
   // This function performed double-checked locking using `DepDirectives`.
   // Assigning it must be the last thing this function does, otherwise other
   // threads may skip the critical section (`DepDirectives != nullptr`), leading
   // to a data race.
-  Contents->DepDirectives.store(
-      new std::optional<DependencyDirectivesTy>(std::move(Directives)));
-  return true;
+  Contents->DepDirectives.store(Result.release());
+  return !Failed;
+}
+
+std::unique_ptr<CachedDependencyDirectives> CachedDependencyDirectives::create(
+    ArrayRef<dependency_directives_scan::Token> Tokens,
+    ArrayRef<dependency_directives_scan::Directive> Directives) {
+  void *Mem =
+      ::operator new(totalSizeToAlloc<dependency_directives_scan::Directive,
+                                      dependency_directives_scan::Token>(
+          Directives.size(), Tokens.size()));
+  auto *Result =
+      new (Mem) CachedDependencyDirectives(/*Success=*/true, Directives.size());
+  dependency_directives_scan::Token *NewTokens =
+      Result->getTrailingObjects<dependency_directives_scan::Token>();
+  llvm::uninitialized_copy(Tokens, NewTokens);
+  dependency_directives_scan::Directive *NewDirectives =
+      Result->getTrailingObjects<dependency_directives_scan::Directive>();
+  for (const dependency_directives_scan::Directive &D : Directives) {
+    assert(D.Tokens.data() >= Tokens.data() && D.Tokens.end() <= Tokens.end() &&
+           "directive doesn't refer to the given tokens");
+    new (NewDirectives++) dependency_directives_scan::Directive(
+        D.Kind, ArrayRef(NewTokens + (D.Tokens.data() - Tokens.data()),
+                         D.Tokens.size()));
+  }
+  return std::unique_ptr<CachedDependencyDirectives>(Result);
+}
+
+std::unique_ptr<CachedDependencyDirectives>
+CachedDependencyDirectives::createFailed() {
+  void *Mem =
+      ::operator new(totalSizeToAlloc<dependency_directives_scan::Directive,
+                                      dependency_directives_scan::Token>(0, 0));
+  return std::unique_ptr<CachedDependencyDirectives>(
+      new (Mem) CachedDependencyDirectives(/*Success=*/false, 0));
 }
 
 DependencyScanningFilesystemSharedCache::
