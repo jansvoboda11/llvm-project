@@ -375,7 +375,8 @@ public:
   void *IdentifierLookupTable = nullptr;
 
   /// Offsets of identifiers that we're going to preload within
-  /// IdentifierTableData.
+  /// IdentifierTableData. Only valid until the identifiers are preloaded, when
+  /// the AST file is first loaded.
   std::vector<unsigned> PreloadIdentifierOffsets;
 
   // === Macros ===

@@ -5216,7 +5216,8 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
     if (F.OriginalSourceFileID.isValid())
       F.OriginalSourceFileID = TranslateFileID(F, F.OriginalSourceFileID);
 
-    for (auto Offset : F.PreloadIdentifierOffsets) {
+    // The offsets aren't needed after this, release their memory.
+    for (auto Offset : std::exchange(F.PreloadIdentifierOffsets, {})) {
       const unsigned char *Data = F.IdentifierTableData + Offset;
 
       ASTIdentifierLookupTrait Trait(*this, F);
