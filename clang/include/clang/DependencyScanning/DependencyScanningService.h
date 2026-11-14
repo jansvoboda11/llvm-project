@@ -103,6 +103,15 @@ struct DependencyScanningServiceOptions {
   /// reported via \c DependencyScanningService::addInvalidatedPath instead of
   /// the filesystem.
   bool ValidateAgainstInvalidatedPaths = false;
+  /// Whether the scanning compiler instances create modules from module maps
+  /// only when needed (\c HeaderSearchOptions::LazyLoadModuleMaps). This
+  /// reduces memory usage and doesn't affect the reported command lines or
+  /// context hashes, but the scanning PCMs go to a different context hash
+  /// directory of the module cache. Off by default, because the lazy mode can
+  /// consider a header textual even though a module map that the scan has
+  /// parsed (and that the explicit build may load) declares it as part of a
+  /// module.
+  bool LazyLoadModuleMaps = false;
   /// The path to a log file, which logs timing of actions performed by
   /// the dependency scanner.
   std::string LogPath;

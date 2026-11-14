@@ -116,6 +116,7 @@ static constexpr bool DoRoundTripDefault = false;
 
 static bool RoundTripArgs = DoRoundTripDefault;
 static bool NoFlushModuleCache = false;
+static bool LazyLoadModuleMaps = false;
 static bool VerbatimArgs = false;
 
 static void ParseArgs(int argc, char **argv) {
@@ -265,6 +266,7 @@ static void ParseArgs(int argc, char **argv) {
   RoundTripArgs = Args.hasArg(OPT_round_trip_args);
 
   NoFlushModuleCache = Args.hasArg(OPT_no_flush_module_cache);
+  LazyLoadModuleMaps = Args.hasArg(OPT_lazy_load_module_maps);
 
   VerbatimArgs = Args.hasArg(OPT_verbatim_args);
 
@@ -1178,6 +1180,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   Opts.TraceVFS = Verbose;
   Opts.AsyncScanModules = AsyncScanModules;
   Opts.FlushModuleCache = !NoFlushModuleCache;
+  Opts.LazyLoadModuleMaps = LazyLoadModuleMaps;
   Opts.CacheNegativeStats = CacheNegativeStats;
   Opts.ValidateAgainstInvalidatedPaths = true;
   Opts.LogPath = LogPath;

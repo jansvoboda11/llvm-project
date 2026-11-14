@@ -58,6 +58,8 @@ def round_trip_args : F<"round-trip-args", "verify that command-line arguments a
 
 def no_flush_module_cache : F<"no-flush-module-cache", "do not flush the module cache from memory to disk">;
 
+def lazy_load_module_maps : F<"lazy-load-module-maps", "Only create the modules of module maps that the scan needs">;
+
 def verbatim_args : F<"verbatim-args", "Pass commands to the scanner verbatim without adjustments">;
 
 defm log_path : Eq<"log-path", "Write dependency scanning log to file">;

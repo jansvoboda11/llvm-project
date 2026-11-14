@@ -20,6 +20,14 @@
 // RUN: %deps-to-rsp %t/result.json --module-name=Client > %t/Client.rsp
 // RUN: cat %t/Client.rsp | sed 's:\\\\\?:/:g' | FileCheck %s -DPREFIX=%/t
 
+// Lazily loaded module maps must load the submodule declared in the module map
+// parsed after its top-level module was loaded too.
+// RUN: clang-scan-deps -format experimental-full -lazy-load-module-maps -- \
+// RUN:   %clang -fmodules -fimplicit-module-maps -fmodules-cache-path=%t/cache \
+// RUN:     -I %t/client -I %t/zzz -I %t/aaa -c %t/tu.m -o %t/tu.o \
+// RUN:   > %t/result-lazy.json
+// RUN: diff %t/result.json %t/result-lazy.json
+
 // CHECK:      -fmodule-map-file=[[PREFIX]]/zzz/module.modulemap
 // CHECK-SAME: -fmodule-map-file=[[PREFIX]]/aaa/module.modulemap
 

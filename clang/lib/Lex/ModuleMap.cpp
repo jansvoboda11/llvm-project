@@ -62,7 +62,9 @@ void ModuleMap::resolveLinkAsDependencies(Module *Mod) {
 }
 
 void ModuleMap::addLinkAsDependency(Module *Mod) {
-  if (findModule(Mod->ExportAsModule))
+  // With lazily loaded module maps, the export_as module may only be parsed.
+  // Treat it the same as if its module map had been loaded eagerly.
+  if (isModuleKnown(Mod->ExportAsModule))
     Mod->UseExportAsModuleLinkName = true;
   else
     PendingLinkAsModule[Mod->ExportAsModule].insert(Mod->Name);
@@ -1549,7 +1551,7 @@ bool ModuleMap::parseModuleMapFile(FileEntryRef File, bool IsSystem,
                      // This will correctly load the submodule declarations when
                      // the module is loaded.
                      auto &ModuleDecls =
-                         ParsedModules[StringRef(MD.Id.front().first)];
+                         ParsedModules[StringRef(MD.Id.front().first)].Decls;
                      ModuleDecls.push_back(std::pair(&MMF, &MD));
                      CollectExternDecls(MD);
                    },
@@ -1559,19 +1561,26 @@ bool ModuleMap::parseModuleMapFile(FileEntryRef File, bool IsSystem,
                Decl);
   }
 
+  // Find and parse the extern module map files the same way
+  // ModuleMapLoader::handleExternModuleDecl() would load them, so that their
+  // FileIDs (which are reused when loading them) are identical in both modes.
   for (const modulemap::ExternModuleDecl *EMD : PendingExternalModuleMaps) {
     StringRef FileNameRef = EMD->Path;
     SmallString<128> ModuleMapFileName;
     if (llvm::sys::path::is_relative(FileNameRef)) {
       ModuleMapFileName += Dir.getName();
       llvm::sys::path::append(ModuleMapFileName, EMD->Path);
+      llvm::sys::path::remove_dots(ModuleMapFileName, /*remove_dot_dot=*/true);
       FileNameRef = ModuleMapFileName;
     }
 
     if (auto EFile =
             SourceMgr.getFileManager().getOptionalFileRef(FileNameRef)) {
       parseModuleMapFile(*EFile, IsSystem, ImplicitlyDiscovered,
-                         EFile->getDir(), FileID(), ExternModuleLoc);
+                         HeaderInfo.getHeaderSearchOpts().ModuleMapFileHomeIsCwd
+                             ? Dir
+                             : EFile->getDir(),
+                         FileID(), EMD->Location);
     }
   }
 
@@ -2454,26 +2463,39 @@ OptionalFileEntryRef ModuleMap::getModuleMapFileForName(StringRef Name) const {
   auto ParsedMod = ParsedModules.find(Name);
   if (ParsedMod == ParsedModules.end())
     return std::nullopt;
-  return SourceMgr.getFileEntryRefForID(ParsedMod->second.front().first->ID);
+  return SourceMgr.getFileEntryRefForID(
+      ParsedMod->second.Decls.front().first->ID);
 }
 
 Module *ModuleMap::findOrLoadModule(StringRef Name) {
-  llvm::StringMap<Module *>::const_iterator Known = Modules.find(Name);
-  if (Known != Modules.end())
-    return Known->getValue();
+  Module *Known = findModule(Name);
 
   auto ParsedMod = ParsedModules.find(Name);
   if (ParsedMod == ParsedModules.end())
-    return nullptr;
+    return Known;
 
-  Diags.Report(diag::remark_mmap_load_module) << Name;
+  // Load the declarations that haven't been loaded yet. If the module is
+  // already known, these were parsed after it was loaded, e.g. submodules
+  // declared in another module map file. Loading that module map file eagerly
+  // would have added them to the module too.
+  ParsedModuleDecls &PMD = ParsedMod->second;
+  if (PMD.NumLoaded == PMD.Decls.size())
+    return Known;
 
-  for (const auto &ModuleDecl : ParsedMod->second) {
-    const modulemap::ModuleMapFile &MMF = *ModuleDecl.first;
-    ModuleMapLoader Loader(SourceMgr, Diags, const_cast<ModuleMap &>(*this),
-                           MMF.ID, *MMF.Dir, MMF.IsSystem,
-                           MMF.ImplicitlyDiscovered);
-    if (Loader.loadModuleDecl(*ModuleDecl.second))
+  bool Remarked = false;
+  while (PMD.NumLoaded != PMD.Decls.size()) {
+    auto [MMF, MD] = PMD.Decls[PMD.NumLoaded++];
+    // A module map file that was loaded eagerly already declared its modules.
+    if (const FileEntry *File = SourceMgr.getFileEntryForID(MMF->ID);
+        File && LoadedModuleMap.contains(File))
+      continue;
+    if (!Remarked) {
+      Diags.Report(diag::remark_mmap_load_module) << Name;
+      Remarked = true;
+    }
+    ModuleMapLoader Loader(SourceMgr, Diags, *this, MMF->ID, *MMF->Dir,
+                           MMF->IsSystem, MMF->ImplicitlyDiscovered);
+    if (Loader.loadModuleDecl(*MD))
       return nullptr;
   }
 

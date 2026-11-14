@@ -678,8 +678,18 @@ void ModuleDepCollector::run(DependencyConsumer &Consumer) {
   for (serialization::ModuleFile *MF : MDC.DirectModularDeps)
     handleTopLevelModule(MF);
 
-  Consumer.handleContextHash(
-      MDC.ScanInstance.getInvocation().computeContextHash());
+  // Lazily loading module maps is an implementation detail of the scan. Keep
+  // it out of the reported context hash, even though it keeps the scanning
+  // PCMs apart.
+  if (MDC.ScanInstance.getHeaderSearchOpts().LazyLoadModuleMaps &&
+      !MDC.CommonInvocation.getHeaderSearchOpts().LazyLoadModuleMaps) {
+    CompilerInvocation CI(MDC.ScanInstance.getInvocation());
+    CI.getHeaderSearchOpts().LazyLoadModuleMaps = false;
+    Consumer.handleContextHash(CI.computeContextHash());
+  } else {
+    Consumer.handleContextHash(
+        MDC.ScanInstance.getInvocation().computeContextHash());
+  }
 
   Consumer.handleDependencyOutputOpts(*MDC.Opts);
 

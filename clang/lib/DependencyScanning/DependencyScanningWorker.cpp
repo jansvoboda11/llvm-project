@@ -432,6 +432,11 @@ createScanCompilerInvocation(const CompilerInvocation &Invocation,
   ScanInvocation->getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
       true;
   ScanInvocation->getHeaderSearchOpts().ModulesForceValidateUserHeaders = false;
+  // Only create the modules the scan needs. This keeps the scanning PCMs apart
+  // from those built eagerly, but the reported command lines and context
+  // hashes derive from the original invocation and stay the same.
+  if (Service.getOpts().LazyLoadModuleMaps)
+    ScanInvocation->getHeaderSearchOpts().LazyLoadModuleMaps = true;
 
   // FIXME: Do this even with PCHs by marking the option as something like
   // "preprocessor benign" in LangOptions.def so that it passes the
