@@ -78,12 +78,12 @@ struct CachedFileContents {
   CachedFileContents(std::unique_ptr<llvm::MemoryBuffer> Contents)
       : Original(std::move(Contents)), DepDirectives(nullptr) {}
 
-  /// Owning storage for the original contents.
+  /// Owning storage for the original contents. The buffer has no name.
   std::unique_ptr<llvm::MemoryBuffer> Original;
 
-  /// The mutex that must be locked before scanning for directives.
-  std::mutex ValueLock;
   /// Accessor to the scanned directives that's atomic to avoid data races.
+  /// Scanning for directives is guarded by the shared cache's
+  /// \c DependencyScanningFilesystemSharedCache::getDirectivesLock().
   /// \p CachedFileContents has ownership of the pointer.
   std::atomic<const CachedDependencyDirectives *> DepDirectives;
 
@@ -238,7 +238,12 @@ public:
     };
 
     /// Map from filenames to their cached state.
-    llvm::StringMap<FilenameCacheState, llvm::BumpPtrAllocator> CacheByFilename;
+    ///
+    /// The entries are allocated individually, so that the slots of uncached
+    /// negative stats can be freed once the stat has been resolved. Slots with
+    /// an entry or a real path are never erased, and \c StringMap never moves
+    /// its entries, so their keys live as long as the shard.
+    llvm::StringMap<FilenameCacheState> CacheByFilename;
 
     /// Map from unique IDs to their cached state.
     llvm::DenseMap<llvm::sys::fs::UniqueID, UIDCacheState> EntriesByUID;
@@ -274,6 +279,11 @@ public:
   CacheShard &getShardForFilename(StringRef Filename) const;
   CacheShard &getShardForUID(llvm::sys::fs::UniqueID UID) const;
 
+  /// Returns the mutex that must be locked before scanning \p Contents for
+  /// directives. The mutexes are striped, so that the cached contents don't
+  /// each need their own.
+  std::mutex &getDirectivesLock(const CachedFileContents &Contents) const;
+
   struct OutOfDateEntry {
     // A null terminated string that contains a path.
     const char *Path = nullptr;
@@ -306,6 +316,9 @@ public:
 private:
   std::unique_ptr<CacheShard[]> CacheShards;
   unsigned NumShards;
+
+  static constexpr unsigned NumDirectivesLocks = 256;
+  std::unique_ptr<std::mutex[]> DirectivesLocks;
 };
 
 /// Reference to a CachedFileSystemEntry.
@@ -410,9 +423,9 @@ private:
   /// or the result of an in-flight wait), or claims the producer slot and
   /// computes the entry via the underlying filesystem.
   /// \p FilenameForLookup is always absolute, and may differ from
-  /// \p OriginalFilename if the latter is relative. Sets \p StoredFilename to
-  /// a copy of \p FilenameForLookup that outlives this filesystem's local
-  /// caches.
+  /// \p OriginalFilename if the latter is relative. Unless an error is
+  /// returned, sets \p StoredFilename to a copy of \p FilenameForLookup that
+  /// outlives this filesystem's local caches.
   llvm::ErrorOr<const CachedFileSystemEntry *>
   resolveFilenameThroughSharedCache(StringRef OriginalFilename,
                                     StringRef FilenameForLookup,

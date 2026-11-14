@@ -29,7 +29,9 @@ DependencyScanningWorkerFilesystem::readFile(StringRef Filename,
     return MaybeStat.getError();
   auto Stat = std::move(*MaybeStat);
 
-  auto MaybeBuffer = File->getBuffer(Stat.getName());
+  // The cached buffer doesn't need a name: each opened file gets its own
+  // buffer that's named after the requested path (see \c DepScanFile).
+  auto MaybeBuffer = File->getBuffer("");
   if (!MaybeBuffer)
     return MaybeBuffer.getError();
   auto Buffer = std::move(*MaybeBuffer);
@@ -61,7 +63,8 @@ bool DependencyScanningWorkerFilesystem::ensureDirectiveTokensArePopulated(
   if (Contents->DepDirectives.load())
     return true;
 
-  std::lock_guard<std::mutex> GuardLock(Contents->ValueLock);
+  std::lock_guard<std::mutex> GuardLock(
+      Service.getSharedCache().getDirectivesLock(*Contents));
 
   // Double-checked locking.
   if (Contents->DepDirectives.load())
@@ -130,6 +133,7 @@ DependencyScanningFilesystemSharedCache::
   NumShards =
       std::max(2u, llvm::hardware_concurrency().compute_thread_count() / 4);
   CacheShards = std::make_unique<CacheShard[]>(NumShards);
+  DirectivesLocks = std::make_unique<std::mutex[]>(NumDirectivesLocks);
 }
 
 DependencyScanningFilesystemSharedCache::CacheShard &
@@ -146,6 +150,11 @@ DependencyScanningFilesystemSharedCache::getShardForUID(
   return CacheShards[Hash % NumShards];
 }
 
+std::mutex &DependencyScanningFilesystemSharedCache::getDirectivesLock(
+    const CachedFileContents &Contents) const {
+  return DirectivesLocks[llvm::hash_value(&Contents) % NumDirectivesLocks];
+}
+
 std::vector<DependencyScanningFilesystemSharedCache::OutOfDateEntry>
 DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     llvm::vfs::FileSystem &UnderlyingFS) const {
@@ -157,8 +166,7 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     for (const auto &[Path, State] : Shard.CacheByFilename) {
       const CachedFileSystemEntry *Entry = State.Entry;
       // Skip slots without a resolved entry: real-path-only entries from
-      // getRealPath, or uncached negative stats. Runs post-scan, so no
-      // in-progress slots remain.
+      // getRealPath. Runs post-scan, so no in-progress slots remain.
       if (!Entry)
         continue;
       llvm::ErrorOr<llvm::vfs::Status> Status = UnderlyingFS.status(Path);
@@ -402,7 +410,10 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
   // share one shard-lock acquisition.
   {
     std::lock_guard<std::mutex> ShardLock(FilenameShard.CacheLock);
-    auto &State = FilenameShard.CacheByFilename[FilenameForLookup];
+    auto It = FilenameShard.CacheByFilename.find(FilenameForLookup);
+    assert(It != FilenameShard.CacheByFilename.end() &&
+           "in-progress filename slot was erased");
+    auto &State = It->getValue();
     assert(!State.Entry && "filename slot already published an entry");
     if (ShouldCacheNegativeStat) {
       auto *Entry = new (FilenameShard.EntryStorage.Allocate())
@@ -413,6 +424,11 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
       State.Entry = *Result;
     }
     State.InProgress.reset();
+    // Don't keep an empty slot for an uncached negative stat. Waiters hold
+    // their own reference to the in-flight slot, and no local cache refers to
+    // this key, since it only caches results that the shard keeps.
+    if (!State.Entry && !State.RealPath)
+      FilenameShard.CacheByFilename.erase(It);
   }
   FilenameProducer->publish(Result);
   return Result;

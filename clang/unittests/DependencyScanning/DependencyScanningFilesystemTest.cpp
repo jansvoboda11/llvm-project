@@ -304,6 +304,49 @@ TEST(DependencyScanningFilesystem, NoNegativeCache) {
   EXPECT_EQ(InstrumentingFS->NumStatusCalls, 4u);
 }
 
+TEST(DependencyScanningFilesystem, NoSlotsForUncachedNegativeStats) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/dir/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS);
+
+  auto HasSlot = [&](llvm::StringRef Filename) {
+    return Service.getSharedCache()
+        .getShardForFilename(Filename)
+        .CacheByFilename.contains(Filename);
+  };
+
+  // Positive stats keep their slot.
+  EXPECT_TRUE(DepFS.status("/dir/present.h"));
+  EXPECT_TRUE(HasSlot("/dir/present.h"));
+
+  // Uncached negative stats don't leave a slot behind, not even on repeated
+  // queries.
+  EXPECT_FALSE(DepFS.status("/dir/missing.h"));
+  EXPECT_FALSE(HasSlot("/dir/missing.h"));
+  EXPECT_FALSE(DepFS.status("/dir/missing.h"));
+  EXPECT_FALSE(HasSlot("/dir/missing.h"));
+
+  // The slot of a cached real path is kept, also after a negative stat.
+  llvm::SmallString<128> RealPath;
+  (void)DepFS.getRealPath("/dir/missing.h", RealPath);
+  EXPECT_TRUE(HasSlot("/dir/missing.h"));
+  DependencyScanningWorkerFilesystem DepFS2(Service, InMemoryFS);
+  EXPECT_FALSE(DepFS2.status("/dir/missing.h"));
+  EXPECT_TRUE(HasSlot("/dir/missing.h"));
+  (void)DepFS2.getRealPath("/dir/missing.h", RealPath);
+
+  // The file showing up later is noticed.
+  InMemoryFS->addFile("/dir/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_TRUE(DepFS2.status("/dir/missing.h"));
+}
+
 TEST(DependencyScanningFilesystem, DiagnoseStaleStatFailures) {
   auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   InMemoryFS->setCurrentWorkingDirectory("/");
@@ -604,6 +647,11 @@ TEST(DependencyScanningWorkerFilesystem,
   DependencyScanningWorkerFilesystem PostWorker(Service, TracingFS);
   EXPECT_FALSE(PostWorker.status(MissingPath));
   EXPECT_EQ(TracingFS->NumStatusCalls.load(), StatsAfterBurst + 1);
+
+  // No empty slot is left behind in the shared cache.
+  EXPECT_FALSE(Service.getSharedCache()
+                   .getShardForFilename(MissingPath)
+                   .CacheByFilename.contains(MissingPath));
 }
 
 TEST(DependencyScanningWorkerFilesystem, LocalFS) {
