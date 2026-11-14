@@ -9230,11 +9230,10 @@ void ASTReader::PrintStats() {
   unsigned NumDeclsLoaded =
       DeclsLoaded.size() -
       llvm::count(DeclsLoaded.materialized(), (Decl *)nullptr);
-  unsigned NumIdentifiersLoaded =
-      IdentifiersLoaded.size() -
-      llvm::count(IdentifiersLoaded, (IdentifierInfo *)nullptr);
-  unsigned NumMacrosLoaded =
-      MacrosLoaded.size() - llvm::count(MacrosLoaded, (MacroInfo *)nullptr);
+  unsigned NumIdentifiersLoaded = llvm::count_if(
+      IdentifiersLoaded.materialized(), [](IdentifierInfo *II) { return II; });
+  unsigned NumMacrosLoaded = llvm::count_if(MacrosLoaded.materialized(),
+                                            [](MacroInfo *MI) { return MI; });
   unsigned NumSelectorsLoaded =
       SelectorsLoaded.size() - llvm::count(SelectorsLoaded, Selector());
 

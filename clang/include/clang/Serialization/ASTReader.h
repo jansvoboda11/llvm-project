@@ -775,7 +775,10 @@ private:
   /// If the pointer at index I is non-NULL, then it refers to the
   /// IdentifierInfo for the identifier with ID=I+1 that has already
   /// been loaded.
-  std::vector<IdentifierInfo *> IdentifiersLoaded;
+  ///
+  /// Typically only a few percent of the identifiers are ever loaded, and they
+  /// cluster, so this is paged to only allocate the parts that are used.
+  llvm::PagedVector<IdentifierInfo *> IdentifiersLoaded;
 
   /// A vector containing macros that have already been
   /// loaded.
@@ -783,7 +786,10 @@ private:
   /// If the pointer at index I is non-NULL, then it refers to the
   /// MacroInfo for the identifier with ID=I+1 that has already
   /// been loaded.
-  std::vector<MacroInfo *> MacrosLoaded;
+  ///
+  /// Typically very few macros are ever loaded, so this is paged to only
+  /// allocate the parts that are used.
+  llvm::PagedVector<MacroInfo *> MacrosLoaded;
 
   using LoadedMacroInfo =
       std::pair<IdentifierInfo *, serialization::SubmoduleID>;
