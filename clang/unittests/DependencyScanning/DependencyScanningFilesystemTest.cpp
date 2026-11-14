@@ -734,6 +734,59 @@ TEST(DependencyScanningWorkerFilesystem, LocalFSRealPath) {
   }
 }
 
+TEST(DependencyScanningWorkerFilesystem, LocalCacheKeysOutliveQueries) {
+  auto GlobalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  GlobalFS->setCurrentWorkingDirectory("/");
+  GlobalFS->addFile("/dir/global.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+  auto LocalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  LocalFS->setCurrentWorkingDirectory("/");
+  LocalFS->addFile("/dir/local.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+
+  auto InstrGlobalFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(GlobalFS);
+  auto InstrLocalFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(LocalFS);
+
+  DependencyScanningService Service({});
+  DependencyScanningWorkerFilesystem DepFS(Service, InstrGlobalFS,
+                                           InstrLocalFS);
+
+  // The local caches must not refer to the strings passed in by the caller.
+  // Overwrite each one after use, so that a dangling key makes the next query
+  // miss the local cache and reach the underlying filesystems again.
+  auto Query = [&](llvm::StringRef Path) {
+    std::string OwnedPath = Path.str();
+    EXPECT_TRUE(DepFS.status(OwnedPath));
+    llvm::SmallString<128> RealPath;
+    EXPECT_FALSE(DepFS.getRealPath(OwnedPath, RealPath));
+    std::fill(OwnedPath.begin(), OwnedPath.end(), 'x');
+  };
+  auto Counts = [&] {
+    return std::vector<std::size_t>{
+        InstrGlobalFS->NumStatusCalls,      InstrGlobalFS->NumExistsCalls,
+        InstrGlobalFS->NumGetRealPathCalls, InstrLocalFS->NumStatusCalls,
+        InstrLocalFS->NumExistsCalls,       InstrLocalFS->NumGetRealPathCalls,
+    };
+  };
+
+  Query("/dir/global.h");
+  Query("/dir/local.h");
+  auto CountsAfterFirstQueries = Counts();
+  EXPECT_EQ(InstrGlobalFS->NumStatusCalls, 1u);
+  EXPECT_EQ(InstrLocalFS->NumGetRealPathCalls, 1u);
+
+  Query("/dir/global.h");
+  Query("/dir/local.h");
+  EXPECT_EQ(Counts(), CountsAfterFirstQueries);
+
+  // Relative paths are made absolute in a temporary buffer before the lookup.
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/dir"));
+  CountsAfterFirstQueries = Counts();
+  Query("global.h");
+  Query("./local.h");
+  EXPECT_EQ(Counts(), CountsAfterFirstQueries);
+}
+
 TEST(DependencyScanningWorkerFilesystem, LocalFSDirectoryIteration) {
   auto GlobalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   GlobalFS->setCurrentWorkingDirectory("/");
