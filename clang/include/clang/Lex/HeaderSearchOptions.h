@@ -280,6 +280,13 @@ public:
   LLVM_PREFERRED_TYPE(bool)
   unsigned ModulesSerializeOnlyPreprocessor : 1;
 
+  /// Whether to compress the contents of embedded source buffers (such as the
+  /// predefines buffer) in AST files with the fastest compression level rather
+  /// than the default one. This trades a slightly larger file for less time
+  /// spent compressing.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned ModulesFastSourceBufferCompression : 1;
+
   /// Whether we should include all things that could impact the module in the
   /// hash.
   ///
@@ -322,6 +329,7 @@ public:
         ModulesSkipPragmaDiagnosticMappings(false),
         ModulesPruneNonAffectingModuleMaps(true), ModulesHashContent(false),
         ModulesSerializeOnlyPreprocessor(false),
+        ModulesFastSourceBufferCompression(false),
         ModulesStrictContextHash(false), ModulesIncludeVFSUsage(false),
         AllowModuleMapSubdirectorySearch(false), LazyLoadModuleMaps(false) {}
 

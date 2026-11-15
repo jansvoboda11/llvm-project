@@ -2370,7 +2370,7 @@ void ASTWriter::WriteHeaderSearch(const HeaderSearch &HS) {
 
 static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
                      unsigned SLocBufferBlobCompressedAbbrv,
-                     unsigned SLocBufferBlobAbbrv) {
+                     unsigned SLocBufferBlobAbbrv, bool FastCompression) {
   using RecordDataType = ASTWriter::RecordData::value_type;
 
   // Compress the buffer if possible. We expect that almost all PCM
@@ -2378,7 +2378,8 @@ static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
   SmallVector<uint8_t, 0> CompressedBuffer;
   if (llvm::compression::zstd::isAvailable()) {
     llvm::compression::zstd::compress(
-        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer, 9);
+        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer,
+        FastCompression ? llvm::compression::zstd::BestSpeedCompression : 9);
     RecordDataType Record[] = {SM_SLOC_BUFFER_BLOB_COMPRESSED, Blob.size() - 1};
     Stream.EmitRecordWithBlob(SLocBufferBlobCompressedAbbrv, Record,
                               llvm::toStringRef(CompressedBuffer));
@@ -2386,7 +2387,9 @@ static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
   }
   if (llvm::compression::zlib::isAvailable()) {
     llvm::compression::zlib::compress(
-        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer);
+        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer,
+        FastCompression ? llvm::compression::zlib::BestSpeedCompression
+                        : llvm::compression::zlib::DefaultCompression);
     RecordDataType Record[] = {SM_SLOC_BUFFER_BLOB_COMPRESSED, Blob.size() - 1};
     Stream.EmitRecordWithBlob(SLocBufferBlobCompressedAbbrv, Record,
                               llvm::toStringRef(CompressedBuffer));
@@ -2419,6 +2422,9 @@ void ASTWriter::WriteSourceManagerBlock(SourceManager &SourceMgr) {
   unsigned SLocBufferBlobCompressedAbbrv =
       CreateSLocBufferBlobAbbrev(Stream, true);
   unsigned SLocExpansionAbbrv = CreateSLocExpansionAbbrev(Stream);
+  bool FastBlobCompression = PP->getHeaderSearchInfo()
+                                 .getHeaderSearchOpts()
+                                 .ModulesFastSourceBufferCompression;
 
   // Write out the source location entry table. We skip the first
   // entry, which is always the same dummy entry.
@@ -2509,7 +2515,7 @@ void ASTWriter::WriteSourceManagerBlock(SourceManager &SourceMgr) {
           Buffer = llvm::MemoryBufferRef("<<<INVALID BUFFER>>>", "");
         StringRef Blob(Buffer->getBufferStart(), Buffer->getBufferSize() + 1);
         emitBlob(Stream, Blob, SLocBufferBlobCompressedAbbrv,
-                 SLocBufferBlobAbbrv);
+                 SLocBufferBlobAbbrv, FastBlobCompression);
       }
     } else {
       // The source location entry is a macro expansion.

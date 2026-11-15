@@ -431,6 +431,12 @@ createScanCompilerInvocation(const CompilerInvocation &Invocation,
   ScanInvocation->getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
   ScanInvocation->getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
       true;
+  // The scanner's PCMs are only read by scans, which almost never need the
+  // contents of embedded buffers, so spend as little time as possible
+  // compressing them. Compressing them at all keeps the PCMs small, which makes
+  // incremental scans faster.
+  ScanInvocation->getHeaderSearchOpts().ModulesFastSourceBufferCompression =
+      true;
   ScanInvocation->getHeaderSearchOpts().ModulesForceValidateUserHeaders = false;
 
   // FIXME: Do this even with PCHs by marking the option as something like
