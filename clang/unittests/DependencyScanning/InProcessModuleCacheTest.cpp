@@ -1,6 +1,7 @@
 #include "clang/DependencyScanning/InProcessModuleCache.h"
 
 #include "clang/Basic/AtomicLineLogger.h"
+#include "llvm/Support/AdvisoryLock.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -8,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+#include <atomic>
 #include <chrono>
 #include <thread>
 
@@ -184,4 +186,75 @@ TEST(InProcessModuleCache, FlushInBackground) {
   EXPECT_EQ(ModTime, WrittenModTime);
 
   llvm::sys::fs::remove_directories(Dir);
+}
+
+namespace {
+struct CountingWaitListener : ModuleLockWaitListener {
+  std::atomic<unsigned> NumWillWait = 0;
+  std::atomic<unsigned> NumDidWait = 0;
+  void willWait() override { ++NumWillWait; }
+  void didWait() override { ++NumDidWait; }
+};
+} // namespace
+
+TEST(InProcessModuleCache, LockWaitListener) {
+  ModuleCacheEntries Entries;
+  AtomicLineLogger Logger;
+  CountingWaitListener Listener;
+  std::shared_ptr<ModuleCache> Owner =
+      makeInProcessModuleCache(Entries, Logger);
+  std::shared_ptr<ModuleCache> Waiter =
+      makeInProcessModuleCache(Entries, Logger, &Listener);
+
+  // Not notified when the lock is free.
+  auto WaiterLock = Waiter->getLock("/M.pcm");
+  EXPECT_EQ(WaiterLock->waitForUnlockFor(std::chrono::seconds(0)),
+            llvm::WaitForUnlockResult::Success);
+  EXPECT_EQ(Listener.NumWillWait, 0u);
+
+  auto OwnerLock = Owner->getLock("/M.pcm");
+  bool Owned = false;
+  ASSERT_THAT_ERROR(OwnerLock->tryLock().moveInto(Owned), llvm::Succeeded());
+  ASSERT_TRUE(Owned);
+
+  // Notified around a wait that times out.
+  EXPECT_EQ(WaiterLock->waitForUnlockFor(std::chrono::seconds(0)),
+            llvm::WaitForUnlockResult::Timeout);
+  EXPECT_EQ(Listener.NumWillWait, 1u);
+  EXPECT_EQ(Listener.NumDidWait, 1u);
+
+  // Notified around a wait that succeeds.
+  std::thread Unlocker([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    OwnerLock.reset();
+  });
+  EXPECT_EQ(WaiterLock->waitForUnlockFor(std::chrono::seconds(60)),
+            llvm::WaitForUnlockResult::Success);
+  Unlocker.join();
+  EXPECT_EQ(Listener.NumWillWait, 2u);
+  EXPECT_EQ(Listener.NumDidWait, 2u);
+}
+
+TEST(InProcessModuleCache, LockState) {
+  ModuleCacheEntries Entries;
+  AtomicLineLogger Logger;
+  std::shared_ptr<ModuleCache> ModCache =
+      makeInProcessModuleCache(Entries, Logger);
+
+  ModuleCacheEntries::LockState State = Entries.getLockState("/M.pcm");
+  EXPECT_FALSE(State.Locked);
+  EXPECT_EQ(State.NumAcquisitions, 0u);
+
+  for (unsigned I = 1; I != 3; ++I) {
+    auto Lock = ModCache->getLock("/M.pcm");
+    bool Owned = false;
+    ASSERT_THAT_ERROR(Lock->tryLock().moveInto(Owned), llvm::Succeeded());
+    ASSERT_TRUE(Owned);
+    State = Entries.getLockState("/M.pcm");
+    EXPECT_TRUE(State.Locked);
+    EXPECT_EQ(State.NumAcquisitions, I);
+  }
+  State = Entries.getLockState("/M.pcm");
+  EXPECT_FALSE(State.Locked);
+  EXPECT_EQ(State.NumAcquisitions, 2u);
 }

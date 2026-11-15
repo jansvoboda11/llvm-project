@@ -1,4 +1,5 @@
 add_clang_unittest(ClangDependencyScanningTests
+  AsyncModuleCompilePoolTest.cpp
   DependencyScanningFilesystemTest.cpp
   InProcessModuleCacheTest.cpp
   CLANG_LIBS

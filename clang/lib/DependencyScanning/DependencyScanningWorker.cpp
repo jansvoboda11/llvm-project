@@ -512,30 +512,28 @@ initializeScanInstanceDependencyCollector(
 }
 
 namespace {
-/// Manages (and terminates) the asynchronous compilation of modules.
+/// Manages (and terminates) the asynchronous compilation of modules for one
+/// translation unit.
 class AsyncModuleCompiles {
-  std::mutex Mutex;
-  bool Stop = false;
-  // FIXME: Have the service own a thread pool and use that instead.
-  std::vector<std::thread> Compiles;
+  AsyncModuleCompilePool &Pool;
+  AsyncModuleCompilePool::Group Group;
 
 public:
-  /// Registers the module compilation, unless this instance is about to be
-  /// destroyed.
-  void add(llvm::unique_function<void()> Compile) {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    if (!Stop)
-      Compiles.emplace_back(std::move(Compile));
+  AsyncModuleCompiles(AsyncModuleCompilePool &Pool) : Pool(Pool) {}
+
+  /// Reserves the compilation of the PCM \p ModuleFileName. Returns false if
+  /// it's already queued.
+  bool reserve(StringRef ModuleFileName) {
+    return Pool.reserve(ModuleFileName);
   }
 
-  ~AsyncModuleCompiles() {
-    {
-      std::lock_guard<std::mutex> Lock(Mutex);
-      Stop = true;
-    }
-    for (std::thread &Compile : Compiles)
-      Compile.join();
+  /// Queues the reserved module compilation, unless this instance is about to
+  /// be destroyed.
+  void add(StringRef ModuleFileName, llvm::unique_function<void()> Compile) {
+    Pool.enqueue(Group, ModuleFileName, std::move(Compile));
   }
+
+  ~AsyncModuleCompiles() { Pool.cancel(Group); }
 };
 
 struct SingleModuleWithAsyncModuleCompiles : PreprocessOnlyAction {
@@ -619,11 +617,13 @@ struct AsyncModuleCompile : PPCallbacks {
       return;
     }
 
-    auto Lock = ModCache.getLock(ModuleFileName);
-    bool Owned;
-    llvm::Error LockErr = Lock->tryLock().moveInto(Owned);
     // Someone else is building the PCM right now.
-    if (!LockErr && !Owned)
+    ModuleCacheEntries::LockState LockState =
+        Service.getModuleCacheEntries().getLockState(ModuleFileName);
+    if (LockState.Locked)
+      return;
+    // A compile of the PCM is already queued.
+    if (!Compiles.reserve(ModuleFileName))
       return;
     // We should build the PCM.
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
@@ -632,8 +632,10 @@ struct AsyncModuleCompile : PPCallbacks {
     VFS = createVFSFromCompilerInvocation(CI.getInvocation(),
                                           CI.getDiagnostics(), std::move(VFS));
     auto DC = std::make_unique<DiagnosticConsumer>();
+    // The compile gives up its slot in the pool while waiting for locks.
     auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
-                                       Service.getLogger());
+                                       Service.getLogger(),
+                                       &Service.getAsyncModuleCompilePool());
     CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
                                                         std::move(MC));
     auto ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
@@ -643,13 +645,32 @@ struct AsyncModuleCompile : PPCallbacks {
 
     auto ModController = Controller.clone();
 
-    // Note: This lock belongs to a module cache that might not outlive the
-    // thread. This works, because the in-process lock only refers to an object
-    // managed by the service, which does outlive the thread.
-    Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
-                  ModCI2 = std::move(ModCI2), DC = std::move(DC),
-                  ModController = std::move(ModController), Service = &Service,
-                  Compiles = &Compiles] {
+    // The compile takes the lock only once it starts running, so that nobody
+    // ever waits for a compile that's still queued. A compile that needs the
+    // PCM before then builds it on its own.
+    Compiles.add(ModuleFileName, [ModuleFileName =
+                                      std::string(ModuleFileName.str()),
+                                  NumAcquisitions = LockState.NumAcquisitions,
+                                  ModCI1 = std::move(ModCI1),
+                                  ModCI2 = std::move(ModCI2),
+                                  DC = std::move(DC),
+                                  ModController = std::move(ModController),
+                                  Service = &Service, Compiles = &Compiles] {
+      auto Lock = ModCI2->getModuleCache().getLock(ModuleFileName);
+      Expected<bool> Owned = Lock->tryLock();
+      if (!Owned) {
+        // Locks are only necessary for performance, build the PCM anyway.
+        llvm::consumeError(Owned.takeError());
+      } else {
+        // Someone else is building the PCM right now.
+        if (!*Owned)
+          return;
+        // Someone else built the PCM (or tried to) since it was queued.
+        if (Service->getModuleCacheEntries()
+                .getLockState(ModuleFileName)
+                .NumAcquisitions != NumAcquisitions + 1)
+          return;
+      }
       llvm::CrashRecoveryContext CRC;
       (void)CRC.RunSafely([&] {
         // Quickly discovers and compiles modules for the real scan below.
@@ -1030,7 +1051,7 @@ public:
 
     std::optional<AsyncModuleCompiles> AsyncCompiles;
     if (Worker.Service.getOpts().AsyncScanModules) {
-      AsyncCompiles.emplace();
+      AsyncCompiles.emplace(Worker.Service.getAsyncModuleCompilePool());
       if (!prescanModulesAsync(*AsyncCompiles, Controller))
         return nullptr;
     }

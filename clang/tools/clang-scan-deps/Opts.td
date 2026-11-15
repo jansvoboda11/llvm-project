@@ -53,6 +53,11 @@ def emit_visible_modules
 def verbose : F<"v", "Use verbose output">;
 
 def async_scan_modules : F<"async-scan-modules", "Scan modules asynchronously">;
+defm async_scan_modules_threads
+    : Eq<"async-scan-modules-threads",
+         "Maximum number of modules compiled asynchronously at the same time, "
+         "not counting the ones waiting for other modules (default: half the "
+         "concurrent threads)">;
 
 def round_trip_args : F<"round-trip-args", "verify that command-line arguments are canonical by parsing and re-serializing">;
 

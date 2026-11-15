@@ -35,6 +35,8 @@ struct ModuleCacheEntry {
   std::condition_variable CondVar;
   bool Locked = false;
   unsigned Generation = 0;
+  /// How many times the lock has been acquired.
+  unsigned NumAcquisitions = 0;
 
   std::atomic<std::time_t> Timestamp = 0;
 
@@ -62,6 +64,16 @@ struct ModuleCacheEntries {
   llvm::StringMap<std::unique_ptr<ModuleCacheEntry>> Map;
 
   bool ValidateAgainstInvalidatedPaths = false;
+
+  ModuleCacheMapEntry &getOrCreateMapEntry(StringRef Filename);
+
+  /// The state of the in-process lock of a PCM.
+  struct LockState {
+    bool Locked;
+    /// How many times the lock has been acquired so far.
+    unsigned NumAcquisitions;
+  };
+  LockState getLockState(StringRef Filename);
 
   void addInvalidatedPath(StringRef Path);
   std::optional<bool> isDirectoryInvalidated(StringRef Directory) const;
@@ -102,8 +114,22 @@ private:
   std::atomic<bool> AnyInvalidatedPaths = false;
 };
 
+/// Gets notified when a compilation blocks waiting for the lock of a PCM.
+class ModuleLockWaitListener {
+public:
+  virtual ~ModuleLockWaitListener();
+  /// Called right before blocking.
+  virtual void willWait() = 0;
+  /// Called after the wait finished, before the compilation continues.
+  virtual void didWait() = 0;
+};
+
+/// Creates a module cache for one compilation and its nested module builds.
+/// When it blocks waiting for the lock of a PCM, it notifies \p WaitListener
+/// (if any).
 std::shared_ptr<ModuleCache>
-makeInProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger);
+makeInProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger,
+                         ModuleLockWaitListener *WaitListener = nullptr);
 
 } // namespace dependencies
 } // namespace clang

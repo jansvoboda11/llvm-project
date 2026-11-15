@@ -102,6 +102,7 @@ static ResourceDirRecipeKind ResourceDirRecipe;
 static std::string LogPath;
 static bool Verbose;
 static bool AsyncScanModules;
+static unsigned AsyncScanModulesThreads = 0;
 static bool PrintTiming;
 static bool EmitVisibleModules;
 static llvm::BumpPtrAllocator Alloc;
@@ -261,6 +262,17 @@ static void ParseArgs(int argc, char **argv) {
   Verbose = Args.hasArg(OPT_verbose);
 
   AsyncScanModules = Args.hasArg(OPT_async_scan_modules);
+
+  if (const llvm::opt::Arg *A =
+          Args.getLastArg(OPT_async_scan_modules_threads_EQ)) {
+    StringRef S{A->getValue()};
+    if (!llvm::to_integer(S, AsyncScanModulesThreads, 0)) {
+      llvm::errs() << ToolName
+                   << ": for the -async-scan-modules-threads option: '" << S
+                   << "' value invalid for uint argument!\n";
+      std::exit(1);
+    }
+  }
 
   RoundTripArgs = Args.hasArg(OPT_round_trip_args);
 
@@ -1177,6 +1189,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   Opts.EagerLoadModules = EagerLoadModules;
   Opts.TraceVFS = Verbose;
   Opts.AsyncScanModules = AsyncScanModules;
+  Opts.AsyncScanModulesThreads = AsyncScanModulesThreads;
   Opts.FlushModuleCache = !NoFlushModuleCache;
   Opts.CacheNegativeStats = CacheNegativeStats;
   Opts.ValidateAgainstInvalidatedPaths = true;
