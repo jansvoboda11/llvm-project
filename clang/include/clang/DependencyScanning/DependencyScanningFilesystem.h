@@ -20,7 +20,9 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <utility>
 #include <variant>
+#include <vector>
 
 namespace clang {
 namespace dependencies {
@@ -458,6 +460,83 @@ private:
   llvm::ErrorOr<StringRef>
   tryGetFilenameForLookup(StringRef OriginalFilename,
                           llvm::SmallVectorImpl<char> &PathBuf) const;
+};
+
+/// A pool of worker filesystems for the scanning compiles that run on threads
+/// of their own (the asynchronous module compiles).
+///
+/// A fresh worker filesystem starts with empty local caches, so all of its
+/// lookups go to the shared cache and its locks. Reusing the filesystems of
+/// finished compiles lets later compiles hit in the local caches instead.
+/// Worker filesystems aren't thread-safe, so each one is checked out by a
+/// single compile at a time.
+///
+/// The pooled filesystems are created like the asynchronous compiles created
+/// them before: over \c DependencyScanningServiceOptions::MakeVFS, without a
+/// local FS. Nothing in their local caches depends on the compile that used
+/// them (the entries come from the service-wide shared cache and are keyed by
+/// absolute path), and per-compile filesystems such as the command line's VFS
+/// overlays are layered on top of them, not inside. The only state a compile
+/// could change is the working directory: a filesystem whose working directory
+/// changed isn't reused.
+class DependencyScanningWorkerFilesystemPool {
+public:
+  /// Exclusive use of a pooled worker filesystem. Unless discarded, the
+  /// filesystem goes back to the pool on destruction, provided nothing else
+  /// still references it.
+  class Lease {
+  public:
+    Lease() = default;
+    Lease(Lease &&Other) { *this = std::move(Other); }
+    Lease &operator=(Lease &&Other) {
+      if (this != &Other) {
+        reset();
+        Pool = std::exchange(Other.Pool, nullptr);
+        FS = std::move(Other.FS);
+        WorkingDir = std::move(Other.WorkingDir);
+      }
+      return *this;
+    }
+    ~Lease() { reset(); }
+
+    DependencyScanningWorkerFilesystem &operator*() const { return *FS; }
+    DependencyScanningWorkerFilesystem *operator->() const { return FS.get(); }
+    IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> get() const {
+      return FS;
+    }
+
+    /// Returns the filesystem to the pool (if it can be reused) and releases
+    /// this lease.
+    void reset();
+
+    /// Releases this lease without returning the filesystem to the pool,
+    /// e.g. because the compile using it crashed.
+    void discard() {
+      Pool = nullptr;
+      FS = nullptr;
+    }
+
+  private:
+    friend class DependencyScanningWorkerFilesystemPool;
+
+    DependencyScanningWorkerFilesystemPool *Pool = nullptr;
+    IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> FS;
+    /// The working directory of \c FS when it was checked out, if any.
+    std::optional<std::string> WorkingDir;
+  };
+
+  /// Checks out a worker filesystem, reusing one returned earlier if possible.
+  Lease acquire(DependencyScanningService &Service);
+
+  /// Returns the number of filesystems available for reuse.
+  size_t getNumAvailable() {
+    std::lock_guard<std::mutex> Guard(Lock);
+    return Available.size();
+  }
+
+private:
+  std::mutex Lock;
+  std::vector<IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem>> Available;
 };
 
 } // end namespace dependencies

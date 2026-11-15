@@ -134,6 +134,11 @@ public:
     return SharedCache;
   }
 
+  /// The worker filesystems of the asynchronous module compiles.
+  DependencyScanningWorkerFilesystemPool &getWorkerFilesystemPool() {
+    return WorkerFSPool;
+  }
+
   ModuleCacheEntries &getModuleCacheEntries() { return ModCacheEntries; }
 
   /// Add a path that changed since the previous scan, so that cached scanning
@@ -158,6 +163,8 @@ private:
   DependencyScanningServiceOptions Opts;
   /// The global file system cache.
   DependencyScanningFilesystemSharedCache SharedCache;
+  /// The pool of worker filesystems for the asynchronous module compiles.
+  DependencyScanningWorkerFilesystemPool WorkerFSPool;
   /// The global module cache entries.
   ModuleCacheEntries ModCacheEntries;
   /// The logger of dependency scanning actions.

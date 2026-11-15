@@ -10,6 +10,7 @@
 #include "clang/DependencyScanning/DependencyScanningService.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
+#include <atomic>
 #include <optional>
 
 using namespace clang;
@@ -567,3 +568,44 @@ DependencyScanningWorkerFilesystem::tryGetFilenameForLookup(
 }
 
 const char DependencyScanningWorkerFilesystem::ID = 0;
+
+DependencyScanningWorkerFilesystemPool::Lease
+DependencyScanningWorkerFilesystemPool::acquire(
+    DependencyScanningService &Service) {
+  Lease L;
+  L.Pool = this;
+  {
+    std::lock_guard<std::mutex> Guard(Lock);
+    if (!Available.empty()) {
+      L.FS = std::move(Available.back());
+      Available.pop_back();
+    }
+  }
+  if (!L.FS)
+    L.FS = llvm::makeIntrusiveRefCnt<DependencyScanningWorkerFilesystem>(
+        Service, Service.getOpts().MakeVFS());
+  if (llvm::ErrorOr<std::string> WorkingDir =
+          L.FS->getCurrentWorkingDirectory())
+    L.WorkingDir = std::move(*WorkingDir);
+  return L;
+}
+
+void DependencyScanningWorkerFilesystemPool::Lease::reset() {
+  if (!Pool)
+    return;
+  DependencyScanningWorkerFilesystemPool *P = std::exchange(Pool, nullptr);
+  IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> F = std::move(FS);
+  // Only reuse the filesystem if it's back in the state it was checked out in:
+  // no compile references it anymore, and it has the same working directory.
+  if (F->UseCount() != 1)
+    return;
+  // Pairs with the release of the last other reference, so that the next user
+  // of the filesystem doesn't race with whoever held that reference.
+  std::atomic_thread_fence(std::memory_order_acquire);
+  llvm::ErrorOr<std::string> CurrentWorkingDir =
+      F->getCurrentWorkingDirectory();
+  if (!WorkingDir || !CurrentWorkingDir || *CurrentWorkingDir != *WorkingDir)
+    return;
+  std::lock_guard<std::mutex> Guard(P->Lock);
+  P->Available.push_back(std::move(F));
+}

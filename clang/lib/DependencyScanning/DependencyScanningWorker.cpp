@@ -625,33 +625,39 @@ struct AsyncModuleCompile : PPCallbacks {
     // Someone else is building the PCM right now.
     if (!LockErr && !Owned)
       return;
-    // We should build the PCM.
-    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-        llvm::makeIntrusiveRefCnt<DependencyScanningWorkerFilesystem>(
-            Service, Service.getOpts().MakeVFS());
-    VFS = createVFSFromCompilerInvocation(CI.getInvocation(),
-                                          CI.getDiagnostics(), std::move(VFS));
+    // We should build the PCM. The compile has exclusive use of a pooled
+    // worker filesystem, whose local caches carry over from earlier compiles.
+    DependencyScanningWorkerFilesystemPool::Lease DepFS =
+        Service.getWorkerFilesystemPool().acquire(Service);
     auto DC = std::make_unique<DiagnosticConsumer>();
-    auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
-                                       Service.getLogger());
-    CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
-                                                        std::move(MC));
-    auto ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
-    auto ModCI2 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
+    std::unique_ptr<CompilerInstance> ModCI1, ModCI2;
+    {
+      // The clones are the only references to the filesystem that outlive
+      // this scope, so that it can go back to the pool once they're gone.
+      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+          createVFSFromCompilerInvocation(CI.getInvocation(),
+                                          CI.getDiagnostics(), DepFS.get());
+      auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
+                                         Service.getLogger());
+      CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
+                                                          std::move(MC));
+      ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
+                                        CloneConfig);
+      ModCI2 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
+                                        CloneConfig);
+    }
 
     auto ModController = Controller.clone();
 
     // Note: This lock belongs to a module cache that might not outlive the
     // thread. This works, because the in-process lock only refers to an object
     // managed by the service, which does outlive the thread.
-    Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
-                  ModCI2 = std::move(ModCI2), DC = std::move(DC),
-                  ModController = std::move(ModController), Service = &Service,
-                  Compiles = &Compiles] {
+    Compiles.add([Lock = std::move(Lock), DepFS = std::move(DepFS),
+                  ModCI1 = std::move(ModCI1), ModCI2 = std::move(ModCI2),
+                  DC = std::move(DC), ModController = std::move(ModController),
+                  Service = &Service, Compiles = &Compiles]() mutable {
       llvm::CrashRecoveryContext CRC;
-      (void)CRC.RunSafely([&] {
+      bool Completed = CRC.RunSafely([&] {
         // Quickly discovers and compiles modules for the real scan below.
         SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
                                                     *Compiles);
@@ -661,6 +667,14 @@ struct AsyncModuleCompile : PPCallbacks {
         GenerateModuleFromModuleMapAction Action2;
         (void)ModCI2->ExecuteAction(Action2);
       });
+      // Don't reuse the filesystem of a crashed compile: its local caches
+      // might be in an inconsistent state.
+      if (!Completed)
+        DepFS.discard();
+      // Release the compile's references to the filesystem, then return it.
+      ModCI1.reset();
+      ModCI2.reset();
+      DepFS.reset();
     });
   }
 };

@@ -13,8 +13,10 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gtest/gtest.h"
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <set>
 #include <thread>
 
 using namespace clang::dependencies;
@@ -709,4 +711,143 @@ TEST(DependencyScanningWorkerFilesystem, LocalFSDirectoryIteration) {
   EXPECT_EQ(Entries.size(), 2u);
   EXPECT_EQ(Entries.lookup("both"), llvm::sys::fs::file_type::directory_file);
   EXPECT_EQ(Entries.lookup("glob.c"), llvm::sys::fs::file_type::regular_file);
+}
+
+namespace {
+/// Options whose \c MakeVFS creates in-memory filesystems and counts them.
+DependencyScanningServiceOptions
+makePoolTestOptions(std::shared_ptr<std::atomic<unsigned>> NumVFSs) {
+  DependencyScanningServiceOptions Opts;
+  Opts.MakeVFS = [NumVFSs] {
+    ++*NumVFSs;
+    auto FS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+    FS->setCurrentWorkingDirectory("/");
+    FS->addFile("/dir/file.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+    return FS;
+  };
+  return Opts;
+}
+} // namespace
+
+TEST(DependencyScanningWorkerFilesystemPool, ReusesReturnedFilesystems) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  // Leases held at the same time get different filesystems.
+  auto Lease1 = Pool.acquire(Service);
+  auto Lease2 = Pool.acquire(Service);
+  ASSERT_TRUE(Lease1.get() && Lease2.get());
+  EXPECT_NE(Lease1.get(), Lease2.get());
+  EXPECT_EQ(NumVFSs->load(), 2u);
+  EXPECT_TRUE(Lease1->status("/dir/file.h"));
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+
+  DependencyScanningWorkerFilesystem *FS1 = Lease1.get().get();
+  DependencyScanningWorkerFilesystem *FS2 = Lease2.get().get();
+  Lease1.reset();
+  Lease2.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 2u);
+
+  // Later leases reuse them instead of creating new ones.
+  auto Lease3 = Pool.acquire(Service);
+  auto Lease4 = Pool.acquire(Service);
+  EXPECT_EQ(NumVFSs->load(), 2u);
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  EXPECT_TRUE((Lease3.get() == FS1 && Lease4.get() == FS2) ||
+              (Lease3.get() == FS2 && Lease4.get() == FS1));
+  EXPECT_TRUE(Lease3->status("/dir/file.h"));
+
+  // A moved-from lease doesn't return anything.
+  DependencyScanningWorkerFilesystemPool::Lease Moved = std::move(Lease3);
+  Lease3.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  Moved.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 1u);
+}
+
+TEST(DependencyScanningWorkerFilesystemPool, DoesNotReuseModifiedFilesystems) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  // A filesystem that's still referenced, e.g. by an overlay of the compile
+  // that used it, isn't returned.
+  {
+    auto Lease = Pool.acquire(Service);
+    auto Overlay =
+        llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(Lease.get());
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+
+  // Neither is one whose working directory changed.
+  {
+    auto Lease = Pool.acquire(Service);
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/dir"));
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+
+  // Nor a discarded one.
+  {
+    auto Lease = Pool.acquire(Service);
+    Lease.discard();
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+  EXPECT_EQ(NumVFSs->load(), 3u);
+
+  // Changing the working directory and changing it back is fine.
+  {
+    auto Lease = Pool.acquire(Service);
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/dir"));
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/"));
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 1u);
+  }
+}
+
+TEST(DependencyScanningWorkerFilesystemPool, LeasesAreExclusive) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  constexpr unsigned NumThreads = 8;
+  constexpr unsigned NumIterations = 200;
+  std::mutex Mutex;
+  std::set<DependencyScanningWorkerFilesystem *> InUse;
+  std::atomic<bool> Overlapped = false;
+  StartBarrier Barrier;
+  std::vector<std::thread> Threads;
+  for (unsigned T = 0; T < NumThreads; ++T)
+    Threads.emplace_back([&] {
+      Barrier.wait();
+      for (unsigned I = 0; I < NumIterations; ++I) {
+        auto Lease = Pool.acquire(Service);
+        {
+          std::lock_guard<std::mutex> Guard(Mutex);
+          if (!InUse.insert(Lease.get().get()).second)
+            Overlapped = true;
+        }
+        // Use the filesystem (and its local caches) without synchronization.
+        EXPECT_TRUE(Lease->status("/dir/file.h"));
+        EXPECT_FALSE(Lease->status("/dir/missing.h"));
+        {
+          std::lock_guard<std::mutex> Guard(Mutex);
+          InUse.erase(Lease.get().get());
+        }
+      }
+    });
+  Barrier.release();
+  for (std::thread &Thread : Threads)
+    Thread.join();
+
+  EXPECT_FALSE(Overlapped);
+  // Never more filesystems than leases held at the same time.
+  EXPECT_LE(NumVFSs->load(), NumThreads);
+  EXPECT_EQ(Pool.getNumAvailable(), NumVFSs->load());
 }
