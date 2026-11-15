@@ -297,12 +297,35 @@ void Module::addTopHeader(FileEntryRef File) {
   TopHeaders.insert(File);
 }
 
+void Module::setExternalTopHeaders(ExternalSubmoduleSource *Source,
+                                   uint32_t ID) {
+  assert(Source && "No external source");
+  if (TopHeadersSource == Source && TopHeadersSourceID == ID)
+    return;
+  // Keep the filenames from the previous source, if any.
+  if (TopHeadersSource)
+    TopHeadersSource->visitTopHeaderFilenames(
+        TopHeadersSourceID,
+        [&](StringRef Filename) { addTopHeaderFilename(Filename); });
+  TopHeadersSource = Source;
+  TopHeadersSourceID = ID;
+}
+
 ArrayRef<FileEntryRef> Module::getTopHeaders(FileManager &FileMgr) {
   if (!TopHeaderNames.empty()) {
     for (StringRef TopHeaderName : TopHeaderNames)
       if (auto FE = FileMgr.getOptionalFileRef(TopHeaderName))
         TopHeaders.insert(*FE);
     TopHeaderNames.clear();
+  }
+
+  if (TopHeadersSource) {
+    ExternalSubmoduleSource *Source = std::exchange(TopHeadersSource, nullptr);
+    Source->visitTopHeaderFilenames(
+        TopHeadersSourceID, [&](StringRef TopHeaderName) {
+          if (auto FE = FileMgr.getOptionalFileRef(TopHeaderName))
+            TopHeaders.insert(*FE);
+        });
   }
 
   return llvm::ArrayRef(TopHeaders.begin(), TopHeaders.end());

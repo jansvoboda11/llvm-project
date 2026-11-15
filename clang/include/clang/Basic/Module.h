@@ -56,6 +56,12 @@ class TargetInfo;
 class ExternalSubmoduleSource {
 public:
   virtual Module *getSubmodule(uint32_t GlobalID) = 0;
+
+  /// Visit the (resolved) top-level header filenames of the given submodule.
+  virtual void
+  visitTopHeaderFilenames(uint32_t GlobalID,
+                          llvm::function_ref<void(StringRef)> Visitor) = 0;
+
   virtual ~ExternalSubmoduleSource() = default;
 };
 
@@ -468,8 +474,15 @@ private:
   /// The top-level headers associated with this module.
   llvm::SmallSetVector<FileEntryRef, 2> TopHeaders;
 
-  /// top-level header filenames that aren't resolved to FileEntries yet.
+  /// Top-level header filenames that aren't resolved to FileEntries yet.
   std::vector<std::string> TopHeaderNames;
+
+  /// The external source of top-level header filenames that aren't resolved
+  /// to FileEntries yet. They're only read on demand by \c getTopHeaders().
+  ExternalSubmoduleSource *TopHeadersSource = nullptr;
+
+  /// The ID of this module in \c TopHeadersSource.
+  uint32_t TopHeadersSourceID = 0;
 
   /// Cache of modules visible to lookup in this module.
   mutable llvm::DenseSet<const Module*> VisibleModulesCache;
@@ -1013,6 +1026,10 @@ public:
   void addTopHeaderFilename(StringRef Filename) {
     TopHeaderNames.push_back(std::string(Filename));
   }
+
+  /// Let \p Source provide the top-level header filenames of this module
+  /// (with ID \p ID in \p Source) when they're first needed.
+  void setExternalTopHeaders(ExternalSubmoduleSource *Source, uint32_t ID);
 
   /// The top-level headers associated with this module.
   ArrayRef<FileEntryRef> getTopHeaders(FileManager &FileMgr);

@@ -2412,6 +2412,10 @@ public:
   /// Retrieve the submodule that corresponds to a global submodule ID.
   Module *getSubmodule(uint32_t GlobalID) override;
 
+  void
+  visitTopHeaderFilenames(uint32_t GlobalID,
+                          llvm::function_ref<void(StringRef)> Visitor) override;
+
   /// Retrieve the module that corresponds to the given module ID.
   ///
   /// Note: overrides method in ExternalASTSource

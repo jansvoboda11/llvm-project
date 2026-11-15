@@ -6439,6 +6439,58 @@ bool ASTReader::isAcceptableASTFile(
                                   /*ValidateDiagnosticOptions=*/true);
 }
 
+void ASTReader::visitTopHeaderFilenames(
+    uint32_t GlobalID, llvm::function_ref<void(StringRef)> Visitor) {
+  assert(GlobalID >= NUM_PREDEF_SUBMODULE_IDS && "Unexpected submodule ID");
+  GlobalSubmoduleMapType::iterator It = GlobalSubmoduleMap.find(GlobalID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+  unsigned Index = GlobalID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+
+  BitstreamCursor &Cursor = F.SubmodulesCursor;
+  SavedStreamPosition SavedPosition(Cursor);
+  if (llvm::Error Err = Cursor.JumpToBit(F.SubmodulesOffsetBase +
+                                         F.SubmoduleOffsets[Index])) {
+    Error(std::move(Err));
+    return;
+  }
+
+  RecordData Record;
+  while (true) {
+    Expected<llvm::BitstreamEntry> MaybeEntry = Cursor.advance();
+    if (!MaybeEntry) {
+      Error(MaybeEntry.takeError());
+      return;
+    }
+    llvm::BitstreamEntry Entry = MaybeEntry.get();
+    if (Entry.Kind != llvm::BitstreamEntry::Record) {
+      Error(llvm::createStringError(std::errc::illegal_byte_sequence,
+                                    "malformed block record in AST file"));
+      return;
+    }
+
+    StringRef Blob;
+    Record.clear();
+    Expected<unsigned> MaybeKind = Cursor.readRecord(Entry.ID, Record, &Blob);
+    if (!MaybeKind) {
+      Error(MaybeKind.takeError());
+      return;
+    }
+
+    switch (static_cast<SubmoduleRecordTypes>(MaybeKind.get())) {
+    case SUBMODULE_END:
+      return;
+    case SUBMODULE_TOPHEADER: {
+      auto HeaderName = ResolveImportedPath(PathBuf, Blob, F);
+      Visitor(*HeaderName);
+      break;
+    }
+    default:
+      break;
+    }
+  }
+}
+
 Module *ASTReader::getSubmodule(uint32_t GlobalID) {
   if (GlobalID < NUM_PREDEF_SUBMODULE_IDS) {
     assert(GlobalID == 0 && "Unhandled global submodule ID");
@@ -6669,11 +6721,10 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       // them here.
       break;
 
-    case SUBMODULE_TOPHEADER: {
-      auto HeaderName = ResolveImportedPath(PathBuf, Blob, F);
-      CurrentModule->addTopHeaderFilename(*HeaderName);
+    case SUBMODULE_TOPHEADER:
+      // Top-level headers are rarely needed; read them on demand.
+      CurrentModule->setExternalTopHeaders(this, GlobalID);
       break;
-    }
 
     case SUBMODULE_UMBRELLA_DIR: {
       auto Dirname = ResolveImportedPath(PathBuf, Blob, F);
