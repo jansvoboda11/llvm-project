@@ -21,8 +21,15 @@
 #include "llvm/Support/SwapByteOrder.h"
 #include <string.h>
 
+#if defined(__ARM_NEON) && defined(__ARM_FEATURE_SHA2) &&                      \
+    !defined(__ARM_BIG_ENDIAN)
+#include <arm_neon.h>
+#define LLVM_SHA1_USE_ARM_SHA_INSTRUCTIONS 1
+#endif
+
 using namespace llvm;
 
+#ifndef LLVM_SHA1_USE_ARM_SHA_INSTRUCTIONS
 static inline uint32_t rol(uint32_t Number, int Bits) {
   return (Number << Bits) | (Number >> (32 - Bits));
 }
@@ -65,6 +72,7 @@ static inline void r4(uint32_t &A, uint32_t &B, uint32_t &C, uint32_t &D,
   E += (B ^ C ^ D) + blk(Buf, I) + 0xCA62C1D6 + rol(A, 5);
   B = rol(B, 30);
 }
+#endif
 
 /* code */
 #define SHA1_K0 0x5a827999
@@ -88,6 +96,78 @@ void SHA1::init() {
   InternalState.BufferOffset = 0;
 }
 
+#ifdef LLVM_SHA1_USE_ARM_SHA_INSTRUCTIONS
+// Process one block, given as the 16 words W0-W3, using the ARMv8 SHA1
+// instructions.
+static inline void hashBlockARM(uint32x4_t &ABCD, uint32_t &E, uint32x4_t W0,
+                                uint32x4_t W1, uint32x4_t W2, uint32x4_t W3) {
+  const uint32x4_t ABCDSaved = ABCD;
+  const uint32_t ESaved = E;
+  const uint32x4_t K0 = vdupq_n_u32(0x5A827999);
+  const uint32x4_t K1 = vdupq_n_u32(0x6ED9EBA1);
+  const uint32x4_t K2 = vdupq_n_u32(0x8F1BBCDC);
+  const uint32x4_t K3 = vdupq_n_u32(0xCA62C1D6);
+
+  // Four rounds using the message words in WA, then compute the next four
+  // message words into WA (unused in the last four groups).
+#define SHA1_ROUNDS(OP, K, WA, WB, WC, WD)                                     \
+  do {                                                                         \
+    uint32_t NextE = vsha1h_u32(vgetq_lane_u32(ABCD, 0));                      \
+    ABCD = OP(ABCD, E, vaddq_u32(WA, K));                                      \
+    E = NextE;                                                                 \
+    WA = vsha1su1q_u32(vsha1su0q_u32(WA, WB, WC), WD);                         \
+  } while (false)
+  SHA1_ROUNDS(vsha1cq_u32, K0, W0, W1, W2, W3);
+  SHA1_ROUNDS(vsha1cq_u32, K0, W1, W2, W3, W0);
+  SHA1_ROUNDS(vsha1cq_u32, K0, W2, W3, W0, W1);
+  SHA1_ROUNDS(vsha1cq_u32, K0, W3, W0, W1, W2);
+  SHA1_ROUNDS(vsha1cq_u32, K0, W0, W1, W2, W3);
+  SHA1_ROUNDS(vsha1pq_u32, K1, W1, W2, W3, W0);
+  SHA1_ROUNDS(vsha1pq_u32, K1, W2, W3, W0, W1);
+  SHA1_ROUNDS(vsha1pq_u32, K1, W3, W0, W1, W2);
+  SHA1_ROUNDS(vsha1pq_u32, K1, W0, W1, W2, W3);
+  SHA1_ROUNDS(vsha1pq_u32, K1, W1, W2, W3, W0);
+  SHA1_ROUNDS(vsha1mq_u32, K2, W2, W3, W0, W1);
+  SHA1_ROUNDS(vsha1mq_u32, K2, W3, W0, W1, W2);
+  SHA1_ROUNDS(vsha1mq_u32, K2, W0, W1, W2, W3);
+  SHA1_ROUNDS(vsha1mq_u32, K2, W1, W2, W3, W0);
+  SHA1_ROUNDS(vsha1mq_u32, K2, W2, W3, W0, W1);
+  SHA1_ROUNDS(vsha1pq_u32, K3, W3, W0, W1, W2);
+  SHA1_ROUNDS(vsha1pq_u32, K3, W0, W1, W2, W3);
+  SHA1_ROUNDS(vsha1pq_u32, K3, W1, W2, W3, W0);
+  SHA1_ROUNDS(vsha1pq_u32, K3, W2, W3, W0, W1);
+  SHA1_ROUNDS(vsha1pq_u32, K3, W3, W0, W1, W2);
+#undef SHA1_ROUNDS
+
+  ABCD = vaddq_u32(ABCD, ABCDSaved);
+  E += ESaved;
+}
+
+// Process NumBlocks consecutive blocks of big-endian input data.
+static void hashBlocksARM(uint32_t *State, const uint8_t *Data,
+                          size_t NumBlocks) {
+  uint32x4_t ABCD = vld1q_u32(State);
+  uint32_t E = State[4];
+  for (; NumBlocks; --NumBlocks, Data += 64) {
+    hashBlockARM(ABCD, E, vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(Data))),
+                 vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(Data + 16))),
+                 vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(Data + 32))),
+                 vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(Data + 48))));
+  }
+  vst1q_u32(State, ABCD);
+  State[4] = E;
+}
+
+void SHA1::hashBlock() {
+  uint32x4_t ABCD = vld1q_u32(&InternalState.State[0]);
+  uint32_t E = InternalState.State[4];
+  const uint32_t *W = InternalState.Buffer.L;
+  hashBlockARM(ABCD, E, vld1q_u32(W), vld1q_u32(W + 4), vld1q_u32(W + 8),
+               vld1q_u32(W + 12));
+  vst1q_u32(&InternalState.State[0], ABCD);
+  InternalState.State[4] = E;
+}
+#else
 void SHA1::hashBlock() {
   uint32_t A = InternalState.State[0];
   uint32_t B = InternalState.State[1];
@@ -186,6 +266,7 @@ void SHA1::hashBlock() {
   InternalState.State[3] += D;
   InternalState.State[4] += E;
 }
+#endif
 
 void SHA1::addUncounted(uint8_t Data) {
   if constexpr (sys::IsBigEndianHost)
@@ -218,6 +299,12 @@ void SHA1::update(ArrayRef<uint8_t> Data) {
   }
 
   // Fast buffer filling for large inputs.
+#ifdef LLVM_SHA1_USE_ARM_SHA_INSTRUCTIONS
+  assert(Data.size() < BLOCK_LENGTH || InternalState.BufferOffset == 0);
+  const size_t NumBlocks = Data.size() / BLOCK_LENGTH;
+  hashBlocksARM(InternalState.State, Data.data(), NumBlocks);
+  Data = Data.drop_front(NumBlocks * BLOCK_LENGTH);
+#else
   while (Data.size() >= BLOCK_LENGTH) {
     assert(InternalState.BufferOffset == 0);
     static_assert(BLOCK_LENGTH % 4 == 0);
@@ -227,6 +314,7 @@ void SHA1::update(ArrayRef<uint8_t> Data) {
     hashBlock();
     Data = Data.drop_front(BLOCK_LENGTH);
   }
+#endif
 
   // Finish the remainder.
   for (uint8_t C : Data)
