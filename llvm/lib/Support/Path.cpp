@@ -69,6 +69,31 @@ namespace {
     return '/';
   }
 
+  // Returns the position of the first separator in \p Path at or after
+  // \p From, or npos if there is none. Same as
+  // `Path.find_first_of(separators(style), From)`, without building a
+  // character set on every call.
+  inline size_t find_first_separator(StringRef Path, Style style,
+                                     size_t From = 0) {
+    if (is_style_posix(style))
+      return Path.find('/', From);
+    for (size_t I = From, E = Path.size(); I < E; ++I)
+      if (is_separator(Path[I], style))
+        return I;
+    return StringRef::npos;
+  }
+
+  // Returns the position of the last separator in \p Path before \p End, or
+  // npos if there is none. Same as `Path.find_last_of(separators(style), End)`.
+  inline size_t find_last_separator(StringRef Path, Style style, size_t End) {
+    if (is_style_posix(style))
+      return Path.rfind('/', End);
+    for (size_t I = std::min(End, Path.size()); I != 0; --I)
+      if (is_separator(Path[I - 1], style))
+        return I - 1;
+    return StringRef::npos;
+  }
+
   StringRef find_first_component(StringRef path, Style style) {
     // Look for this first component in the following order.
     // * empty (in this case we return an empty string)
@@ -90,7 +115,7 @@ namespace {
     if ((path.size() > 2) && is_separator(path[0], style) &&
         path[0] == path[1] && !is_separator(path[2], style)) {
       // Find the next directory separator.
-      size_t end = path.find_first_of(separators(style), 2);
+      size_t end = find_first_separator(path, style, 2);
       return path.substr(0, end);
     }
 
@@ -99,7 +124,7 @@ namespace {
       return path.substr(0, 1);
 
     // * {file,directory}name
-    size_t end = path.find_first_of(separators(style));
+    size_t end = find_first_separator(path, style);
     return path.substr(0, end);
   }
 
@@ -109,7 +134,7 @@ namespace {
     if (str.size() > 0 && is_separator(str[str.size() - 1], style))
       return str.size() - 1;
 
-    size_t pos = str.find_last_of(separators(style), str.size() - 1);
+    size_t pos = find_last_separator(str, style, str.size() - 1);
 
     if (is_style_windows(style)) {
       if (pos == StringRef::npos)
@@ -134,7 +159,7 @@ namespace {
     // case "//net"
     if (str.size() > 3 && is_separator(str[0], style) && str[0] == str[1] &&
         !is_separator(str[2], style)) {
-      return str.find_first_of(separators(style), 2);
+      return find_first_separator(str, style, 2);
     }
 
     // case "/"
@@ -291,7 +316,7 @@ const_iterator &const_iterator::operator++() {
   }
 
   // Find next component.
-  size_t end_pos = Path.find_first_of(separators(S), Position);
+  size_t end_pos = find_first_separator(Path, S, Position);
   Component = Path.slice(Position, end_pos);
 
   return *this;
@@ -444,7 +469,9 @@ void append(SmallVectorImpl<char> &path, Style style, const Twine &a,
         !path.empty() && is_separator(path[path.size() - 1], style);
     if (path_has_sep) {
       // Strip separators from beginning of component.
-      size_t loc = component.find_first_not_of(separators(style));
+      size_t loc = 0;
+      while (loc != component.size() && is_separator(component[loc], style))
+        ++loc;
       StringRef c = component.substr(loc);
 
       // Append it.
@@ -454,8 +481,11 @@ void append(SmallVectorImpl<char> &path, Style style, const Twine &a,
 
     bool component_has_sep =
         !component.empty() && is_separator(component[0], style);
+    // A POSIX root name ("//net") starts with a separator, so only Windows
+    // components that don't start with one can have a root name ("C:").
     if (!component_has_sep &&
-        !(path.empty() || has_root_name(component, style))) {
+        !(path.empty() ||
+          (is_style_windows(style) && has_root_name(component, style)))) {
       // Add a separator.
       path.push_back(preferred_separator(style));
     }
@@ -689,8 +719,19 @@ bool is_absolute(const Twine &path, Style style) {
   SmallString<128> path_storage;
   StringRef p = path.toStringRef(path_storage);
 
+  if (is_style_posix(style)) {
+    // Same as has_root_directory(p, style): a path that starts with exactly two
+    // separators begins with a root name ("//net"), which must be followed by
+    // a root directory.
+    if (p.empty() || p[0] != '/')
+      return false;
+    if (p.size() > 2 && p[1] == '/' && p[2] != '/')
+      return p.find('/', 2) != StringRef::npos;
+    return true;
+  }
+
   bool rootDir = has_root_directory(p, style);
-  bool rootName = is_style_posix(style) || has_root_name(p, style);
+  bool rootName = has_root_name(p, style);
 
   return rootDir && rootName;
 }
@@ -792,7 +833,7 @@ bool remove_dots(SmallVectorImpl<char> &the_path, bool remove_dot_dot,
   // Loop over path components manually. This makes it easier to detect
   // non-preferred slashes and double separators that must be canonicalized.
   while (!remaining.empty()) {
-    size_t next_slash = remaining.find_first_of(separators(style));
+    size_t next_slash = find_first_separator(remaining, style);
     if (next_slash == StringRef::npos)
       next_slash = remaining.size();
     StringRef component = remaining.take_front(next_slash);
