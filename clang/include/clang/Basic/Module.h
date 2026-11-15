@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/Allocator.h"
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -328,10 +329,14 @@ public:
 /// Required to construct a Module.
 ///
 /// This tag type is only constructible by ModuleMap, guaranteeing it ownership
-/// of all Module instances.
+/// of all Module instances. It also provides the ModuleMap's allocator, which
+/// outlives the modules, for their auxiliary data.
 class ModuleConstructorTag {
-  explicit ModuleConstructorTag() = default;
+  llvm::BumpPtrAllocator &Alloc;
+
+  explicit ModuleConstructorTag(llvm::BumpPtrAllocator &Alloc) : Alloc(Alloc) {}
   friend ModuleMap;
+  friend Module;
 };
 
 /// Describes a module or submodule.
@@ -457,8 +462,9 @@ private:
   std::vector<ModuleRef> SubModules;
 
   /// A mapping from the submodule name to the index into the
-  /// \c SubModules vector at which that submodule resides.
-  llvm::StringMap<unsigned> SubModuleIndex;
+  /// \c SubModules vector at which that submodule resides. The entries are
+  /// allocated by the \c ModuleMap, which frees them all at once.
+  llvm::StringMap<unsigned, llvm::BumpPtrAllocator &> SubModuleIndex;
 
   /// The AST file name and key if this is a top-level module which has a
   /// corresponding serialized AST file, or null otherwise.

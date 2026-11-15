@@ -34,15 +34,15 @@
 
 using namespace clang;
 
-Module::Module(ModuleConstructorTag, StringRef Name,
+Module::Module(ModuleConstructorTag Tag, StringRef Name,
                SourceLocation DefinitionLoc, Module *Parent, bool IsFramework,
                bool IsExplicit, unsigned VisibilityID)
     : Name(Name), DefinitionLoc(DefinitionLoc), Parent(Parent),
-      VisibilityID(VisibilityID), IsUnimportable(false),
-      HasIncompatibleModuleFile(false), IsAvailable(true),
-      IsFromModuleFile(false), IsFramework(IsFramework), IsExplicit(IsExplicit),
-      IsSystem(false), IsExternC(false), IsInferred(false),
-      InferSubmodules(false), InferExplicitSubmodules(false),
+      SubModuleIndex(Tag.Alloc), VisibilityID(VisibilityID),
+      IsUnimportable(false), HasIncompatibleModuleFile(false),
+      IsAvailable(true), IsFromModuleFile(false), IsFramework(IsFramework),
+      IsExplicit(IsExplicit), IsSystem(false), IsExternC(false),
+      IsInferred(false), InferSubmodules(false), InferExplicitSubmodules(false),
       InferExportWildcard(false), ConfigMacrosExhaustive(false),
       NoUndeclaredIncludes(false), ModuleMapIsPrivate(false),
       NamedModuleHasInit(true), NameVisibility(Hidden) {

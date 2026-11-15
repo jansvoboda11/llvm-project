@@ -951,8 +951,8 @@ Module *ModuleMap::findOrInferSubmodule(Module *Parent, StringRef Name) {
   if (!Parent->InferSubmodules)
     return nullptr;
   Module *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, Name, SourceLocation(), Parent, false,
-             Parent->InferExplicitSubmodules, 0);
+      Module(ModuleConstructorTag(ModuleDataAlloc), Name, SourceLocation(),
+             Parent, false, Parent->InferExplicitSubmodules, 0);
   Result->InferExplicitSubmodules = Parent->InferExplicitSubmodules;
   Result->InferSubmodules = Parent->InferSubmodules;
   Result->InferExportWildcard = Parent->InferExportWildcard;
@@ -998,8 +998,8 @@ Module *ModuleMap::createModule(StringRef Name, Module *Parent,
          "Creating duplicate submodule");
 
   Module *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, Name, SourceLocation(), Parent,
-             IsFramework, IsExplicit, NumCreatedModules++);
+      Module(ModuleConstructorTag(ModuleDataAlloc), Name, SourceLocation(),
+             Parent, IsFramework, IsExplicit, NumCreatedModules++);
   if (!Parent) {
     if (LangOpts.CurrentModule == Name)
       SourceModule = Result;
@@ -1011,9 +1011,10 @@ Module *ModuleMap::createModule(StringRef Name, Module *Parent,
 
 Module *ModuleMap::createGlobalModuleFragmentForModuleUnit(SourceLocation Loc,
                                                            Module *Parent) {
-  auto *Result = new (ModulesAlloc.Allocate()) Module(
-      ModuleConstructorTag{}, "<global>", Loc, Parent, /*IsFramework=*/false,
-      /*IsExplicit=*/true, NumCreatedModules++);
+  auto *Result = new (ModulesAlloc.Allocate())
+      Module(ModuleConstructorTag(ModuleDataAlloc), "<global>", Loc, Parent,
+             /*IsFramework=*/false,
+             /*IsExplicit=*/true, NumCreatedModules++);
   Result->Kind = Module::ExplicitGlobalModuleFragment;
   // If the created module isn't owned by a parent, send it to PendingSubmodules
   // to wait for its parent.
@@ -1030,9 +1031,9 @@ ModuleMap::createImplicitGlobalModuleFragmentForModuleUnit(SourceLocation Loc,
   // Note: Here the `IsExplicit` parameter refers to the semantics in clang
   // modules. All the non-explicit submodules in clang modules will be exported
   // too. Here we simplify the implementation by using the concept.
-  auto *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, "<implicit global>", Loc, Parent,
-             /*IsFramework=*/false, /*IsExplicit=*/false, NumCreatedModules++);
+  auto *Result = new (ModulesAlloc.Allocate()) Module(
+      ModuleConstructorTag(ModuleDataAlloc), "<implicit global>", Loc, Parent,
+      /*IsFramework=*/false, /*IsExplicit=*/false, NumCreatedModules++);
   Result->Kind = Module::ImplicitGlobalModuleFragment;
   return Result;
 }
@@ -1040,9 +1041,10 @@ ModuleMap::createImplicitGlobalModuleFragmentForModuleUnit(SourceLocation Loc,
 Module *
 ModuleMap::createPrivateModuleFragmentForInterfaceUnit(Module *Parent,
                                                        SourceLocation Loc) {
-  auto *Result = new (ModulesAlloc.Allocate()) Module(
-      ModuleConstructorTag{}, "<private>", Loc, Parent, /*IsFramework=*/false,
-      /*IsExplicit=*/true, NumCreatedModules++);
+  auto *Result = new (ModulesAlloc.Allocate())
+      Module(ModuleConstructorTag(ModuleDataAlloc), "<private>", Loc, Parent,
+             /*IsFramework=*/false,
+             /*IsExplicit=*/true, NumCreatedModules++);
   Result->Kind = Module::PrivateModuleFragment;
   return Result;
 }
@@ -1050,7 +1052,8 @@ ModuleMap::createPrivateModuleFragmentForInterfaceUnit(Module *Parent,
 Module *ModuleMap::createModuleUnitWithKind(SourceLocation Loc, StringRef Name,
                                             Module::ModuleKind Kind) {
   auto *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, Name, Loc, nullptr, /*IsFramework=*/false,
+      Module(ModuleConstructorTag(ModuleDataAlloc), Name, Loc, nullptr,
+             /*IsFramework=*/false,
              /*IsExplicit=*/false, NumCreatedModules++);
   Result->Kind = Kind;
 
@@ -1109,7 +1112,8 @@ Module *ModuleMap::createHeaderUnit(SourceLocation Loc, StringRef Name,
   assert(!Modules[Name] && "redefining existing module");
 
   auto *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, Name, Loc, nullptr, /*IsFramework=*/false,
+      Module(ModuleConstructorTag(ModuleDataAlloc), Name, Loc, nullptr,
+             /*IsFramework=*/false,
              /*IsExplicit=*/false, NumCreatedModules++);
   Result->Kind = Module::ModuleHeaderUnit;
   Modules[Name] = SourceModule = Result;
@@ -1228,7 +1232,8 @@ Module *ModuleMap::inferFrameworkModule(DirectoryEntryRef FrameworkDir,
     return nullptr;
 
   Module *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, ModuleName, SourceLocation(), Parent,
+      Module(ModuleConstructorTag(ModuleDataAlloc), ModuleName,
+             SourceLocation(), Parent,
              /*IsFramework=*/true, /*IsExplicit=*/false, NumCreatedModules++);
   setInferredModuleAllowedBy(Result, ModuleMapFID);
   if (!Parent) {
@@ -1320,8 +1325,9 @@ Module *ModuleMap::createShadowedModule(StringRef Name, bool IsFramework,
 
   // Create a new module with this name.
   Module *Result = new (ModulesAlloc.Allocate())
-      Module(ModuleConstructorTag{}, Name, SourceLocation(), /*Parent=*/nullptr,
-             IsFramework, /*IsExplicit=*/false, NumCreatedModules++);
+      Module(ModuleConstructorTag(ModuleDataAlloc), Name, SourceLocation(),
+             /*Parent=*/nullptr, IsFramework, /*IsExplicit=*/false,
+             NumCreatedModules++);
   Result->ShadowingModule = ShadowingModule;
   Result->markUnavailable(/*Unimportable*/true);
   ModuleScopeIDs[Result] = CurrentModuleScopeID;

@@ -89,6 +89,10 @@ class ModuleMap {
   /// named LangOpts::CurrentModule, if we've loaded it).
   Module *SourceModule = nullptr;
 
+  /// The allocator for auxiliary data of all (sub)modules. Declared before
+  /// \c ModulesAlloc so that it outlives the modules.
+  llvm::BumpPtrAllocator ModuleDataAlloc;
+
   /// The allocator for all (sub)modules.
   llvm::SpecificBumpPtrAllocator<Module> ModulesAlloc;
 
