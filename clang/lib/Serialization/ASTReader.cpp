@@ -100,6 +100,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -5130,6 +5131,43 @@ static bool SkipCursorToBlock(BitstreamCursor &Cursor, unsigned BlockID) {
   }
 }
 
+namespace {
+/// A probabilistic set of the names in an \c IdentifierTable, keyed by the
+/// hash that AST files store for each identifier in their on-disk identifier
+/// table. It has no false negatives and about 3% false positives.
+class IdentifierHashFilter {
+  llvm::BitVector Bits;
+  unsigned Shift;
+
+  unsigned getBit(unsigned Hash) const {
+    // Fibonacci hashing: the top bits of the product are well mixed.
+    return (uint64_t(Hash) * 0x9E3779B97F4A7C15ULL) >> Shift;
+  }
+
+public:
+  explicit IdentifierHashFilter(const IdentifierTable &Table) {
+    // About 32 bits per name keep the false positive rate at about 3%.
+    unsigned Log2NumBits =
+        llvm::Log2_64_Ceil(std::max<uint64_t>(Table.size() * 32, 64));
+    Bits.resize(uint64_t(1) << Log2NumBits);
+    Shift = 64 - Log2NumBits;
+    for (const auto &Entry : Table)
+      Bits.set(getBit(ASTIdentifierLookupTrait::ComputeHash(Entry.getKey())));
+  }
+
+  bool mayContain(unsigned Hash) const { return Bits.test(getBit(Hash)); }
+};
+} // namespace
+
+/// Returns the hash of the on-disk identifier table entry whose key/data
+/// lengths start at \p Data. \c OnDiskChainedHashTable stores the hash right
+/// before them.
+static unsigned readIdentifierHash(const unsigned char *Data) {
+  using namespace llvm::support;
+  using HashTy = ASTIdentifierLookupTrait::hash_value_type;
+  return endian::read<HashTy, llvm::endianness::little>(Data - sizeof(HashTy));
+}
+
 ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
                                             ModuleKind Type,
                                             SourceLocation ImportLoc,
@@ -5207,6 +5245,20 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
     GlobalBitOffsetsMap.insert(std::make_pair(F.GlobalBitOffset, &F));
   }
 
+  // Without C++, only the interesting identifiers that the importing instance
+  // already knows get preloaded (see below), and module files usually have
+  // many more interesting identifiers than the importing instance knows. If
+  // so, filter them by their stored hashes before hashing their names for the
+  // identifier table lookup.
+  std::optional<IdentifierHashFilter> PreloadFilter;
+  if (!PP.getLangOpts().CPlusPlus) {
+    size_t NumPreload = 0;
+    for (ImportedModule &M : Loaded)
+      NumPreload += M.Mod->PreloadIdentifierOffsets.size();
+    if (NumPreload > 2 * PP.getIdentifierTable().size())
+      PreloadFilter.emplace(PP.getIdentifierTable());
+  }
+
   // Preload source locations and interesting indentifiers.
   for (ImportedModule &M : Loaded) {
     ModuleFile &F = *M.Mod;
@@ -5218,6 +5270,10 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
 
     for (auto Offset : F.PreloadIdentifierOffsets) {
       const unsigned char *Data = F.IdentifierTableData + Offset;
+
+      unsigned Hash = readIdentifierHash(Data);
+      if (PreloadFilter && !PreloadFilter->mayContain(Hash))
+        continue;
 
       ASTIdentifierLookupTrait Trait(*this, F);
       auto KeyDataLen = Trait.ReadKeyDataLength(Data);
@@ -5234,6 +5290,8 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
         auto It = PP.getIdentifierTable().find(Key);
         if (It == PP.getIdentifierTable().end())
           continue;
+        assert(Hash == Trait.ComputeHash(Key) &&
+               "Unexpected on-disk identifier table layout");
         II = It->second;
       } else {
         // With C++ modules, not many identifiers are considered interesting.
