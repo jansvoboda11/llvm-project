@@ -1147,7 +1147,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
             LookupOutput, TUBuffer);
         handleDiagnostics(Filename, S, Errs);
         if (MaybeTUDeps)
-          FD->mergeDeps(Filename, *MaybeTUDeps, LocalIndex);
+          FD->mergeDeps(Filename, std::move(*MaybeTUDeps), LocalIndex);
         else
           HadErrors = true;
       }
