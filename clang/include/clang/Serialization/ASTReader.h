@@ -1216,6 +1216,17 @@ private:
   /// the last time we loaded information about this identifier.
   llvm::DenseMap<const IdentifierInfo *, unsigned> IdentifierGeneration;
 
+  /// The number of module files whose header file info tables have been
+  /// read so far. Each of them records the value of this counter in its
+  /// \c ModuleFile::HeaderFileInfoGeneration.
+  unsigned HeaderFileInfoGeneration = 0;
+
+  /// For each file not found in any header file info table the last time it
+  /// was looked up, the header file info generation at the time of that
+  /// lookup. Module files of that generation or older don't need to be
+  /// searched for that file again.
+  llvm::DenseMap<const FileEntry *, unsigned> HeaderFileInfoMissGeneration;
+
   /// Contains declarations and definitions that could be
   /// "interesting" to the ASTConsumer, when we get that AST consumer.
   ///

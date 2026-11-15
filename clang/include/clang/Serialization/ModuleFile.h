@@ -442,6 +442,11 @@ public:
   /// the header files.
   void *HeaderFileInfoTable = nullptr;
 
+  /// The value of ASTReader's header file info generation counter right after
+  /// this module file's AST block (and so its header file info table) has been
+  /// read, or zero if it hasn't been read yet.
+  unsigned HeaderFileInfoGeneration = 0;
+
   // === Submodule information ===
 
   /// The number of submodules in this module.

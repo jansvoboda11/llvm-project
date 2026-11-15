@@ -5155,6 +5155,11 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
           ReadASTCore(FileName, Type, ImportLoc,
                       /*ImportedBy=*/nullptr, Loaded, 0, 0, ASTFileSignature(),
                       ClientLoadCapabilities)) {
+    assert(
+        llvm::none_of(
+            llvm::make_range(ModuleMgr.begin() + NumModules, ModuleMgr.end()),
+            [](const ModuleFile &M) { return M.HeaderFileInfoGeneration; }) &&
+        "removing a module file whose header file info table was read");
     ModuleMgr.removeModules(ModuleMgr.begin() + NumModules);
 
     // If we find that any modules are unusable, the global index is going
@@ -5185,6 +5190,9 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
       Error(std::move(Err));
       return Failure;
     }
+
+    // The header file info table of this module file is now complete.
+    F.HeaderFileInfoGeneration = ++HeaderFileInfoGeneration;
 
     // The AST block should always have a definition for the main module.
     if (F.isModule() && !F.DidReadTopLevelSubmodule) {
@@ -7291,12 +7299,20 @@ namespace {
   /// Visitor used to search for information about a header file.
   class HeaderFileInfoVisitor {
   FileEntryRef FE;
+    unsigned PriorGeneration;
     std::optional<HeaderFileInfo> HFI;
 
   public:
-    explicit HeaderFileInfoVisitor(FileEntryRef FE) : FE(FE) {}
+    HeaderFileInfoVisitor(FileEntryRef FE, unsigned PriorGeneration)
+        : FE(FE), PriorGeneration(PriorGeneration) {}
 
     bool operator()(ModuleFile &M) {
+      // An earlier lookup already searched this module file and didn't find
+      // the file.
+      if (M.HeaderFileInfoGeneration &&
+          M.HeaderFileInfoGeneration <= PriorGeneration)
+        return false;
+
       HeaderFileInfoLookupTable *Table
         = static_cast<HeaderFileInfoLookupTable *>(M.HeaderFileInfoTable);
       if (!Table)
@@ -7317,11 +7333,33 @@ namespace {
 } // namespace
 
 HeaderFileInfo ASTReader::GetHeaderFileInfo(FileEntryRef FE) {
-  HeaderFileInfoVisitor Visitor(FE);
-  ModuleMgr.visit(Visitor);
-  if (std::optional<HeaderFileInfo> HFI = Visitor.getHeaderFileInfo())
-      return *HFI;
+  // Header file info tables never change once read. If an earlier lookup
+  // didn't find this file, only module files whose tables have been read since
+  // then (or are still being read) need to be searched. That gives the same
+  // result as searching all module files, since the older ones can neither
+  // provide the file's info nor cut off the visitation of their imports.
+  unsigned PriorGeneration = 0;
+  auto Known = HeaderFileInfoMissGeneration.find(&FE.getFileEntry());
+  bool MissedBefore = Known != HeaderFileInfoMissGeneration.end();
+  if (MissedBefore) {
+    PriorGeneration = Known->second;
+    // Every loaded module file (modules are only removed before their AST
+    // block is read) has already been searched.
+    if (PriorGeneration == HeaderFileInfoGeneration &&
+        ModuleMgr.size() == HeaderFileInfoGeneration)
+      return HeaderFileInfo();
+  }
 
+  unsigned Generation = HeaderFileInfoGeneration;
+  HeaderFileInfoVisitor Visitor(FE, PriorGeneration);
+  ModuleMgr.visit(Visitor);
+  if (std::optional<HeaderFileInfo> HFI = Visitor.getHeaderFileInfo()) {
+    if (MissedBefore)
+      HeaderFileInfoMissGeneration.erase(&FE.getFileEntry());
+    return *HFI;
+  }
+
+  HeaderFileInfoMissGeneration[&FE.getFileEntry()] = Generation;
   return HeaderFileInfo();
 }
 
