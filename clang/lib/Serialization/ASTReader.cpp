@@ -6688,6 +6688,8 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     }
 
     case SUBMODULE_IMPORTS:
+      CurrentModule->Imports.reserve(CurrentModule->Imports.size() +
+                                     Record.size());
       for (unsigned Idx = 0; Idx != Record.size(); ++Idx) {
         SubmoduleID GlobalID = getGlobalSubmoduleID(F, Record[Idx]);
         CurrentModule->Imports.push_back(ModuleRef(this, GlobalID));
@@ -6703,6 +6705,8 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       break;
 
     case SUBMODULE_EXPORTS:
+      CurrentModule->Exports.reserve(CurrentModule->Exports.size() +
+                                     Record.size() / 2);
       for (unsigned Idx = 0; Idx + 1 < Record.size(); Idx += 2) {
         SubmoduleID GlobalID = getGlobalSubmoduleID(F, Record[Idx]);
         bool IsWildcard = Record[Idx + 1];
