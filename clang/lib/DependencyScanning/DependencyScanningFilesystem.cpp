@@ -445,11 +445,11 @@ DepScanFile::create(EntryRef Entry) {
   if (Entry.isDirectory())
     return std::make_error_code(std::errc::is_a_directory);
 
-  auto Result = std::make_unique<DepScanFile>(
-      llvm::MemoryBuffer::getMemBuffer(Entry.getContents(),
-                                       Entry.getStatus().getName(),
-                                       /*RequiresNullTerminator=*/false),
-      Entry.getStatus());
+  llvm::vfs::Status Stat = Entry.getStatus();
+  auto Buffer = llvm::MemoryBuffer::getMemBuffer(
+      Entry.getContents(), Stat.getName(), /*RequiresNullTerminator=*/false);
+  auto Result =
+      std::make_unique<DepScanFile>(std::move(Buffer), std::move(Stat));
 
   return llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>(
       std::unique_ptr<llvm::vfs::File>(std::move(Result)));

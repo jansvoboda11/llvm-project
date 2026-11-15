@@ -268,9 +268,12 @@ private:
 /// Reference to a CachedFileSystemEntry.
 /// If the underlying entry is an opened file, this wrapper returns the file
 /// contents and the scanned preprocessor directives.
+///
+/// Doesn't own the filename, so it must not outlive the string passed to
+/// \c DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry().
 class EntryRef {
   /// The filename used to access this entry.
-  std::string Filename;
+  StringRef Filename;
 
   /// The underlying cached entry.
   const CachedFileSystemEntry &Entry;
@@ -351,7 +354,9 @@ public:
   /// used to speed up preprocessing, if available.
   std::optional<ArrayRef<dependency_directives_scan::Directive>>
   getDirectiveTokens(const Twine &Path) {
-    if (llvm::ErrorOr<EntryRef> Entry = getOrCreateFileSystemEntry(Path.str()))
+    SmallString<256> OwnedFilename;
+    StringRef Filename = Path.toStringRef(OwnedFilename);
+    if (llvm::ErrorOr<EntryRef> Entry = getOrCreateFileSystemEntry(Filename))
       if (ensureDirectiveTokensArePopulated(*Entry))
         return Entry->getDirectiveTokens();
     return std::nullopt;
