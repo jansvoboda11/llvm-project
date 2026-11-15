@@ -3504,7 +3504,8 @@ ASTReader::ReadControlBlock(ModuleFile &F,
 
       F.HasTimestamps = Record[6];
 
-      const std::string &CurBranch = getClangFullRepositoryVersion();
+      // The version only depends on how clang was built; compute it once.
+      static const std::string CurBranch = getClangFullRepositoryVersion();
       StringRef ASTBranch = Blob;
       if (StringRef(CurBranch) != ASTBranch && !DisableValidation) {
         if ((ClientLoadCapabilities & ARR_VersionMismatch) == 0)
