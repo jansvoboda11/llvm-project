@@ -62,6 +62,25 @@ public:
 /// Describes the name of a module.
 using ModuleId = SmallVector<std::pair<std::string, SourceLocation>, 2>;
 
+class ModuleFileKey;
+
+/// A non-owning view of a \c ModuleFileKey, for lookups that shouldn't need to
+/// allocate.
+struct ModuleFileKeyRef {
+  /// The entity used for deduplication.
+  const void *Ptr;
+  /// The path relative to the module cache path for implicit module file, empty
+  /// for other kinds of module files.
+  StringRef ImplicitModulePathSuffix;
+
+  ModuleFileKeyRef(const void *ModuleFile) : Ptr(ModuleFile) {}
+
+  ModuleFileKeyRef(const void *ModuleCacheDir, StringRef PathSuffix)
+      : Ptr(ModuleCacheDir), ImplicitModulePathSuffix(PathSuffix) {}
+
+  inline ModuleFileKeyRef(const ModuleFileKey &Key);
+};
+
 /// Deduplication key for a loaded module file in \c ModuleManager.
 ///
 /// For implicitly-built modules, this is a pointer representing the module
@@ -91,6 +110,14 @@ public:
   ModuleFileKey(const void *ModuleCacheDir, StringRef PathSuffix)
       : Ptr(ModuleCacheDir), ImplicitModulePathSuffix(PathSuffix) {}
 
+  explicit ModuleFileKey(ModuleFileKeyRef Ref)
+      : Ptr(Ref.Ptr), ImplicitModulePathSuffix(Ref.ImplicitModulePathSuffix) {}
+
+  const void *getPtr() const { return Ptr; }
+  StringRef getImplicitModulePathSuffix() const {
+    return ImplicitModulePathSuffix;
+  }
+
   bool operator==(const ModuleFileKey &Other) const {
     return Ptr == Other.Ptr &&
            ImplicitModulePathSuffix == Other.ImplicitModulePathSuffix;
@@ -100,6 +127,10 @@ public:
     return !operator==(Other);
   }
 };
+
+ModuleFileKeyRef::ModuleFileKeyRef(const ModuleFileKey &Key)
+    : Ptr(Key.getPtr()),
+      ImplicitModulePathSuffix(Key.getImplicitModulePathSuffix()) {}
 
 /// Identifies a module file to be loaded.
 ///
@@ -1168,13 +1199,21 @@ private:
 } // namespace clang
 
 template <> struct llvm::DenseMapInfo<clang::ModuleFileKey> {
-  static unsigned getHashValue(const clang::ModuleFileKey &Val) {
+  static unsigned getHashValue(const clang::ModuleFileKeyRef &Val) {
     return hash_combine(Val.Ptr, Val.ImplicitModulePathSuffix);
+  }
+  static unsigned getHashValue(const clang::ModuleFileKey &Val) {
+    return getHashValue(clang::ModuleFileKeyRef(Val));
   }
 
   static bool isEqual(const clang::ModuleFileKey &LHS,
                       const clang::ModuleFileKey &RHS) {
     return LHS == RHS;
+  }
+  static bool isEqual(const clang::ModuleFileKeyRef &LHS,
+                      const clang::ModuleFileKey &RHS) {
+    return LHS.Ptr == RHS.Ptr &&
+           LHS.ImplicitModulePathSuffix == RHS.ImplicitModulePathSuffix;
   }
 };
 

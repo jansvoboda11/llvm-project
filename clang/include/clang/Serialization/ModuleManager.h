@@ -235,10 +235,10 @@ public:
   ModuleFile *lookupByModuleName(StringRef ModName) const;
 
   /// Returns the module associated with the given module file name.
-  ModuleFile *lookupByFileName(ModuleFileName FileName) const;
+  ModuleFile *lookupByFileName(const ModuleFileName &FileName) const;
 
   /// Returns the module associated with the given module file key.
-  ModuleFile *lookup(ModuleFileKey Key) const;
+  ModuleFile *lookup(ModuleFileKeyRef Key) const;
 
   /// Number of modules loaded
   unsigned size() const { return Chain.size(); }
@@ -320,6 +320,9 @@ public:
   /// * the module cache does not exist for an implicit module name,
   /// * the module file does not exist for an explicit module name.
   std::optional<ModuleFileKey> makeKey(const ModuleFileName &Name) const;
+
+  /// Like \c makeKey, but returns a non-owning key that refers to \p Name.
+  std::optional<ModuleFileKeyRef> makeKeyRef(const ModuleFileName &Name) const;
 
   ModuleCache &getModuleCache() const { return ModCache; }
 };

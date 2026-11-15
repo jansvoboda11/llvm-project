@@ -43,22 +43,29 @@ using namespace serialization;
 
 std::optional<ModuleFileKey>
 ModuleManager::makeKey(const ModuleFileName &Name) const {
+  if (std::optional<ModuleFileKeyRef> Key = makeKeyRef(Name))
+    return ModuleFileKey(*Key);
+  return std::nullopt;
+}
+
+std::optional<ModuleFileKeyRef>
+ModuleManager::makeKeyRef(const ModuleFileName &Name) const {
   if (unsigned SuffixLen = Name.getImplicitModuleSuffixLength()) {
     StringRef ModuleCachePath = StringRef(Name).drop_back(SuffixLen);
     StringRef ImplicitModuleSuffix = StringRef(Name).take_back(SuffixLen);
     if (auto *ModuleCacheDir = ModCache.getDirectoryPtr(ModuleCachePath))
-      return ModuleFileKey(ModuleCacheDir, ImplicitModuleSuffix);
+      return ModuleFileKeyRef(ModuleCacheDir, ImplicitModuleSuffix);
   } else if (Name.isInMemory()) {
     off_t Size;
     time_t ModTime;
     if (auto *Buf =
             ModCache.getInMemoryModuleCache().lookupPCM(Name, Size, ModTime))
-      return ModuleFileKey(Buf);
+      return ModuleFileKeyRef(Buf);
   } else {
     if (auto ModuleFile = FileMgr.getOptionalFileRef(Name, /*OpenFile=*/true,
                                                      /*CacheFailure=*/true,
                                                      /*IsText=*/false))
-      return ModuleFileKey(*ModuleFile);
+      return ModuleFileKeyRef(*ModuleFile);
   }
 
   return std::nullopt;
@@ -72,13 +79,14 @@ ModuleFile *ModuleManager::lookupByModuleName(StringRef Name) const {
   return nullptr;
 }
 
-ModuleFile *ModuleManager::lookupByFileName(ModuleFileName Name) const {
-  std::optional<ModuleFileKey> Key = makeKey(Name);
+ModuleFile *ModuleManager::lookupByFileName(const ModuleFileName &Name) const {
+  std::optional<ModuleFileKeyRef> Key = makeKeyRef(Name);
   return Key ? lookup(*Key) : nullptr;
 }
 
-ModuleFile *ModuleManager::lookup(ModuleFileKey Key) const {
-  return Modules.lookup(Key);
+ModuleFile *ModuleManager::lookup(ModuleFileKeyRef Key) const {
+  auto It = Modules.find_as(Key);
+  return It != Modules.end() ? It->second : nullptr;
 }
 
 bool ModuleManager::isModuleFileOutOfDate(off_t Size, time_t ModTime,
@@ -145,7 +153,7 @@ AddModuleResult ModuleManager::addModule(
     ExpectedModTime = 0;
   }
 
-  std::optional<ModuleFileKey> FileKey = makeKey(FileName);
+  std::optional<ModuleFileKeyRef> FileKey = makeKeyRef(FileName);
   if (!FileKey) {
     Result.K = AddModuleResult::Missing;
     return Result;
@@ -234,7 +242,8 @@ AddModuleResult ModuleManager::addModule(
   }
 
   // Allocate bookkeeping for a module file not yet loaded into this reader.
-  auto NewModule = std::make_unique<ModuleFile>(Type, *FileKey, Generation);
+  auto NewModule =
+      std::make_unique<ModuleFile>(Type, ModuleFileKey(*FileKey), Generation);
   NewModule->Index = Chain.size();
   NewModule->FileName = FileName;
   NewModule->ImportLoc = ImportLoc;
@@ -265,7 +274,7 @@ AddModuleResult ModuleManager::addModule(
         FileName, std::move(NewFileBuffer), Size, ModTime);
 
   // We're keeping this module. Store it in the map.
-  Result.Module = Modules[*FileKey] = NewModule.get();
+  Result.Module = Modules[NewModule->FileKey] = NewModule.get();
 
   updateModuleImports(*NewModule, ImportedBy, ImportLoc);
 
