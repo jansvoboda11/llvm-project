@@ -105,6 +105,11 @@ void AsyncModuleCompilePool::cancel(Group &G) {
   Dropped.clear();
 }
 
+bool AsyncModuleCompilePool::hasQueuedCompiles() {
+  std::lock_guard<std::mutex> Lock(Mutex);
+  return !Queue.empty();
+}
+
 void AsyncModuleCompilePool::willWait() {
   std::unique_lock<std::mutex> Lock(Mutex);
   assert(NumActive > 0 && "Waiting without a slot");

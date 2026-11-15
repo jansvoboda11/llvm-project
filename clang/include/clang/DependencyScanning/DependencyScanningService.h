@@ -156,6 +156,9 @@ public:
   /// and drops any compiles of \p G queued later.
   void cancel(Group &G);
 
+  /// Whether any compiles are waiting for a slot.
+  bool hasQueuedCompiles();
+
   /// The module caches of the compiles must notify the pool about blocking
   /// waits (see \c makeInProcessModuleCache()), which then give up the slot.
   void willWait() override;

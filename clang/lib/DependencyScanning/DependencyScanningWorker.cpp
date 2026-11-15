@@ -674,9 +674,13 @@ struct AsyncModuleCompile : PPCallbacks {
       llvm::CrashRecoveryContext CRC;
       (void)CRC.RunSafely([&] {
         // Quickly discovers and compiles modules for the real scan below.
-        SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
-                                                    *Compiles);
-        (void)ModCI1->ExecuteAction(Action1);
+        // Unless compiles are queued already: then the new ones would likely
+        // start only once the real scan has built the modules on its own.
+        if (!Service->getAsyncModuleCompilePool().hasQueuedCompiles()) {
+          SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
+                                                      *Compiles);
+          (void)ModCI1->ExecuteAction(Action1);
+        }
         // The real scan below.
         ModCI2->getPreprocessorOpts().SingleModuleParseMode = false;
         GenerateModuleFromModuleMapAction Action2;
