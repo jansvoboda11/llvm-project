@@ -3657,9 +3657,10 @@ ASTReader::ReadControlBlock(ModuleFile &F,
 
     case MODULE_NAME:
       F.ModuleName = std::string(Blob);
-      Diag(diag::remark_module_import)
-          << F.ModuleName << F.FileName << (ImportedBy ? true : false)
-          << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
+      if (!Diags.isIgnored(diag::remark_module_import, CurrentImportLoc))
+        Diag(diag::remark_module_import)
+            << F.ModuleName << F.FileName << (ImportedBy ? true : false)
+            << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
       if (Listener)
         Listener->ReadModuleName(F.ModuleName);
 
@@ -5384,9 +5385,10 @@ ASTReader::ASTReadResult ASTReader::ReadASTCore(
 
   switch (Result.getKind()) {
   case AddModuleResult::AlreadyLoaded: {
-    Diag(diag::remark_module_import)
-        << M->ModuleName << M->FileName << (ImportedBy ? true : false)
-        << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
+    if (!Diags.isIgnored(diag::remark_module_import, CurrentImportLoc))
+      Diag(diag::remark_module_import)
+          << M->ModuleName << M->FileName << (ImportedBy ? true : false)
+          << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
     return Success;
   }
 

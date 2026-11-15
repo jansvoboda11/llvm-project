@@ -801,7 +801,8 @@ void HeaderSearch::noteLookupUsage(unsigned HitIdx, SourceLocation Loc) {
   SearchDirsUsage[HitIdx] = true;
 
   auto UserEntryIdxIt = SearchDirToHSEntry.find(HitIdx);
-  if (UserEntryIdxIt != SearchDirToHSEntry.end())
+  if (UserEntryIdxIt != SearchDirToHSEntry.end() &&
+      !Diags.isIgnored(diag::remark_pp_search_path_usage, Loc))
     Diags.Report(Loc, diag::remark_pp_search_path_usage)
         << HSOpts.UserEntries[UserEntryIdxIt->second].Path;
 }
