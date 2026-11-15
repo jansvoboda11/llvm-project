@@ -304,6 +304,116 @@ TEST(DependencyScanningFilesystem, NoNegativeCache) {
   EXPECT_EQ(InstrumentingFS->NumStatusCalls, 4u);
 }
 
+TEST(DependencyScanningFilesystem, StableDirectories) {
+  DependencyScanningFilesystemSharedCache Cache;
+  Cache.addStableDirectory("/sdk/");
+  Cache.addStableDirectory("/res");
+  // Relative paths and root directories are ignored.
+  Cache.addStableDirectory("rel");
+  Cache.addStableDirectory("/");
+  Cache.addStableDirectory("");
+
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/usr/include/a"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/usr/./a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk//a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/res/include/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk2/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/../a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/usr/../../a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/usr/.."));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk//../a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/..a/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/rel/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("rel/a.h"));
+}
+
+TEST(DependencyScanningFilesystem, CacheStatFailuresInStableDirectories) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/sdk/usr/include/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  InMemoryFS->addFile("/proj/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+
+  auto InstrumentingFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(InMemoryFS);
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  Service.getSharedCache().addStableDirectory("/sdk");
+  DependencyScanningWorkerFilesystem DepFS(Service, InstrumentingFS);
+
+  auto CountStats = [&](llvm::StringRef Path) {
+    size_t Before = InstrumentingFS->NumStatusCalls;
+    EXPECT_FALSE(DepFS.status(Path));
+    EXPECT_FALSE(DepFS.status(Path));
+    return InstrumentingFS->NumStatusCalls - Before;
+  };
+
+  // Failures in a stable directory are cached, with or without an extension.
+  EXPECT_EQ(CountStats("/sdk/usr/include/missing.h"), 1u);
+  EXPECT_EQ(CountStats("/sdk/usr/include/Missing.framework"), 1u);
+  EXPECT_EQ(CountStats("/sdk/usr/include/missing"), 1u);
+
+  // Failures elsewhere aren't.
+  EXPECT_EQ(CountStats("/proj/missing.h"), 2u);
+  EXPECT_EQ(CountStats("/sdk2/missing.h"), 2u);
+  EXPECT_EQ(CountStats("/sdk/../proj/missing2.h"), 2u);
+
+  // Relative paths are resolved against the working directory first.
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/sdk/usr"));
+  EXPECT_EQ(CountStats("include/missing3.h"), 1u);
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/proj"));
+  EXPECT_EQ(CountStats("missing3.h"), 2u);
+
+  // Files showing up outside stable directories are noticed.
+  InMemoryFS->addFile("/proj/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_TRUE(DepFS.status("/proj/missing.h"));
+
+  // Files showing up in stable directories aren't, but they're diagnosed.
+  InMemoryFS->addFile("/sdk/usr/include/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_FALSE(DepFS.status("/sdk/usr/include/missing.h"));
+  auto InvalidEntries =
+      Service.getSharedCache().getOutOfDateEntries(*InMemoryFS);
+  ASSERT_EQ(InvalidEntries.size(), 1u);
+  EXPECT_STREQ("/sdk/usr/include/missing.h", InvalidEntries[0].Path);
+}
+
+TEST(DependencyScanningFilesystem, NoCachedOtherErrorsInStableDirectories) {
+  struct DenyingFS : llvm::vfs::ProxyFileSystem {
+    unsigned NumStatusCalls = 0;
+    DenyingFS(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> UnderlyingFS)
+        : ProxyFileSystem(std::move(UnderlyingFS)) {}
+    llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &Path) override {
+      ++NumStatusCalls;
+      return std::make_error_code(std::errc::permission_denied);
+    }
+  };
+
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  auto FS = llvm::makeIntrusiveRefCnt<DenyingFS>(InMemoryFS);
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  Service.getSharedCache().addStableDirectory("/sdk");
+  DependencyScanningWorkerFilesystem DepFS(Service, FS);
+
+  // Only missing files are cached, not other (maybe transient) errors.
+  EXPECT_EQ(DepFS.status("/sdk/denied.h").getError(),
+            std::errc::permission_denied);
+  EXPECT_EQ(DepFS.status("/sdk/denied.h").getError(),
+            std::errc::permission_denied);
+  EXPECT_EQ(FS->NumStatusCalls, 2u);
+}
+
 TEST(DependencyScanningFilesystem, DiagnoseStaleStatFailures) {
   auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   InMemoryFS->setCurrentWorkingDirectory("/");

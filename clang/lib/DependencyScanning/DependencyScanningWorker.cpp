@@ -381,6 +381,14 @@ static void initializeScanCompilerInstance(
   ScanInstance.createFileManager();
   ScanInstance.createSourceManager();
 
+  // Nothing gets created in the SDK or the resource directory during a build,
+  // so the filesystem cache can remember which files are missing there.
+  if (Service.getOpts().CacheNegativeStatsInStableDirs) {
+    const HeaderSearchOptions &HSOpts = ScanInstance.getHeaderSearchOpts();
+    Service.getSharedCache().addStableDirectory(HSOpts.Sysroot);
+    Service.getSharedCache().addStableDirectory(HSOpts.ResourceDir);
+  }
+
   // Use DepFS for getting the dependency directives if requested to do so.
   if (Service.getOpts().Mode == ScanningMode::DependencyDirectivesScan)
     ScanInstance.setDependencyDirectivesGetter(

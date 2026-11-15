@@ -20,7 +20,10 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
+#include <string>
 #include <variant>
+#include <vector>
 
 namespace clang {
 namespace dependencies {
@@ -260,9 +263,25 @@ public:
   std::vector<OutOfDateEntry>
   getOutOfDateEntries(llvm::vfs::FileSystem &UnderlyingFS) const;
 
+  /// Records that nothing gets created in the absolute directory \p Dir while
+  /// this cache is alive, e.g. because it's an SDK or the compiler's resource
+  /// directory. Missing files in it are then cached, independently of
+  /// \c DependencyScanningServiceOptions::CacheNegativeStats. Ignores relative
+  /// paths and root directories.
+  void addStableDirectory(StringRef Dir);
+
+  /// Returns whether \p Path is spelled as a path in a directory passed to
+  /// \c addStableDirectory(). Paths with ".." components never are.
+  bool isInStableDirectory(StringRef Path) const;
+
 private:
   std::unique_ptr<CacheShard[]> CacheShards;
   unsigned NumShards;
+
+  /// The directories passed to \c addStableDirectory(), without trailing
+  /// separators.
+  std::vector<std::string> StableDirs;
+  mutable std::shared_mutex StableDirsLock;
 };
 
 /// Reference to a CachedFileSystemEntry.

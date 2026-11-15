@@ -157,6 +157,43 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
   return InvalidDiagInfo;
 }
 
+void DependencyScanningFilesystemSharedCache::addStableDirectory(
+    StringRef Dir) {
+  while (!Dir.empty() && llvm::sys::path::is_separator(Dir.back()))
+    Dir = Dir.drop_back();
+  if (!llvm::sys::path::is_absolute_gnu(Dir) ||
+      !llvm::sys::path::has_relative_path(Dir))
+    return;
+  {
+    std::shared_lock<std::shared_mutex> Lock(StableDirsLock);
+    if (llvm::is_contained(StableDirs, Dir))
+      return;
+  }
+  std::unique_lock<std::shared_mutex> Lock(StableDirsLock);
+  if (!llvm::is_contained(StableDirs, Dir))
+    StableDirs.emplace_back(Dir);
+}
+
+bool DependencyScanningFilesystemSharedCache::isInStableDirectory(
+    StringRef Path) const {
+  auto IsInDir = [Path](StringRef Dir) {
+    if (!Path.starts_with(Dir) || Path.size() == Dir.size() ||
+        !llvm::sys::path::is_separator(Path[Dir.size()]))
+      return false;
+    // Don't let ".." escape the directory.
+    for (size_t Begin = Dir.size(), End; Begin < Path.size(); Begin = End + 1) {
+      End = Begin;
+      while (End < Path.size() && !llvm::sys::path::is_separator(Path[End]))
+        ++End;
+      if (Path.slice(Begin, End) == "..")
+        return false;
+    }
+    return true;
+  };
+  std::shared_lock<std::shared_mutex> Lock(StableDirsLock);
+  return llvm::any_of(StableDirs, IsInDir);
+}
+
 namespace {
 using InProgressEntry =
     DependencyScanningFilesystemSharedCache::InProgressEntry;
@@ -332,13 +369,21 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
   //   - Stat succeeded: delegate to the UID resolver.
   //   - Stat failed, cacheable: defer error-entry allocation to the critical
   //     section below so allocate+bind+reset share one shard-lock acquisition.
+  //     Missing files in stable directories (e.g. the SDK) are always
+  //     cacheable, since nothing gets created there during a build.
   //   - Stat failed, not cacheable: publish the error to current waiters but
   //     don't persist; a later separate query re-runs the stat (so a file
   //     created mid-scan becomes visible).
   auto Stat = BaseFS->status(OriginalFilename);
+  auto IsMissingFromStableDirectory = [&] {
+    return (Stat.getError() == std::errc::no_such_file_or_directory ||
+            Stat.getError() == std::errc::not_a_directory) &&
+           Service.getSharedCache().isInStableDirectory(FilenameForLookup);
+  };
   const bool ShouldCacheNegativeStat =
-      !Stat && Service.getOpts().CacheNegativeStats &&
-      shouldCacheNegativeStatsForPath(OriginalFilename);
+      !Stat && ((Service.getOpts().CacheNegativeStats &&
+                 shouldCacheNegativeStatsForPath(OriginalFilename)) ||
+                IsMissingFromStableDirectory());
   llvm::ErrorOr<const CachedFileSystemEntry *> Result = std::error_code{};
   if (Stat)
     Result = resolveUIDThroughSharedCache(OriginalFilename, *Stat);

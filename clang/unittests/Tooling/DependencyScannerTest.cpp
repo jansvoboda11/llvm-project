@@ -305,6 +305,58 @@ TEST(DependencyScanner, ScanDepsWithModuleLookup) {
   EXPECT_EQ(InterceptFS->ReadFiles, std::vector<std::string>{"test.m"});
 }
 
+TEST(DependencyScanner, CacheStatFailuresInSysrootAndResourceDir) {
+#ifdef _WIN32
+  GTEST_SKIP() << "uses POSIX paths";
+#endif
+  std::vector<std::string> CommandLine = {
+      "clang",     "-target",     "x86_64-apple-macosx10.7",
+      "-isysroot", "/sdk",        "-resource-dir",
+      "/res",      "-I/root/inc", "-c",
+      "test.c",    "-o",          "test.o"};
+  StringRef CWD = "/root";
+
+  auto VFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  VFS->setCurrentWorkingDirectory(CWD);
+  VFS->addFile("/sdk/usr/include/sdk.h", 0,
+               llvm::MemoryBuffer::getMemBuffer("\n"));
+  VFS->addFile("/res/include/res.h", 0, llvm::MemoryBuffer::getMemBuffer("\n"));
+  VFS->addFile("/root/inc/inc.h", 0, llvm::MemoryBuffer::getMemBuffer("\n"));
+  VFS->addFile("/root/test.c", 0,
+               llvm::MemoryBuffer::getMemBuffer(
+                   "#if __has_include(<missing.h>)\n#endif\n"));
+
+  auto Scan = [&](bool CacheNegativeStatsInStableDirs) {
+    DependencyScanningServiceOptions Opts;
+    Opts.MakeVFS = [&] { return VFS; };
+    Opts.CacheNegativeStats = false;
+    Opts.CacheNegativeStatsInStableDirs = CacheNegativeStatsInStableDirs;
+    DependencyScanningService Service(std::move(Opts));
+    DependencyScanningTool ScanTool(Service);
+    TextDiagnosticBuffer DiagConsumer;
+    std::optional<std::string> DepFile = ScanTool.getDependencyFile(
+        CommandLine, CWD,
+        CallbackActionController::lookupUnreachableModuleOutput, DiagConsumer);
+    EXPECT_TRUE(DepFile.has_value());
+    auto IsCached = [&](StringRef Path) {
+      auto &Shard = Service.getSharedCache().getShardForFilename(Path);
+      std::lock_guard<std::mutex> Lock(Shard.CacheLock);
+      auto It = Shard.CacheByFilename.find(Path);
+      return It != Shard.CacheByFilename.end() && It->second.Entry &&
+             It->second.Entry->isError();
+    };
+    return std::make_tuple(IsCached("/sdk/usr/include/missing.h"),
+                           IsCached("/res/include/missing.h"),
+                           IsCached("/root/inc/missing.h"));
+  };
+
+  // The sysroot and the resource directory are stable, the project isn't.
+  EXPECT_EQ(Scan(/*CacheNegativeStatsInStableDirs=*/true),
+            std::make_tuple(true, true, false));
+  EXPECT_EQ(Scan(/*CacheNegativeStatsInStableDirs=*/false),
+            std::make_tuple(false, false, false));
+}
+
 // When scanning from a TU buffer, the in-memory TU lives ONLY
 // in the overlay filesystem built from that buffer, never on the base VFS. If
 // DependencyScanningWorker::computeDependencies moves the overlay away before

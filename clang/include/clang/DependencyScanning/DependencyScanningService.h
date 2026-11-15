@@ -99,6 +99,11 @@ struct DependencyScanningServiceOptions {
   bool FlushModuleCache = true;
   /// Whether the caching VFS should cache missing filesystem entries.
   bool CacheNegativeStats = shouldCacheNegativeStatsDefault();
+  /// Whether the caching VFS should cache missing filesystem entries in the
+  /// sysroot and the resource directory of each scanned command line, even
+  /// with \c CacheNegativeStats off. These directories are assumed not to
+  /// change while the service is alive.
+  bool CacheNegativeStatsInStableDirs = true;
   /// Whether scanning modules validate their directory deps against paths
   /// reported via \c DependencyScanningService::addInvalidatedPath instead of
   /// the filesystem.
