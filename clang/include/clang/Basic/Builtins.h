@@ -277,7 +277,13 @@ public:
   getShardAndInfo(unsigned ID) const;
 
   /// Return the IDs of all builtins named \p Name, in no particular order.
-  llvm::SmallVector<unsigned, 2> lookup(llvm::StringRef Name) const;
+  /// \p NameHash must be \c llvm::StringMapImpl::hash(Name), which callers
+  /// that put the name in a \c StringMap have already computed.
+  llvm::SmallVector<unsigned, 2> lookup(llvm::StringRef Name,
+                                        uint32_t NameHash) const;
+  llvm::SmallVector<unsigned, 2> lookup(llvm::StringRef Name) const {
+    return lookup(Name, llvm::StringMapImpl::hash(Name));
+  }
 };
 
 /// Holds information about both target-independent and
@@ -313,9 +319,14 @@ public:
   /// Return the ID of the builtin named \p Name, or \c NotBuiltin if there's
   /// none, \p LangOpts doesn't support it, or -fno-builtin-* disables it.
   /// \c IdentifierTable::setBuiltinInfo() makes the table call this for each
-  /// identifier it creates.
-  unsigned lookupBuiltinID(llvm::StringRef Name,
+  /// identifier it creates. \p NameHash must be
+  /// \c llvm::StringMapImpl::hash(Name).
+  unsigned lookupBuiltinID(llvm::StringRef Name, uint32_t NameHash,
                            const LangOptions &LangOpts) const;
+  unsigned lookupBuiltinID(llvm::StringRef Name,
+                           const LangOptions &LangOpts) const {
+    return lookupBuiltinID(Name, llvm::StringMapImpl::hash(Name), LangOpts);
+  }
 
   /// Call \p Fn with the name of every builtin supported by \p LangOpts,
   /// whether or not the identifier table contains an identifier for it. Does

@@ -18,7 +18,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/xxhash.h"
 #include <memory>
 using namespace clang;
 
@@ -290,8 +289,10 @@ bool Builtin::Context::shouldGenerateFPMathIntrinsic(
   return GenerateIntrinsics;
 }
 
+/// The same hash as StringMap's, so that the identifier table can pass the
+/// hash it has already computed for a new identifier.
 static uint32_t hashBuiltinName(StringRef Name) {
-  return static_cast<uint32_t>(llvm::xxh3_64bits(Name));
+  return llvm::StringMapImpl::hash(Name);
 }
 
 Builtin::TargetBuiltins::TargetBuiltins(const TargetInfo &Target,
@@ -359,19 +360,22 @@ bool Builtin::TargetBuiltins::hasName(unsigned ID, StringRef Name) const {
          Name == (*Shard.Strings)[I.Offsets.Name];
 }
 
-SmallVector<unsigned, 2> Builtin::TargetBuiltins::lookup(StringRef Name) const {
+SmallVector<unsigned, 2>
+Builtin::TargetBuiltins::lookup(StringRef Name, uint32_t NameHash) const {
+#ifdef EXPENSIVE_CHECKS
+  assert(NameHash == hashBuiltinName(Name) && "Wrong hash");
+#endif
   SmallVector<unsigned, 2> IDs;
-  uint32_t Hash = hashBuiltinName(Name);
-  for (size_t Slot = Hash & Mask; uint64_t Entry = Slots[Slot];
+  for (size_t Slot = NameHash & Mask; uint64_t Entry = Slots[Slot];
        Slot = (Slot + 1) & Mask) {
     unsigned ID = static_cast<uint32_t>(Entry);
-    if (Entry >> 32 == Hash && hasName(ID, Name))
+    if (Entry >> 32 == NameHash && hasName(ID, Name))
       IDs.push_back(ID);
   }
   return IDs;
 }
 
-unsigned Builtin::Context::lookupBuiltinID(StringRef Name,
+unsigned Builtin::Context::lookupBuiltinID(StringRef Name, uint32_t NameHash,
                                            const LangOptions &LangOpts) const {
   // This needs to behave as if the builtins were registered in the order of
   // their IDs, with later registrations overriding earlier ones: aux target
@@ -380,7 +384,7 @@ unsigned Builtin::Context::lookupBuiltinID(StringRef Name,
   if (!Builtins)
     return NotBuiltin;
   unsigned Result = NotBuiltin;
-  for (unsigned ID : Builtins->lookup(Name)) {
+  for (unsigned ID : Builtins->lookup(Name, NameHash)) {
     if (ID <= Result)
       continue;
     const auto &[Shard, I] = getShardAndInfo(ID);

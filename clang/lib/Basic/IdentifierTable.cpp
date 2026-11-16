@@ -80,7 +80,7 @@ void IdentifierTable::setBuiltinInfo(const Builtin::Context &Builtins,
   BuiltinLangOpts = &LangOpts;
   for (auto &Entry : HashTable)
     if (Entry.second)
-      assignBuiltinID(*Entry.second);
+      assignBuiltinID(*Entry.second, HashTableTy::hash(Entry.first()));
 }
 
 //===----------------------------------------------------------------------===//

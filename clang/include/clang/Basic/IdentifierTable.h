@@ -705,10 +705,11 @@ class IdentifierTable {
   const LangOptions *BuiltinLangOpts = nullptr;
 
   /// Set the builtin ID of a new identifier if it names a builtin.
-  void assignBuiltinID(IdentifierInfo &II) {
+  /// \p NameHash is the hash of its name in the table.
+  void assignBuiltinID(IdentifierInfo &II, uint32_t NameHash) {
     if (Builtins)
-      if (unsigned ID =
-              Builtins->lookupBuiltinID(II.getName(), *BuiltinLangOpts))
+      if (unsigned ID = Builtins->lookupBuiltinID(II.getName(), NameHash,
+                                                  *BuiltinLangOpts))
         II.setBuiltinID(ID);
   }
 
@@ -746,7 +747,9 @@ public:
   /// Return the identifier token info for the specified named
   /// identifier.
   IdentifierInfo &get(StringRef Name) {
-    auto &Entry = *HashTable.try_emplace(Name, nullptr).first;
+    // The builtin lookup uses the same hash.
+    uint32_t Hash = HashTableTy::hash(Name);
+    auto &Entry = *HashTable.try_emplace_with_hash(Name, Hash, nullptr).first;
 
     IdentifierInfo *&II = Entry.second;
     if (II) return *II;
@@ -766,7 +769,7 @@ public:
     // contents.
     II->Entry = &Entry;
 
-    assignBuiltinID(*II);
+    assignBuiltinID(*II, Hash);
 
     return *II;
   }
@@ -785,7 +788,8 @@ public:
   /// introduce or modify an identifier. If they called get(), they would
   /// likely end up in a recursion.
   IdentifierInfo &getOwn(StringRef Name) {
-    auto &Entry = *HashTable.try_emplace(Name).first;
+    uint32_t Hash = HashTableTy::hash(Name);
+    auto &Entry = *HashTable.try_emplace_with_hash(Name, Hash).first;
 
     IdentifierInfo *&II = Entry.second;
     if (II)
@@ -799,7 +803,7 @@ public:
     // contents.
     II->Entry = &Entry;
 
-    assignBuiltinID(*II);
+    assignBuiltinID(*II, Hash);
 
     // If this is the 'import' or 'module' contextual keyword, mark it as such.
     if (Name == "import")
