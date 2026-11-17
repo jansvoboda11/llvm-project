@@ -15,7 +15,7 @@
 
 // Same with chained PCHs.
 // RUN: %clang_cc1 -triple arm64-apple-macosx -target-feature +neon \
-// RUN:   -chain-include %t%{fs-sep}prefix.h -chain-include %t%{fs-sep}chained.h \
+// RUN:   -chain-include %t/prefix.h -chain-include %t/chained.h \
 // RUN:   -fsyntax-only -verify -DCHAINED %t/tu.c
 
 //--- prefix.h
