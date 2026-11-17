@@ -699,17 +699,14 @@ class IdentifierTable {
 
   IdentifierInfoLookup* ExternalLookup;
 
-  /// Assigns builtin IDs to identifiers as they get created, for the builtins
-  /// that BuiltinLangOpts supports.
+  /// Assigns builtin IDs to identifiers as they get created.
   const Builtin::Context *Builtins = nullptr;
-  const LangOptions *BuiltinLangOpts = nullptr;
 
   /// Set the builtin ID of a new identifier if it names a builtin.
   /// \p NameHash is the hash of its name in the table.
   void assignBuiltinID(IdentifierInfo &II, uint32_t NameHash) {
     if (Builtins)
-      if (unsigned ID = Builtins->lookupBuiltinID(II.getName(), NameHash,
-                                                  *BuiltinLangOpts))
+      if (unsigned ID = Builtins->lookupBuiltinID(II.getName(), NameHash))
         II.setBuiltinID(ID);
   }
 
@@ -733,12 +730,10 @@ public:
   }
 
   /// Assign builtin IDs from \p Builtins to the identifiers in the table, and
-  /// to every identifier that gets created from now on, for the builtins
-  /// supported by \p LangOpts. This lets the table avoid creating identifiers
-  /// for all builtins upfront. \p Builtins and \p LangOpts must outlive the
-  /// table, and \p LangOpts must not change afterwards.
-  void setBuiltinInfo(const Builtin::Context &Builtins,
-                      const LangOptions &LangOpts);
+  /// to every identifier that gets created from now on. This lets the table
+  /// avoid creating identifiers for all builtins upfront. \p Builtins must
+  /// outlive the table.
+  void setBuiltinInfo(const Builtin::Context &Builtins);
 
   llvm::BumpPtrAllocator& getAllocator() {
     return HashTable.getAllocator();

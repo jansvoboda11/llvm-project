@@ -1253,9 +1253,11 @@ public:
   /// lifetime of the preprocessor.
   /// \param AuxTarget is owned by the caller and must remain valid for
   /// the lifetime of the preprocessor.
-  /// \param SharedBuiltins are the builtins of \p Target and \p AuxTarget.
-  /// They must have been collected for exactly these targets (or targets with
-  /// the same builtins). If null, the preprocessor collects them.
+  /// \param SharedBuiltins are the builtins of \p Target and \p AuxTarget
+  /// for the preprocessor's language options. They must have been collected
+  /// for exactly these targets (or targets with the same builtins) and for
+  /// language options that agree on which builtins are supported and
+  /// disabled. If null, the preprocessor collects them.
   void Initialize(
       const TargetInfo &Target, const TargetInfo *AuxTarget = nullptr,
       std::shared_ptr<const Builtin::TargetBuiltins> SharedBuiltins = nullptr);

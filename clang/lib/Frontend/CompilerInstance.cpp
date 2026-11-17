@@ -485,7 +485,7 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   getTarget().adjust(getDiagnostics(), getLangOpts(), getAuxTarget());
   if (!SharedBuiltins)
     SharedBuiltins = std::make_shared<const Builtin::TargetBuiltins>(
-        getTarget(), getAuxTarget());
+        getTarget(), getAuxTarget(), getLangOpts());
   PP->Initialize(getTarget(), getAuxTarget(), SharedBuiltins);
 
   if (PPOpts.DetailedRecord)
@@ -1241,7 +1241,10 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
   auto &Instance = *InstancePtr;
 
   // The module build has the same targets as this instance, so it can use
-  // the same builtins.
+  // the same builtins. They also depend on the language options that decide
+  // which builtins are supported and on -fno-builtin-*, but the module build
+  // has the same ones: resetNonModularOptions() only resets benign language
+  // options, which these aren't, and keeps NoBuiltinFuncs.
   Instance.SharedBuiltins = SharedBuiltins;
 
   auto &Inv = Instance.getInvocation();

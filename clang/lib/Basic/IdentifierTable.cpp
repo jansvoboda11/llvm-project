@@ -74,10 +74,8 @@ IdentifierTable::IdentifierTable(const LangOptions &LangOpts,
   AddKeywords(LangOpts);
 }
 
-void IdentifierTable::setBuiltinInfo(const Builtin::Context &Builtins,
-                                     const LangOptions &LangOpts) {
+void IdentifierTable::setBuiltinInfo(const Builtin::Context &Builtins) {
   this->Builtins = &Builtins;
-  BuiltinLangOpts = &LangOpts;
   for (auto &Entry : HashTable)
     if (Entry.second)
       assignBuiltinID(*Entry.second, HashTableTy::hash(Entry.first()));

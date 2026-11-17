@@ -117,8 +117,9 @@ class CompilerInstance : public ModuleLoader {
   /// The cache of PCM files.
   std::shared_ptr<ModuleCache> ModCache;
 
-  /// The builtins of the instance's target and aux target, shared with the
-  /// module builds it requests, which have the same targets.
+  /// The builtins of the instance's target and aux target for its language
+  /// options, shared with the module builds it requests, which have the same
+  /// targets and builtin-related language options.
   std::shared_ptr<const Builtin::TargetBuiltins> SharedBuiltins;
 
   /// Directory dependencies from the instance that requested this module build.

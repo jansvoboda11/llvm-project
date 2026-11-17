@@ -231,16 +231,19 @@ struct InfosShard {
       HeaderDesc::HEADER, LANG},
 
 /// The builtins of a target and an optional aux target: their shards, and a
-/// hash table from their names to their builtin IDs.
+/// hash table from the names of the builtins that some language options
+/// support to their builtin IDs.
 ///
-/// It contains every builtin of the targets, whether or not it's supported by
-/// some language options; \c Context checks that when looking a name up. It's
-/// immutable, so any number of contexts for the same targets can use it, also
-/// concurrently.
+/// A name maps to the builtin a lookup resolves it to: of the builtins with
+/// that name that the language options support (aux target builtins are
+/// always supported), the one with the highest ID, unless -fno-builtin-*
+/// disables it. It's immutable, so any number of contexts for the same targets
+/// and language options can use it, also concurrently.
 class TargetBuiltins {
   /// Open addressing with linear probing. A slot holds the hash of the name in
   /// the upper 32 bits and the builtin ID in the lower 32 bits, or zero if
-  /// it's empty (zero is \c NotBuiltin).
+  /// it's empty (zero is \c NotBuiltin). The highest bit of the ID is set if
+  /// -fno-builtin-* disables the builtin.
   std::unique_ptr<uint64_t[]> Slots;
   size_t Mask = 0;
 
@@ -252,12 +255,15 @@ class TargetBuiltins {
   unsigned NumTargetBuiltins = 0;
   unsigned NumAuxTargetBuiltins = 0;
 
-  /// Whether the builtin with \p ID is named \p Name.
-  bool hasName(unsigned ID, llvm::StringRef Name) const;
+  /// Return the slot for \p Name, which is either empty or holds the builtin
+  /// with that name. \p NameHash is \c llvm::StringMapImpl::hash(Name).
+  size_t findSlot(llvm::StringRef Name, uint32_t NameHash) const;
 
 public:
-  /// Collect the builtins of \p Target and \p AuxTarget, which may be null.
-  TargetBuiltins(const TargetInfo &Target, const TargetInfo *AuxTarget);
+  /// Collect the builtins of \p Target and \p AuxTarget, which may be null,
+  /// that \p LangOpts supports.
+  TargetBuiltins(const TargetInfo &Target, const TargetInfo *AuxTarget,
+                 const LangOptions &LangOpts);
 
   /// The shards of the target's builtins.
   llvm::ArrayRef<InfosShard> getTargetShards() const {
@@ -276,14 +282,19 @@ public:
   std::pair<const InfosShard &, const Info &>
   getShardAndInfo(unsigned ID) const;
 
-  /// Return the IDs of all builtins named \p Name, in no particular order.
-  /// \p NameHash must be \c llvm::StringMapImpl::hash(Name), which callers
-  /// that put the name in a \c StringMap have already computed.
-  llvm::SmallVector<unsigned, 2> lookup(llvm::StringRef Name,
-                                        uint32_t NameHash) const;
-  llvm::SmallVector<unsigned, 2> lookup(llvm::StringRef Name) const {
+  /// Return the ID of the builtin named \p Name, or \c NotBuiltin if there's
+  /// none, the language options don't support it, or -fno-builtin-* disables
+  /// it. \p NameHash must be \c llvm::StringMapImpl::hash(Name), which
+  /// callers that put the name in a \c StringMap have already computed.
+  unsigned lookup(llvm::StringRef Name, uint32_t NameHash) const;
+  unsigned lookup(llvm::StringRef Name) const {
     return lookup(Name, llvm::StringMapImpl::hash(Name));
   }
+
+  /// Call \p Fn with the name of every builtin the language options support,
+  /// including those disabled by -fno-builtin-*, once each, in no particular
+  /// order.
+  void forEachName(llvm::function_ref<void(llvm::StringRef)> Fn) const;
 };
 
 /// Holds information about both target-independent and
@@ -309,31 +320,29 @@ public:
   Context();
 
   /// Create a context with the builtins of \p Target and \p AuxTarget, which
-  /// may be null.
-  Context(const TargetInfo &Target, const TargetInfo *AuxTarget);
+  /// may be null, that \p LangOpts supports.
+  Context(const TargetInfo &Target, const TargetInfo *AuxTarget,
+          const LangOptions &LangOpts);
 
   /// Create a context with \p Builtins, which can be shared with other
-  /// contexts for the same targets.
+  /// contexts for the same targets and language options.
   explicit Context(std::shared_ptr<const TargetBuiltins> Builtins);
 
   /// Return the ID of the builtin named \p Name, or \c NotBuiltin if there's
-  /// none, \p LangOpts doesn't support it, or -fno-builtin-* disables it.
-  /// \c IdentifierTable::setBuiltinInfo() makes the table call this for each
-  /// identifier it creates. \p NameHash must be
+  /// none, the context's language options don't support it, or
+  /// -fno-builtin-* disables it. \c IdentifierTable::setBuiltinInfo() makes
+  /// the table call this for each identifier it creates. \p NameHash must be
   /// \c llvm::StringMapImpl::hash(Name).
-  unsigned lookupBuiltinID(llvm::StringRef Name, uint32_t NameHash,
-                           const LangOptions &LangOpts) const;
-  unsigned lookupBuiltinID(llvm::StringRef Name,
-                           const LangOptions &LangOpts) const {
-    return lookupBuiltinID(Name, llvm::StringMapImpl::hash(Name), LangOpts);
+  unsigned lookupBuiltinID(llvm::StringRef Name, uint32_t NameHash) const;
+  unsigned lookupBuiltinID(llvm::StringRef Name) const {
+    return lookupBuiltinID(Name, llvm::StringMapImpl::hash(Name));
   }
 
-  /// Call \p Fn with the name of every builtin supported by \p LangOpts,
-  /// whether or not the identifier table contains an identifier for it. Does
-  /// nothing for a context without a target. The order is unspecified, and
-  /// names might repeat.
-  void forEachBuiltinName(const LangOptions &LangOpts,
-                          llvm::function_ref<void(llvm::StringRef)> Fn) const;
+  /// Call \p Fn with the name of every builtin supported by the context's
+  /// language options, whether or not the identifier table contains an
+  /// identifier for it. Does nothing for a context without a target. The
+  /// order is unspecified.
+  void forEachBuiltinName(llvm::function_ref<void(llvm::StringRef)> Fn) const;
 
   /// Return the identifier name for the specified builtin,
   /// e.g. "__builtin_abs".

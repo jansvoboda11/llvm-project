@@ -43,13 +43,13 @@ protected:
       AuxTarget = TargetInfo::CreateTargetInfo(Diags, AuxTargetOpts);
       ASSERT_TRUE(AuxTarget);
     }
-    Builtins = Builtin::Context(*Target, AuxTarget.get());
+    Builtins = Builtin::Context(*Target, AuxTarget.get(), LangOpts);
     Idents = std::make_unique<IdentifierTable>(LangOpts);
   }
 
   void initialize(StringRef Triple, StringRef AuxTriple = "") {
     initializeTarget(Triple, AuxTriple);
-    Idents->setBuiltinInfo(Builtins, LangOpts);
+    Idents->setBuiltinInfo(Builtins);
   }
 
   unsigned getBuiltinID(StringRef Name) {
@@ -90,7 +90,7 @@ TEST_F(BuiltinsTest, ExistingIdentifiersAreResolved) {
   EXPECT_EQ(getBuiltinID("__builtin_abs"), Builtin::NotBuiltin);
   EXPECT_EQ(getBuiltinID("__builtin_ia32_pause"), Builtin::NotBuiltin);
 
-  Idents->setBuiltinInfo(Builtins, LangOpts);
+  Idents->setBuiltinInfo(Builtins);
   EXPECT_EQ(getBuiltinID("__builtin_abs"), Builtin::BI__builtin_abs);
   unsigned ID = getBuiltinID("__builtin_ia32_pause");
   EXPECT_TRUE(Builtins.isTSBuiltin(ID));
@@ -184,9 +184,9 @@ TEST_F(BuiltinsTest, ConcurrentContexts) {
       IntrusiveRefCntPtr<TargetInfo> T =
           TargetInfo::CreateTargetInfo(Diags, Opts);
       LangOptions LO;
-      Builtin::Context Ctx(*T, nullptr);
+      Builtin::Context Ctx(*T, nullptr, LO);
       IdentifierTable Table(LO);
-      Table.setBuiltinInfo(Ctx, LO);
+      Table.setBuiltinInfo(Ctx);
       IDs[I] = Table.get("__builtin_abs").getBuiltinID();
     });
   }
@@ -198,47 +198,109 @@ TEST_F(BuiltinsTest, ConcurrentContexts) {
 
 TEST_F(BuiltinsTest, SharedTargetBuiltins) {
   initializeTarget("arm64-apple-macosx");
-  // Contexts with different language options can share the builtins, which
-  // stay valid as long as any context uses them.
-  auto Shared =
-      std::make_shared<const Builtin::TargetBuiltins>(*Target, nullptr);
-  auto MSContext = std::make_unique<Builtin::Context>(Shared);
+  // Contexts can share the builtins, which stay valid as long as any context
+  // uses them.
+  auto Shared = std::make_shared<const Builtin::TargetBuiltins>(
+      *Target, nullptr, LangOpts);
+  auto Other = std::make_unique<Builtin::Context>(Shared);
   Builtin::Context Ctx(std::move(Shared));
+  EXPECT_EQ(Other->lookupBuiltinID("__builtin_abs"), Builtin::BI__builtin_abs);
+  Other.reset();
+  EXPECT_EQ(Ctx.lookupBuiltinID("__builtin_abs"), Builtin::BI__builtin_abs);
+  EXPECT_TRUE(Ctx.isTSBuiltin(Ctx.lookupBuiltinID("__builtin_neon_vaddq_v")));
+
+  // The builtins depend on the language options they were collected for.
+  EXPECT_EQ(Ctx.lookupBuiltinID("__noop"), Builtin::NotBuiltin);
   LangOptions MS;
   MS.MicrosoftExt = true;
-  EXPECT_EQ(MSContext->lookupBuiltinID("__noop", MS), Builtin::BI__noop);
-  MSContext.reset();
-  EXPECT_EQ(Ctx.lookupBuiltinID("__noop", LangOpts), Builtin::NotBuiltin);
-  EXPECT_EQ(Ctx.lookupBuiltinID("__builtin_abs", LangOpts),
-            Builtin::BI__builtin_abs);
-  EXPECT_TRUE(
-      Ctx.isTSBuiltin(Ctx.lookupBuiltinID("__builtin_neon_vaddq_v", LangOpts)));
+  Builtin::Context MSContext(*Target, nullptr, MS);
+  EXPECT_EQ(MSContext.lookupBuiltinID("__noop"), Builtin::BI__noop);
 }
 
 TEST_F(BuiltinsTest, ContextWithoutTarget) {
   Builtin::Context Ctx;
-  EXPECT_EQ(Ctx.lookupBuiltinID("__builtin_abs", LangOpts),
-            Builtin::NotBuiltin);
+  EXPECT_EQ(Ctx.lookupBuiltinID("__builtin_abs"), Builtin::NotBuiltin);
   EXPECT_EQ(Ctx.getName(Builtin::BI__builtin_abs), "__builtin_abs");
   unsigned NumNames = 0;
-  Ctx.forEachBuiltinName(LangOpts, [&](StringRef) { ++NumNames; });
+  Ctx.forEachBuiltinName([&](StringRef) { ++NumNames; });
   EXPECT_EQ(NumNames, 0u);
 }
 
 TEST_F(BuiltinsTest, TargetBuiltinsLookup) {
   // __mulh is a builtin of both x86-64 and AArch64.
+  LangOpts.MicrosoftExt = true;
   initializeTarget("x86_64-windows-msvc", "aarch64-windows-msvc");
-  Builtin::TargetBuiltins Index(*Target, AuxTarget.get());
-  EXPECT_EQ(Index.lookup("__builtin_abs"),
-            SmallVector<unsigned>({Builtin::BI__builtin_abs}));
-  SmallVector<unsigned, 2> Mulh = Index.lookup("__mulh");
-  ASSERT_EQ(Mulh.size(), 2u);
-  EXPECT_NE(Builtins.isAuxBuiltinID(Mulh[0]), Builtins.isAuxBuiltinID(Mulh[1]));
-  for (unsigned ID : Mulh)
-    EXPECT_EQ(Builtins.getName(ID), "__mulh");
-  EXPECT_TRUE(Index.lookup("not_a_builtin").empty());
-  EXPECT_TRUE(Index.lookup("").empty());
-  EXPECT_TRUE(Index.lookup("__builtin_neon_").empty());
+  Builtin::TargetBuiltins Index(*Target, AuxTarget.get(), LangOpts);
+  EXPECT_EQ(Index.lookup("__builtin_abs"), Builtin::BI__builtin_abs);
+  unsigned Mulh = Index.lookup("__mulh");
+  EXPECT_TRUE(Builtins.isAuxBuiltinID(Mulh));
+  EXPECT_EQ(Builtins.getName(Mulh), "__mulh");
+  EXPECT_EQ(Index.lookup("not_a_builtin"), Builtin::NotBuiltin);
+  EXPECT_EQ(Index.lookup(""), Builtin::NotBuiltin);
+  EXPECT_EQ(Index.lookup("__builtin_neon_"), Builtin::NotBuiltin);
+}
+
+/// A target whose builtins have the names of target-independent ones.
+class OverridingTarget : public TargetInfo {
+  // Builtin "malloc" (a library builtin), "free" (not a library builtin) and
+  // "__builtin_abs" (only with Microsoft extensions).
+  static constexpr llvm::StringTable Strings =
+      "\0malloc\0v\0f\0free\0n\0__builtin_abs\0";
+  static constexpr Builtin::Info Infos[] = {
+      {{1, 8, 10}, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+      {{12, 8, 17}, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+      {{19, 8, 17}, HeaderDesc::NO_HEADER, MS_LANG},
+  };
+
+public:
+  OverridingTarget() : TargetInfo(llvm::Triple("aarch64-unknown-linux")) {}
+  void getTargetDefines(const LangOptions &, MacroBuilder &) const override {}
+  llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override {
+    return {{&Strings, Infos}};
+  }
+  BuiltinVaListKind getBuiltinVaListKind() const override {
+    return VoidPtrBuiltinVaList;
+  }
+  bool validateAsmConstraint(const char *&,
+                             TargetInfo::ConstraintInfo &) const override {
+    return false;
+  }
+  std::string_view getClobbers() const override { return ""; }
+  ArrayRef<const char *> getGCCRegNames() const override { return {}; }
+  ArrayRef<GCCRegAlias> getGCCRegAliases() const override { return {}; }
+};
+
+TEST_F(BuiltinsTest, TargetBuiltinsWinOverTargetIndependentBuiltins) {
+  OverridingTarget T;
+  Builtin::Context Ctx(T, nullptr, LangOpts);
+  for (StringRef Name : {"malloc", "free"}) {
+    unsigned ID = Ctx.lookupBuiltinID(Name);
+    EXPECT_TRUE(Ctx.isTSBuiltin(ID)) << Name;
+    EXPECT_EQ(Ctx.getName(ID), Name);
+  }
+  // Unsupported builtins don't win.
+  EXPECT_EQ(Ctx.lookupBuiltinID("__builtin_abs"), Builtin::BI__builtin_abs);
+  LangOptions MS;
+  MS.MicrosoftExt = true;
+  Builtin::Context MSContext(T, nullptr, MS);
+  EXPECT_TRUE(
+      MSContext.isTSBuiltin(MSContext.lookupBuiltinID("__builtin_abs")));
+}
+
+TEST_F(BuiltinsTest, NoBuiltinFuncsOnlyDisableTheWinner) {
+  OverridingTarget T;
+  LangOpts.NoBuiltinFuncs = {"malloc", "free"};
+  Builtin::Context Ctx(T, nullptr, LangOpts);
+  // The target's malloc is disabled, which doesn't make malloc the
+  // target-independent builtin.
+  EXPECT_EQ(Ctx.lookupBuiltinID("malloc"), Builtin::NotBuiltin);
+  // The target's free isn't a library builtin, so it can't be disabled.
+  unsigned ID = Ctx.lookupBuiltinID("free");
+  EXPECT_TRUE(Ctx.isTSBuiltin(ID));
+  // Disabled builtins are still enumerated, like any supported builtin.
+  llvm::StringSet<> Names;
+  Ctx.forEachBuiltinName([&](StringRef Name) { Names.insert(Name); });
+  EXPECT_TRUE(Names.contains("malloc"));
 }
 
 struct BuiltinsConfig {
@@ -251,16 +313,16 @@ class BuiltinsConsistencyTest
     : public BuiltinsTest,
       public ::testing::WithParamInterface<BuiltinsConfig> {};
 
-/// The lookup through the name indices agrees with the enumeration of all
-/// supported builtins, which checks every builtin directly: every enumerated
-/// name resolves to a builtin with that name, and no other builtin name
-/// resolves.
+/// The lookup agrees with the enumeration of all supported builtins: every
+/// enumerated name resolves to a builtin with that name, no other builtin name
+/// resolves, and no name is enumerated twice.
 TEST_P(BuiltinsConsistencyTest, LookupMatchesEnumeration) {
   GetParam().Configure(LangOpts);
   initialize(GetParam().Triple, GetParam().AuxTriple);
   llvm::StringSet<> Supported;
-  Builtins.forEachBuiltinName(LangOpts,
-                              [&](StringRef Name) { Supported.insert(Name); });
+  Builtins.forEachBuiltinName([&](StringRef Name) {
+    EXPECT_TRUE(Supported.insert(Name).second) << Name;
+  });
   ASSERT_FALSE(Supported.empty());
 
   llvm::StringMap<unsigned> LastAuxID;
@@ -329,8 +391,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_F(BuiltinsTest, ForEachBuiltinName) {
   initialize("arm64-apple-macosx");
   llvm::StringSet<> Names;
-  Builtins.forEachBuiltinName(LangOpts,
-                              [&](StringRef Name) { Names.insert(Name); });
+  Builtins.forEachBuiltinName([&](StringRef Name) { Names.insert(Name); });
   EXPECT_TRUE(Names.contains("__builtin_abs"));
   EXPECT_TRUE(Names.contains("__builtin_neon_vaddq_v"));
   EXPECT_TRUE(Names.contains("__builtin_arm_rbit"));

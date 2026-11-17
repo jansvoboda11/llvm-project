@@ -237,7 +237,7 @@ void Preprocessor::Initialize(
       (!SharedBuiltins || areBuiltinsFor(*SharedBuiltins, Target, AuxTarget)) &&
       "Builtins collected for other targets");
   *BuiltinInfo = SharedBuiltins ? Builtin::Context(std::move(SharedBuiltins))
-                                : Builtin::Context(Target, AuxTarget);
+                                : Builtin::Context(Target, AuxTarget, LangOpts);
   HeaderInfo.setTarget(Target);
 
   // Populate the identifier table with info about keywords for the current language.
@@ -246,7 +246,7 @@ void Preprocessor::Initialize(
   // Make the identifier table assign builtin IDs. This is done before any AST
   // file gets loaded, so that the identifiers read from AST files get their
   // builtin IDs from this compilation rather than from the AST file.
-  Identifiers.setBuiltinInfo(*BuiltinInfo, LangOpts);
+  Identifiers.setBuiltinInfo(*BuiltinInfo);
 
   // Initialize the __FTL_EVAL_METHOD__ macro to the TargetInfo.
   setTUFPEvalMethod(getTargetInfo().getFPEvalMethod());
