@@ -54,6 +54,12 @@ public:
 
   ~DependencyScanningWorker();
 
+  // Workers register with the service on construction and unregister on
+  // destruction, so copying them would unbalance that.
+  DependencyScanningWorker(const DependencyScanningWorker &) = delete;
+  DependencyScanningWorker &
+  operator=(const DependencyScanningWorker &) = delete;
+
   /// Run the dependency scanning tool for all given frontend command-lines,
   /// and report the discovered dependencies to the provided consumer. The
   /// \c OverlayFS will be used to call \c makeEffectiveVFS().

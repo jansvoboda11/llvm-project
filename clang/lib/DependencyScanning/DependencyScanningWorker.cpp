@@ -1081,6 +1081,9 @@ DependencyScanningWorker::DependencyScanningWorker(
     DependencyScanningService &Service,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> LocalFS)
     : Service(Service) {
+  // The shared module dependencies cache sizes itself by the number of workers.
+  Service.registerWorker();
+
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
   // We need to read object files from PCH built outside the scanner.
   PCHContainerOps->registerReader(
@@ -1100,7 +1103,9 @@ DependencyScanningWorker::DependencyScanningWorker(
       Service, std::move(BaseFS), std::move(LocalFS));
 }
 
-DependencyScanningWorker::~DependencyScanningWorker() = default;
+DependencyScanningWorker::~DependencyScanningWorker() {
+  Service.unregisterWorker();
+}
 
 IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 DependencyScanningWorker::makeEffectiveVFS(

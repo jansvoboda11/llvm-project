@@ -1,6 +1,7 @@
 add_clang_unittest(ClangDependencyScanningTests
   DependencyScanningFilesystemTest.cpp
   InProcessModuleCacheTest.cpp
+  ModuleDepsCacheTest.cpp
   CLANG_LIBS
   clangDependencyScanning
   clangFrontend # For TextDiagnosticPrinter.

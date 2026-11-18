@@ -14,6 +14,8 @@
 #include "clang/DependencyScanning/InProcessModuleCache.h"
 #include "clang/DependencyScanning/ModuleDepsCache.h"
 #include "llvm/ADT/BitmaskEnum.h"
+#include <atomic>
+#include <cassert>
 
 namespace clang {
 namespace dependencies {
@@ -118,7 +120,8 @@ struct DependencyScanningServiceOptions {
 class DependencyScanningService {
 public:
   explicit DependencyScanningService(DependencyScanningServiceOptions Opts)
-      : Opts(std::move(Opts)), Logger(this->Opts.LogPath) {
+      : Opts(std::move(Opts)), Logger(this->Opts.LogPath),
+        ModDepsCache(PeakNumWorkers) {
     ModCacheEntries.ValidateAgainstInvalidatedPaths =
         this->Opts.ValidateAgainstInvalidatedPaths;
     if (this->Opts.FlushModuleCache)
@@ -162,6 +165,24 @@ public:
   /// used with \c ShareModuleDeps.
   ModuleDepsCache &getModuleDepsCache() { return ModDepsCache; }
 
+  /// Called by each worker when it is created.
+  void registerWorker() {
+    unsigned NewNumWorkers =
+        NumWorkers.fetch_add(1, std::memory_order_relaxed) + 1;
+    unsigned Peak = PeakNumWorkers.load(std::memory_order_relaxed);
+    while (Peak < NewNumWorkers &&
+           !PeakNumWorkers.compare_exchange_weak(Peak, NewNumWorkers,
+                                                 std::memory_order_relaxed))
+      ;
+  }
+
+  /// Called by each worker when it is destroyed.
+  void unregisterWorker() {
+    [[maybe_unused]] unsigned OldNumWorkers =
+        NumWorkers.fetch_sub(1, std::memory_order_relaxed);
+    assert(OldNumWorkers > 0 && "Unbalanced worker registration");
+  }
+
 private:
   /// The options customizing dependency scanning behavior.
   DependencyScanningServiceOptions Opts;
@@ -171,7 +192,12 @@ private:
   ModuleCacheEntries ModCacheEntries;
   /// The logger of dependency scanning actions.
   AtomicLineLogger Logger;
-  /// The global cache of modular dependencies.
+  /// The number of workers that currently exist.
+  std::atomic<unsigned> NumWorkers = 0;
+  /// The highest value \c NumWorkers ever had.
+  std::atomic<unsigned> PeakNumWorkers = 0;
+  /// The global cache of modular dependencies. Must be declared after
+  /// \c PeakNumWorkers, which it refers to.
   ModuleDepsCache ModDepsCache;
 };
 

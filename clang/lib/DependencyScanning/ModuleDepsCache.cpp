@@ -13,6 +13,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/HashBuilder.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 
 using namespace clang;
 using namespace dependencies;
@@ -69,9 +70,57 @@ std::shared_ptr<ModuleDepsGroup>
 ModuleDepsCache::getOrCreateGroup(const CompilerInvocation &Invocation,
                                   StringRef WorkingDirectory) {
   GroupKey Key = getKey(Invocation, WorkingDirectory);
+  std::shared_ptr<ModuleDepsGroup> Result;
+  // Destroyed after releasing the lock, since it may take a while.
+  std::vector<std::shared_ptr<ModuleDepsGroup>> Pruned;
+  {
+    std::lock_guard<std::mutex> Lock(Mutex);
+    GroupEntry &Entry = Groups[Key];
+    Entry.LastUse = ++UseCounter;
+    Result = Entry.Group;
+    if (!Result) {
+      Result = Entry.Group = std::make_shared<ModuleDepsGroup>();
+      // The number of groups only grows here, so this is the only place that
+      // needs to prune. The new group is held by \c Result, so it stays.
+      pruneGroups(Pruned);
+    }
+  }
+  return Result;
+}
+
+void ModuleDepsCache::pruneGroups(
+    std::vector<std::shared_ptr<ModuleDepsGroup>> &Pruned) {
+  // References to a group are only created under the lock, so a group that is
+  // only referenced by the cache stays that way until we release the lock.
+  // Other references may concurrently go away, which only makes this
+  // conservative.
+  std::vector<std::map<GroupKey, GroupEntry>::iterator> Unheld;
+  for (auto It = Groups.begin(), End = Groups.end(); It != End; ++It)
+    if (It->second.Group.use_count() == 1)
+      Unheld.push_back(It);
+
+  // The group that was just created is held by the caller for now, but it is
+  // the most recently used one once it's released, so leave room for it.
+  size_t MaxUnheld =
+      size_t(std::max(PeakNumWorkers.load(std::memory_order_relaxed), 1u)) *
+          UnheldGroupsPerWorker -
+      1;
+  if (Unheld.size() <= MaxUnheld)
+    return;
+
+  size_t NumToPrune = Unheld.size() - MaxUnheld;
+  auto ByLastUse = [](const auto &LHS, const auto &RHS) {
+    return LHS->second.LastUse < RHS->second.LastUse;
+  };
+  std::nth_element(Unheld.begin(), Unheld.begin() + (NumToPrune - 1),
+                   Unheld.end(), ByLastUse);
+  for (size_t I = 0; I != NumToPrune; ++I) {
+    Pruned.push_back(std::move(Unheld[I]->second.Group));
+    Groups.erase(Unheld[I]);
+  }
+}
+
+size_t ModuleDepsCache::getNumGroups() {
   std::lock_guard<std::mutex> Lock(Mutex);
-  std::shared_ptr<ModuleDepsGroup> &Group = Groups[Key];
-  if (!Group)
-    Group = std::make_shared<ModuleDepsGroup>();
-  return Group;
+  return Groups.size();
 }
