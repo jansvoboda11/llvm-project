@@ -102,6 +102,7 @@ static ResourceDirRecipeKind ResourceDirRecipe;
 static std::string LogPath;
 static bool Verbose;
 static bool AsyncScanModules;
+static bool ShareModuleDeps;
 static bool PrintTiming;
 static bool EmitVisibleModules;
 static llvm::BumpPtrAllocator Alloc;
@@ -261,6 +262,7 @@ static void ParseArgs(int argc, char **argv) {
   Verbose = Args.hasArg(OPT_verbose);
 
   AsyncScanModules = Args.hasArg(OPT_async_scan_modules);
+  ShareModuleDeps = Args.hasArg(OPT_share_module_deps);
 
   RoundTripArgs = Args.hasArg(OPT_round_trip_args);
 
@@ -855,8 +857,8 @@ struct ByNameConsumer : DependencyConsumer {
   void handleDirectModuleDependency(ModuleID) override {}
   void handleVisibleModule(std::string) override {}
   void handleContextHash(std::string) override {}
-  void handleModuleDependency(ModuleDeps MD) override {
-    ModuleGraph.push_back(std::move(MD));
+  void handleModuleDependency(const ModuleDeps &MD) override {
+    ModuleGraph.push_back(MD);
   }
   void finishQuery(StringRef, bool Success) override {
     if (Success)
@@ -1146,10 +1148,15 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
             Input->CommandLine, CWD, DiagConsumer, AlreadySeenModules,
             LookupOutput, TUBuffer);
         handleDiagnostics(Filename, S, Errs);
-        if (MaybeTUDeps)
+        if (MaybeTUDeps) {
+          // This worker only ever picks up inputs with increasing indices, so
+          // there is no need to have modules it already merged reported again.
+          for (const ModuleDeps &MD : MaybeTUDeps->ModuleGraph)
+            AlreadySeenModules.insert(MD.ID);
           FD->mergeDeps(Filename, *MaybeTUDeps, LocalIndex);
-        else
+        } else {
           HadErrors = true;
+        }
       }
     }
 
@@ -1181,6 +1188,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
   Opts.CacheNegativeStats = CacheNegativeStats;
   Opts.ValidateAgainstInvalidatedPaths = true;
   Opts.LogPath = LogPath;
+  Opts.ShareModuleDeps = ShareModuleDeps;
 
   llvm::Timer T;
   T.startTimer();

@@ -53,6 +53,7 @@ def emit_visible_modules
 def verbose : F<"v", "Use verbose output">;
 
 def async_scan_modules : F<"async-scan-modules", "Scan modules asynchronously">;
+def share_module_deps : F<"share-module-deps", "Share what the scanner learns about modular dependencies between translation units whose invocations only differ in per-TU paths">;
 
 def round_trip_args : F<"round-trip-args", "verify that command-line arguments are canonical by parsing and re-serializing">;
 

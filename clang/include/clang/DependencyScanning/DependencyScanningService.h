@@ -12,6 +12,7 @@
 #include "clang/Basic/AtomicLineLogger.h"
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
 #include "clang/DependencyScanning/InProcessModuleCache.h"
+#include "clang/DependencyScanning/ModuleDepsCache.h"
 #include "llvm/ADT/BitmaskEnum.h"
 
 namespace clang {
@@ -106,6 +107,10 @@ struct DependencyScanningServiceOptions {
   /// The path to a log file, which logs timing of actions performed by
   /// the dependency scanner.
   std::string LogPath;
+  /// Whether translation units whose compiler invocations only differ in
+  /// per-TU paths share what the scanner learns about their modular
+  /// dependencies. See \c ModuleDepsGroup for the requirements.
+  bool ShareModuleDeps = false;
 };
 
 /// The dependency scanning service contains shared configuration and state that
@@ -153,6 +158,10 @@ public:
 
   AtomicLineLogger &getLogger() { return Logger; }
 
+  /// The cache of modular dependencies shared between translation units. Only
+  /// used with \c ShareModuleDeps.
+  ModuleDepsCache &getModuleDepsCache() { return ModDepsCache; }
+
 private:
   /// The options customizing dependency scanning behavior.
   DependencyScanningServiceOptions Opts;
@@ -162,6 +171,8 @@ private:
   ModuleCacheEntries ModCacheEntries;
   /// The logger of dependency scanning actions.
   AtomicLineLogger Logger;
+  /// The global cache of modular dependencies.
+  ModuleDepsCache ModDepsCache;
 };
 
 } // end namespace dependencies
