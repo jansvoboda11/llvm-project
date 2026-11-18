@@ -678,9 +678,6 @@ void ModuleDepCollector::run(DependencyConsumer &Consumer) {
   for (serialization::ModuleFile *MF : MDC.DirectModularDeps)
     handleTopLevelModule(MF);
 
-  Consumer.handleContextHash(
-      MDC.ScanInstance.getInvocation().computeContextHash());
-
   Consumer.handleDependencyOutputOpts(*MDC.Opts);
 
   Consumer.handleProvidedAndRequiredStdCXXModules(MDC.ProvidedStdCXXModule,

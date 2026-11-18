@@ -12,7 +12,7 @@
 // RUN: clang-scan-deps -compilation-database %t.cdb -j 1 -format experimental-full \
 // RUN:   -mode preprocess-dependency-directives > %t.result
 // RUN: cat %t.result | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-context-hash,clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name \
 // RUN:   | FileCheck -DPREFIX=%/t.dir --check-prefixes=CHECK %s
 
 #import "header3.h"
@@ -34,8 +34,7 @@
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "[[HASH_TU:[A-Z0-9]+]]",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "[[HASH_H2]]",
 // CHECK-NEXT:           "module-name": "header2"

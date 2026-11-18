@@ -54,7 +54,6 @@ public:
   }
   void handleDirectModuleDependency(ModuleID ID) override {}
   void handleVisibleModule(std::string ModuleName) override {}
-  void handleContextHash(std::string Hash) override {}
 
   void printDependencies(std::string &S) {
     assert(Opts && "Handled dependency output options.");

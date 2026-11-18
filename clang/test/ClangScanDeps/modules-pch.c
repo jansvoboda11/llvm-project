@@ -10,7 +10,7 @@
 // RUN: clang-scan-deps -compilation-database %t/cdb_pch.json -format experimental-full \
 // RUN:   -module-files-dir %t/build > %t/result_pch.json
 // RUN: cat %t/result_pch.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t -check-prefix=CHECK-PCH
 //
 // Check we didn't build the PCH during dependency scanning.
@@ -65,8 +65,7 @@
 // CHECK-PCH-NEXT:   ],
 // CHECK-PCH-NEXT:   "translation-units": [
 // CHECK-PCH-NEXT:     {
-// CHECK-PCH:            "clang-context-hash": "[[HASH_PCH:.*]]",
-// CHECK-PCH-NEXT:       "clang-module-deps": [
+// CHECK-PCH:            "clang-module-deps": [
 // CHECK-PCH-NEXT:         {
 // CHECK-PCH-NEXT:           "context-hash": "[[HASH_MOD_COMMON_1]]",
 // CHECK-PCH-NEXT:           "module-name": "ModCommon1"
@@ -103,7 +102,7 @@
 // RUN: clang-scan-deps -compilation-database %t/cdb_tu.json -format experimental-full \
 // RUN:   -module-files-dir %t/build > %t/result_tu.json
 // RUN: cat %t/result_tu.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t -check-prefix=CHECK-TU
 //
 // CHECK-TU:      {
@@ -124,8 +123,7 @@
 // CHECK-TU-NEXT:   ],
 // CHECK-TU-NEXT:   "translation-units": [
 // CHECK-TU-NEXT:     {
-// CHECK-TU:            "clang-context-hash": "[[HASH_TU:.*]]",
-// CHECK-TU-NEXT:       "clang-module-deps": [
+// CHECK-TU:            "clang-module-deps": [
 // CHECK-TU-NEXT:         {
 // CHECK-TU-NEXT:           "context-hash": "[[HASH_MOD_TU]]",
 // CHECK-TU-NEXT:           "module-name": "ModTU"
@@ -155,7 +153,7 @@
 // RUN: clang-scan-deps -compilation-database %t/cdb_tu_with_common.json -format experimental-full \
 // RUN:   -module-files-dir %t/build > %t/result_tu_with_common.json
 // RUN: cat %t/result_tu_with_common.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t -check-prefix=CHECK-TU-WITH-COMMON
 //
 // CHECK-TU-WITH-COMMON:      {
@@ -176,8 +174,7 @@
 // CHECK-TU-WITH-COMMON-NEXT:   ],
 // CHECK-TU-WITH-COMMON-NEXT:   "translation-units": [
 // CHECK-TU-WITH-COMMON-NEXT:     {
-// CHECK-TU-WITH-COMMON:            "clang-context-hash": "[[HASH_TU_WITH_COMMON:.*]]",
-// CHECK-TU-WITH-COMMON-NEXT:       "clang-module-deps": [
+// CHECK-TU-WITH-COMMON:            "clang-module-deps": [
 // CHECK-TU-WITH-COMMON-NEXT:         {
 // CHECK-TU-WITH-COMMON-NEXT:           "context-hash": "[[HASH_MOD_TU_WITH_COMMON]]",
 // CHECK-TU-WITH-COMMON-NEXT:           "module-name": "ModTUWithCommon"

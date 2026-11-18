@@ -23,7 +23,7 @@ framework module FW_Private { umbrella header "FW_Private.h" }
 // RUN: sed -e "s|DIR|%/t|g" %t/cdb.json.template > %t/cdb.json
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,link-libraries,name,clang-context-hash,command-line,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,link-libraries,name,command-line,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
@@ -66,8 +66,7 @@ framework module FW_Private { umbrella header "FW_Private.h" }
 // CHECK:        ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
 // CHECK-NEXT:           "module-name": "FW"

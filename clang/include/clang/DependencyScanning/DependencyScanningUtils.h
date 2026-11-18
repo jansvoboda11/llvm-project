@@ -51,10 +51,6 @@ public:
     VisibleModules.push_back(ModuleName);
   }
 
-  void handleContextHash(std::string Hash) override {
-    ContextHash = std::move(Hash);
-  }
-
   void handleProvidedAndRequiredStdCXXModules(
       std::optional<P1689ModuleInfo> Provided,
       std::vector<P1689ModuleInfo> Requires) override {
@@ -74,7 +70,6 @@ private:
   std::vector<ModuleID> DirectModuleDeps;
   std::vector<std::string> VisibleModules;
   std::vector<Command> Commands;
-  std::string ContextHash;
   const llvm::DenseSet<ModuleID> &AlreadySeen;
 };
 

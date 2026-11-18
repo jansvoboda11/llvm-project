@@ -30,7 +30,7 @@ module User [no_undeclared_includes] { header "user.h" }
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full \
 // RUN:   -module-files-dir %t/build > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
 // CHECK:        {
@@ -53,8 +53,7 @@ module User [no_undeclared_includes] { header "user.h" }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}"
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}"
 // CHECK-NEXT:           "module-name": "User"

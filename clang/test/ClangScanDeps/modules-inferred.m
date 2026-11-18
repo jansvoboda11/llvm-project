@@ -27,7 +27,7 @@ inferred a = 0;
 // RUN: sed "s|DIR|%/t|g" %t/cdb.json.template > %t/cdb.json
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
 // CHECK:      {
@@ -56,7 +56,6 @@ inferred a = 0;
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "{{.*}}",

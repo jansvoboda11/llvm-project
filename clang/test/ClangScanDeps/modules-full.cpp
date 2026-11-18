@@ -13,13 +13,13 @@
 // RUN: clang-scan-deps -compilation-database %t.cdb -j 4 -format experimental-full \
 // RUN:   -mode preprocess-dependency-directives > %t.result
 // RUN: cat %t.result | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,executable,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,executable,input-file \
 // RUN:   | FileCheck -DPREFIX=%/t.dir %s
 //
 // RUN: clang-scan-deps -compilation-database %t_clangcl.cdb -j 4 -format experimental-full \
 // RUN:   -mode preprocess-dependency-directives > %t_clangcl.result
 // RUN: cat %t_clangcl.result | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,executable,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,executable,input-file \
 // RUN:   | FileCheck -DPREFIX=%/t.dir %s
 
 #include "header.h"
@@ -94,7 +94,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU_DINCLUDE:[A-Z0-9]+]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_H1_DINCLUDE]]",
@@ -117,7 +116,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU:[A-Z0-9]+]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_H1]]",
@@ -140,7 +138,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU:[A-Z0-9]+]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_H1]]",
@@ -163,7 +160,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU:[A-Z0-9]+]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_H1]]",

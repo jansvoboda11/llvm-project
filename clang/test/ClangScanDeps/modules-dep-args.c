@@ -25,25 +25,25 @@ module Direct { header "direct.h" }
 // Check that the PCM path defaults to the modules cache from implicit build.
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result_cache.json
 // RUN: cat %t/result_cache.json  | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,clang-module-deps,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-module-deps,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t --check-prefixes=CHECK,CHECK_CACHE
 
 // Check that the PCM path can be customized.
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full -module-files-dir %t/build > %t/result_build.json
 // RUN: cat %t/result_build.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,clang-module-deps,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-module-deps,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t --check-prefixes=CHECK,CHECK_BUILD
 
 // Check that the PCM file is loaded lazily by default.
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result_lazy.json
 // RUN: cat %t/result_lazy.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,clang-module-deps,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-module-deps,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t --check-prefixes=CHECK,CHECK_LAZY
 
 // Check that the PCM file can be loaded eagerly.
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full -eager-load-pcm > %t/result_eager.json
 // RUN: cat %t/result_eager.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,clang-module-deps,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-module-deps,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t --check-prefixes=CHECK,CHECK_EAGER
 
 // CHECK:      {
@@ -88,8 +88,7 @@ module Direct { header "direct.h" }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
 // CHECK-NEXT:           "module-name": "Direct"

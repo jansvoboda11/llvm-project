@@ -40,7 +40,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH]]",
@@ -62,7 +61,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH]]",

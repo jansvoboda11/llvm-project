@@ -169,10 +169,8 @@ struct TranslationUnitDeps {
   /// The graph of direct and transitive modular dependencies.
   ModuleDepsGraph ModuleGraph;
 
-  /// The identifier of the C++20 module this translation unit exports.
-  ///
-  /// If the translation unit is not a module then \c ID.ModuleName is empty.
-  ModuleID ID;
+  /// The name of the C++20 module this TU exports, if any. Empty otherwise.
+  std::string ModuleName;
 
   /// A collection of absolute paths to files that this translation unit
   /// directly depends on, not including transitive dependencies.

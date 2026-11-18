@@ -55,9 +55,9 @@ module X { header "X.h" }
 // RUN: sed -e "s|DIR|%/t|g" %t/cdb_without_a.json.template > %t/cdb_without_a.json
 
 // RUN: clang-scan-deps -compilation-database %t/cdb_with_a.json    -format experimental-full -optimize-args=header-search \
-// RUN:   | sed 's:\\\\\?:/:g' | %scan-deps-filter --fields=clang-context-hash,clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name >  %t/results.json
+// RUN:   | sed 's:\\\\\?:/:g' | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name >  %t/results.json
 // RUN: clang-scan-deps -compilation-database %t/cdb_without_a.json -format experimental-full -optimize-args=header-search \
-// RUN:   | sed 's:\\\\\?:/:g' | %scan-deps-filter --fields=clang-context-hash,clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name >> %t/results.json
+// RUN:   | sed 's:\\\\\?:/:g' | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name >> %t/results.json
 // RUN: cat %t/results.json | FileCheck %s -DPREFIX=%/t
 
 // CHECK:      {
@@ -95,8 +95,7 @@ module X { header "X.h" }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "[[HASH_X]]",
 // CHECK-NEXT:           "module-name": "X"
@@ -144,8 +143,7 @@ module X { header "X.h" }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "{{.*}}",
 // CHECK-NEXT:           "module-name": "X"

@@ -84,7 +84,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU:.*]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_TOP]]",
@@ -116,7 +115,6 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "[[HASH_TU]]",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "[[HASH_TOP]]",

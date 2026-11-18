@@ -530,7 +530,7 @@ struct InputDependencies {
 
 static InputDependencies makeInputDeps(deps::TranslationUnitDeps &&TUDeps) {
   InputDependencies InputDeps;
-  InputDeps.ModuleName = std::move(TUDeps.ID.ModuleName);
+  InputDeps.ModuleName = std::move(TUDeps.ModuleName);
   InputDeps.NamedModuleDeps = std::move(TUDeps.NamedModuleDeps);
   InputDeps.ClangModuleDeps = std::move(TUDeps.ClangModuleDeps);
   InputDeps.FileDeps = std::move(TUDeps.FileDeps);

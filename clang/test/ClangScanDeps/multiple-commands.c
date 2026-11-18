@@ -16,7 +16,7 @@
 // RUN:   > %t/deps.json
 
 // RUN: cat %t/deps.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,name,clang-context-hash,clang-module-deps,command-line,executable,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-modulemap-file,name,clang-module-deps,command-line,executable,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
 // Build the -save-temps + -fmodules case
@@ -46,7 +46,6 @@
 // CHECK-NEXT:   {
 // CHECK:          "commands": [
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "clang-context-hash":
 // CHECK-NEXT:         "clang-module-deps": []
 // CHECK-NEXT:         "command-line": [
 // CHECK-NEXT:           "-cc1"
@@ -58,7 +57,6 @@
 // CHECK:              "input-file": "[[PREFIX]]{{.}}tu_no_integrated_cpp.c"
 // CHECK-NEXT:       }
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "clang-context-hash":
 // CHECK-NEXT:         "clang-module-deps": []
 // CHECK-NEXT:         "command-line": [
 // CHECK-NEXT:           "-cc1"

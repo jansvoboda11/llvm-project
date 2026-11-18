@@ -33,7 +33,7 @@ module Dependency { header "dependency.h" }
 
 // Check that FW is reported to depend on FW_Private.
 // RUN: cat %t/deps.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 // CHECK:      {
 // CHECK-NEXT:   "modules": [
@@ -103,7 +103,6 @@ module Dependency { header "dependency.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "{{.*}}",

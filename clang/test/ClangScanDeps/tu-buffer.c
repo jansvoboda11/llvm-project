@@ -36,7 +36,7 @@ module addition { header "addition.h" }
 // RUN: sed "s|DIR|%/t|g" %t/cdb.json.template > %t/cdb.json
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full -tu-buffer-path %t/tu.c > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,name,clang-context-hash,input-file \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,name,input-file \
 // RUN:   | FileCheck -DPREFIX=%/t %s --check-prefix=CHECK
 
 // CHECK:      {
@@ -87,7 +87,6 @@ module addition { header "addition.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "{{.*}}",

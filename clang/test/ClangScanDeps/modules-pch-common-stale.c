@@ -41,7 +41,7 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // RUN:     %clang -nostdinc -c %t/tu.c -o %t/tu.o -include %t/prefix.h \
 // RUN:     -fmodules -fimplicit-module-maps -fmodules-cache-path=%t/cache
 // RUN: cat %t/deps_tu_clean.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,executable,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,executable,input-file \
 // RUN:   | FileCheck %s --check-prefix=CHECK-TU-CLEAN -DPREFIX=%/t
 // CHECK-TU-CLEAN:      {
 // CHECK-TU-CLEAN-NEXT:   "modules": [
@@ -63,7 +63,6 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // CHECK-TU-CLEAN-NEXT:     {
 // CHECK-TU-CLEAN-NEXT:       "commands": [
 // CHECK-TU-CLEAN-NEXT:         {
-// CHECK-TU-CLEAN-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-TU-CLEAN-NEXT:           "clang-module-deps": [
 // CHECK-TU-CLEAN-NEXT:             {
 // CHECK-TU-CLEAN-NEXT:               "context-hash": "{{.*}}",
@@ -112,7 +111,7 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // RUN:     %clang -nostdinc -c %t/tu.c -o %t/tu.o -include %t/prefix.h \
 // RUN:     -fmodules -fimplicit-module-maps -fmodules-cache-path=%t/cache
 // RUN: cat %t/deps_tu_incremental.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,clang-context-hash,executable,input-file \
+// RUN:   | %scan-deps-filter --fields=name,clang-module-deps,clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,executable,input-file \
 // RUN:   | FileCheck %s --check-prefix=CHECK-TU-INCREMENTAL -DPREFIX=%/t
 // CHECK-TU-INCREMENTAL:      {
 // CHECK-TU-INCREMENTAL-NEXT:   "modules": [
@@ -152,7 +151,6 @@ module mod_tu_extra { header "mod_tu_extra.h" }
 // CHECK-TU-INCREMENTAL-NEXT:     {
 // CHECK-TU-INCREMENTAL-NEXT:       "commands": [
 // CHECK-TU-INCREMENTAL-NEXT:         {
-// CHECK-TU-INCREMENTAL-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-TU-INCREMENTAL-NEXT:           "clang-module-deps": [
 // CHECK-TU-INCREMENTAL-NEXT:             {
 // CHECK-TU-INCREMENTAL-NEXT:               "context-hash": "{{.*}}",

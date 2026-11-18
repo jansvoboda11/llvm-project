@@ -82,7 +82,6 @@ module mod {
 // CHECK:        {
 // CHECK:          "commands": [
 // CHECK:          {
-// CHECK-NEXT:        "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:        "clang-module-deps": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "context-hash": "[[HASH]]",
@@ -99,7 +98,6 @@ module mod {
 // CHECK:         {
 // CHECK:           "commands": [
 // CHECK:           {
-// CHECK-NEXT:         "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:         "clang-module-deps": [
 // CHECK-NEXT:           {
 // CHECK-NEXT:             "context-hash": "[[HASH]]",
@@ -119,7 +117,6 @@ module mod {
 // SKIPOPT:         {
 // SKIPOPT:            "commands": [
 // SKIPOPT:             {
-// SKIPOPT-NEXT:          "clang-context-hash": "{{.*}}",
 // SKIPOPT-NEXT:          "clang-module-deps": [
 // SKIPOPT-NEXT:            {
 // SKIPOPT-NEXT:              "context-hash": "[[HASH0]]",
@@ -137,7 +134,6 @@ module mod {
 // SKIPOPT:         {
 // SKIPOPT:           "commands": [
 // SKIPOPT:             {
-// SKIPOPT-NEXT:          "clang-context-hash": "{{.*}}",
 // SKIPOPT-NEXT:          "clang-module-deps": [
 // SKIPOPT-NEXT:            {
 // SKIPOPT-NOT:              "context-hash": "[[HASH0]]",
@@ -159,7 +155,6 @@ module mod {
 // RELPATH:         {
 // RELPATH:            "commands": [
 // RELPATH:             {
-// RELPATH-NEXT:          "clang-context-hash": "{{.*}}",
 // RELPATH-NEXT:          "clang-module-deps": [
 // RELPATH-NEXT:            {
 // RELPATH-NEXT:              "context-hash": "[[HASH3]]",
@@ -177,7 +172,6 @@ module mod {
 // RELPATH:         {
 // RELPATH:           "commands": [
 // RELPATH:             {
-// RELPATH-NEXT:          "clang-context-hash": "{{.*}}",
 // RELPATH-NEXT:          "clang-module-deps": [
 // RELPATH-NEXT:            {
 // RELPATH-NOT:              "context-hash": "[[HASH3]]",

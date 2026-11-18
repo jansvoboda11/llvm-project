@@ -40,7 +40,7 @@ module root { header "root.h" }
 // RUN:   -compilation-database=%t/compile_commands.json \
 // RUN:   -format experimental-full \
 // RUN:   | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-context-hash,clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name,named-module,named-module-deps \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name,named-module,named-module-deps \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
 // CHECK:      {
@@ -61,7 +61,6 @@ module root { header "root.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "named-module-deps": [
 // CHECK-NEXT:             "A",
 // CHECK-NEXT:             "B"
@@ -82,7 +81,6 @@ module root { header "root.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "named-module": "A",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
@@ -100,7 +98,6 @@ module root { header "root.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "named-module": "B",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {

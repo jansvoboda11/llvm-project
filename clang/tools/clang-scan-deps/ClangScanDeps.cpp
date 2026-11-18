@@ -422,9 +422,8 @@ public:
 
     InputDeps ID;
     ID.FileName = std::string(Input);
-    ID.ContextHash = std::move(TUDeps.ID.ContextHash);
     ID.FileDeps = std::move(TUDeps.FileDeps);
-    ID.NamedModule = std::move(TUDeps.ID.ModuleName);
+    ID.NamedModule = std::move(TUDeps.ModuleName);
     ID.NamedModuleDeps = std::move(TUDeps.NamedModuleDeps);
     ID.ClangModuleDeps = std::move(TUDeps.ClangModuleDeps);
     ID.VisibleModules = std::move(TUDeps.VisibleModules);
@@ -543,10 +542,8 @@ public:
               if (I.DriverCommandLine.empty()) {
                 for (const auto &Cmd : I.Commands) {
                   JOS.object([&] {
-                    JOS.attribute("clang-context-hash",
-                                  StringRef(I.ContextHash));
                     if (!I.NamedModule.empty())
-                      JOS.attribute("named-module", (I.NamedModule));
+                      JOS.attribute("named-module", StringRef(I.NamedModule));
                     if (!I.NamedModuleDeps.empty())
                       JOS.attributeArray("named-module-deps", [&] {
                         for (const auto &Dep : I.NamedModuleDeps)
@@ -567,9 +564,8 @@ public:
                 }
               } else {
                 JOS.object([&] {
-                  JOS.attribute("clang-context-hash", StringRef(I.ContextHash));
                   if (!I.NamedModule.empty())
-                    JOS.attribute("named-module", (I.NamedModule));
+                    JOS.attribute("named-module", StringRef(I.NamedModule));
                   if (!I.NamedModuleDeps.empty())
                     JOS.attributeArray("named-module-deps", [&] {
                       for (const auto &Dep : I.NamedModuleDeps)
@@ -593,6 +589,8 @@ public:
         }
       });
     });
+
+    OS << '\n';
   }
 
 private:
@@ -632,7 +630,6 @@ private:
 
   struct InputDeps {
     std::string FileName;
-    std::string ContextHash;
     std::vector<std::string> FileDeps;
     std::string NamedModule;
     std::vector<std::string> NamedModuleDeps;
@@ -854,7 +851,6 @@ struct ByNameConsumer : DependencyConsumer {
   void handlePrebuiltModuleDependency(PrebuiltModuleDep) override {}
   void handleDirectModuleDependency(ModuleID) override {}
   void handleVisibleModule(std::string) override {}
-  void handleContextHash(std::string) override {}
   void handleModuleDependency(ModuleDeps MD) override {
     ModuleGraph.push_back(std::move(MD));
   }

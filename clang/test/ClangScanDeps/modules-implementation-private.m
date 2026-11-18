@@ -27,7 +27,7 @@ framework module FW_Private { umbrella header "FW_Private.h" }
 // RUN: sed "s|DIR|%/t|g" %t/cdb.json.template > %t/cdb.json
 // RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full > %t/result.json
 // RUN: cat %t/result.json | sed 's:\\\\\?:/:g' \
-// RUN:   | %scan-deps-filter --fields=clang-context-hash,clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name \
+// RUN:   | %scan-deps-filter --fields=clang-module-deps,clang-modulemap-file,context-hash,file-deps,input-file,link-libraries,name \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
 // CHECK:      {
@@ -53,7 +53,6 @@ framework module FW_Private { umbrella header "FW_Private.h" }
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "commands": [
 // CHECK-NEXT:         {
-// CHECK-NEXT:           "clang-context-hash": "{{.*}}",
 // CHECK-NEXT:           "clang-module-deps": [
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "context-hash": "{{.*}}",

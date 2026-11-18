@@ -18,9 +18,9 @@
 // RUN: clang-scan-deps -compilation-database %t/cdb_b.json -format experimental-full -j 1 > %t/result_b.json
 // RUN: clang-scan-deps -compilation-database %t/cdb_b2.json -format experimental-full -j 1 > %t/result_b2.json
 // Filter each unique JSON output before concatenating for FileCheck.
-// RUN: %scan-deps-filter --fields=clang-context-hash,clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_a.json > %t/result_a.filt.json
-// RUN: %scan-deps-filter --fields=clang-context-hash,clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_b.json > %t/result_b.filt.json
-// RUN: %scan-deps-filter --fields=clang-context-hash,clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_b2.json > %t/result_b2.filt.json
+// RUN: %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_a.json > %t/result_a.filt.json
+// RUN: %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_b.json > %t/result_b.filt.json
+// RUN: %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,input-file,link-libraries,name,clang-module-deps %t/result_b2.json > %t/result_b2.filt.json
 // RUN: cat %t/result_a.filt.json %t/result_b.filt.json | sed 's:\\\\\?:/:g' | FileCheck %s -DPREFIX=%/t -check-prefix=CHECK
 // RUN: cat %t/result_b.filt.json %t/result_b2.filt.json | sed 's:\\\\\?:/:g' | FileCheck %s -DPREFIX=%/t -check-prefix=FLAG_ONLY
 
@@ -48,8 +48,7 @@
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "context-hash": "[[HASH_MOD_A]]",
 // CHECK-NEXT:           "module-name": "mod"
@@ -86,8 +85,7 @@
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "translation-units": [
 // CHECK-NEXT:     {
-// CHECK:            "clang-context-hash": "{{.*}}",
-// CHECK-NEXT:       "clang-module-deps": [
+// CHECK:            "clang-module-deps": [
 // CHECK-NEXT:         {
 // CHECK-NOT:            "context-hash": "[[HASH_MOD_A]]",
 // CHECK:                "module-name": "mod"
