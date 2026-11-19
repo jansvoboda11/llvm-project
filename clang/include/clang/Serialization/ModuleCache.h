@@ -13,6 +13,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem/UniqueID.h"
 
@@ -68,8 +69,11 @@ public:
   // concurrently noticing an out-of-date module file and validating its inputs.
 
   /// Returns the timestamp denoting the last time inputs of the module file
-  /// were validated.
-  virtual std::time_t getModuleTimestamp(StringRef ModuleFilename) = 0;
+  /// were validated, or the start of the Epoch if they never were. Caches
+  /// record this with the same precision as the build session timestamp they
+  /// are used with, see \c HeaderSearchOptions::BuildSessionTimestamp.
+  virtual llvm::sys::TimePoint<>
+  getModuleTimestamp(StringRef ModuleFilename) = 0;
 
   /// Updates the timestamp denoting the last time inputs of the module file
   /// were validated.

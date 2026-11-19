@@ -36,7 +36,9 @@ struct ModuleCacheEntry {
   bool Locked = false;
   unsigned Generation = 0;
 
-  std::atomic<std::time_t> Timestamp = 0;
+  /// The time when inputs were last validated, or the start of the Epoch if
+  /// they never were.
+  std::atomic<llvm::sys::TimePoint<>> Timestamp{};
 
   enum {
     S_Unknown,

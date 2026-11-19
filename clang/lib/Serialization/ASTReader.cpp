@@ -3246,11 +3246,14 @@ ASTReader::getModuleForRelocationChecks(ModuleFile &F, bool DirectoryCheck) {
   // session.
   auto [EnablesBSValidation, WasValidated] =
       wasValidatedInBuildSession(F, HSOpts);
+  // FIXME: The modification time of a module file read from disk comes from the
+  // file system clock, which may be skewed from the clock the build session
+  // timestamp comes from, like the system clock in the dependency scanner.
   const bool SkipModuleLookup =
       !PP.getPreprocessorOpts().ModulesForceRedundantLookup &&
       (WasValidated ||
        (EnablesBSValidation &&
-        static_cast<uint64_t>(F.ModTime) >= HSOpts.BuildSessionTimestamp));
+        F.ModTime >= llvm::sys::toTimeT(HSOpts.BuildSessionTimestamp)));
 
   if (SkipModuleLookup)
     return {std::nullopt, IgnoreError};
@@ -4912,8 +4915,10 @@ bool ASTReader::isDirectoryDependencyOutOfDate(ModuleFile &F, bool Complain) {
             ModCache.isDirectoryInvalidated(Dir)) {
       // The build system reports paths as changed before the build session
       // started, so a module built during it is newer than them.
+      // FIXME: This compares clocks that may be skewed, see
+      // getModuleForRelocationChecks().
       if (!*Invalidated ||
-          static_cast<uint64_t>(F.ModTime) >= HSOpts.BuildSessionTimestamp)
+          F.ModTime >= llvm::sys::toTimeT(HSOpts.BuildSessionTimestamp))
         continue;
       Diag(diag::remark_module_path_invalidated) << F.ModuleName << Dir;
       if (Complain)

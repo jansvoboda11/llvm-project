@@ -232,7 +232,7 @@ public:
     return std::make_unique<ReaderWriterLock>(Entry);
   }
 
-  std::time_t getModuleTimestamp(StringRef Filename) override {
+  llvm::sys::TimePoint<> getModuleTimestamp(StringRef Filename) override {
     auto &Timestamp = getOrCreateEntry(Filename).Timestamp;
 
     Logger.log() << "timestamp_read: " << Filename;
@@ -244,7 +244,10 @@ public:
     auto &Timestamp = getOrCreateEntry(Filename).Timestamp;
 
     Logger.log() << "timestamp_write: " << Filename;
-    Timestamp.store(llvm::sys::toTimeT(std::chrono::system_clock::now()));
+    // The scanner knows the start of the build session precisely, so keep the
+    // full precision. Otherwise, modules validated in the first second of the
+    // session would not count as validated during it.
+    Timestamp.store(std::chrono::system_clock::now());
   }
 
   std::optional<bool> isDirectoryInvalidated(StringRef Directory) override {

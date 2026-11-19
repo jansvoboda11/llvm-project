@@ -929,16 +929,43 @@ TEST_F(CommandLineTest, ConditionalParsingIgnoreRowMajorIfMatrixNotEnabled) {
   Invocation.generateCC1CommandLine(GeneratedArgs, *this);
 }
 
-// Wide integer option.
+// Build session timestamp, in seconds on the command line.
 
-TEST_F(CommandLineTest, WideIntegerHighValue) {
-  const char *Args[] = {"-fbuild-session-timestamp=1609827494445723662"};
+TEST_F(CommandLineTest, BuildSessionTimestamp) {
+  const char *Args[] = {"-fbuild-session-timestamp=1609827494"};
 
   CompilerInvocation::CreateFromArgs(Invocation, Args, *Diags);
 
   ASSERT_FALSE(Diags->hasErrorOccurred());
   ASSERT_EQ(Invocation.getHeaderSearchOpts().BuildSessionTimestamp,
-            1609827494445723662ull);
+            llvm::sys::toTimePoint(std::time_t(1609827494)));
+
+  Invocation.generateCC1CommandLine(GeneratedArgs, *this);
+
+  ASSERT_THAT(GeneratedArgs,
+              Contains(StrEq("-fbuild-session-timestamp=1609827494")));
+}
+
+TEST_F(CommandLineTest, BuildSessionTimestampOutOfRange) {
+  const char *Args[] = {"-fbuild-session-timestamp=1609827494445723662"};
+
+  CompilerInvocation::CreateFromArgs(Invocation, Args, *Diags);
+
+  ASSERT_TRUE(Diags->hasErrorOccurred());
+}
+
+TEST_F(CommandLineTest, BuildSessionTimestampGeneratedInSeconds) {
+  CompilerInvocation::CreateFromArgs(Invocation, {}, *Diags);
+  ASSERT_FALSE(Diags->hasErrorOccurred());
+
+  Invocation.getHeaderSearchOpts().BuildSessionTimestamp =
+      llvm::sys::toTimePoint(std::time_t(1609827494)) +
+      std::chrono::nanoseconds(123456789);
+
+  Invocation.generateCC1CommandLine(GeneratedArgs, *this);
+
+  ASSERT_THAT(GeneratedArgs,
+              Contains(StrEq("-fbuild-session-timestamp=1609827494")));
 }
 
 // Tree of boolean options that can be (directly or transitively) implied by

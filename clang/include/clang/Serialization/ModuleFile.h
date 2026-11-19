@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/Endian.h"
 #include <cassert>
 #include <cstdint>
@@ -311,11 +312,9 @@ public:
   // system input files reside at [NumUserInputFiles, InputFilesLoaded.size()).
   unsigned NumUserInputFiles = 0;
 
-  /// If non-zero, specifies the time when we last validated input
-  /// files.  Zero means we never validated them.
-  ///
-  /// The time is specified in seconds since the start of the Epoch.
-  uint64_t InputFilesValidationTimestamp = 0;
+  /// The time when we last validated input files, or the start of the Epoch
+  /// if we never validated them. See \c ModuleCache::getModuleTimestamp().
+  llvm::sys::TimePoint<> InputFilesValidationTimestamp;
 
   /// Captures the high-level result of validating input files.
   ///

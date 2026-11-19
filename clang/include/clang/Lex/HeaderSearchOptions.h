@@ -13,6 +13,7 @@
 #include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/HashBuilder.h"
 #include <cstdint>
 #include <map>
@@ -181,11 +182,22 @@ public:
   /// regenerated often.
   unsigned ModuleCachePruneAfter = 31 * 24 * 60 * 60;
 
-  /// The time in seconds when the build session started.
+  /// The time when the build session started.
   ///
   /// This time is used by other optimizations in header search and module
-  /// loading.
-  uint64_t BuildSessionTimestamp = 0;
+  /// loading. On the command line, it is specified in whole seconds. Clients
+  /// that know the start of the build session more precisely, like the
+  /// dependency scanner, may set it with full precision.
+  ///
+  /// This is compared to the times when module files were last validated. The
+  /// cross-process module cache records those with the file system clock, so
+  /// this should come from the same clock, e.g. via -fbuild-session-file.
+  ///
+  /// FIXME: This is also compared to the modification times of module files,
+  /// which come from the file system clock when read from disk, and may be
+  /// skewed from the clock this comes from, like the system clock in the
+  /// dependency scanner.
+  llvm::sys::TimePoint<> BuildSessionTimestamp;
 
   /// The set of macro names that should be ignored by implicitly-built modules.
   llvm::SmallSetVector<llvm::CachedHashString, 16> ModulesIgnoreMacros;

@@ -13,6 +13,7 @@
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
 #include "clang/DependencyScanning/InProcessModuleCache.h"
 #include "llvm/ADT/BitmaskEnum.h"
+#include "llvm/Support/Chrono.h"
 
 namespace clang {
 namespace dependencies {
@@ -93,7 +94,7 @@ struct DependencyScanningServiceOptions {
   /// Whether to scan modules asynchronously.
   bool AsyncScanModules = false;
   /// The build session timestamp for validate-once-per-build-session logic.
-  std::time_t BuildSessionTimestamp; // = std::chrono::system_clock::now();
+  llvm::sys::TimePoint<> BuildSessionTimestamp; // = system_clock::now();
   /// Whether to automatically flush the module cache from memory to disk. PCMs
   /// get flushed on a background thread as soon as they're built.
   bool FlushModuleCache = true;

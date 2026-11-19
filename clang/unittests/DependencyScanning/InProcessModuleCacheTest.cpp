@@ -185,3 +185,22 @@ TEST(InProcessModuleCache, FlushInBackground) {
 
   llvm::sys::fs::remove_directories(Dir);
 }
+
+TEST(InProcessModuleCache, TimestampAfterSessionStartInSameSecond) {
+  ModuleCacheEntries Entries;
+  AtomicLineLogger Logger;
+  std::shared_ptr<ModuleCache> ModCache =
+      makeInProcessModuleCache(Entries, Logger);
+
+  // Never validated.
+  EXPECT_EQ(ModCache->getModuleTimestamp("M.pcm"), llvm::sys::TimePoint<>());
+
+  // A module validated right after the session started must count as validated
+  // during the session, even if both happened in the same second.
+  llvm::sys::TimePoint<> SessionStart = std::chrono::system_clock::now();
+  // The clock may be coarser than the time it takes to get here.
+  while (std::chrono::system_clock::now() <= SessionStart)
+    std::this_thread::yield();
+  ModCache->updateModuleTimestamp("M.pcm");
+  EXPECT_GT(ModCache->getModuleTimestamp("M.pcm"), SessionStart);
+}

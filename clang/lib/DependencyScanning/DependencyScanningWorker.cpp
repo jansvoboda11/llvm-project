@@ -586,7 +586,8 @@ struct AsyncModuleCompile : PPCallbacks {
     ModuleCache &ModCache = CI.getModuleCache();
     ModuleFileName ModuleFileName = HS.getCachedModuleFileName(M);
 
-    uint64_t Timestamp = ModCache.getModuleTimestamp(ModuleFileName);
+    llvm::sys::TimePoint<> Timestamp =
+        ModCache.getModuleTimestamp(ModuleFileName);
     // Someone else already built/validated the PCM.
     if (Timestamp > CI.getHeaderSearchOpts().BuildSessionTimestamp)
       return;

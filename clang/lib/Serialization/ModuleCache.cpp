@@ -85,6 +85,8 @@ void clang::maybePruneImpl(StringRef Path, time_t PruneInterval,
 
   // Check whether the time stamp is older than our pruning interval.
   // If not, do nothing.
+  // FIXME: This compares the file system clock to the system clock, which is
+  // only harmless as long as their skew is small compared to the interval.
   time_t TimestampModTime =
       llvm::sys::toTimeT(StatBuf.getLastModificationTime());
   time_t CurrentTime = time(nullptr);
@@ -122,6 +124,8 @@ void clang::maybePruneImpl(StringRef Path, time_t PruneInterval,
       return;
 
     // If the file has been used recently enough, leave it there.
+    // FIXME: This compares the file system clock to the system clock, see
+    // above.
     time_t FileAccessTime = llvm::sys::toTimeT(StatBuf.getLastAccessedTime());
     if (CurrentTime - FileAccessTime <= PruneAfter)
       return;
@@ -247,6 +251,9 @@ refreshAccessTime([[maybe_unused]] llvm::sys::fs::file_t FD,
 // FIXME: Support Windows. The handle (FD) is opened for reading only, and
 // SetFileTime needs one with FILE_WRITE_ATTRIBUTES access.
 #ifndef _WIN32
+  // FIXME: The access time may come from the file system clock, which is only
+  // harmless as long as its skew from the system clock is small compared to
+  // the interval.
   llvm::sys::TimePoint<> Now = std::chrono::system_clock::now();
   if (Now - Status.getLastAccessedTime() <= AccessTimeRefreshInterval)
     return;
@@ -295,7 +302,7 @@ public:
     return std::make_unique<llvm::LockFileManager>(ModuleFilename);
   }
 
-  std::time_t getModuleTimestamp(StringRef ModuleFilename) override {
+  llvm::sys::TimePoint<> getModuleTimestamp(StringRef ModuleFilename) override {
     // This is a compiler-internal input/output, let's bypass the sandbox.
     auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
 
@@ -303,8 +310,11 @@ public:
         serialization::ModuleFile::getTimestampFilename(ModuleFilename);
     llvm::sys::fs::file_status Status;
     if (llvm::sys::fs::status(TimestampFilename, Status) != std::error_code{})
-      return 0;
-    return llvm::sys::toTimeT(Status.getLastModificationTime());
+      return {};
+    // Compiles share these timestamps through the file system, and get the
+    // build session timestamp from the command line, both in whole seconds.
+    return llvm::sys::toTimePoint(
+        llvm::sys::toTimeT(Status.getLastModificationTime()));
   }
 
   void updateModuleTimestamp(StringRef ModuleFilename) override {

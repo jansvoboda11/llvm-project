@@ -40,5 +40,4 @@ bool dependencies::shouldCacheNegativeStatsForPath(StringRef Path) {
 
 DependencyScanningServiceOptions::DependencyScanningServiceOptions()
     : MakeVFS([] { return llvm::vfs::createPhysicalFileSystem(); }),
-      BuildSessionTimestamp(
-          llvm::sys::toTimeT(std::chrono::system_clock::now())) {}
+      BuildSessionTimestamp(std::chrono::system_clock::now()) {}

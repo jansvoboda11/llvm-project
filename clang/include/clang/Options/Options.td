@@ -3812,7 +3812,10 @@ def fbuild_session_timestamp : Joined<["-"], "fbuild-session-timestamp=">,
   Group<i_Group>, Visibility<[ClangOption, CC1Option]>,
   MetaVarName<"<time since Epoch in seconds>">,
   HelpText<"Time when the current build session started">,
-  MarshallingInfoInt<HeaderSearchOpts<"BuildSessionTimestamp">, "0", "uint64_t">;
+  MarshallingInfo<HeaderSearchOpts<"BuildSessionTimestamp">,
+                  "llvm::sys::TimePoint<>()">,
+  Normalizer<"normalizeBuildSessionTimestamp">,
+  Denormalizer<"denormalizeBuildSessionTimestamp">;
 def fbuild_session_file : Joined<["-"], "fbuild-session-file=">,
   Group<i_Group>, MetaVarName<"<file>">,
   HelpText<"Use the last modification time of <file> as the build session timestamp">;

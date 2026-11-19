@@ -516,6 +516,37 @@ static std::optional<std::string> normalizeTriple(OptSpecifier Opt,
   return llvm::Triple::normalize(Arg->getValue());
 }
 
+/// Parses the build session timestamp, specified in seconds since the Epoch.
+static std::optional<llvm::sys::TimePoint<>>
+normalizeBuildSessionTimestamp(OptSpecifier Opt, int, const ArgList &Args,
+                               DiagnosticsEngine &Diags) {
+  auto *Arg = Args.getLastArg(Opt);
+  if (!Arg)
+    return std::nullopt;
+  using namespace std::chrono;
+  constexpr uint64_t MaxSeconds =
+      duration_cast<seconds>(llvm::sys::TimePoint<>::max().time_since_epoch())
+          .count();
+  uint64_t Seconds;
+  if (StringRef(Arg->getValue()).getAsInteger(0, Seconds) ||
+      Seconds > MaxSeconds) {
+    Diags.Report(diag::err_drv_invalid_int_value)
+        << Arg->getAsString(Args) << Arg->getValue();
+    return std::nullopt;
+  }
+  return llvm::sys::TimePoint<>(seconds(Seconds));
+}
+
+/// Generates the build session timestamp in whole seconds since the Epoch.
+static void denormalizeBuildSessionTimestamp(ArgumentConsumer Consumer,
+                                             unsigned SpellingOffset,
+                                             Option::OptionClass OptClass,
+                                             unsigned TableIndex,
+                                             llvm::sys::TimePoint<> Value) {
+  denormalizeString(Consumer, SpellingOffset, OptClass, TableIndex,
+                    static_cast<uint64_t>(llvm::sys::toTimeT(Value)));
+}
+
 #define PARSE_OPTION_WITH_MARSHALLING(                                         \
     ARGS, DIAGS, PREFIX_TYPE, SPELLING_OFFSET, ID, KIND, GROUP, ALIAS,         \
     ALIASARGS, FLAGS, VISIBILITY, PARAM, HELPTEXT, HELPTEXTSFORVARIANTS,       \
@@ -5591,7 +5622,7 @@ void CompilerInvocation::clearImplicitModuleBuildOptions() {
   getHeaderSearchOpts().ModuleCachePath.clear();
   getHeaderSearchOpts().ModulesValidateOncePerBuildSession = false;
   getHeaderSearchOpts().ModulesValidateDirectoryDependencies = false;
-  getHeaderSearchOpts().BuildSessionTimestamp = 0;
+  getHeaderSearchOpts().BuildSessionTimestamp = {};
   // The specific values we canonicalize to for pruning don't affect behaviour,
   /// so use the default values so they may be dropped from the command-line.
   getHeaderSearchOpts().ModuleCachePruneInterval = 7 * 24 * 60 * 60;

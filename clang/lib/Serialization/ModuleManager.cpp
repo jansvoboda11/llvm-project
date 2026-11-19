@@ -129,7 +129,7 @@ AddModuleResult ModuleManager::addModule(
     ASTFileSignatureReader ReadSignature) {
   AddModuleResult Result;
 
-  uint64_t InputFilesValidationTimestamp = 0;
+  llvm::sys::TimePoint<> InputFilesValidationTimestamp;
   if (Type == MK_ImplicitModule)
     InputFilesValidationTimestamp = ModCache.getModuleTimestamp(FileName);
 

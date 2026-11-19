@@ -340,6 +340,9 @@ bool GlobalModuleIndex::loadedModuleFile(ModuleFile *File) {
 
   //  If the size and modification time match what we expected, record this
   // module file.
+  // FIXME: The index records the modification time from the file system clock,
+  // but a module cache may give module files it wrote itself the system clock
+  // time of the write.
   bool Failed = true;
   if (File->Size == Info.Size && File->ModTime == Info.ModTime) {
     Info.File = File;
