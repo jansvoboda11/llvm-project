@@ -1579,8 +1579,18 @@ private:
   /// A relocated module is defined as a module that is either no longer
   /// resolvable from the modulemap or search path it originally compiled it's
   /// definition from.
-  RelocationResult getModuleForRelocationChecks(ModuleFile &F,
-                                                bool DirectoryCheck = false);
+  ///
+  /// For implicitly-built modules that are not loaded yet, with lazily loaded
+  /// module maps, this first finds where the module is defined by only parsing
+  /// module maps, and calls \p AcceptUnloaded with the result and whether to
+  /// ignore errors. If that returns true, the check passed without loading the
+  /// module, and this returns `std::nullopt`. Otherwise, the module is loaded
+  /// and returned.
+  RelocationResult getModuleForRelocationChecks(
+      ModuleFile &F, bool DirectoryCheck,
+      llvm::function_ref<bool(const ModuleMap::UnloadedModuleDefinition &,
+                              bool IgnoreError)>
+          AcceptUnloaded);
   ASTReadResult ReadModuleMapFileBlock(RecordData &Record, ModuleFile &F,
                                        const ModuleFile *ImportedBy,
                                        unsigned ClientLoadCapabilities);

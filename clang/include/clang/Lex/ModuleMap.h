@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -289,6 +290,9 @@ private:
                               1>>
       ParsedModules;
 
+  /// Parsed module map files that were declared by `extern module`.
+  llvm::SmallPtrSet<const modulemap::ModuleMapFile *, 4> ExternParsedModuleMaps;
+
   /// Resolve the given export declaration into an actual export
   /// declaration.
   ///
@@ -533,6 +537,27 @@ public:
   /// For an inferred module, this is the module map that allows inferring it
   /// and requires loading.
   OptionalFileEntryRef getModuleMapFileForName(StringRef Name) const;
+
+  /// Describes a top-level module that has been parsed, but not loaded.
+  struct UnloadedModuleDefinition {
+    /// The module map file that contains the definition.
+    FileEntryRef ModuleMapFile;
+    /// The directory the module map file was parsed against.
+    DirectoryEntryRef Directory;
+  };
+
+  /// If the top-level module \p Name has not been loaded, and its only parsed
+  /// declaration is its definition (as opposed to an extension such as
+  /// \c module Name.Sub in another module map file) without nested
+  /// \c extern \c module declarations, return where it is defined.
+  ///
+  /// Loading such a module in the current state creates it from that single
+  /// declaration: \c getModuleMapFileForUniquing() of the loaded module is
+  /// \c ModuleMapFile, its \c Directory is \c Directory, and it has no
+  /// additional module map files. This allows checking where a module is
+  /// defined without loading it.
+  std::optional<UnloadedModuleDefinition>
+  getUnloadedModuleDefinition(StringRef Name) const;
 
   Module *findOrInferSubmodule(Module *Parent, StringRef Name);
 

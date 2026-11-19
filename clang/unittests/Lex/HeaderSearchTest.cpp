@@ -590,5 +590,68 @@ TEST_F(HeaderSearchTest, ParseModuleMapFileShadowsSearchPath) {
   EXPECT_EQ(Search.getModuleMap().findModule("A"), nullptr);
 }
 
+// Verify where an unloaded module is defined is the same as where the loaded
+// module is defined.
+TEST_F(HeaderSearchTest, GetUnloadedModuleDefinition) {
+  enableLazyModuleMaps();
+
+  addFrameworkSearchDir("/Frameworks");
+  addFile("/Frameworks/A.framework/Modules/module.modulemap",
+          "framework module A { header \"A.h\" }");
+  addFile("/Frameworks/A.framework/Modules/module.private.modulemap",
+          "framework module A_Private { header \"A_Private.h\" }");
+  addFile("/Frameworks/A.framework/Headers/A.h", "");
+  addFile("/Frameworks/A.framework/PrivateHeaders/A_Private.h", "");
+
+  ModuleMap &MM = Search.getModuleMap();
+  for (StringRef Name : {"A", "A_Private"}) {
+    SCOPED_TRACE(Name);
+    ASSERT_TRUE(Search.lookupModuleMapFileForModule(Name));
+    auto Def = MM.getUnloadedModuleDefinition(Name);
+    ASSERT_TRUE(Def);
+
+    Module *M = Search.lookupModule(Name);
+    ASSERT_NE(M, nullptr);
+    EXPECT_EQ(MM.getModuleMapFileForUniquing(M), Def->ModuleMapFile);
+    EXPECT_EQ(M->Directory, Def->Directory);
+    EXPECT_EQ(llvm::sys::path::convert_to_slash(Def->Directory.getName()),
+              "/Frameworks/A.framework");
+    EXPECT_EQ(MM.getAdditionalModuleMapFiles(M), nullptr);
+
+    // The module is loaded now.
+    EXPECT_FALSE(MM.getUnloadedModuleDefinition(Name));
+  }
+}
+
+// Verify there's no unloaded module definition when loading the module could
+// involve other module map files.
+TEST_F(HeaderSearchTest, GetUnloadedModuleDefinitionMultipleModuleMaps) {
+  enableLazyModuleMaps();
+
+  addSearchDir("/a");
+  addSearchDir("/b");
+  addSearchDir("/c");
+  addFile("/a/module.modulemap", "module A {}\n"
+                                 "module B { extern module Sub \"sub.map\" }\n"
+                                 "module E.Ext {}");
+  addFile("/a/sub.map", "module X {}");
+  addFile("/b/module.modulemap", "module A.Ext {}\nmodule C {}");
+  addFile("/c/module.modulemap", "module C.Ext {}");
+
+  ModuleMap &MM = Search.getModuleMap();
+  EXPECT_FALSE(Search.lookupModuleMapFileForModule("D"));
+  // Defined, but extended from another module map.
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("A"));
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("C"));
+  // Contains an extern module declaration.
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("B"));
+  // Only an extension was parsed.
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("E"));
+  // Not found.
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("D"));
+  // Defined in an extern module map.
+  EXPECT_FALSE(MM.getUnloadedModuleDefinition("X"));
+}
+
 } // namespace
 } // namespace clang

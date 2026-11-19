@@ -3222,8 +3222,11 @@ wasValidatedInBuildSession(const ModuleFile &MF,
   return {EnablesBSValidation, WasValidated};
 }
 
-ASTReader::RelocationResult
-ASTReader::getModuleForRelocationChecks(ModuleFile &F, bool DirectoryCheck) {
+ASTReader::RelocationResult ASTReader::getModuleForRelocationChecks(
+    ModuleFile &F, bool DirectoryCheck,
+    llvm::function_ref<bool(const ModuleMap::UnloadedModuleDefinition &,
+                            bool IgnoreError)>
+        AcceptUnloaded) {
   // Don't emit module relocation errors if we have -fno-validate-pch.
   const bool IgnoreError =
       bool(PP.getPreprocessorOpts().DisablePCHOrModuleValidation &
@@ -3257,13 +3260,41 @@ ASTReader::getModuleForRelocationChecks(ModuleFile &F, bool DirectoryCheck) {
 
   Diag(diag::remark_module_check_relocation) << F.ModuleName << F.FileName;
 
+  HeaderSearch &HS = PP.getHeaderSearchInfo();
+
+  // Loading a module resolves all of its headers, which is expensive. With
+  // lazily loaded module maps, if the module is not loaded yet, find where it
+  // is defined by only parsing module maps, and skip loading it if that
+  // matches what the module file expects. Loading the module from that state
+  // would define it from the same module map file and directory, so the
+  // outcome of the check is the same. Leave anything else, including
+  // mismatches that need diagnosing, to the full lookup below.
+  //
+  // Skipping the load also skips diagnostics emitted while loading the module
+  // (e.g. for module map changes that don't invalidate the module file), the
+  // same as when the check is skipped for build session validation.
+  //
+  // Without lazy loading, the full lookup loads every module map it visits,
+  // which makes the headers of other modules in them known; keep doing that.
+  // Explicitly-built modules always get the full lookup, as do compilations
+  // relying on the side effects of loading the module.
+  if (IsImplicitModule && HS.getHeaderSearchOpts().LazyLoadModuleMaps &&
+      !PP.getPreprocessorOpts().ModulesForceRedundantLookup) {
+    HS.lookupModuleMapFileForModule(
+        F.ModuleName,
+        /*AllowExtraModuleMapSearch=*/DirectoryCheck);
+    if (auto Def = HS.getModuleMap().getUnloadedModuleDefinition(F.ModuleName))
+      if (AcceptUnloaded(*Def, IgnoreError))
+        return {std::nullopt, IgnoreError};
+  }
+
   // If we've already loaded a module map file covering this module, we may
   // have a better path for it (relative to the current build if doing directory
   // check).
-  Module *M = PP.getHeaderSearchInfo().lookupModule(
-      F.ModuleName, DirectoryCheck ? SourceLocation() : F.ImportLoc,
-      /*AllowSearch=*/true,
-      /*AllowExtraModuleMapSearch=*/DirectoryCheck);
+  Module *M = HS.lookupModule(F.ModuleName,
+                              DirectoryCheck ? SourceLocation() : F.ImportLoc,
+                              /*AllowSearch=*/true,
+                              /*AllowExtraModuleMapSearch=*/DirectoryCheck);
 
   return {M, IgnoreError};
 }
@@ -3678,8 +3709,19 @@ ASTReader::ReadControlBlock(ModuleFile &F,
              "MODULE_DIRECTORY found before MODULE_NAME");
       F.BaseDirectory = std::string(Blob);
 
-      auto [MaybeM, IgnoreError] =
-          getModuleForRelocationChecks(F, /*DirectoryCheck=*/true);
+      auto [MaybeM, IgnoreError] = getModuleForRelocationChecks(
+          F, /*DirectoryCheck=*/true,
+          [&](const ModuleMap::UnloadedModuleDefinition &Def,
+              bool IgnoreError) {
+            // Mirrors the checks on the loaded module below.
+            if (!IgnoreError) {
+              auto BuildDir = PP.getFileManager().getOptionalDirectoryRef(Blob);
+              if (!BuildDir || *BuildDir != Def.Directory)
+                return false;
+            }
+            F.BaseDirectory = std::string(Def.Directory.getName());
+            return true;
+          });
       if (!MaybeM.has_value())
         break;
 
@@ -4782,8 +4824,17 @@ ASTReader::ReadModuleMapFileBlock(RecordData &Record, ModuleFile &F,
   // usable header search context.
   assert(!F.ModuleName.empty() &&
          "MODULE_NAME should come before MODULE_MAP_FILE");
-  auto [MaybeM, IgnoreError] =
-      getModuleForRelocationChecks(F, /*DirectoryCheck=*/false);
+  auto [MaybeM, IgnoreError] = getModuleForRelocationChecks(
+      F, /*DirectoryCheck=*/false,
+      [&](const ModuleMap::UnloadedModuleDefinition &Def, bool) {
+        // The unloaded module has no additional module map files, so only
+        // accept it if the module file didn't record any either. Otherwise,
+        // this mirrors the checks on the loaded module below.
+        if (Idx >= Record.size() || Record[Idx] != 0)
+          return false;
+        auto StoredModMap = FileMgr.getOptionalFileRef(F.ModuleMapPath);
+        return StoredModMap && *StoredModMap == Def.ModuleMapFile;
+      });
   if (MaybeM.has_value()) {
     // An implicitly-loaded module file should have its module listed in some
     // module map file that we've already loaded.

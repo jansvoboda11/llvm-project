@@ -1572,6 +1572,9 @@ bool ModuleMap::parseModuleMapFile(FileEntryRef File, bool IsSystem,
             SourceMgr.getFileManager().getOptionalFileRef(FileNameRef)) {
       parseModuleMapFile(*EFile, IsSystem, ImplicitlyDiscovered,
                          EFile->getDir(), FileID(), ExternModuleLoc);
+      if (const modulemap::ModuleMapFile *ExternMMF =
+              getParsedModuleMap(*EFile))
+        ExternParsedModuleMaps.insert(ExternMMF);
     }
   }
 
@@ -2455,6 +2458,52 @@ OptionalFileEntryRef ModuleMap::getModuleMapFileForName(StringRef Name) const {
   if (ParsedMod == ParsedModules.end())
     return std::nullopt;
   return SourceMgr.getFileEntryRefForID(ParsedMod->second.front().first->ID);
+}
+
+/// Whether \p MD or any of its submodule declarations contains an
+/// \c extern \c module declaration.
+static bool containsExternModuleDecl(const modulemap::ModuleDecl &MD) {
+  return llvm::any_of(MD.Decls, [](const modulemap::Decl &D) {
+    if (std::holds_alternative<modulemap::ExternModuleDecl>(D))
+      return true;
+    if (const auto *SubMD = std::get_if<modulemap::ModuleDecl>(&D))
+      return containsExternModuleDecl(*SubMD);
+    return false;
+  });
+}
+
+std::optional<ModuleMap::UnloadedModuleDefinition>
+ModuleMap::getUnloadedModuleDefinition(StringRef Name) const {
+  if (Modules.contains(Name))
+    return std::nullopt;
+
+  auto ParsedMod = ParsedModules.find(Name);
+  if (ParsedMod == ParsedModules.end())
+    return std::nullopt;
+
+  // With more than one declaration, loading may register additional module
+  // map files, report redefinitions, or create a shadowed module.
+  if (ParsedMod->second.size() != 1)
+    return std::nullopt;
+
+  const auto &[MMF, MD] = ParsedMod->second.front();
+  // An extension (module Name.Sub) does not define the top-level module.
+  if (MD->Id.size() != 1)
+    return std::nullopt;
+  // Loading an extern module map may extend this module from another module
+  // map file.
+  if (containsExternModuleDecl(*MD))
+    return std::nullopt;
+  // Parsing a module map declared by `extern module` doesn't resolve its file
+  // and directory exactly like loading it does (e.g. for
+  // -fmodule-map-file-home-is-cwd).
+  if (ExternParsedModuleMaps.contains(MMF))
+    return std::nullopt;
+
+  OptionalFileEntryRef File = SourceMgr.getFileEntryRefForID(MMF->ID);
+  if (!File || !MMF->Dir)
+    return std::nullopt;
+  return UnloadedModuleDefinition{*File, *MMF->Dir};
 }
 
 Module *ModuleMap::findOrLoadModule(StringRef Name) {
