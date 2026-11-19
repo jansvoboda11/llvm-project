@@ -399,14 +399,18 @@ createScanCompilerInvocation(const CompilerInvocation &Invocation,
   ScanInvocation->getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
       true;
 
-  if (ScanInvocation->getHeaderSearchOpts()
-          .ModulesValidateOncePerBuildSession ||
-      Service.getOpts().ValidateAgainstInvalidatedPaths)
-    ScanInvocation->getHeaderSearchOpts().BuildSessionTimestamp =
-        Service.getOpts().BuildSessionTimestamp;
-  if (Service.getOpts().ValidateAgainstInvalidatedPaths)
+  // The build system reports paths that changed before the build session
+  // started, so modules built or validated during the session are up to date
+  // with them. This requires tracking when modules were validated.
+  if (Service.getOpts().ValidateAgainstInvalidatedPaths) {
+    ScanInvocation->getHeaderSearchOpts().ModulesValidateOncePerBuildSession =
+        true;
     ScanInvocation->getHeaderSearchOpts().ModulesValidateDirectoryDependencies =
         true;
+  }
+  if (ScanInvocation->getHeaderSearchOpts().ModulesValidateOncePerBuildSession)
+    ScanInvocation->getHeaderSearchOpts().BuildSessionTimestamp =
+        Service.getOpts().BuildSessionTimestamp;
 
   ScanInvocation->getFrontendOpts().DisableFree = false;
   ScanInvocation->getFrontendOpts().GenerateGlobalModuleIndex = false;

@@ -192,11 +192,6 @@ public:
   /// This is compared to the times when module files were last validated. The
   /// cross-process module cache records those with the file system clock, so
   /// this should come from the same clock, e.g. via -fbuild-session-file.
-  ///
-  /// FIXME: This is also compared to the modification times of module files,
-  /// which come from the file system clock when read from disk, and may be
-  /// skewed from the clock this comes from, like the system clock in the
-  /// dependency scanner.
   llvm::sys::TimePoint<> BuildSessionTimestamp;
 
   /// The set of macro names that should be ignored by implicitly-built modules.

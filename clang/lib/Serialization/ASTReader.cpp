@@ -3241,19 +3241,11 @@ ASTReader::getModuleForRelocationChecks(ModuleFile &F, bool DirectoryCheck) {
   const HeaderSearchOptions &HSOpts =
       PP.getHeaderSearchInfo().getHeaderSearchOpts();
 
-  // When only validating modules once per build session,
-  // Skip check if the timestamp is up to date or module was built in same build
-  // session.
-  auto [EnablesBSValidation, WasValidated] =
-      wasValidatedInBuildSession(F, HSOpts);
-  // FIXME: The modification time of a module file read from disk comes from the
-  // file system clock, which may be skewed from the clock the build session
-  // timestamp comes from, like the system clock in the dependency scanner.
+  // When only validating modules once per build session, skip the check if the
+  // module was built or validated in this build session.
+  auto [_, WasValidated] = wasValidatedInBuildSession(F, HSOpts);
   const bool SkipModuleLookup =
-      !PP.getPreprocessorOpts().ModulesForceRedundantLookup &&
-      (WasValidated ||
-       (EnablesBSValidation &&
-        F.ModTime >= llvm::sys::toTimeT(HSOpts.BuildSessionTimestamp)));
+      !PP.getPreprocessorOpts().ModulesForceRedundantLookup && WasValidated;
 
   if (SkipModuleLookup)
     return {std::nullopt, IgnoreError};
@@ -4908,17 +4900,13 @@ bool ASTReader::isDirectoryDependencyOutOfDate(ModuleFile &F, bool Complain) {
   };
 
   ModuleCache &ModCache = getModuleManager().getModuleCache();
-  const HeaderSearchOptions &HSOpts =
-      PP.getHeaderSearchInfo().getHeaderSearchOpts();
   for (StringRef Dir : F.DirectoryDependencies) {
     if (std::optional<bool> Invalidated =
             ModCache.isDirectoryInvalidated(Dir)) {
       // The build system reports paths as changed before the build session
-      // started, so a module built during it is newer than them.
-      // FIXME: This compares clocks that may be skewed, see
-      // getModuleForRelocationChecks().
-      if (!*Invalidated ||
-          F.ModTime >= llvm::sys::toTimeT(HSOpts.BuildSessionTimestamp))
+      // started, so modules built or validated during it are up to date with
+      // them. Those don't get here, see the caller.
+      if (!*Invalidated)
         continue;
       Diag(diag::remark_module_path_invalidated) << F.ModuleName << Dir;
       if (Complain)

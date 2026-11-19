@@ -2,6 +2,9 @@
 // RUN: split-file %s %t
 
 // RUN: touch %t/session.timestamp
+// Modules count as validated in the build session if they were validated in a
+// strictly later second than the one it started in.
+// RUN: sleep 1
 // RUN: %clang -fmodules -fimplicit-module-maps  -fsyntax-only %t/tu1.c \
 // RUN:   -fmodules-cache-path=%t/cache -F%t/preferred_frameworks -F%t/fallback_frameworks \
 // RUN:   -fbuild-session-file=%t/session.timestamp -fmodules-validate-once-per-build-session \

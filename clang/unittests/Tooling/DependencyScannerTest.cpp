@@ -20,8 +20,11 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/Chrono.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gtest/gtest.h"
@@ -403,6 +406,146 @@ TEST(DependencyScanner, InvalidatedPathAfterModuleBuilt) {
   EXPECT_EQ(ScanModuleFileDeps(), Expected);
 
   llvm::sys::fs::remove_directories(Root);
+}
+
+/// Tests that a module file written to disk before the build session started,
+/// but in the same second, doesn't count as built during the session.
+class ModuleWrittenBeforeBuildSessionTest : public ::testing::Test {
+protected:
+  void SetUp() override {
+    ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("build-session", Root));
+    Write("include/module.modulemap", "module Umb { umbrella \"dir\" }\n");
+    Write("include/dir/a.h", "");
+    Write("tu.c", "#include \"dir/a.h\"\n");
+    CommandLine = {"clang",
+                   "-fmodules",
+                   "-fmodules-cache-path=" + Path("cache"),
+                   "-fmodules-validate-once-per-build-session",
+                   "-fbuild-session-timestamp=1",
+                   "-Rmodule-validation",
+                   "-I" + Path("include"),
+                   "-c",
+                   "tu.c",
+                   "-o",
+                   "tu.o"};
+
+    // Build the module with a service whose session already ended. Destroying
+    // the service flushes the module file to disk.
+    {
+      DependencyScanningServiceOptions Opts;
+      DependencyScanningService Service(std::move(Opts));
+      std::vector<std::string> Remarks;
+      EXPECT_EQ(scanModuleFileDeps(Service, Remarks), ExpectedDeps);
+    }
+
+    // Pretend the module file was written right before the session started,
+    // in the same second. The session started a while ago, so that nothing
+    // else happens during it.
+    std::time_t SessionSecond =
+        llvm::sys::toTimeT(std::chrono::system_clock::now()) - 10;
+    SessionStart =
+        llvm::sys::toTimePoint(SessionSecond) + std::chrono::milliseconds(900);
+    llvm::sys::TimePoint<> ModTime =
+        llvm::sys::toTimePoint(SessionSecond) + std::chrono::milliseconds(100);
+    std::string PCMPath = findPCM();
+    ASSERT_FALSE(PCMPath.empty());
+    int FD;
+    ASSERT_FALSE(llvm::sys::fs::openFileForWrite(
+        PCMPath, FD, llvm::sys::fs::CD_OpenExisting, llvm::sys::fs::OF_Append));
+    std::error_code EC =
+        llvm::sys::fs::setLastAccessAndModificationTime(FD, ModTime);
+    llvm::sys::Process::SafelyCloseFileDescriptor(FD);
+    ASSERT_FALSE(EC);
+  }
+
+  void TearDown() override { llvm::sys::fs::remove_directories(Root); }
+
+  std::string Path(StringRef Rel) {
+    SmallString<128> P(Root);
+    llvm::sys::path::append(P, Rel);
+    llvm::sys::path::native(P);
+    return std::string(P);
+  }
+
+  void Write(StringRef Rel, StringRef Contents) {
+    ASSERT_FALSE(llvm::sys::fs::create_directories(
+        llvm::sys::path::parent_path(Path(Rel))));
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(Path(Rel), EC);
+    ASSERT_FALSE(EC);
+    OS << Contents;
+  }
+
+  std::string findPCM() {
+    std::error_code EC;
+    for (llvm::sys::fs::recursive_directory_iterator I(Path("cache"), EC), E;
+         I != E && !EC; I.increment(EC))
+      if (llvm::sys::path::extension(I->path()) == ".pcm")
+        return I->path();
+    return "";
+  }
+
+  /// Scans the TU and returns the file dependencies of its module, collecting
+  /// the remarks emitted while doing so into \p Remarks.
+  std::vector<std::string>
+  scanModuleFileDeps(DependencyScanningService &Service,
+                     std::vector<std::string> &Remarks) {
+    DependencyScanningTool ScanTool(Service);
+    TextDiagnosticBuffer DiagConsumer;
+    auto Result = ScanTool.getTranslationUnitDependencies(
+        CommandLine, Root, DiagConsumer, {},
+        [&](const ModuleDeps &MD, ModuleOutputKind) {
+          return Path("out/" + MD.ID.ModuleName + ".pcm");
+        });
+    for (const auto &[Loc, Msg] : llvm::make_range(DiagConsumer.remark_begin(),
+                                                   DiagConsumer.remark_end()))
+      Remarks.push_back(Msg);
+    if (!Result || Result->ModuleGraph.size() != 1)
+      return {};
+    std::vector<std::string> Deps;
+    Result->ModuleGraph[0].forEachFileDep([&](StringRef File) {
+      Deps.push_back(llvm::sys::path::filename(File).str());
+    });
+    return Deps;
+  }
+
+  SmallString<128> Root;
+  std::vector<std::string> CommandLine;
+  llvm::sys::TimePoint<> SessionStart;
+  const std::vector<std::string> ExpectedDeps = {"module.modulemap", "a.h"};
+};
+
+// The build system reported the directory as changed before the session
+// started, so it may have changed after the module file was written.
+TEST_F(ModuleWrittenBeforeBuildSessionTest, InvalidatedPath) {
+  Write("include/dir/b.h", "");
+
+  DependencyScanningServiceOptions Opts;
+  Opts.ValidateAgainstInvalidatedPaths = true;
+  Opts.BuildSessionTimestamp = SessionStart;
+  DependencyScanningService Service(std::move(Opts));
+  Service.addInvalidatedPath(Path("include/dir"));
+
+  std::vector<std::string> Remarks;
+  std::vector<std::string> Expected = {"module.modulemap", "a.h", "b.h"};
+  EXPECT_EQ(scanModuleFileDeps(Service, Remarks), Expected);
+  EXPECT_TRUE(llvm::any_of(Remarks, [](StringRef Remark) {
+    return Remark.contains("module 'Umb' is out of date because the build "
+                           "system reported that");
+  }));
+}
+
+// The module may have relocated since the module file was written.
+TEST_F(ModuleWrittenBeforeBuildSessionTest, RelocationCheck) {
+  DependencyScanningServiceOptions Opts;
+  Opts.BuildSessionTimestamp = SessionStart;
+  DependencyScanningService Service(std::move(Opts));
+
+  std::vector<std::string> Remarks;
+  EXPECT_EQ(scanModuleFileDeps(Service, Remarks), ExpectedDeps);
+  EXPECT_TRUE(llvm::any_of(Remarks, [](StringRef Remark) {
+    return Remark.contains("checking if module 'Umb' from");
+  }));
 }
 
 /// Test fixture for module map resolution without module loading.
