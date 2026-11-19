@@ -208,6 +208,12 @@ public:
   /// Directories this module file depends on the listing of.
   std::vector<std::string> DirectoryDependencies;
 
+  /// For each of \c DirectoryDependencies, the newest modification time of the
+  /// directory and the directories in it when the module file was written, in
+  /// seconds since the Epoch. These are 0 if the module file was written
+  /// without -fmodules-validate-directory-dependencies.
+  std::vector<time_t> DirectoryDependencyModTimes;
+
   /// Whether this precompiled header is a relocatable PCH file.
   bool RelocatablePCH = false;
 

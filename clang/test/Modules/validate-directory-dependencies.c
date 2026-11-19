@@ -24,8 +24,17 @@
 // BUILD-BOTH-DAG: remark: building module 'Umbrella'
 // BUILD-BOTH-DAG: remark: building module 'UmbrellaHeader'
 
+// Module files written without the flag don't record when the directories
+// last changed, so the flag rebuilds them.
+// RUN: %{clang} -fmodules-validate-directory-dependencies \
+// RUN:   | FileCheck %s --check-prefix=BUILD-BOTH
+// RUN: %{fw} -fmodules-validate-directory-dependencies \
+// RUN:   | FileCheck %s --check-prefix=BUILD-FW
+
 // Nothing changed, so neither module is rebuilt.
 // RUN: %{clang} -fmodules-validate-directory-dependencies \
+// RUN:   | FileCheck %s --check-prefix=NO-BUILD --allow-empty
+// RUN: %{fw} -fmodules-validate-directory-dependencies \
 // RUN:   | FileCheck %s --check-prefix=NO-BUILD --allow-empty
 
 // NO-BUILD-NOT: remark: building module
@@ -61,10 +70,28 @@
 // RUN: %{fw} -fmodules-validate-directory-dependencies \
 // RUN:   | FileCheck %s --check-prefix=NO-BUILD --allow-empty
 
+// The modification time of the module file doesn't tell when the directories
+// were listed, e.g. when the module file gets written or copied later. Moving
+// it into the future after adding a header doesn't hide the change.
+// RUN: %clang_cc1 -fsyntax-only -fmodules -fimplicit-module-maps \
+// RUN:   -fmodules-cache-path=%t/future-cache -I %t/include %t/tu.c \
+// RUN:   -fmodules-validate-directory-dependencies
+// RUN: sleep 1
+// RUN: touch %t/include/umbrella/nested/added-before-future.h
+// RUN: %python -c "import glob, os, time; t = time.time() + 3600; [os.utime(p, (t, t)) for p in glob.glob('%/t/future-cache/*/*.pcm')]"
+// RUN: %clang_cc1 -fsyntax-only -fmodules -fimplicit-module-maps \
+// RUN:   -fmodules-cache-path=%t/future-cache -I %t/include %t/tu.c \
+// RUN:   -fmodules-validate-directory-dependencies -Rmodule-build \
+// RUN:   -Rmodule-validation 2>&1 | FileCheck %s --check-prefix=FUTURE
+
+// FUTURE: remark: module 'Umbrella' is out of date because the contents of directory '{{.*}}nested' changed after it was built
+// FUTURE: remark: building module 'Umbrella'
+
 // A module found through a relative search path still depends on absolute
 // directories.
 // RUN: cd %t && %clang_cc1 -fsyntax-only -fmodules -fimplicit-module-maps \
-// RUN:   -fmodules-cache-path=%t/rel-cache -I include tu.c
+// RUN:   -fmodules-cache-path=%t/rel-cache -I include tu.c \
+// RUN:   -fmodules-validate-directory-dependencies
 // RUN: sleep 1
 // RUN: touch %t/include/umbrella/nested/added-later.h
 // RUN: cd %t && %clang_cc1 -fsyntax-only -fmodules -fimplicit-module-maps \

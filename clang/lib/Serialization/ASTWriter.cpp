@@ -1289,6 +1289,30 @@ ASTFileSignature ASTWriter::createSignatureForNamedModule() const {
   return ASTFileSignature::create(Hasher.result());
 }
 
+/// Returns the newest modification time of \p Dir and the directories in it,
+/// in seconds since the Epoch, or 0 if \p Dir isn't a directory. Adding or
+/// removing an entry updates the modification time of the directory holding
+/// it, so the reader can compare this against the directories it finds to tell
+/// whether the listing changed.
+static uint64_t getNewestDirectoryModTime(llvm::vfs::FileSystem &FS,
+                                          StringRef Dir) {
+  llvm::ErrorOr<llvm::vfs::Status> Status = FS.status(Dir);
+  if (!Status || !Status->isDirectory())
+    return 0;
+  std::time_t Newest = llvm::sys::toTimeT(Status->getLastModificationTime());
+  std::error_code EC;
+  for (llvm::vfs::recursive_directory_iterator I(FS, Dir, EC), E; I != E && !EC;
+       I.increment(EC)) {
+    if (I->type() != llvm::sys::fs::file_type::directory_file)
+      continue;
+    llvm::ErrorOr<llvm::vfs::Status> SubStatus = FS.status(I->path());
+    if (SubStatus && SubStatus->isDirectory())
+      Newest = std::max(
+          Newest, llvm::sys::toTimeT(SubStatus->getLastModificationTime()));
+  }
+  return Newest;
+}
+
 static void BackpatchSignatureAt(llvm::BitstreamWriter &Stream,
                                  const ASTFileSignature &S, uint64_t BitNo) {
   for (uint8_t Byte : S) {
@@ -1584,8 +1608,17 @@ void ASTWriter::WriteControlBlock(Preprocessor &PP, StringRef isysroot) {
     SmallVector<StringRef> Dirs(WritingModule->getDirectoryDependencies());
     llvm::sort(Dirs);
     Record.push_back(Dirs.size());
-    for (StringRef Dir : Dirs)
+    // Readers only compare directories against the recorded times with
+    // -fmodules-validate-directory-dependencies, so only walk the trees then.
+    // Otherwise, record 0, which makes such readers rebuild the module.
+    const bool RecordModTimes = PP.getHeaderSearchInfo()
+                                    .getHeaderSearchOpts()
+                                    .ModulesValidateDirectoryDependencies;
+    llvm::vfs::FileSystem &FS = PP.getFileManager().getVirtualFileSystem();
+    for (StringRef Dir : Dirs) {
       AddPath(Dir, Record);
+      Record.push_back(RecordModTimes ? getNewestDirectoryModTime(FS, Dir) : 0);
+    }
     Stream.EmitRecord(MODULE_DIRECTORY_DEPENDENCIES, Record);
   }
 

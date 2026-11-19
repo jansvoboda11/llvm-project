@@ -4878,29 +4878,33 @@ void ASTReader::ReadDirectoryDependencies(const RecordData &Record,
   unsigned Idx = 0;
   unsigned N = Record[Idx++];
   F.DirectoryDependencies.reserve(N);
+  F.DirectoryDependencyModTimes.reserve(N);
   for (unsigned I = 0; I != N; ++I) {
     // The base directory is relative if the module was found through a
     // relative search path, and empty with -fmodule-file-home-is-cwd.
     SmallString<256> Dir(ReadPath(F, Record, Idx));
     ModuleMap::canonicalizeDirectoryDependency(FileMgr, Dir);
     F.DirectoryDependencies.push_back(std::string(Dir));
+    F.DirectoryDependencyModTimes.push_back(static_cast<time_t>(Record[Idx++]));
   }
 }
 
 bool ASTReader::isDirectoryDependencyOutOfDate(ModuleFile &F, bool Complain) {
   llvm::vfs::FileSystem &FS = PP.getFileManager().getVirtualFileSystem();
   // Adding or removing an entry updates the modification time of the directory
-  // holding it, so comparing every directory in the tree against the module
-  // file catches a header that was added, even one whose own modification time
-  // is older. A directory that doesn't exist has no listing to depend on.
-  auto IsNewer = [&](StringRef Dir) {
+  // holding it, so comparing every directory in the tree against the newest
+  // modification time recorded when the module file was written catches a
+  // header that was added, even one whose own modification time is older. A
+  // directory that doesn't exist has no listing to depend on.
+  auto IsNewer = [&](StringRef Dir, time_t Recorded) {
     llvm::ErrorOr<llvm::vfs::Status> Status = FS.status(Dir);
     return Status && Status->isDirectory() &&
-           llvm::sys::toTimeT(Status->getLastModificationTime()) > F.ModTime;
+           llvm::sys::toTimeT(Status->getLastModificationTime()) > Recorded;
   };
 
   ModuleCache &ModCache = getModuleManager().getModuleCache();
-  for (StringRef Dir : F.DirectoryDependencies) {
+  for (auto [Dir, Recorded] : llvm::zip_equal(F.DirectoryDependencies,
+                                              F.DirectoryDependencyModTimes)) {
     if (std::optional<bool> Invalidated =
             ModCache.isDirectoryInvalidated(Dir)) {
       // The build system reports paths as changed before the build session
@@ -4915,14 +4919,14 @@ bool ASTReader::isDirectoryDependencyOutOfDate(ModuleFile &F, bool Complain) {
     }
 
     std::optional<std::string> Changed;
-    if (IsNewer(Dir)) {
-      Changed = Dir.str();
+    if (IsNewer(Dir, Recorded)) {
+      Changed = Dir;
     } else {
       std::error_code EC;
       for (llvm::vfs::recursive_directory_iterator I(FS, Dir, EC), E;
            I != E && !EC; I.increment(EC)) {
         if (I->type() == llvm::sys::fs::file_type::directory_file &&
-            IsNewer(I->path())) {
+            IsNewer(I->path(), Recorded)) {
           Changed = I->path().str();
           break;
         }
