@@ -15,6 +15,7 @@
 #ifndef LLVM_CLANG_SERIALIZATION_GLOBALMODULEINDEX_H
 #define LLVM_CLANG_SERIALIZATION_GLOBALMODULEINDEX_H
 
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -78,9 +79,8 @@ class GlobalModuleIndex {
     /// Size of the module file at the time the global index was built.
     off_t Size = 0;
 
-    /// Modification time of the module file at the time the global
-    /// index was built.
-    time_t ModTime = 0;
+    /// Signature of the module file at the time the global index was built.
+    ASTFileSignature Signature;
 
     /// The module IDs on which this module directly depends.
     /// FIXME: We don't really need a vector here.

@@ -60,7 +60,7 @@ namespace {
 static const char * const IndexFileName = "modules.idx";
 
 /// The global index file version.
-static const unsigned CurrentVersion = 1;
+static const unsigned CurrentVersion = 2;
 
 //----------------------------------------------------------------------------//
 // Global module index reader.
@@ -201,10 +201,12 @@ GlobalModuleIndex::GlobalModuleIndex(
       else
         Modules.resize(ID + 1);
 
-      // Size/modification time for this module file at the time the
-      // global index was built.
+      // Size/signature for this module file at the time the global index was
+      // built.
       Modules[ID].Size = Record[Idx++];
-      Modules[ID].ModTime = Record[Idx++];
+      Modules[ID].Signature = ASTFileSignature::create(
+          Record.begin() + Idx, Record.begin() + Idx + ASTFileSignature::size);
+      Idx += ASTFileSignature::size;
 
       // File name.
       unsigned NameLen = Record[Idx++];
@@ -338,13 +340,12 @@ bool GlobalModuleIndex::loadedModuleFile(ModuleFile *File) {
   // Rectify this module with the global module index.
   ModuleInfo &Info = Modules[Known->second];
 
-  //  If the size and modification time match what we expected, record this
-  // module file.
-  // FIXME: The index records the modification time from the file system clock,
-  // but a module cache may give module files it wrote itself the system clock
-  // time of the write.
+  // If the size and signature match what we expected, record this module file.
+  // Module files without a signature can't be identified, but all module files
+  // in the module cache have one.
   bool Failed = true;
-  if (File->Size == Info.Size && File->ModTime == Info.ModTime) {
+  if (Info.Signature && File->Size == Info.Size &&
+      File->Signature == Info.Signature) {
     Info.File = File;
     ModulesByFile[File] = Known->second;
 
@@ -797,7 +798,7 @@ bool GlobalModuleIndexBuilder::writeIndex(llvm::BitstreamWriter &Stream) {
     Record.clear();
     Record.push_back(M->second.ID);
     Record.push_back(M->first.getSize());
-    Record.push_back(M->first.getModificationTime());
+    Record.append(M->second.Signature.begin(), M->second.Signature.end());
 
     // File name
     StringRef Name(M->first.getName());
