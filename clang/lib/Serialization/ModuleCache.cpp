@@ -167,7 +167,7 @@ void clang::maybePruneImpl(StringRef Path, time_t PruneInterval,
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 clang::writeImpl(StringRef Path, llvm::MemoryBufferRef Buffer, off_t &Size,
-                 time_t &ModTime, bool ReadBack) {
+                 bool ReadBack) {
   StringRef Extension = llvm::sys::path::extension(Path);
   SmallString<128> ModelPath = StringRef(Path).drop_back(Extension.size());
   ModelPath += "-%%%%%%%%";
@@ -224,13 +224,12 @@ clang::writeImpl(StringRef Path, llvm::MemoryBufferRef Buffer, off_t &Size,
     return EC;
   }
 
-  // Rename to the final path and close. This preserves both size and
-  // modification time. On failure, the temporary file is removed.
+  // Rename to the final path and close. This preserves the size. On failure,
+  // the temporary file is removed.
   if (std::error_code EC = Temp->keepWithErrorCode(Path))
     return EC;
 
   Size = Status.getSize();
-  ModTime = llvm::sys::toTimeT(Status.getLastModificationTime());
 
   return std::move(Written);
 }
@@ -258,7 +257,7 @@ refreshAccessTime([[maybe_unused]] llvm::sys::fs::file_t FD,
   if (Now - Status.getLastAccessedTime() <= AccessTimeRefreshInterval)
     return;
 
-  // Keep the modification time: modules importing this one record it.
+  // Keep the modification time, only the access time is meant to change.
   // Go through the descriptor so a module file replaced meanwhile is left
   // alone.
   (void)llvm::sys::fs::setLastAccessAndModificationTime(
@@ -267,7 +266,7 @@ refreshAccessTime([[maybe_unused]] llvm::sys::fs::file_t FD,
 }
 
 Expected<std::unique_ptr<llvm::MemoryBuffer>>
-clang::readImpl(StringRef FileName, off_t &Size, time_t &ModTime) {
+clang::readImpl(StringRef FileName, off_t &Size) {
   Expected<llvm::sys::fs::file_t> FD =
       llvm::sys::fs::openNativeFileForRead(FileName);
   if (!FD)
@@ -282,7 +281,6 @@ clang::readImpl(StringRef FileName, off_t &Size, time_t &ModTime) {
   if (!Buf)
     return llvm::errorCodeToError(Buf.getError());
   Size = Status.getSize();
-  ModTime = llvm::sys::toTimeT(Status.getLastModificationTime());
   refreshAccessTime(*FD, Status);
   return std::move(*Buf);
 }
@@ -347,20 +345,20 @@ public:
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer, off_t &Size,
-        time_t &ModTime) override {
+  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer,
+        off_t &Size) override {
     // This is a compiler-internal input/output, let's bypass the sandbox.
     auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
 
-    return writeImpl(Path, *Buffer, Size, ModTime, /*ReadBack=*/true);
+    return writeImpl(Path, *Buffer, Size, /*ReadBack=*/true);
   }
 
-  Expected<std::unique_ptr<llvm::MemoryBuffer>>
-  read(StringRef FileName, off_t &Size, time_t &ModTime) override {
+  Expected<std::unique_ptr<llvm::MemoryBuffer>> read(StringRef FileName,
+                                                     off_t &Size) override {
     // This is a compiler-internal input/output, let's bypass the sandbox.
     auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
 
-    return readImpl(FileName, Size, ModTime);
+    return readImpl(FileName, Size);
   }
 };
 } // namespace

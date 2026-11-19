@@ -52,8 +52,6 @@ struct ModuleCacheEntry {
   /// Buffers returned from \c ModuleCache::read() share ownership of this, so
   /// it can be replaced while readers still reference the previous contents.
   std::shared_ptr<const llvm::MemoryBuffer> Buffer;
-  /// The modification time of the entry.
-  time_t ModTime = 0;
 };
 
 using ModuleCacheMapEntry =

@@ -112,8 +112,7 @@ void ModuleCacheEntries::flushEntry(StringRef Path, ModuleCacheEntry &Entry,
   }
 
   off_t Size;
-  time_t ModTime;
-  auto Written = writeImpl(Path, *InMemoryBuffer, Size, ModTime, ReadBack);
+  auto Written = writeImpl(Path, *InMemoryBuffer, Size, ReadBack);
   if (!Written) {
     // Best-effort: keep the buffer in memory and let flush() try again.
     Logger.log() << "pcm_flush_failed: " << Path;
@@ -122,7 +121,6 @@ void ModuleCacheEntries::flushEntry(StringRef Path, ModuleCacheEntry &Entry,
   Logger.log() << "pcm_flush: " << Path;
 
   std::lock_guard<std::mutex> Lock(Entry.Mutex);
-  // Note: We keep Entry.ModTime, since that's what readers have already seen.
   Entry.Buffer = std::move(*Written);
   Entry.State = ModuleCacheEntry::S_Flushed;
 }
@@ -267,8 +265,8 @@ public:
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer, off_t &Size,
-        time_t &ModTime) override {
+  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer,
+        off_t &Size) override {
     ModuleCacheMapEntry &MapEntry = getOrCreateMapEntry(Path);
     ModuleCacheEntry &Entry = *MapEntry.second;
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
@@ -279,21 +277,18 @@ public:
       assert(Entry.Buffer->getBuffer() == Buffer->getBuffer() &&
              "Wrote the same PCM with different contents");
       Size = Entry.Buffer->getBufferSize();
-      ModTime = Entry.ModTime;
       return std::make_unique<SharedMemoryBuffer>(Entry.Buffer);
     }
     // Readers of the previous buffer (if any) keep it alive on their own.
     Entry.Buffer = std::move(Buffer);
-    Entry.ModTime = llvm::sys::toTimeT(std::chrono::system_clock::now());
     Entry.State = ModuleCacheEntry::S_Written;
     Entries.scheduleFlush(MapEntry);
     Size = Entry.Buffer->getBufferSize();
-    ModTime = Entry.ModTime;
     return std::make_unique<SharedMemoryBuffer>(Entry.Buffer);
   }
 
-  Expected<std::unique_ptr<llvm::MemoryBuffer>>
-  read(StringRef FileName, off_t &Size, time_t &ModTime) override {
+  Expected<std::unique_ptr<llvm::MemoryBuffer>> read(StringRef FileName,
+                                                     off_t &Size) override {
     Logger.log() << "pcm_read_disk: " << FileName;
     ModuleCacheEntry &Entry = getOrCreateEntry(FileName);
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
@@ -301,16 +296,13 @@ public:
       // This is a compiler-internal input/output, let's bypass the sandbox.
       auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
       off_t ReadSize;
-      time_t ReadModTime;
-      auto ReadBuffer = readImpl(FileName, ReadSize, ReadModTime);
+      auto ReadBuffer = readImpl(FileName, ReadSize);
       if (!ReadBuffer)
         return ReadBuffer.takeError();
       Entry.Buffer = std::move(*ReadBuffer);
-      Entry.ModTime = ReadModTime;
       Entry.State = ModuleCacheEntry::S_Read;
     }
     Size = Entry.Buffer->getBufferSize();
-    ModTime = Entry.ModTime;
     return std::make_unique<SharedMemoryBuffer>(Entry.Buffer);
   }
 };

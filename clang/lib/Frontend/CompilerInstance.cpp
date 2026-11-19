@@ -1580,10 +1580,9 @@ static bool compileModuleImpl(CompilerInstance &ImportingInstance,
   }
 
   off_t Size;
-  time_t ModTime;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Written =
-      ImportingInstance.getModuleCache().write(
-          ModuleFileName, std::move(Buffer), Size, ModTime);
+      ImportingInstance.getModuleCache().write(ModuleFileName,
+                                               std::move(Buffer), Size);
   if (!Written) {
     ImportingInstance.getDiagnostics().Report(ModuleNameLoc,
                                               diag::err_module_not_written)
@@ -1609,7 +1608,7 @@ static bool compileModuleImpl(CompilerInstance &ImportingInstance,
   Buffer =
       std::make_unique<SubMemoryBuffer>(std::move(Buffer), ExtractedBuffer);
   ImportingInstance.getModuleCache().getInMemoryModuleCache().addBuiltPCM(
-      ModuleFileName, std::move(Buffer), Size, ModTime);
+      ModuleFileName, std::move(Buffer), Size, /*ModTime=*/0);
 
   return true;
 }

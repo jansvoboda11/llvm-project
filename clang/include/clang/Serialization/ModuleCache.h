@@ -99,12 +99,15 @@ public:
   ///
   /// Returns a buffer with the written contents, which readers in this process
   /// should use instead of their own copy.
+  ///
+  /// Module files in the module cache are identified by their signature, so
+  /// unlike other inputs, they don't have a meaningful modification time.
   virtual llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer, off_t &Size,
-        time_t &ModTime) = 0;
+  write(StringRef Path, std::unique_ptr<llvm::MemoryBuffer> Buffer,
+        off_t &Size) = 0;
 
-  virtual Expected<std::unique_ptr<llvm::MemoryBuffer>>
-  read(StringRef FileName, off_t &Size, time_t &ModTime) = 0;
+  virtual Expected<std::unique_ptr<llvm::MemoryBuffer>> read(StringRef FileName,
+                                                             off_t &Size) = 0;
 
   virtual ~ModuleCache() = default;
 
@@ -133,11 +136,11 @@ void maybePruneImpl(StringRef Path, time_t PruneInterval, time_t PruneAfter,
 /// replacement of the file at \p Path). Otherwise, returns nullptr on success.
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 writeImpl(StringRef Path, llvm::MemoryBufferRef Buffer, off_t &Size,
-          time_t &ModTime, bool ReadBack);
+          bool ReadBack);
 
 /// Shared implementation of `ModuleCache::read()`.
-Expected<std::unique_ptr<llvm::MemoryBuffer>>
-readImpl(StringRef FileName, off_t &Size, time_t &ModTime);
+Expected<std::unique_ptr<llvm::MemoryBuffer>> readImpl(StringRef FileName,
+                                                       off_t &Size);
 } // namespace clang
 
 #endif

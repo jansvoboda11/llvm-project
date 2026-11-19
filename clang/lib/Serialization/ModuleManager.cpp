@@ -196,9 +196,12 @@ AddModuleResult ModuleManager::addModule(
     auto Buf = [&]() -> Expected<std::unique_ptr<llvm::MemoryBuffer>> {
       assert(!FileName.isInMemory() && "In-memory module not found");
 
-      // Implicit modules live in the module cache.
-      if (FileName.getImplicitModuleSuffixLength())
-        return ModCache.read(FileName, Size, ModTime);
+      // Implicit modules live in the module cache, which identifies them by
+      // their signature rather than their modification time.
+      if (FileName.getImplicitModuleSuffixLength()) {
+        ModTime = 0;
+        return ModCache.read(FileName, Size);
+      }
 
       // Explicit modules are treated as any other compiler input file, load
       // them via FileManager.

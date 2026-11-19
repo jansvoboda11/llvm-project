@@ -30,14 +30,13 @@ TEST(InProcessModuleCache, ReadWriteInvalidation) {
   }
 
   off_t Size;
-  time_t ModTime;
   std::unique_ptr<llvm::MemoryBuffer> Buf;
-  ASSERT_THAT_ERROR(ModCache->read(Path, Size, ModTime).moveInto(Buf),
+  ASSERT_THAT_ERROR(ModCache->read(Path, Size).moveInto(Buf),
                     llvm::Succeeded());
   EXPECT_EQ(Buf->getBuffer(), "original\n");
 
   auto NewBuf = llvm::MemoryBuffer::getMemBufferCopy("modified\n", Path);
-  ASSERT_EQ(ModCache->write(Path, std::move(NewBuf), Size, ModTime).getError(),
+  ASSERT_EQ(ModCache->write(Path, std::move(NewBuf), Size).getError(),
             std::error_code{});
 
   // Writing a new buffer should not invalidate the previously-read buffer.
@@ -60,16 +59,14 @@ TEST(InProcessModuleCache, ReadReadInvalidation) {
   }
 
   off_t Size1;
-  time_t ModTime1;
   std::unique_ptr<llvm::MemoryBuffer> Buf1;
-  ASSERT_THAT_ERROR(ModCache->read(Path, Size1, ModTime1).moveInto(Buf1),
+  ASSERT_THAT_ERROR(ModCache->read(Path, Size1).moveInto(Buf1),
                     llvm::Succeeded());
   EXPECT_EQ(Buf1->getBuffer(), "original\n");
 
   off_t Size2;
-  time_t ModTime2;
   std::unique_ptr<llvm::MemoryBuffer> Buf2;
-  ASSERT_THAT_ERROR(ModCache->read(Path, Size2, ModTime2).moveInto(Buf2),
+  ASSERT_THAT_ERROR(ModCache->read(Path, Size2).moveInto(Buf2),
                     llvm::Succeeded());
   EXPECT_EQ(Buf2->getBuffer(), "original\n");
 
@@ -93,8 +90,7 @@ TEST(InProcessModuleCache, WriteReturnsSharedBuffer) {
   const char *GivenBufStart = Given->getBufferStart();
 
   off_t Size;
-  time_t ModTime;
-  auto WrittenOrErr = ModCache->write(Path, std::move(Given), Size, ModTime);
+  auto WrittenOrErr = ModCache->write(Path, std::move(Given), Size);
   ASSERT_EQ(WrittenOrErr.getError(), std::error_code{});
   auto Written = std::move(*WrittenOrErr);
   ASSERT_TRUE(Written);
@@ -104,14 +100,13 @@ TEST(InProcessModuleCache, WriteReturnsSharedBuffer) {
 
   // Read buffers share the memory of the written buffer.
   std::unique_ptr<llvm::MemoryBuffer> Read;
-  ASSERT_THAT_ERROR(ModCache->read(Path, Size, ModTime).moveInto(Read),
+  ASSERT_THAT_ERROR(ModCache->read(Path, Size).moveInto(Read),
                     llvm::Succeeded());
   EXPECT_EQ(Read->getBufferStart(), Written->getBufferStart());
 
   // Repeatedly-read buffers share the memory of the buffer written first.
   auto RewrittenOrErr = ModCache->write(
-      Path, llvm::MemoryBuffer::getMemBufferCopy("contents\n", Path), Size,
-      ModTime);
+      Path, llvm::MemoryBuffer::getMemBufferCopy("contents\n", Path), Size);
   ASSERT_EQ(RewrittenOrErr.getError(), std::error_code{});
   ASSERT_TRUE(*RewrittenOrErr);
   EXPECT_EQ((*RewrittenOrErr)->getBufferStart(), Written->getBufferStart());
@@ -132,10 +127,8 @@ TEST(InProcessModuleCache, FlushInBackground) {
   // Large enough for the buffer to be memory-mapped when read back.
   std::string Contents(1024 * 1024, 'm');
   off_t Size;
-  time_t WrittenModTime;
   auto WrittenOrErr = ModCache->write(
-      Path, llvm::MemoryBuffer::getMemBufferCopy(Contents, Path), Size,
-      WrittenModTime);
+      Path, llvm::MemoryBuffer::getMemBufferCopy(Contents, Path), Size);
   ASSERT_EQ(WrittenOrErr.getError(), std::error_code{});
   std::unique_ptr<llvm::MemoryBuffer> Written = std::move(*WrittenOrErr);
 
@@ -144,8 +137,7 @@ TEST(InProcessModuleCache, FlushInBackground) {
   // memory-mapped buffer, which happens after the PCM appears on disk.
   auto IsFlushed = [&] {
     off_t ReadSize;
-    time_t ReadModTime;
-    auto Read = ModCache->read(Path, ReadSize, ReadModTime);
+    auto Read = ModCache->read(Path, ReadSize);
     if (!Read) {
       llvm::consumeError(Read.takeError());
       return false;
@@ -165,23 +157,20 @@ TEST(InProcessModuleCache, FlushInBackground) {
   EXPECT_EQ(Written->getBuffer(), Contents);
 
   // The flushed PCM is now memory-mapped from disk, with the same metadata.
-  time_t ModTime;
   std::unique_ptr<llvm::MemoryBuffer> Read;
-  ASSERT_THAT_ERROR(ModCache->read(Path, Size, ModTime).moveInto(Read),
+  ASSERT_THAT_ERROR(ModCache->read(Path, Size).moveInto(Read),
                     llvm::Succeeded());
   EXPECT_EQ(Read->getBuffer(), Contents);
   EXPECT_EQ(Read->getBufferKind(), llvm::MemoryBuffer::MemoryBuffer_MMap);
   EXPECT_EQ(Size, off_t(Contents.size()));
-  EXPECT_EQ(ModTime, WrittenModTime);
 
   // Writing the same contents again keeps the PCM flushed.
   ASSERT_EQ(ModCache
                 ->write(Path,
                         llvm::MemoryBuffer::getMemBufferCopy(Contents, Path),
-                        Size, ModTime)
+                        Size)
                 .getError(),
             std::error_code{});
-  EXPECT_EQ(ModTime, WrittenModTime);
 
   llvm::sys::fs::remove_directories(Dir);
 }

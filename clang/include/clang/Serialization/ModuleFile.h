@@ -229,7 +229,8 @@ public:
   /// Size of the module file.
   off_t Size = 0;
 
-  /// Modification of the module file.
+  /// Modification time of the module file, or 0 if unknown. Module files in
+  /// the module cache don't track it, since they always have a signature.
   time_t ModTime = 0;
 
   /// The signature of the module file, which may be used instead of the size

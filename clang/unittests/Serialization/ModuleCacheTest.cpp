@@ -331,11 +331,9 @@ TEST_F(ModuleCacheTest, ReadRefreshesAccessTime) {
                                                          OldModTime));
 
   off_t Size;
-  time_t ModTime;
-  Expected<std::unique_ptr<MemoryBuffer>> Buf = readImpl(Path, Size, ModTime);
+  Expected<std::unique_ptr<MemoryBuffer>> Buf = readImpl(Path, Size);
   ASSERT_TRUE(static_cast<bool>(Buf));
   EXPECT_EQ(Size, 24);
-  EXPECT_EQ(ModTime, sys::toTimeT(OldModTime));
 
   sys::fs::file_status Status;
   ASSERT_FALSE(sys::fs::status(Path, Status));
@@ -352,8 +350,7 @@ TEST_F(ModuleCacheTest, WriteReportsFullSize) {
 
   StringRef Contents = "contents\n";
   off_t Size;
-  time_t ModTime;
-  ASSERT_EQ(writeImpl(Path, MemoryBufferRef(Contents, Path), Size, ModTime,
+  ASSERT_EQ(writeImpl(Path, MemoryBufferRef(Contents, Path), Size,
                       /*ReadBack=*/false)
                 .getError(),
             std::error_code{});
@@ -371,9 +368,8 @@ TEST_F(ModuleCacheTest, WriteReturnsMappedBuffer) {
   ASSERT_NE(Given->getBufferKind(), MemoryBuffer::MemoryBuffer_MMap);
 
   off_t Size;
-  time_t ModTime;
   std::shared_ptr<ModuleCache> ModCache = createCrossProcessModuleCache();
-  auto WrittenOrErr = ModCache->write(Path, std::move(Given), Size, ModTime);
+  auto WrittenOrErr = ModCache->write(Path, std::move(Given), Size);
   ASSERT_EQ(WrittenOrErr.getError(), std::error_code{});
   auto Written = std::move(*WrittenOrErr);
   ASSERT_TRUE(Written);
@@ -386,9 +382,7 @@ TEST_F(ModuleCacheTest, WriteReturnsMappedBuffer) {
 static std::error_code writeError(StringRef Path, StringRef Contents,
                                   bool ReadBack = true) {
   off_t Size;
-  time_t ModTime;
-  return writeImpl(Path, MemoryBufferRef(Contents, Path), Size, ModTime,
-                   ReadBack)
+  return writeImpl(Path, MemoryBufferRef(Contents, Path), Size, ReadBack)
       .getError();
 }
 
