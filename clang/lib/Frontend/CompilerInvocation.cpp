@@ -5380,6 +5380,11 @@ std::string CompilerInvocation::computeContextHash() const {
                hsOpts.ModulesValidateDiagnosticOptions);
   HBuilder.add(hsOpts.ResourceDir);
 
+  // Lazily loading module maps can change which headers are considered part of
+  // a module. Keep such PCMs separate, but don't change the hash otherwise.
+  if (hsOpts.LazyLoadModuleMaps)
+    HBuilder.add(hsOpts.LazyLoadModuleMaps);
+
   if (hsOpts.ModulesStrictContextHash) {
     HBuilder.addRange(hsOpts.SystemHeaderPrefixes);
 

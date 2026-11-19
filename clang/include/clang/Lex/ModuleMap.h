@@ -89,6 +89,10 @@ class ModuleMap {
   /// named LangOpts::CurrentModule, if we've loaded it).
   Module *SourceModule = nullptr;
 
+  /// The allocator for auxiliary data of all (sub)modules. Declared before
+  /// \c ModulesAlloc so that it outlives the modules.
+  llvm::BumpPtrAllocator ModuleDataAlloc;
+
   /// The allocator for all (sub)modules.
   llvm::SpecificBumpPtrAllocator<Module> ModulesAlloc;
 
@@ -281,13 +285,21 @@ private:
 
   std::vector<std::unique_ptr<modulemap::ModuleMapFile>> ParsedModuleMaps;
 
+  /// The ModuleDecls of a top-level module name, in the order they were
+  /// discovered.
+  struct ParsedModuleDecls {
+    SmallVector<std::pair<const modulemap::ModuleMapFile *,
+                          const modulemap::ModuleDecl *>,
+                1>
+        Decls;
+    /// The number of \c Decls already loaded by \c findOrLoadModule().
+    unsigned NumLoaded = 0;
+  };
+
   /// Map from top level module name to a list of ModuleDecls in the order they
   /// were discovered. This allows handling shadowing correctly and diagnosing
   /// redefinitions.
-  llvm::StringMap<SmallVector<std::pair<const modulemap::ModuleMapFile *,
-                                        const modulemap::ModuleDecl *>,
-                              1>>
-      ParsedModules;
+  llvm::StringMap<ParsedModuleDecls> ParsedModules;
 
   /// Resolve the given export declaration into an actual export
   /// declaration.

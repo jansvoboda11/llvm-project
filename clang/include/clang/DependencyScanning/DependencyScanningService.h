@@ -12,7 +12,18 @@
 #include "clang/Basic/AtomicLineLogger.h"
 #include "clang/DependencyScanning/DependencyScanningFilesystem.h"
 #include "clang/DependencyScanning/InProcessModuleCache.h"
+#include "clang/DependencyScanning/ModuleDepsCache.h"
 #include "llvm/ADT/BitmaskEnum.h"
+#include "llvm/ADT/FunctionExtras.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/thread.h"
+
+#include <atomic>
+#include <cassert>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <vector>
 
 namespace clang {
 namespace dependencies {
@@ -92,6 +103,10 @@ struct DependencyScanningServiceOptions {
   bool TraceVFS = false;
   /// Whether to scan modules asynchronously.
   bool AsyncScanModules = false;
+  /// The maximum number of modules compiled asynchronously at the same time,
+  /// not counting the ones waiting for module locks. Zero means half the number
+  /// of hardware threads.
+  unsigned AsyncScanModulesThreads = 0;
   /// The build session timestamp for validate-once-per-build-session logic.
   std::time_t BuildSessionTimestamp; // = std::chrono::system_clock::now();
   /// Whether to automatically flush the module cache from memory to disk. PCMs
@@ -99,13 +114,103 @@ struct DependencyScanningServiceOptions {
   bool FlushModuleCache = true;
   /// Whether the caching VFS should cache missing filesystem entries.
   bool CacheNegativeStats = shouldCacheNegativeStatsDefault();
+  /// Whether the caching VFS should cache missing filesystem entries in the
+  /// sysroot and the resource directory of each scanned command line, even
+  /// with \c CacheNegativeStats off. These directories are assumed not to
+  /// change while the service is alive.
+  bool CacheNegativeStatsInStableDirs = true;
   /// Whether scanning modules validate their directory deps against paths
   /// reported via \c DependencyScanningService::addInvalidatedPath instead of
   /// the filesystem.
   bool ValidateAgainstInvalidatedPaths = false;
+  /// Whether the scanning compiler instances create modules from module maps
+  /// only when needed (\c HeaderSearchOptions::LazyLoadModuleMaps). This
+  /// reduces memory usage and doesn't affect the reported command lines or
+  /// context hashes, but the scanning PCMs go to a different context hash
+  /// directory of the module cache. Off by default, because the lazy mode can
+  /// consider a header textual even though a module map that the scan has
+  /// parsed (and that the explicit build may load) declares it as part of a
+  /// module.
+  bool LazyLoadModuleMaps = false;
   /// The path to a log file, which logs timing of actions performed by
   /// the dependency scanner.
   std::string LogPath;
+  /// Whether translation units whose compiler invocations only differ in
+  /// per-TU paths share what the scanner learns about their modular
+  /// dependencies. See \c ModuleDepsGroup for the requirements.
+  bool ShareModuleDeps = false;
+};
+
+/// Runs asynchronous module compiles, at most a fixed number at a time.
+///
+/// A compile that blocks waiting for the lock of a PCM gives up its slot while
+/// it waits, and another queued compile may start (on a new thread if needed).
+/// So the number of running compiles is bounded, but the number of threads
+/// isn't: it grows with the number of blocked compiles.
+///
+/// Queued compiles must not hold anything running compiles may wait for, like
+/// the lock of their PCM: a compile waiting for a compile queued behind it
+/// would deadlock once all slots are taken (e.g. on a long chain of imports).
+/// Giving up slots while waiting would avoid the deadlock too, but this way any
+/// chain of waits ends at a running compile, even without that.
+class AsyncModuleCompilePool : public ModuleLockWaitListener {
+public:
+  /// Compiles that get cancelled together, see \c cancel().
+  class Group {
+    friend class AsyncModuleCompilePool;
+    unsigned NumRunning = 0;
+    bool Cancelled = false;
+  };
+
+  explicit AsyncModuleCompilePool(unsigned MaxActive);
+  ~AsyncModuleCompilePool() override;
+
+  /// Reserves a compile of the PCM \p Key. Returns false if a compile of the
+  /// PCM is already queued.
+  bool reserve(StringRef Key);
+
+  /// Queues \p Compile of the PCM \p Key, which must have been reserved. Drops
+  /// it instead if \p G has been cancelled.
+  void enqueue(Group &G, StringRef Key, llvm::unique_function<void()> Compile);
+
+  /// Drops the queued compiles of \p G, waits for the running ones to finish,
+  /// and drops any compiles of \p G queued later.
+  void cancel(Group &G);
+
+  /// The module caches of the compiles must notify the pool about blocking
+  /// waits (see \c makeInProcessModuleCache()), which then give up the slot.
+  void willWait() override;
+  void didWait() override;
+
+private:
+  struct Task {
+    Group *G;
+    std::string Key;
+    llvm::unique_function<void()> Compile;
+  };
+
+  void work();
+  /// Lets a resuming or a queued compile take a free slot, if there is one.
+  void slotFreed(std::unique_lock<std::mutex> &Lock);
+
+  const unsigned MaxActive;
+  std::mutex Mutex;
+  /// Notifies idle threads about new tasks, free slots, or stopping.
+  std::condition_variable WorkCondVar;
+  /// Notifies compiles waiting to resume about free slots.
+  std::condition_variable ResumeCondVar;
+  /// Notifies \c cancel() about finished tasks.
+  std::condition_variable DoneCondVar;
+  std::deque<Task> Queue;
+  llvm::StringSet<> Queued;
+  /// The number of compiles holding a slot.
+  unsigned NumActive = 0;
+  /// The number of compiles that finished waiting and need a slot.
+  unsigned NumResuming = 0;
+  /// The number of threads without a compile.
+  unsigned NumIdle = 0;
+  bool Stop = false;
+  std::vector<llvm::thread> Threads;
 };
 
 /// The dependency scanning service contains shared configuration and state that
@@ -113,7 +218,9 @@ struct DependencyScanningServiceOptions {
 class DependencyScanningService {
 public:
   explicit DependencyScanningService(DependencyScanningServiceOptions Opts)
-      : Opts(std::move(Opts)), Logger(this->Opts.LogPath) {
+      : Opts(std::move(Opts)), Logger(this->Opts.LogPath),
+        ModDepsCache(PeakNumWorkers),
+        AsyncCompilePool(this->Opts.AsyncScanModulesThreads) {
     ModCacheEntries.ValidateAgainstInvalidatedPaths =
         this->Opts.ValidateAgainstInvalidatedPaths;
     if (this->Opts.FlushModuleCache)
@@ -132,6 +239,11 @@ public:
 
   DependencyScanningFilesystemSharedCache &getSharedCache() {
     return SharedCache;
+  }
+
+  /// The worker filesystems of the asynchronous module compiles.
+  DependencyScanningWorkerFilesystemPool &getWorkerFilesystemPool() {
+    return WorkerFSPool;
   }
 
   ModuleCacheEntries &getModuleCacheEntries() { return ModCacheEntries; }
@@ -153,15 +265,53 @@ public:
 
   AtomicLineLogger &getLogger() { return Logger; }
 
+  /// The pool running asynchronous module compiles.
+  AsyncModuleCompilePool &getAsyncModuleCompilePool() {
+    return AsyncCompilePool;
+  }
+
+  /// The cache of modular dependencies shared between translation units. Only
+  /// used with \c ShareModuleDeps.
+  ModuleDepsCache &getModuleDepsCache() { return ModDepsCache; }
+
+  /// Called by each worker when it is created.
+  void registerWorker() {
+    unsigned NewNumWorkers =
+        NumWorkers.fetch_add(1, std::memory_order_relaxed) + 1;
+    unsigned Peak = PeakNumWorkers.load(std::memory_order_relaxed);
+    while (Peak < NewNumWorkers &&
+           !PeakNumWorkers.compare_exchange_weak(Peak, NewNumWorkers,
+                                                 std::memory_order_relaxed))
+      ;
+  }
+
+  /// Called by each worker when it is destroyed.
+  void unregisterWorker() {
+    [[maybe_unused]] unsigned OldNumWorkers =
+        NumWorkers.fetch_sub(1, std::memory_order_relaxed);
+    assert(OldNumWorkers > 0 && "Unbalanced worker registration");
+  }
+
 private:
   /// The options customizing dependency scanning behavior.
   DependencyScanningServiceOptions Opts;
   /// The global file system cache.
   DependencyScanningFilesystemSharedCache SharedCache;
+  /// The pool of worker filesystems for the asynchronous module compiles.
+  DependencyScanningWorkerFilesystemPool WorkerFSPool;
   /// The global module cache entries.
   ModuleCacheEntries ModCacheEntries;
   /// The logger of dependency scanning actions.
   AtomicLineLogger Logger;
+  /// The number of workers that currently exist.
+  std::atomic<unsigned> NumWorkers = 0;
+  /// The highest value \c NumWorkers ever had.
+  std::atomic<unsigned> PeakNumWorkers = 0;
+  /// The global cache of modular dependencies. Must be declared after
+  /// \c PeakNumWorkers, which it refers to.
+  ModuleDepsCache ModDepsCache;
+  /// Asynchronous module compiles. They reference everything above.
+  AsyncModuleCompilePool AsyncCompilePool;
 };
 
 } // end namespace dependencies

@@ -12,6 +12,7 @@
 #include "clang/DependencyScanning/DependencyActionController.h"
 #include "clang/DependencyScanning/DependencyConsumer.h"
 #include "clang/DependencyScanning/DependencyScanningWorker.h"
+#include "clang/DependencyScanning/ModuleDepsCache.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/STLExtras.h"
@@ -238,27 +239,12 @@ bool dependencies::areOptionsInStableDir(const ArrayRef<StringRef> Directories,
   return true;
 }
 
-static CowCompilerInvocation
-makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
-  CI.resetNonModularOptions();
-  CI.clearImplicitModuleBuildOptions();
-
-  // The scanner takes care to avoid passing non-affecting module maps to the
-  // explicit compiles. No need to do extra work just to find out there are no
-  // module map files to prune.
-  CI.getHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
-
-  // Remove options incompatible with explicit module build or are likely to
-  // differ between identical modules discovered from different translation
-  // units.
+/// Resets the options of \p CI that are specific to the translation unit, like
+/// the paths of its input and outputs. What remains of the invocation is
+/// typically the same for all translation units of a build target.
+static void resetTranslationUnitOptions(CompilerInvocation &CI) {
   CI.getFrontendOpts().Inputs.clear();
   CI.getFrontendOpts().OutputFile.clear();
-  CI.getFrontendOpts().GenReducedBMI = false;
-  CI.getFrontendOpts().ModuleOutputPath.clear();
-  CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = false;
-  CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = false;
-  // LLVM options are not going to affect the AST
-  CI.getFrontendOpts().LLVMArgs.clear();
 
   resetBenignCodeGenOptions(frontend::GenerateModule, CI.getLangOpts(),
                             CI.getCodeGenOpts());
@@ -276,6 +262,29 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   if (!CI.getDependencyOutputOpts().OutputFile.empty())
     CI.getDependencyOutputOpts().OutputFile = "-";
   CI.getDependencyOutputOpts().Targets.clear();
+}
+
+static CowCompilerInvocation
+makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
+  CI.resetNonModularOptions();
+  CI.clearImplicitModuleBuildOptions();
+  resetTranslationUnitOptions(CI);
+
+  // The scanner takes care to avoid passing non-affecting module maps to the
+  // explicit compiles. No need to do extra work just to find out there are no
+  // module map files to prune.
+  CI.getHeaderSearchOpts().ModulesPruneNonAffectingModuleMaps = false;
+
+  // Remove options incompatible with explicit module build or are likely to
+  // differ between identical modules discovered from different translation
+  // units.
+  CI.getFrontendOpts().GenReducedBMI = false;
+  CI.getFrontendOpts().ModuleOutputPath.clear();
+  CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = false;
+  CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = false;
+  // LLVM options are not going to affect the AST
+  CI.getFrontendOpts().LLVMArgs.clear();
+
   CI.getDependencyOutputOpts().IncludeModuleFiles = MFDK_Direct;
 
   CI.getFrontendOpts().ProgramAction = frontend::GenerateModule;
@@ -375,7 +384,7 @@ void ModuleDepCollector::collectModuleMapFiles(
   // Add each dependency's module map, in the order the PCM recorded its
   // imports. This is expected to be a stable order across runs and workers.
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     assert(MD && "Inconsistent dependency info");
     // TODO: Track ClangModuleMapFile as `FileEntryRef`.
     auto FE = ScanInstance.getFileManager().getOptionalFileRef(
@@ -393,7 +402,7 @@ void ModuleDepCollector::collectModuleMapFiles(
 void ModuleDepCollector::addModuleFiles(
     CompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     std::string PCMPath =
         Controller.lookupModuleOutput(*MD, ModuleOutputKind::ModuleFile);
 
@@ -408,7 +417,7 @@ void ModuleDepCollector::addModuleFiles(
 void ModuleDepCollector::addModuleFiles(
     CowCompilerInvocation &CI, ArrayRef<ModuleID> ClangModuleDeps) const {
   for (const ModuleID &MID : ClangModuleDeps) {
-    ModuleDeps *MD = ModuleDepsByID.lookup(MID);
+    const ModuleDeps *MD = ModuleDepsByID.lookup(MID);
     std::string PCMPath =
         Controller.lookupModuleOutput(*MD, ModuleOutputKind::ModuleFile);
 
@@ -678,8 +687,18 @@ void ModuleDepCollector::run(DependencyConsumer &Consumer) {
   for (serialization::ModuleFile *MF : MDC.DirectModularDeps)
     handleTopLevelModule(MF);
 
-  Consumer.handleContextHash(
-      MDC.ScanInstance.getInvocation().computeContextHash());
+  // Lazily loading module maps is an implementation detail of the scan. Keep
+  // it out of the reported context hash, even though it keeps the scanning
+  // PCMs apart.
+  if (MDC.ScanInstance.getHeaderSearchOpts().LazyLoadModuleMaps &&
+      !MDC.CommonInvocation.getHeaderSearchOpts().LazyLoadModuleMaps) {
+    CompilerInvocation CI(MDC.ScanInstance.getInvocation());
+    CI.getHeaderSearchOpts().LazyLoadModuleMaps = false;
+    Consumer.handleContextHash(CI.computeContextHash());
+  } else {
+    Consumer.handleContextHash(
+        MDC.ScanInstance.getInvocation().computeContextHash());
+  }
 
   Consumer.handleDependencyOutputOpts(*MDC.Opts);
 
@@ -724,6 +743,25 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
   if (auto ModI = MDC.ModularDeps.find(MF); ModI != MDC.ModularDeps.end())
     return ModI->second->ID;
 
+  // What we are about to compute is assumed to only depend on the module file
+  // and the parts of the invocation that are shared between translation units
+  // (see \c ModuleDepsGroup for the fine print). If some other
+  // translation unit already did the work, reuse the result.
+  if (SharedGroup) {
+    if (auto Shared = SharedGroup->lookup(*MF)) {
+      // Make sure the transitive dependencies get reported too, and in the
+      // same order as if we computed everything from scratch.
+      for (serialization::ModuleFile *Import : MF->Imports)
+        if (!MDC.isPrebuiltModule(Import))
+          handleTopLevelModule(Import);
+
+      ModuleID ID = Shared->ID;
+      MDC.ModuleDepsByID.insert({ID, Shared.get()});
+      MDC.ModularDeps.insert({MF, std::move(Shared)});
+      return ID;
+    }
+  }
+
   Module *M = MDC.ScanInstance.getPreprocessor()
                   .getHeaderSearchInfo()
                   .getModuleMap()
@@ -731,7 +769,7 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
   assert(M && M == M->getTopLevelModule() &&
          "ModuleFile without top-level Module");
 
-  auto OwnedMD = std::make_unique<ModuleDeps>();
+  auto OwnedMD = std::make_shared<ModuleDeps>();
   ModuleDeps &MD = *OwnedMD;
 
   MD.ID.ModuleName = MF->ModuleName;
@@ -745,7 +783,7 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
   // For modules which use export_as link name, the linked product that of the
   // corresponding export_as-named module.
   if (!M->UseExportAsModuleLinkName)
-    MD.LinkLibraries = M->LinkLibraries;
+    MD.LinkLibraries.assign(M->getLinkLibraries());
 
   ModuleMap &ModMapInfo =
       MDC.ScanInstance.getPreprocessor().getHeaderSearchInfo().getModuleMap();
@@ -872,9 +910,19 @@ ModuleDepCollector::handleTopLevelModule(serialization::ModuleFile *MF) {
 
   MD.BuildInfo = std::move(CI);
 
+  if (SharedGroup) {
+    // The object is about to become visible to other threads. Generate the
+    // build arguments now, since doing so lazily mutates the object.
+    MD.getBuildArguments();
+    // Note: another thread might have beaten us to it, but the information is
+    // the same, and \c ModuleDepsByID already refers to ours.
+    SharedGroup->add(*MF, OwnedMD);
+  }
+
+  ModuleID ID = MD.ID;
   MDC.ModularDeps.insert({MF, std::move(OwnedMD)});
 
-  return MD.ID;
+  return ID;
 }
 
 void ModuleDepCollector::addAllModuleDeps(serialization::ModuleFile &MF,
@@ -910,9 +958,18 @@ ModuleDepCollector::ModuleDepCollector(
     const ArrayRef<StringRef> StableDirs)
     : Service(Service), ScanInstance(ScanInstance), Controller(Controller),
       PrebuiltModulesASTMap(std::move(PrebuiltModulesASTMap)),
-      StableDirs(StableDirs), Opts(std::move(Opts)),
-      CommonInvocation(
-          makeCommonInvocationForModuleBuild(std::move(OriginalCI))) {}
+      StableDirs(StableDirs), Opts(std::move(Opts)) {
+  if (Service.getOpts().ShareModuleDeps) {
+    // Translation units whose invocations only differ in the per-TU options
+    // share what they learn about their modular dependencies.
+    resetTranslationUnitOptions(OriginalCI);
+    llvm::ErrorOr<std::string> CWD =
+        ScanInstance.getVirtualFileSystem().getCurrentWorkingDirectory();
+    SharedGroup = Service.getModuleDepsCache().getOrCreateGroup(
+        OriginalCI, CWD ? StringRef(*CWD) : StringRef());
+  }
+  CommonInvocation = makeCommonInvocationForModuleBuild(std::move(OriginalCI));
+}
 
 void ModuleDepCollector::attachToPreprocessor(Preprocessor &PP) {
   auto CollectorPP = std::make_unique<ModuleDepCollectorPP>(*this);

@@ -39,8 +39,11 @@ public:
     PrebuiltModuleDeps.emplace_back(std::move(PMD));
   }
 
-  void handleModuleDependency(ModuleDeps MD) override {
-    ClangModuleDeps[MD.ID] = std::move(MD);
+  void handleModuleDependency(const ModuleDeps &MD) override {
+    // Avoid copying what the client already knows about.
+    if (AlreadySeen.contains(MD.ID))
+      return;
+    ClangModuleDeps[MD.ID] = MD;
   }
 
   void handleDirectModuleDependency(ModuleID ID) override {

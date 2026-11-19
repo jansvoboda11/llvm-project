@@ -13,6 +13,7 @@ add_clang_library(clangDependencyScanning
   DependencyScanningUtils.cpp
   InProcessModuleCache.cpp
   ModuleDepCollector.cpp
+  ModuleDepsCache.cpp
 
   DEPENDS
   ClangDriverOptions

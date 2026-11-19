@@ -100,6 +100,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -1284,8 +1285,20 @@ IdentifierInfo *ASTIdentifierLookupTrait::ReadData(const internal_key_type& k,
   // Token IDs are read-only.
   if (HasRevertedTokenIDToIdentifier && II->getTokenID() != tok::identifier)
     II->revertTokenIDToIdentifier();
-  if (!F.isModule())
+  if (!F.isModule()) {
+    // Restore the Objective-C keyword or notable identifier ID, but not the
+    // builtin ID: the identifier table assigns builtin IDs based on this
+    // compilation's target and language options, which may disable builtins
+    // differently from the AST file's (-fno-builtin-foo isn't validated).
+    // TODO: Simplify this to: if the identifier has no builtin ID, restore
+    // ObjCOrBuiltinID, then clear it if it's a builtin ID.
+    unsigned BuiltinID = II->getBuiltinID();
     II->setObjCOrBuiltinID(ObjCOrBuiltinID);
+    if (BuiltinID != Builtin::NotBuiltin)
+      II->setBuiltinID(BuiltinID);
+    else if (II->getBuiltinID() != Builtin::NotBuiltin)
+      II->clearBuiltinID();
+  }
   assert(II->isExtensionToken() == ExtensionToken &&
          "Incorrect extension token flag");
   (void)ExtensionToken;
@@ -3504,7 +3517,8 @@ ASTReader::ReadControlBlock(ModuleFile &F,
 
       F.HasTimestamps = Record[6];
 
-      const std::string &CurBranch = getClangFullRepositoryVersion();
+      // The version only depends on how clang was built; compute it once.
+      static const std::string CurBranch = getClangFullRepositoryVersion();
       StringRef ASTBranch = Blob;
       if (StringRef(CurBranch) != ASTBranch && !DisableValidation) {
         if ((ClientLoadCapabilities & ARR_VersionMismatch) == 0)
@@ -3657,9 +3671,10 @@ ASTReader::ReadControlBlock(ModuleFile &F,
 
     case MODULE_NAME:
       F.ModuleName = std::string(Blob);
-      Diag(diag::remark_module_import)
-          << F.ModuleName << F.FileName << (ImportedBy ? true : false)
-          << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
+      if (!Diags.isIgnored(diag::remark_module_import, CurrentImportLoc))
+        Diag(diag::remark_module_import)
+            << F.ModuleName << F.FileName << (ImportedBy ? true : false)
+            << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
       if (Listener)
         Listener->ReadModuleName(F.ModuleName);
 
@@ -5130,6 +5145,43 @@ static bool SkipCursorToBlock(BitstreamCursor &Cursor, unsigned BlockID) {
   }
 }
 
+namespace {
+/// A probabilistic set of the names in an \c IdentifierTable, keyed by the
+/// hash that AST files store for each identifier in their on-disk identifier
+/// table. It has no false negatives and about 3% false positives.
+class IdentifierHashFilter {
+  llvm::BitVector Bits;
+  unsigned Shift;
+
+  unsigned getBit(unsigned Hash) const {
+    // Fibonacci hashing: the top bits of the product are well mixed.
+    return (uint64_t(Hash) * 0x9E3779B97F4A7C15ULL) >> Shift;
+  }
+
+public:
+  explicit IdentifierHashFilter(const IdentifierTable &Table) {
+    // About 32 bits per name keep the false positive rate at about 3%.
+    unsigned Log2NumBits =
+        llvm::Log2_64_Ceil(std::max<uint64_t>(Table.size() * 32, 64));
+    Bits.resize(uint64_t(1) << Log2NumBits);
+    Shift = 64 - Log2NumBits;
+    for (const auto &Entry : Table)
+      Bits.set(getBit(ASTIdentifierLookupTrait::ComputeHash(Entry.getKey())));
+  }
+
+  bool mayContain(unsigned Hash) const { return Bits.test(getBit(Hash)); }
+};
+} // namespace
+
+/// Returns the hash of the on-disk identifier table entry whose key/data
+/// lengths start at \p Data. \c OnDiskChainedHashTable stores the hash right
+/// before them.
+static unsigned readIdentifierHash(const unsigned char *Data) {
+  using namespace llvm::support;
+  using HashTy = ASTIdentifierLookupTrait::hash_value_type;
+  return endian::read<HashTy, llvm::endianness::little>(Data - sizeof(HashTy));
+}
+
 ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
                                             ModuleKind Type,
                                             SourceLocation ImportLoc,
@@ -5155,6 +5207,11 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
           ReadASTCore(FileName, Type, ImportLoc,
                       /*ImportedBy=*/nullptr, Loaded, 0, 0, ASTFileSignature(),
                       ClientLoadCapabilities)) {
+    assert(
+        llvm::none_of(
+            llvm::make_range(ModuleMgr.begin() + NumModules, ModuleMgr.end()),
+            [](const ModuleFile &M) { return M.HeaderFileInfoGeneration; }) &&
+        "removing a module file whose header file info table was read");
     ModuleMgr.removeModules(ModuleMgr.begin() + NumModules);
 
     // If we find that any modules are unusable, the global index is going
@@ -5186,6 +5243,9 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
       return Failure;
     }
 
+    // The header file info table of this module file is now complete.
+    F.HeaderFileInfoGeneration = ++HeaderFileInfoGeneration;
+
     // The AST block should always have a definition for the main module.
     if (F.isModule() && !F.DidReadTopLevelSubmodule) {
       Error(diag::err_module_file_missing_top_level_submodule, F.FileName);
@@ -5207,6 +5267,20 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
     GlobalBitOffsetsMap.insert(std::make_pair(F.GlobalBitOffset, &F));
   }
 
+  // Without C++, only the interesting identifiers that the importing instance
+  // already knows get preloaded (see below), and module files usually have
+  // many more interesting identifiers than the importing instance knows. If
+  // so, filter them by their stored hashes before hashing their names for the
+  // identifier table lookup.
+  std::optional<IdentifierHashFilter> PreloadFilter;
+  if (!PP.getLangOpts().CPlusPlus) {
+    size_t NumPreload = 0;
+    for (ImportedModule &M : Loaded)
+      NumPreload += M.Mod->PreloadIdentifierOffsets.size();
+    if (NumPreload > 2 * PP.getIdentifierTable().size())
+      PreloadFilter.emplace(PP.getIdentifierTable());
+  }
+
   // Preload source locations and interesting indentifiers.
   for (ImportedModule &M : Loaded) {
     ModuleFile &F = *M.Mod;
@@ -5216,8 +5290,13 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
     if (F.OriginalSourceFileID.isValid())
       F.OriginalSourceFileID = TranslateFileID(F, F.OriginalSourceFileID);
 
-    for (auto Offset : F.PreloadIdentifierOffsets) {
+    // The offsets aren't needed after this, release their memory.
+    for (auto Offset : std::exchange(F.PreloadIdentifierOffsets, {})) {
       const unsigned char *Data = F.IdentifierTableData + Offset;
+
+      unsigned Hash = readIdentifierHash(Data);
+      if (PreloadFilter && !PreloadFilter->mayContain(Hash))
+        continue;
 
       ASTIdentifierLookupTrait Trait(*this, F);
       auto KeyDataLen = Trait.ReadKeyDataLength(Data);
@@ -5234,6 +5313,8 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
         auto It = PP.getIdentifierTable().find(Key);
         if (It == PP.getIdentifierTable().end())
           continue;
+        assert(Hash == Trait.ComputeHash(Key) &&
+               "Unexpected on-disk identifier table layout");
         II = It->second;
       } else {
         // With C++ modules, not many identifiers are considered interesting.
@@ -5256,8 +5337,8 @@ ASTReader::ASTReadResult ASTReader::ReadAST(ModuleFileName FileName,
     }
   }
 
-  // Builtins and library builtins have already been initialized. Mark all
-  // identifiers as out-of-date, so that they are deserialized on first use.
+  // Mark all identifiers as out-of-date, so that they are deserialized on
+  // first use.
   if (Type == MK_PCH || Type == MK_Preamble || Type == MK_MainFile)
     for (auto &Id : PP.getIdentifierTable())
       Id.second->setOutOfDate(true);
@@ -5384,9 +5465,10 @@ ASTReader::ASTReadResult ASTReader::ReadASTCore(
 
   switch (Result.getKind()) {
   case AddModuleResult::AlreadyLoaded: {
-    Diag(diag::remark_module_import)
-        << M->ModuleName << M->FileName << (ImportedBy ? true : false)
-        << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
+    if (!Diags.isIgnored(diag::remark_module_import, CurrentImportLoc))
+      Diag(diag::remark_module_import)
+          << M->ModuleName << M->FileName << (ImportedBy ? true : false)
+          << (ImportedBy ? StringRef(ImportedBy->ModuleName) : StringRef());
     return Success;
   }
 
@@ -6439,6 +6521,58 @@ bool ASTReader::isAcceptableASTFile(
                                   /*ValidateDiagnosticOptions=*/true);
 }
 
+void ASTReader::visitTopHeaderFilenames(
+    uint32_t GlobalID, llvm::function_ref<void(StringRef)> Visitor) {
+  assert(GlobalID >= NUM_PREDEF_SUBMODULE_IDS && "Unexpected submodule ID");
+  GlobalSubmoduleMapType::iterator It = GlobalSubmoduleMap.find(GlobalID);
+  assert(It != GlobalSubmoduleMap.end());
+  ModuleFile &F = *It->second;
+  unsigned Index = GlobalID - F.BaseSubmoduleID - NUM_PREDEF_SUBMODULE_IDS;
+
+  BitstreamCursor &Cursor = F.SubmodulesCursor;
+  SavedStreamPosition SavedPosition(Cursor);
+  if (llvm::Error Err = Cursor.JumpToBit(F.SubmodulesOffsetBase +
+                                         F.SubmoduleOffsets[Index])) {
+    Error(std::move(Err));
+    return;
+  }
+
+  RecordData Record;
+  while (true) {
+    Expected<llvm::BitstreamEntry> MaybeEntry = Cursor.advance();
+    if (!MaybeEntry) {
+      Error(MaybeEntry.takeError());
+      return;
+    }
+    llvm::BitstreamEntry Entry = MaybeEntry.get();
+    if (Entry.Kind != llvm::BitstreamEntry::Record) {
+      Error(llvm::createStringError(std::errc::illegal_byte_sequence,
+                                    "malformed block record in AST file"));
+      return;
+    }
+
+    StringRef Blob;
+    Record.clear();
+    Expected<unsigned> MaybeKind = Cursor.readRecord(Entry.ID, Record, &Blob);
+    if (!MaybeKind) {
+      Error(MaybeKind.takeError());
+      return;
+    }
+
+    switch (static_cast<SubmoduleRecordTypes>(MaybeKind.get())) {
+    case SUBMODULE_END:
+      return;
+    case SUBMODULE_TOPHEADER: {
+      auto HeaderName = ResolveImportedPath(PathBuf, Blob, F);
+      Visitor(*HeaderName);
+      break;
+    }
+    default:
+      break;
+    }
+  }
+}
+
 Module *ASTReader::getSubmodule(uint32_t GlobalID) {
   if (GlobalID < NUM_PREDEF_SUBMODULE_IDS) {
     assert(GlobalID == 0 && "Unhandled global submodule ID");
@@ -6583,7 +6717,8 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
 
         F.DidReadTopLevelSubmodule = true;
         CurrentModule->setASTFileNameAndKey(F.FileName, F.FileKey);
-        CurrentModule->PresumedModuleMapFile = F.ModuleMapPath;
+        CurrentModule->setPresumedModuleMapFile(F.ModuleMapPath);
+        CurrentModule->setSignature(F.Signature);
       }
 
       CurrentModule->Kind = Kind;
@@ -6594,7 +6729,6 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       // location to be marked as "unaffecting" when writing and avoid creating
       // duplicate locations for the same module map file.
       CurrentModule->DefinitionLoc = DefinitionLoc;
-      CurrentModule->Signature = F.Signature;
       CurrentModule->IsFromModuleFile = true;
       if (InferredAllowedBy.isValid())
         ModMap.setInferredModuleAllowedBy(CurrentModule, InferredAllowedBy);
@@ -6621,18 +6755,18 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       SubmodulesLoaded[GlobalIndex] = CurrentModule;
 
       // Clear out data that will be replaced by what is in the module file.
-      CurrentModule->LinkLibraries.clear();
-      CurrentModule->ConfigMacros.clear();
-      CurrentModule->UnresolvedConflicts.clear();
-      CurrentModule->Conflicts.clear();
+      CurrentModule->clearLinkLibraries();
+      CurrentModule->clearConfigMacros();
+      CurrentModule->clearUnresolvedConflicts();
+      CurrentModule->clearConflicts();
 
       // The module is available unless it's missing a requirement; relevant
       // requirements will be (re-)added by SUBMODULE_REQUIRES records.
       // Missing headers that were present when the module was built do not
       // make it unavailable -- if we got this far, this must be an explicitly
       // imported module file.
-      CurrentModule->Requirements.clear();
-      CurrentModule->MissingHeaders.clear();
+      CurrentModule->clearRequirements();
+      CurrentModule->clearMissingHeaders();
       CurrentModule->IsUnimportable =
           ParentModule && ParentModule->IsUnimportable;
       CurrentModule->IsAvailable = !CurrentModule->IsUnimportable;
@@ -6669,11 +6803,10 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       // them here.
       break;
 
-    case SUBMODULE_TOPHEADER: {
-      auto HeaderName = ResolveImportedPath(PathBuf, Blob, F);
-      CurrentModule->addTopHeaderFilename(*HeaderName);
+    case SUBMODULE_TOPHEADER:
+      // Top-level headers are rarely needed; read them on demand.
+      CurrentModule->setExternalTopHeaders(this, GlobalID);
       break;
-    }
 
     case SUBMODULE_UMBRELLA_DIR: {
       auto Dirname = ResolveImportedPath(PathBuf, Blob, F);
@@ -6688,6 +6821,8 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     }
 
     case SUBMODULE_IMPORTS:
+      CurrentModule->Imports.reserve(CurrentModule->Imports.size() +
+                                     Record.size());
       for (unsigned Idx = 0; Idx != Record.size(); ++Idx) {
         SubmoduleID GlobalID = getGlobalSubmoduleID(F, Record[Idx]);
         CurrentModule->Imports.push_back(ModuleRef(this, GlobalID));
@@ -6697,12 +6832,13 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     case SUBMODULE_AFFECTING_MODULES:
       for (unsigned Idx = 0; Idx != Record.size(); ++Idx) {
         SubmoduleID GlobalID = getGlobalSubmoduleID(F, Record[Idx]);
-        CurrentModule->AffectingClangModules.push_back(
-            ModuleRef(this, GlobalID));
+        CurrentModule->addAffectingClangModule(ModuleRef(this, GlobalID));
       }
       break;
 
     case SUBMODULE_EXPORTS:
+      CurrentModule->Exports.reserve(CurrentModule->Exports.size() +
+                                     Record.size() / 2);
       for (unsigned Idx = 0; Idx + 1 < Record.size(); Idx += 2) {
         SubmoduleID GlobalID = getGlobalSubmoduleID(F, Record[Idx]);
         bool IsWildcard = Record[Idx + 1];
@@ -6714,7 +6850,8 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
 
       // Once we've loaded the set of exports, there's no reason to keep
       // the parsed, unresolved exports around.
-      CurrentModule->UnresolvedExports.clear();
+      CurrentModule->clearUnresolvedExports();
+      CurrentModule->UnresolvedWildcardExport = false;
       break;
 
     case SUBMODULE_REQUIRES:
@@ -6724,12 +6861,12 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
 
     case SUBMODULE_LINK_LIBRARY:
       ModMap.resolveLinkAsDependencies(CurrentModule);
-      CurrentModule->LinkLibraries.push_back(
+      CurrentModule->addLinkLibrary(
           Module::LinkLibrary(std::string(Blob), Record[0]));
       break;
 
     case SUBMODULE_CONFIG_MACRO:
-      CurrentModule->ConfigMacros.push_back(Blob.str());
+      CurrentModule->addConfigMacro(Blob);
       break;
 
     case SUBMODULE_CONFLICT: {
@@ -6737,7 +6874,7 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
       Module::Conflict Conflict;
       Conflict.Other = ModuleRef(this, GlobalID);
       Conflict.Message = Blob.str();
-      CurrentModule->Conflicts.push_back(Conflict);
+      CurrentModule->addConflict(std::move(Conflict));
       break;
     }
 
@@ -6755,7 +6892,7 @@ Module *ASTReader::getSubmodule(uint32_t GlobalID) {
     }
 
     case SUBMODULE_EXPORT_AS:
-      CurrentModule->ExportAsModule = Blob.str();
+      CurrentModule->setExportAsModule(Blob);
       ModMap.addLinkAsDependency(CurrentModule);
       break;
 
@@ -7291,12 +7428,20 @@ namespace {
   /// Visitor used to search for information about a header file.
   class HeaderFileInfoVisitor {
   FileEntryRef FE;
+    unsigned PriorGeneration;
     std::optional<HeaderFileInfo> HFI;
 
   public:
-    explicit HeaderFileInfoVisitor(FileEntryRef FE) : FE(FE) {}
+    HeaderFileInfoVisitor(FileEntryRef FE, unsigned PriorGeneration)
+        : FE(FE), PriorGeneration(PriorGeneration) {}
 
     bool operator()(ModuleFile &M) {
+      // An earlier lookup already searched this module file and didn't find
+      // the file.
+      if (M.HeaderFileInfoGeneration &&
+          M.HeaderFileInfoGeneration <= PriorGeneration)
+        return false;
+
       HeaderFileInfoLookupTable *Table
         = static_cast<HeaderFileInfoLookupTable *>(M.HeaderFileInfoTable);
       if (!Table)
@@ -7317,11 +7462,33 @@ namespace {
 } // namespace
 
 HeaderFileInfo ASTReader::GetHeaderFileInfo(FileEntryRef FE) {
-  HeaderFileInfoVisitor Visitor(FE);
-  ModuleMgr.visit(Visitor);
-  if (std::optional<HeaderFileInfo> HFI = Visitor.getHeaderFileInfo())
-      return *HFI;
+  // Header file info tables never change once read. If an earlier lookup
+  // didn't find this file, only module files whose tables have been read since
+  // then (or are still being read) need to be searched. That gives the same
+  // result as searching all module files, since the older ones can neither
+  // provide the file's info nor cut off the visitation of their imports.
+  unsigned PriorGeneration = 0;
+  auto Known = HeaderFileInfoMissGeneration.find(&FE.getFileEntry());
+  bool MissedBefore = Known != HeaderFileInfoMissGeneration.end();
+  if (MissedBefore) {
+    PriorGeneration = Known->second;
+    // Every loaded module file (modules are only removed before their AST
+    // block is read) has already been searched.
+    if (PriorGeneration == HeaderFileInfoGeneration &&
+        ModuleMgr.size() == HeaderFileInfoGeneration)
+      return HeaderFileInfo();
+  }
 
+  unsigned Generation = HeaderFileInfoGeneration;
+  HeaderFileInfoVisitor Visitor(FE, PriorGeneration);
+  ModuleMgr.visit(Visitor);
+  if (std::optional<HeaderFileInfo> HFI = Visitor.getHeaderFileInfo()) {
+    if (MissedBefore)
+      HeaderFileInfoMissGeneration.erase(&FE.getFileEntry());
+    return *HFI;
+  }
+
+  HeaderFileInfoMissGeneration[&FE.getFileEntry()] = Generation;
   return HeaderFileInfo();
 }
 
@@ -9230,11 +9397,10 @@ void ASTReader::PrintStats() {
   unsigned NumDeclsLoaded =
       DeclsLoaded.size() -
       llvm::count(DeclsLoaded.materialized(), (Decl *)nullptr);
-  unsigned NumIdentifiersLoaded =
-      IdentifiersLoaded.size() -
-      llvm::count(IdentifiersLoaded, (IdentifierInfo *)nullptr);
-  unsigned NumMacrosLoaded =
-      MacrosLoaded.size() - llvm::count(MacrosLoaded, (MacroInfo *)nullptr);
+  unsigned NumIdentifiersLoaded = llvm::count_if(
+      IdentifiersLoaded.materialized(), [](IdentifierInfo *II) { return II; });
+  unsigned NumMacrosLoaded = llvm::count_if(MacrosLoaded.materialized(),
+                                            [](MacroInfo *MI) { return MI; });
   unsigned NumSelectorsLoaded =
       SelectorsLoaded.size() - llvm::count(SelectorsLoaded, Selector());
 

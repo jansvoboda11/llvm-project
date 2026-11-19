@@ -33,6 +33,7 @@ namespace dependencies {
 
 class DependencyActionController;
 class DependencyConsumer;
+class ModuleDepsGroup;
 class PrebuiltModuleASTAttrs;
 
 /// Attributes loaded from AST files of prebuilt modules collected prior to
@@ -121,12 +122,18 @@ private:
   /// Non-modular file dependencies. This includes the main source file and
   /// textually included header files.
   std::vector<std::string> FileDeps;
-  /// Direct and transitive modular dependencies of the main source file.
-  llvm::MapVector<serialization::ModuleFile *, std::unique_ptr<ModuleDeps>>
+  /// The modular dependencies shared with the translation units whose
+  /// invocations only differ from ours in per-TU options, if enabled.
+  std::shared_ptr<ModuleDepsGroup> SharedGroup;
+  /// Direct and transitive modular dependencies of the main source file. These
+  /// may be shared with other translation units (and threads) and must not be
+  /// modified once they are in the map.
+  llvm::MapVector<serialization::ModuleFile *,
+                  std::shared_ptr<const ModuleDeps>>
       ModularDeps;
   /// Secondary mapping for \c ModularDeps allowing lookup by ModuleID without
   /// a preprocessor. Storage owned by \c ModularDeps.
-  llvm::DenseMap<ModuleID, ModuleDeps *> ModuleDepsByID;
+  llvm::DenseMap<ModuleID, const ModuleDeps *> ModuleDepsByID;
   /// Direct modular dependencies that have already been built.
   llvm::MapVector<serialization::ModuleFile *, PrebuiltModuleDep>
       DirectPrebuiltModularDeps;

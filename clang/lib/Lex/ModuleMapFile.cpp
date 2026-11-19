@@ -177,16 +177,23 @@ modulemap::parseModuleMap(FileID ID, clang::DirectoryEntryRef Dir,
 }
 
 bool ModuleMapFileParser::parseTopLevelDecls() {
+  // Collect the declarations in a SmallVector, which grows by moving its
+  // elements, and only then move them into the exactly sized std::vector.
+  // std::vector would copy them when growing because the declarations aren't
+  // nothrow move constructible.
+  SmallVector<TopLevelDecl, 0> Decls;
   Tok.clear();
   consumeToken();
   do {
     switch (Tok.Kind) {
     case MMToken::EndOfFile:
+      MMF.Decls.assign(std::make_move_iterator(Decls.begin()),
+                       std::make_move_iterator(Decls.end()));
       return HadError;
     case MMToken::ExternKeyword: {
       std::optional<ExternModuleDecl> EMD = parseExternModuleDecl();
       if (EMD)
-        MMF.Decls.push_back(std::move(*EMD));
+        Decls.push_back(std::move(*EMD));
       break;
     }
     case MMToken::ExplicitKeyword:
@@ -194,7 +201,7 @@ bool ModuleMapFileParser::parseTopLevelDecls() {
     case MMToken::FrameworkKeyword: {
       std::optional<ModuleDecl> MD = parseModuleDecl(true);
       if (MD)
-        MMF.Decls.push_back(std::move(*MD));
+        Decls.push_back(std::move(*MD));
       break;
     }
     case MMToken::Comma:
@@ -326,6 +333,9 @@ std::optional<ModuleDecl> ModuleMapFileParser::parseModuleDecl(bool TopLevel) {
   }
   SourceLocation LBraceLoc = consumeToken();
 
+  // See parseTopLevelDecls() for why the declarations are collected in a
+  // SmallVector first.
+  SmallVector<Decl, 4> Decls;
   bool Done = false;
   do {
     std::optional<Decl> SubDecl;
@@ -416,8 +426,10 @@ std::optional<ModuleDecl> ModuleMapFileParser::parseModuleDecl(bool TopLevel) {
       break;
     }
     if (SubDecl)
-      MDecl.Decls.push_back(std::move(*SubDecl));
+      Decls.push_back(std::move(*SubDecl));
   } while (!Done);
+  MDecl.Decls.assign(std::make_move_iterator(Decls.begin()),
+                     std::make_move_iterator(Decls.end()));
 
   if (Tok.is(MMToken::RBrace))
     consumeToken();

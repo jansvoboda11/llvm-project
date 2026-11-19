@@ -32,6 +32,12 @@ module third {}
 // RUN:   | %scan-deps-filter --fields=clang-modulemap-file,command-line,context-hash,file-deps,link-libraries,name,clang-context-hash,clang-module-deps,input-file \
 // RUN:   | FileCheck %s -DPREFIX=%/t
 
+// The extern module map must not be considered top-level with lazily loaded
+// module maps either.
+// RUN: clang-scan-deps -compilation-database %t/cdb.json -format experimental-full \
+// RUN:   -lazy-load-module-maps > %t/result-lazy.json
+// RUN: diff %t/result.json %t/result-lazy.json
+
 // CHECK:       {
 // CHECK-NEXT:   "modules": [
 // CHECK-NEXT:     {

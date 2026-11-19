@@ -50,6 +50,22 @@ ModuleCacheEntries::~ModuleCacheEntries() {
   assert(!Flusher.joinable() && "Concurrent flushing was not stopped");
 }
 
+ModuleCacheMapEntry &
+ModuleCacheEntries::getOrCreateMapEntry(StringRef Filename) {
+  std::lock_guard<std::mutex> Lock(Mutex);
+  auto &MapEntry = *Map.try_emplace(Filename).first;
+  if (!MapEntry.second)
+    MapEntry.second = std::make_unique<ModuleCacheEntry>();
+  return MapEntry;
+}
+
+ModuleCacheEntries::LockState
+ModuleCacheEntries::getLockState(StringRef Filename) {
+  ModuleCacheEntry &Entry = *getOrCreateMapEntry(Filename).second;
+  std::lock_guard<std::mutex> Lock(Entry.Mutex);
+  return {Entry.Locked, Entry.NumAcquisitions};
+}
+
 void ModuleCacheEntries::scheduleFlush(ModuleCacheMapEntry &MapEntry) {
   // We're not flushing at all, nothing to schedule.
   if (!Flusher.joinable())
@@ -150,16 +166,20 @@ public:
 
 class ReaderWriterLock : public llvm::AdvisoryLock {
   ModuleCacheEntry &Entry;
+  ModuleLockWaitListener *WaitListener;
   std::optional<unsigned> OwnedGeneration;
 
 public:
-  ReaderWriterLock(ModuleCacheEntry &Entry) : Entry(Entry) {}
+  ReaderWriterLock(ModuleCacheEntry &Entry,
+                   ModuleLockWaitListener *WaitListener)
+      : Entry(Entry), WaitListener(WaitListener) {}
 
   Expected<bool> tryLock() override {
     std::lock_guard<std::mutex> Lock(Entry.Mutex);
     if (Entry.Locked)
       return false;
     Entry.Locked = true;
+    ++Entry.NumAcquisitions;
     OwnedGeneration = Entry.Generation;
     return true;
   }
@@ -169,11 +189,24 @@ public:
     assert(!OwnedGeneration);
     std::unique_lock<std::mutex> Lock(Entry.Mutex);
     unsigned CurrentGeneration = Entry.Generation;
-    bool Success = Entry.CondVar.wait_for(Lock, MaxSeconds, [&] {
+    auto IsUnlocked = [&] {
       // We check not only Locked, but also Generation to break the wait in case
       // of unsafeUnlock() and successful tryLock().
       return !Entry.Locked || Entry.Generation != CurrentGeneration;
-    });
+    };
+    if (IsUnlocked())
+      return llvm::WaitForUnlockResult::Success;
+    // Don't call the listener under the lock.
+    if (WaitListener) {
+      Lock.unlock();
+      WaitListener->willWait();
+      Lock.lock();
+    }
+    bool Success = Entry.CondVar.wait_for(Lock, MaxSeconds, IsUnlocked);
+    if (WaitListener) {
+      Lock.unlock();
+      WaitListener->didWait();
+    }
     return Success ? llvm::WaitForUnlockResult::Success
                    : llvm::WaitForUnlockResult::Timeout;
   }
@@ -204,6 +237,7 @@ public:
 
 class InProcessModuleCache : public ModuleCache {
   ModuleCacheEntries &Entries;
+  ModuleLockWaitListener *WaitListener;
 
   // TODO: If we changed the InMemoryModuleCache API and relied on strict
   // context hash, we could probably create more efficient thread-safe
@@ -212,11 +246,7 @@ class InProcessModuleCache : public ModuleCache {
   InMemoryModuleCache InMemory;
 
   ModuleCacheMapEntry &getOrCreateMapEntry(StringRef Filename) {
-    std::lock_guard<std::mutex> Lock(Entries.Mutex);
-    auto &MapEntry = *Entries.Map.try_emplace(Filename).first;
-    if (!MapEntry.second)
-      MapEntry.second = std::make_unique<ModuleCacheEntry>();
-    return MapEntry;
+    return Entries.getOrCreateMapEntry(Filename);
   }
 
   ModuleCacheEntry &getOrCreateEntry(StringRef Filename) {
@@ -224,12 +254,14 @@ class InProcessModuleCache : public ModuleCache {
   }
 
 public:
-  InProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger)
-      : ModuleCache(Logger), Entries(Entries), InMemory(Logger) {}
+  InProcessModuleCache(ModuleCacheEntries &Entries, AtomicLineLogger &Logger,
+                       ModuleLockWaitListener *WaitListener)
+      : ModuleCache(Logger), Entries(Entries), WaitListener(WaitListener),
+        InMemory(Logger) {}
 
   std::unique_ptr<llvm::AdvisoryLock> getLock(StringRef Filename) override {
     auto &Entry = getOrCreateEntry(Filename);
-    return std::make_unique<ReaderWriterLock>(Entry);
+    return std::make_unique<ReaderWriterLock>(Entry, WaitListener);
   }
 
   std::time_t getModuleTimestamp(StringRef Filename) override {
@@ -313,8 +345,11 @@ public:
 };
 } // namespace
 
+ModuleLockWaitListener::~ModuleLockWaitListener() = default;
+
 std::shared_ptr<ModuleCache>
 dependencies::makeInProcessModuleCache(ModuleCacheEntries &Entries,
-                                       AtomicLineLogger &Logger) {
-  return std::make_shared<InProcessModuleCache>(Entries, Logger);
+                                       AtomicLineLogger &Logger,
+                                       ModuleLockWaitListener *WaitListener) {
+  return std::make_shared<InProcessModuleCache>(Entries, Logger, WaitListener);
 }

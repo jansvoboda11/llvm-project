@@ -13,8 +13,10 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
 #include "gtest/gtest.h"
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <set>
 #include <thread>
 
 using namespace clang::dependencies;
@@ -304,6 +306,159 @@ TEST(DependencyScanningFilesystem, NoNegativeCache) {
   EXPECT_EQ(InstrumentingFS->NumStatusCalls, 4u);
 }
 
+TEST(DependencyScanningFilesystem, NoSlotsForUncachedNegativeStats) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/dir/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS);
+
+  auto HasSlot = [&](llvm::StringRef Filename) {
+    return Service.getSharedCache()
+        .getShardForFilename(Filename)
+        .CacheByFilename.contains(Filename);
+  };
+
+  // Positive stats keep their slot.
+  EXPECT_TRUE(DepFS.status("/dir/present.h"));
+  EXPECT_TRUE(HasSlot("/dir/present.h"));
+
+  // Uncached negative stats don't leave a slot behind, not even on repeated
+  // queries.
+  EXPECT_FALSE(DepFS.status("/dir/missing.h"));
+  EXPECT_FALSE(HasSlot("/dir/missing.h"));
+  EXPECT_FALSE(DepFS.status("/dir/missing.h"));
+  EXPECT_FALSE(HasSlot("/dir/missing.h"));
+
+  // The slot of a cached real path is kept, also after a negative stat.
+  llvm::SmallString<128> RealPath;
+  (void)DepFS.getRealPath("/dir/missing.h", RealPath);
+  EXPECT_TRUE(HasSlot("/dir/missing.h"));
+  DependencyScanningWorkerFilesystem DepFS2(Service, InMemoryFS);
+  EXPECT_FALSE(DepFS2.status("/dir/missing.h"));
+  EXPECT_TRUE(HasSlot("/dir/missing.h"));
+  (void)DepFS2.getRealPath("/dir/missing.h", RealPath);
+
+  // The file showing up later is noticed.
+  InMemoryFS->addFile("/dir/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_TRUE(DepFS2.status("/dir/missing.h"));
+}
+
+TEST(DependencyScanningFilesystem, StableDirectories) {
+  DependencyScanningFilesystemSharedCache Cache;
+  Cache.addStableDirectory("/sdk/");
+  Cache.addStableDirectory("/res");
+  // Relative paths and root directories are ignored.
+  Cache.addStableDirectory("rel");
+  Cache.addStableDirectory("/");
+  Cache.addStableDirectory("");
+
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/usr/include/a"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/usr/./a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk//a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/res/include/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk2/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/../a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/usr/../../a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk/usr/.."));
+  EXPECT_FALSE(Cache.isInStableDirectory("/sdk//../a.h"));
+  EXPECT_TRUE(Cache.isInStableDirectory("/sdk/..a/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("/rel/a.h"));
+  EXPECT_FALSE(Cache.isInStableDirectory("rel/a.h"));
+}
+
+TEST(DependencyScanningFilesystem, CacheStatFailuresInStableDirectories) {
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/sdk/usr/include/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  InMemoryFS->addFile("/proj/present.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+
+  auto InstrumentingFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(InMemoryFS);
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  Service.getSharedCache().addStableDirectory("/sdk");
+  DependencyScanningWorkerFilesystem DepFS(Service, InstrumentingFS);
+
+  auto CountStats = [&](llvm::StringRef Path) {
+    size_t Before = InstrumentingFS->NumStatusCalls;
+    EXPECT_FALSE(DepFS.status(Path));
+    EXPECT_FALSE(DepFS.status(Path));
+    return InstrumentingFS->NumStatusCalls - Before;
+  };
+
+  // Failures in a stable directory are cached, with or without an extension.
+  EXPECT_EQ(CountStats("/sdk/usr/include/missing.h"), 1u);
+  EXPECT_EQ(CountStats("/sdk/usr/include/Missing.framework"), 1u);
+  EXPECT_EQ(CountStats("/sdk/usr/include/missing"), 1u);
+
+  // Failures elsewhere aren't.
+  EXPECT_EQ(CountStats("/proj/missing.h"), 2u);
+  EXPECT_EQ(CountStats("/sdk2/missing.h"), 2u);
+  EXPECT_EQ(CountStats("/sdk/../proj/missing2.h"), 2u);
+
+  // Relative paths are resolved against the working directory first.
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/sdk/usr"));
+  EXPECT_EQ(CountStats("include/missing3.h"), 1u);
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/proj"));
+  EXPECT_EQ(CountStats("missing3.h"), 2u);
+
+  // Files showing up outside stable directories are noticed.
+  InMemoryFS->addFile("/proj/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_TRUE(DepFS.status("/proj/missing.h"));
+
+  // Files showing up in stable directories aren't, but they're diagnosed.
+  InMemoryFS->addFile("/sdk/usr/include/missing.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer(""));
+  EXPECT_FALSE(DepFS.status("/sdk/usr/include/missing.h"));
+  auto InvalidEntries =
+      Service.getSharedCache().getOutOfDateEntries(*InMemoryFS);
+  ASSERT_EQ(InvalidEntries.size(), 1u);
+  EXPECT_STREQ("/sdk/usr/include/missing.h", InvalidEntries[0].Path);
+}
+
+TEST(DependencyScanningFilesystem, NoCachedOtherErrorsInStableDirectories) {
+  struct DenyingFS : llvm::vfs::ProxyFileSystem {
+    unsigned NumStatusCalls = 0;
+    DenyingFS(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> UnderlyingFS)
+        : ProxyFileSystem(std::move(UnderlyingFS)) {}
+    llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &Path) override {
+      ++NumStatusCalls;
+      return std::make_error_code(std::errc::permission_denied);
+    }
+  };
+
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  auto FS = llvm::makeIntrusiveRefCnt<DenyingFS>(InMemoryFS);
+
+  DependencyScanningServiceOptions Opts;
+  Opts.CacheNegativeStats = false;
+  DependencyScanningService Service(std::move(Opts));
+  Service.getSharedCache().addStableDirectory("/sdk");
+  DependencyScanningWorkerFilesystem DepFS(Service, FS);
+
+  // Only missing files are cached, not other (maybe transient) errors.
+  EXPECT_EQ(DepFS.status("/sdk/denied.h").getError(),
+            std::errc::permission_denied);
+  EXPECT_EQ(DepFS.status("/sdk/denied.h").getError(),
+            std::errc::permission_denied);
+  EXPECT_EQ(FS->NumStatusCalls, 2u);
+}
+
 TEST(DependencyScanningFilesystem, DiagnoseStaleStatFailures) {
   auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   InMemoryFS->setCurrentWorkingDirectory("/");
@@ -394,6 +549,60 @@ TEST(DependencyScanningFilesystem, DoNotDiagnoseDirSizeChange) {
   // We do not report directory size changes.
   auto InvalidEntries = Service.getSharedCache().getOutOfDateEntries(*FS);
   EXPECT_EQ(InvalidEntries.size(), 0u);
+}
+
+TEST(DependencyScanningWorkerFilesystem, DirectiveTokens) {
+  using namespace clang::dependency_directives_scan;
+
+  // Enough directives and tokens to spill the scanner's vectors to the heap.
+  std::string Source;
+  for (unsigned I = 0; I < 200; ++I)
+    Source +=
+        "#define M" + std::to_string(I) + "(x) x + " + std::to_string(I) + "\n";
+  Source += "#include \"bar.h\"\nint x;\n";
+
+  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS->setCurrentWorkingDirectory("/");
+  InMemoryFS->addFile("/foo.h", 0, llvm::MemoryBuffer::getMemBuffer(Source));
+  InMemoryFS->addFile("/bad.h", 0,
+                      llvm::MemoryBuffer::getMemBuffer("@import A\n"));
+
+  DependencyScanningService Service({});
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS);
+  DependencyScanningWorkerFilesystem DepFS2(Service, InMemoryFS);
+
+  llvm::SmallVector<Token> ExpectedTokens;
+  llvm::SmallVector<Directive> ExpectedDirectives;
+  ASSERT_FALSE(clang::scanSourceForDependencyDirectives(Source, ExpectedTokens,
+                                                        ExpectedDirectives));
+
+  auto Directives = DepFS.getDirectiveTokens("/foo.h");
+  ASSERT_TRUE(Directives);
+  ASSERT_EQ(Directives->size(), ExpectedDirectives.size());
+  const Token *NextToken = Directives->front().Tokens.data();
+  for (auto [D, Expected] : llvm::zip_equal(*Directives, ExpectedDirectives)) {
+    EXPECT_EQ(D.Kind, Expected.Kind);
+    // The tokens of all directives are stored contiguously.
+    EXPECT_EQ(D.Tokens.data(), NextToken);
+    NextToken = D.Tokens.end();
+    ASSERT_EQ(D.Tokens.size(), Expected.Tokens.size());
+    for (auto [T, ExpectedT] : llvm::zip_equal(D.Tokens, Expected.Tokens)) {
+      EXPECT_EQ(T.Offset, ExpectedT.Offset);
+      EXPECT_EQ(T.Length, ExpectedT.Length);
+      EXPECT_EQ(T.Kind, ExpectedT.Kind);
+      EXPECT_EQ(T.Flags, ExpectedT.Flags);
+    }
+  }
+  EXPECT_EQ(Directives->back().Kind, pp_eof);
+
+  // The scanned directives are shared.
+  auto Directives2 = DepFS2.getDirectiveTokens("/foo.h");
+  ASSERT_TRUE(Directives2);
+  EXPECT_EQ(Directives2->data(), Directives->data());
+
+  // Scanning failures are cached too.
+  EXPECT_FALSE(DepFS.getDirectiveTokens("/bad.h"));
+  EXPECT_FALSE(DepFS2.getDirectiveTokens("/bad.h"));
 }
 
 TEST(DependencyScanningWorkerFilesystem, ConcurrentSameFilenameDeduplicates) {
@@ -550,6 +759,11 @@ TEST(DependencyScanningWorkerFilesystem,
   DependencyScanningWorkerFilesystem PostWorker(Service, TracingFS);
   EXPECT_FALSE(PostWorker.status(MissingPath));
   EXPECT_EQ(TracingFS->NumStatusCalls.load(), StatsAfterBurst + 1);
+
+  // No empty slot is left behind in the shared cache.
+  EXPECT_FALSE(Service.getSharedCache()
+                   .getShardForFilename(MissingPath)
+                   .CacheByFilename.contains(MissingPath));
 }
 
 TEST(DependencyScanningWorkerFilesystem, LocalFS) {
@@ -680,6 +894,59 @@ TEST(DependencyScanningWorkerFilesystem, LocalFSRealPath) {
   }
 }
 
+TEST(DependencyScanningWorkerFilesystem, LocalCacheKeysOutliveQueries) {
+  auto GlobalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  GlobalFS->setCurrentWorkingDirectory("/");
+  GlobalFS->addFile("/dir/global.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+  auto LocalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  LocalFS->setCurrentWorkingDirectory("/");
+  LocalFS->addFile("/dir/local.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+
+  auto InstrGlobalFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(GlobalFS);
+  auto InstrLocalFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(LocalFS);
+
+  DependencyScanningService Service({});
+  DependencyScanningWorkerFilesystem DepFS(Service, InstrGlobalFS,
+                                           InstrLocalFS);
+
+  // The local caches must not refer to the strings passed in by the caller.
+  // Overwrite each one after use, so that a dangling key makes the next query
+  // miss the local cache and reach the underlying filesystems again.
+  auto Query = [&](llvm::StringRef Path) {
+    std::string OwnedPath = Path.str();
+    EXPECT_TRUE(DepFS.status(OwnedPath));
+    llvm::SmallString<128> RealPath;
+    EXPECT_FALSE(DepFS.getRealPath(OwnedPath, RealPath));
+    std::fill(OwnedPath.begin(), OwnedPath.end(), 'x');
+  };
+  auto Counts = [&] {
+    return std::vector<std::size_t>{
+        InstrGlobalFS->NumStatusCalls,      InstrGlobalFS->NumExistsCalls,
+        InstrGlobalFS->NumGetRealPathCalls, InstrLocalFS->NumStatusCalls,
+        InstrLocalFS->NumExistsCalls,       InstrLocalFS->NumGetRealPathCalls,
+    };
+  };
+
+  Query("/dir/global.h");
+  Query("/dir/local.h");
+  auto CountsAfterFirstQueries = Counts();
+  EXPECT_EQ(InstrGlobalFS->NumStatusCalls, 1u);
+  EXPECT_EQ(InstrLocalFS->NumGetRealPathCalls, 1u);
+
+  Query("/dir/global.h");
+  Query("/dir/local.h");
+  EXPECT_EQ(Counts(), CountsAfterFirstQueries);
+
+  // Relative paths are made absolute in a temporary buffer before the lookup.
+  ASSERT_FALSE(DepFS.setCurrentWorkingDirectory("/dir"));
+  CountsAfterFirstQueries = Counts();
+  Query("global.h");
+  Query("./local.h");
+  EXPECT_EQ(Counts(), CountsAfterFirstQueries);
+}
+
 TEST(DependencyScanningWorkerFilesystem, LocalFSDirectoryIteration) {
   auto GlobalFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   GlobalFS->setCurrentWorkingDirectory("/");
@@ -709,4 +976,143 @@ TEST(DependencyScanningWorkerFilesystem, LocalFSDirectoryIteration) {
   EXPECT_EQ(Entries.size(), 2u);
   EXPECT_EQ(Entries.lookup("both"), llvm::sys::fs::file_type::directory_file);
   EXPECT_EQ(Entries.lookup("glob.c"), llvm::sys::fs::file_type::regular_file);
+}
+
+namespace {
+/// Options whose \c MakeVFS creates in-memory filesystems and counts them.
+DependencyScanningServiceOptions
+makePoolTestOptions(std::shared_ptr<std::atomic<unsigned>> NumVFSs) {
+  DependencyScanningServiceOptions Opts;
+  Opts.MakeVFS = [NumVFSs] {
+    ++*NumVFSs;
+    auto FS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+    FS->setCurrentWorkingDirectory("/");
+    FS->addFile("/dir/file.h", 0, llvm::MemoryBuffer::getMemBuffer(""));
+    return FS;
+  };
+  return Opts;
+}
+} // namespace
+
+TEST(DependencyScanningWorkerFilesystemPool, ReusesReturnedFilesystems) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  // Leases held at the same time get different filesystems.
+  auto Lease1 = Pool.acquire(Service);
+  auto Lease2 = Pool.acquire(Service);
+  ASSERT_TRUE(Lease1.get() && Lease2.get());
+  EXPECT_NE(Lease1.get(), Lease2.get());
+  EXPECT_EQ(NumVFSs->load(), 2u);
+  EXPECT_TRUE(Lease1->status("/dir/file.h"));
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+
+  DependencyScanningWorkerFilesystem *FS1 = Lease1.get().get();
+  DependencyScanningWorkerFilesystem *FS2 = Lease2.get().get();
+  Lease1.reset();
+  Lease2.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 2u);
+
+  // Later leases reuse them instead of creating new ones.
+  auto Lease3 = Pool.acquire(Service);
+  auto Lease4 = Pool.acquire(Service);
+  EXPECT_EQ(NumVFSs->load(), 2u);
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  EXPECT_TRUE((Lease3.get() == FS1 && Lease4.get() == FS2) ||
+              (Lease3.get() == FS2 && Lease4.get() == FS1));
+  EXPECT_TRUE(Lease3->status("/dir/file.h"));
+
+  // A moved-from lease doesn't return anything.
+  DependencyScanningWorkerFilesystemPool::Lease Moved = std::move(Lease3);
+  Lease3.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  Moved.reset();
+  EXPECT_EQ(Pool.getNumAvailable(), 1u);
+}
+
+TEST(DependencyScanningWorkerFilesystemPool, DoesNotReuseModifiedFilesystems) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  // A filesystem that's still referenced, e.g. by an overlay of the compile
+  // that used it, isn't returned.
+  {
+    auto Lease = Pool.acquire(Service);
+    auto Overlay =
+        llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(Lease.get());
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+
+  // Neither is one whose working directory changed.
+  {
+    auto Lease = Pool.acquire(Service);
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/dir"));
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+
+  // Nor a discarded one.
+  {
+    auto Lease = Pool.acquire(Service);
+    Lease.discard();
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 0u);
+  }
+  EXPECT_EQ(NumVFSs->load(), 3u);
+
+  // Changing the working directory and changing it back is fine.
+  {
+    auto Lease = Pool.acquire(Service);
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/dir"));
+    ASSERT_FALSE(Lease->setCurrentWorkingDirectory("/"));
+    Lease.reset();
+    EXPECT_EQ(Pool.getNumAvailable(), 1u);
+  }
+}
+
+TEST(DependencyScanningWorkerFilesystemPool, LeasesAreExclusive) {
+  auto NumVFSs = std::make_shared<std::atomic<unsigned>>(0);
+  DependencyScanningService Service(makePoolTestOptions(NumVFSs));
+  DependencyScanningWorkerFilesystemPool &Pool =
+      Service.getWorkerFilesystemPool();
+
+  constexpr unsigned NumThreads = 8;
+  constexpr unsigned NumIterations = 200;
+  std::mutex Mutex;
+  std::set<DependencyScanningWorkerFilesystem *> InUse;
+  std::atomic<bool> Overlapped = false;
+  StartBarrier Barrier;
+  std::vector<std::thread> Threads;
+  for (unsigned T = 0; T < NumThreads; ++T)
+    Threads.emplace_back([&] {
+      Barrier.wait();
+      for (unsigned I = 0; I < NumIterations; ++I) {
+        auto Lease = Pool.acquire(Service);
+        {
+          std::lock_guard<std::mutex> Guard(Mutex);
+          if (!InUse.insert(Lease.get().get()).second)
+            Overlapped = true;
+        }
+        // Use the filesystem (and its local caches) without synchronization.
+        EXPECT_TRUE(Lease->status("/dir/file.h"));
+        EXPECT_FALSE(Lease->status("/dir/missing.h"));
+        {
+          std::lock_guard<std::mutex> Guard(Mutex);
+          InUse.erase(Lease.get().get());
+        }
+      }
+    });
+  Barrier.release();
+  for (std::thread &Thread : Threads)
+    Thread.join();
+
+  EXPECT_FALSE(Overlapped);
+  // Never more filesystems than leases held at the same time.
+  EXPECT_LE(NumVFSs->load(), NumThreads);
+  EXPECT_EQ(Pool.getNumAvailable(), NumVFSs->load());
 }

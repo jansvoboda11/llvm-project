@@ -1086,6 +1086,8 @@ def err_dep_source_scanner_missing_semi_after_at_import : Error<
   "could not find ';' after @import">;
 def err_dep_source_scanner_unexpected_tokens_at_import : Error<
   "unexpected extra tokens at end of @import declaration">;
+def err_dep_source_scanner_token_too_long : Error<
+  "token is too long for dependency directive scanning">;
 
 }
 

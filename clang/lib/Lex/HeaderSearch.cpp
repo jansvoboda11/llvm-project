@@ -483,11 +483,12 @@ OptionalFileEntryRef HeaderSearch::getFileAndSuggestModule(
     bool CacheFailures /*=true*/) {
   // If we have a module map that might map this header, load it and
   // check whether we'll have a suggestion for a module.
-  auto File = getFileMgr().getFileRef(FileName, OpenFile, CacheFailures);
+  auto File =
+      getFileMgr().getFileRefOrErrorCode(FileName, OpenFile, CacheFailures);
   if (!File) {
     // For rare, surprising errors (e.g. "out of file handles"), diag the EC
     // message.
-    std::error_code EC = llvm::errorToErrorCode(File.takeError());
+    std::error_code EC = File.getError();
     if (EC != llvm::errc::no_such_file_or_directory &&
         EC != llvm::errc::invalid_argument &&
         EC != llvm::errc::is_a_directory && EC != llvm::errc::not_a_directory) {
@@ -801,7 +802,8 @@ void HeaderSearch::noteLookupUsage(unsigned HitIdx, SourceLocation Loc) {
   SearchDirsUsage[HitIdx] = true;
 
   auto UserEntryIdxIt = SearchDirToHSEntry.find(HitIdx);
-  if (UserEntryIdxIt != SearchDirToHSEntry.end())
+  if (UserEntryIdxIt != SearchDirToHSEntry.end() &&
+      !Diags.isIgnored(diag::remark_pp_search_path_usage, Loc))
     Diags.Report(Loc, diag::remark_pp_search_path_usage)
         << HSOpts.UserEntries[UserEntryIdxIt->second].Path;
 }

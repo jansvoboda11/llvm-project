@@ -375,7 +375,8 @@ public:
   void *IdentifierLookupTable = nullptr;
 
   /// Offsets of identifiers that we're going to preload within
-  /// IdentifierTableData.
+  /// IdentifierTableData. Only valid until the identifiers are preloaded, when
+  /// the AST file is first loaded.
   std::vector<unsigned> PreloadIdentifierOffsets;
 
   // === Macros ===
@@ -441,6 +442,11 @@ public:
   /// The on-disk hash table that contains information about each of
   /// the header files.
   void *HeaderFileInfoTable = nullptr;
+
+  /// The value of ASTReader's header file info generation counter right after
+  /// this module file's AST block (and so its header file info table) has been
+  /// read, or zero if it hasn't been read yet.
+  unsigned HeaderFileInfoGeneration = 0;
 
   // === Submodule information ===
 

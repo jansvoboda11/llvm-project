@@ -246,7 +246,7 @@ GetAffectingModuleMaps(const Preprocessor &PP, Module *RootModule) {
 
     for (const Module *ImportedModule : CurrentModule->Imports)
       CollectModuleMapsForHierarchy(ImportedModule, AR_ImportOrTextualHeader);
-    for (const Module *UndeclaredModule : CurrentModule->UndeclaredUses)
+    for (const Module *UndeclaredModule : CurrentModule->getUndeclaredUses())
       CollectModuleMapsForHierarchy(UndeclaredModule, AR_ImportOrTextualHeader);
 
     for (Module *M : CurrentModule->submodules())
@@ -1259,7 +1259,7 @@ ASTFileSignature ASTWriter::createSignatureForNamedModule() const {
   // We need to combine all the export imported modules no matter
   // we used it or not.
   for (auto [ExportImported, _] : WritingModule->Exports)
-    Hasher.update(ExportImported->Signature);
+    Hasher.update(ExportImported->getSignature());
 
   // We combine all the used modules to make sure the signature is precise.
   // Consider the case like:
@@ -1284,7 +1284,7 @@ ASTFileSignature ASTWriter::createSignatureForNamedModule() const {
   // efficiency may a problem too. Here we just combine the hash value of the
   // used modules conservatively.
   for (Module *M : TouchedTopLevelModules)
-    Hasher.update(M->Signature);
+    Hasher.update(M->getSignature());
 
   return ASTFileSignature::create(Hasher.result());
 }
@@ -1554,10 +1554,10 @@ void ASTWriter::WriteControlBlock(Preprocessor &PP, StringRef isysroot) {
     Record.clear();
 
     auto &Map = PP.getHeaderSearchInfo().getModuleMap();
-    AddPath(WritingModule->PresumedModuleMapFile.empty()
+    AddPath(WritingModule->getPresumedModuleMapFile().empty()
                 ? Map.getModuleMapFileForUniquing(WritingModule)
                       ->getNameAsRequested()
-                : StringRef(WritingModule->PresumedModuleMapFile),
+                : WritingModule->getPresumedModuleMapFile(),
             Record);
 
     // Additional module map files.
@@ -2272,7 +2272,7 @@ void ASTWriter::WriteHeaderSearch(const HeaderSearch &HS) {
 
       // If the file didn't exist, we can still create a module if we were given
       // enough information in the module map.
-      for (const auto &U : M->MissingHeaders) {
+      for (const auto &U : M->getMissingHeaders()) {
         // Check that we were given enough information to build a module
         // without this file existing on disk.
         if (!U.Size || (!U.ModTime && IncludeTimestamps)) {
@@ -2370,7 +2370,7 @@ void ASTWriter::WriteHeaderSearch(const HeaderSearch &HS) {
 
 static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
                      unsigned SLocBufferBlobCompressedAbbrv,
-                     unsigned SLocBufferBlobAbbrv) {
+                     unsigned SLocBufferBlobAbbrv, bool FastCompression) {
   using RecordDataType = ASTWriter::RecordData::value_type;
 
   // Compress the buffer if possible. We expect that almost all PCM
@@ -2378,7 +2378,8 @@ static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
   SmallVector<uint8_t, 0> CompressedBuffer;
   if (llvm::compression::zstd::isAvailable()) {
     llvm::compression::zstd::compress(
-        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer, 9);
+        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer,
+        FastCompression ? llvm::compression::zstd::BestSpeedCompression : 9);
     RecordDataType Record[] = {SM_SLOC_BUFFER_BLOB_COMPRESSED, Blob.size() - 1};
     Stream.EmitRecordWithBlob(SLocBufferBlobCompressedAbbrv, Record,
                               llvm::toStringRef(CompressedBuffer));
@@ -2386,7 +2387,9 @@ static void emitBlob(llvm::BitstreamWriter &Stream, StringRef Blob,
   }
   if (llvm::compression::zlib::isAvailable()) {
     llvm::compression::zlib::compress(
-        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer);
+        llvm::arrayRefFromStringRef(Blob.drop_back(1)), CompressedBuffer,
+        FastCompression ? llvm::compression::zlib::BestSpeedCompression
+                        : llvm::compression::zlib::DefaultCompression);
     RecordDataType Record[] = {SM_SLOC_BUFFER_BLOB_COMPRESSED, Blob.size() - 1};
     Stream.EmitRecordWithBlob(SLocBufferBlobCompressedAbbrv, Record,
                               llvm::toStringRef(CompressedBuffer));
@@ -2419,6 +2422,9 @@ void ASTWriter::WriteSourceManagerBlock(SourceManager &SourceMgr) {
   unsigned SLocBufferBlobCompressedAbbrv =
       CreateSLocBufferBlobAbbrev(Stream, true);
   unsigned SLocExpansionAbbrv = CreateSLocExpansionAbbrev(Stream);
+  bool FastBlobCompression = PP->getHeaderSearchInfo()
+                                 .getHeaderSearchOpts()
+                                 .ModulesFastSourceBufferCompression;
 
   // Write out the source location entry table. We skip the first
   // entry, which is always the same dummy entry.
@@ -2509,7 +2515,7 @@ void ASTWriter::WriteSourceManagerBlock(SourceManager &SourceMgr) {
           Buffer = llvm::MemoryBufferRef("<<<INVALID BUFFER>>>", "");
         StringRef Blob(Buffer->getBufferStart(), Buffer->getBufferSize() + 1);
         emitBlob(Stream, Blob, SLocBufferBlobCompressedAbbrv,
-                 SLocBufferBlobAbbrv);
+                 SLocBufferBlobAbbrv, FastBlobCompression);
       }
     } else {
       // The source location entry is a macro expansion.
@@ -3196,7 +3202,7 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     }
 
     // Emit the requirements.
-    for (const auto &R : Mod->Requirements) {
+    for (const auto &R : Mod->getRequirements()) {
       RecordData::value_type Record[] = {SUBMODULE_REQUIRES, R.RequiredState};
       Stream.EmitRecordWithBlob(RequiresAbbrev, Record, R.FeatureName);
     }
@@ -3252,9 +3258,9 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     }
 
     // Emit the modules affecting compilation that were not imported.
-    if (!Mod->AffectingClangModules.empty()) {
+    if (!Mod->getAffectingClangModules().empty()) {
       RecordData Record;
-      for (Module *I : Mod->AffectingClangModules)
+      for (Module *I : Mod->getAffectingClangModules())
         Record.push_back(getSubmoduleID(I));
       Stream.EmitRecord(SUBMODULE_AFFECTING_MODULES, Record);
     }
@@ -3278,14 +3284,14 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     // TODO: Consider serializing undeclared uses of modules.
 
     // Emit the link libraries.
-    for (const auto &LL : Mod->LinkLibraries) {
+    for (const auto &LL : Mod->getLinkLibraries()) {
       RecordData::value_type Record[] = {SUBMODULE_LINK_LIBRARY,
                                          LL.IsFramework};
       Stream.EmitRecordWithBlob(LinkLibraryAbbrev, Record, LL.Library);
     }
 
     // Emit the conflicts.
-    for (const auto &C : Mod->Conflicts) {
+    for (const auto &C : Mod->getConflicts()) {
       // FIXME: This may fail; we don't require that all conflicting modules
       // are local or imported.
       RecordData::value_type Record[] = {SUBMODULE_CONFLICT,
@@ -3294,7 +3300,7 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     }
 
     // Emit the configuration macros.
-    for (const auto &CM : Mod->ConfigMacros) {
+    for (const auto &CM : Mod->getConfigMacros()) {
       RecordData::value_type Record[] = {SUBMODULE_CONFIG_MACRO};
       Stream.EmitRecordWithBlob(ConfigMacroAbbrev, Record, CM);
     }
@@ -3311,9 +3317,10 @@ void ASTWriter::WriteSubmodules(Module *WritingModule, ASTContext *Context) {
     }
 
     // Emit the name of the re-exported module, if any.
-    if (!Mod->ExportAsModule.empty()) {
+    if (!Mod->getExportAsModule().empty()) {
       RecordData::value_type Record[] = {SUBMODULE_EXPORT_AS};
-      Stream.EmitRecordWithBlob(ExportAsAbbrev, Record, Mod->ExportAsModule);
+      Stream.EmitRecordWithBlob(ExportAsAbbrev, Record,
+                                Mod->getExportAsModule());
     }
 
     // Emit one SUBMODULE_CHILD record per direct child so the reader can
@@ -3929,6 +3936,9 @@ bool IsInterestingIdentifier(const IdentifierInfo *II, uint64_t MacroOffset,
                              bool IsModule, bool IsCPlusPlus) {
   bool NeedDecls = !IsModule || !IsCPlusPlus;
 
+  // TODO: The reader no longer restores builtin IDs from a PCH (they come
+  // from the importing compilation), so a builtin ID no longer makes an
+  // identifier interesting. Dropping it changes which identifiers get written.
   bool IsInteresting =
       II->getNotableIdentifierID() != tok::NotableIdentifierKind::not_notable ||
       II->getBuiltinID() != Builtin::ID::NotBuiltin ||

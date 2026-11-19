@@ -381,6 +381,14 @@ static void initializeScanCompilerInstance(
   ScanInstance.createFileManager();
   ScanInstance.createSourceManager();
 
+  // Nothing gets created in the SDK or the resource directory during a build,
+  // so the filesystem cache can remember which files are missing there.
+  if (Service.getOpts().CacheNegativeStatsInStableDirs) {
+    const HeaderSearchOptions &HSOpts = ScanInstance.getHeaderSearchOpts();
+    Service.getSharedCache().addStableDirectory(HSOpts.Sysroot);
+    Service.getSharedCache().addStableDirectory(HSOpts.ResourceDir);
+  }
+
   // Use DepFS for getting the dependency directives if requested to do so.
   if (Service.getOpts().Mode == ScanningMode::DependencyDirectivesScan)
     ScanInstance.setDependencyDirectivesGetter(
@@ -431,7 +439,18 @@ createScanCompilerInvocation(const CompilerInvocation &Invocation,
   ScanInvocation->getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
   ScanInvocation->getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
       true;
+  // The scanner's PCMs are only read by scans, which almost never need the
+  // contents of embedded buffers, so spend as little time as possible
+  // compressing them. Compressing them at all keeps the PCMs small, which makes
+  // incremental scans faster.
+  ScanInvocation->getHeaderSearchOpts().ModulesFastSourceBufferCompression =
+      true;
   ScanInvocation->getHeaderSearchOpts().ModulesForceValidateUserHeaders = false;
+  // Only create the modules the scan needs. This keeps the scanning PCMs apart
+  // from those built eagerly, but the reported command lines and context
+  // hashes derive from the original invocation and stay the same.
+  if (Service.getOpts().LazyLoadModuleMaps)
+    ScanInvocation->getHeaderSearchOpts().LazyLoadModuleMaps = true;
 
   // FIXME: Do this even with PCHs by marking the option as something like
   // "preprocessor benign" in LangOptions.def so that it passes the
@@ -512,30 +531,28 @@ initializeScanInstanceDependencyCollector(
 }
 
 namespace {
-/// Manages (and terminates) the asynchronous compilation of modules.
+/// Manages (and terminates) the asynchronous compilation of modules for one
+/// translation unit.
 class AsyncModuleCompiles {
-  std::mutex Mutex;
-  bool Stop = false;
-  // FIXME: Have the service own a thread pool and use that instead.
-  std::vector<std::thread> Compiles;
+  AsyncModuleCompilePool &Pool;
+  AsyncModuleCompilePool::Group Group;
 
 public:
-  /// Registers the module compilation, unless this instance is about to be
-  /// destroyed.
-  void add(llvm::unique_function<void()> Compile) {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    if (!Stop)
-      Compiles.emplace_back(std::move(Compile));
+  AsyncModuleCompiles(AsyncModuleCompilePool &Pool) : Pool(Pool) {}
+
+  /// Reserves the compilation of the PCM \p ModuleFileName. Returns false if
+  /// it's already queued.
+  bool reserve(StringRef ModuleFileName) {
+    return Pool.reserve(ModuleFileName);
   }
 
-  ~AsyncModuleCompiles() {
-    {
-      std::lock_guard<std::mutex> Lock(Mutex);
-      Stop = true;
-    }
-    for (std::thread &Compile : Compiles)
-      Compile.join();
+  /// Queues the reserved module compilation, unless this instance is about to
+  /// be destroyed.
+  void add(StringRef ModuleFileName, llvm::unique_function<void()> Compile) {
+    Pool.enqueue(Group, ModuleFileName, std::move(Compile));
   }
+
+  ~AsyncModuleCompiles() { Pool.cancel(Group); }
 };
 
 struct SingleModuleWithAsyncModuleCompiles : PreprocessOnlyAction {
@@ -619,48 +636,93 @@ struct AsyncModuleCompile : PPCallbacks {
       return;
     }
 
-    auto Lock = ModCache.getLock(ModuleFileName);
-    bool Owned;
-    llvm::Error LockErr = Lock->tryLock().moveInto(Owned);
     // Someone else is building the PCM right now.
-    if (!LockErr && !Owned)
+    ModuleCacheEntries::LockState LockState =
+        Service.getModuleCacheEntries().getLockState(ModuleFileName);
+    if (LockState.Locked)
       return;
-    // We should build the PCM.
-    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-        llvm::makeIntrusiveRefCnt<DependencyScanningWorkerFilesystem>(
-            Service, Service.getOpts().MakeVFS());
-    VFS = createVFSFromCompilerInvocation(CI.getInvocation(),
-                                          CI.getDiagnostics(), std::move(VFS));
+    // A compile of the PCM is already queued.
+    if (!Compiles.reserve(ModuleFileName))
+      return;
+    // We should build the PCM. The compile has exclusive use of a pooled
+    // worker filesystem, whose local caches carry over from earlier compiles.
+    DependencyScanningWorkerFilesystemPool::Lease DepFS =
+        Service.getWorkerFilesystemPool().acquire(Service);
     auto DC = std::make_unique<DiagnosticConsumer>();
-    auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
-                                       Service.getLogger());
-    CompilerInstance::ThreadSafeCloneConfig CloneConfig(std::move(VFS), *DC,
-                                                        std::move(MC));
-    auto ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
-    auto ModCI2 = CI.cloneForModuleCompile(SourceLocation(), M, ModuleFileName,
-                                           CloneConfig);
+    // The state of the compile. Its members are destroyed in reverse order, so
+    // that the compile's references to the filesystem are gone by the time the
+    // lease returns it to the pool, also when the compile is skipped or dropped
+    // from the queue without running.
+    struct CompileState {
+      DependencyScanningWorkerFilesystemPool::Lease DepFS;
+      std::unique_ptr<DiagnosticConsumer> DC;
+      std::unique_ptr<DependencyActionController> ModController;
+      std::unique_ptr<CompilerInstance> ModCI1, ModCI2;
+    } State;
+    State.DepFS = std::move(DepFS);
+    State.DC = std::move(DC);
+    {
+      // The clones are the only references to the filesystem that outlive
+      // this scope, so that it can go back to the pool once they're gone.
+      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+          createVFSFromCompilerInvocation(
+              CI.getInvocation(), CI.getDiagnostics(), State.DepFS.get());
+      // The compile gives up its slot in the pool while waiting for locks.
+      auto MC = makeInProcessModuleCache(Service.getModuleCacheEntries(),
+                                         Service.getLogger(),
+                                         &Service.getAsyncModuleCompilePool());
+      CompilerInstance::ThreadSafeCloneConfig CloneConfig(
+          std::move(VFS), *State.DC, std::move(MC));
+      State.ModCI1 = CI.cloneForModuleCompile(SourceLocation(), M,
+                                              ModuleFileName, CloneConfig);
+      State.ModCI2 = CI.cloneForModuleCompile(SourceLocation(), M,
+                                              ModuleFileName, CloneConfig);
+    }
 
-    auto ModController = Controller.clone();
+    State.ModController = Controller.clone();
 
-    // Note: This lock belongs to a module cache that might not outlive the
-    // thread. This works, because the in-process lock only refers to an object
-    // managed by the service, which does outlive the thread.
-    Compiles.add([Lock = std::move(Lock), ModCI1 = std::move(ModCI1),
-                  ModCI2 = std::move(ModCI2), DC = std::move(DC),
-                  ModController = std::move(ModController), Service = &Service,
-                  Compiles = &Compiles] {
+    // The compile takes the lock only once it starts running, so that nobody
+    // ever waits for a compile that's still queued. A compile that needs the
+    // PCM before then builds it on its own.
+    Compiles.add(ModuleFileName, [ModuleFileName =
+                                      std::string(ModuleFileName.str()),
+                                  NumAcquisitions = LockState.NumAcquisitions,
+                                  State = std::move(State), Service = &Service,
+                                  Compiles = &Compiles]() mutable {
+      auto Lock = State.ModCI2->getModuleCache().getLock(ModuleFileName);
+      Expected<bool> Owned = Lock->tryLock();
+      if (!Owned) {
+        // Locks are only necessary for performance, build the PCM anyway.
+        llvm::consumeError(Owned.takeError());
+      } else {
+        // Someone else is building the PCM right now.
+        if (!*Owned)
+          return;
+        // Someone else built the PCM (or tried to) since it was queued.
+        if (Service->getModuleCacheEntries()
+                .getLockState(ModuleFileName)
+                .NumAcquisitions != NumAcquisitions + 1)
+          return;
+      }
       llvm::CrashRecoveryContext CRC;
-      (void)CRC.RunSafely([&] {
+      bool Completed = CRC.RunSafely([&] {
         // Quickly discovers and compiles modules for the real scan below.
-        SingleModuleWithAsyncModuleCompiles Action1(*Service, *ModController,
-                                                    *Compiles);
-        (void)ModCI1->ExecuteAction(Action1);
+        SingleModuleWithAsyncModuleCompiles Action1(
+            *Service, *State.ModController, *Compiles);
+        (void)State.ModCI1->ExecuteAction(Action1);
         // The real scan below.
-        ModCI2->getPreprocessorOpts().SingleModuleParseMode = false;
+        State.ModCI2->getPreprocessorOpts().SingleModuleParseMode = false;
         GenerateModuleFromModuleMapAction Action2;
-        (void)ModCI2->ExecuteAction(Action2);
+        (void)State.ModCI2->ExecuteAction(Action2);
       });
+      // Don't reuse the filesystem of a crashed compile: its local caches
+      // might be in an inconsistent state.
+      if (!Completed)
+        State.DepFS.discard();
+      // Release the compile's references to the filesystem, then return it.
+      State.ModCI1.reset();
+      State.ModCI2.reset();
+      State.DepFS.reset();
     });
   }
 };
@@ -1030,7 +1092,7 @@ public:
 
     std::optional<AsyncModuleCompiles> AsyncCompiles;
     if (Worker.Service.getOpts().AsyncScanModules) {
-      AsyncCompiles.emplace();
+      AsyncCompiles.emplace(Worker.Service.getAsyncModuleCompilePool());
       if (!prescanModulesAsync(*AsyncCompiles, Controller))
         return nullptr;
     }
@@ -1081,6 +1143,9 @@ DependencyScanningWorker::DependencyScanningWorker(
     DependencyScanningService &Service,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> LocalFS)
     : Service(Service) {
+  // The shared module dependencies cache sizes itself by the number of workers.
+  Service.registerWorker();
+
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
   // We need to read object files from PCH built outside the scanner.
   PCHContainerOps->registerReader(
@@ -1100,7 +1165,9 @@ DependencyScanningWorker::DependencyScanningWorker(
       Service, std::move(BaseFS), std::move(LocalFS));
 }
 
-DependencyScanningWorker::~DependencyScanningWorker() = default;
+DependencyScanningWorker::~DependencyScanningWorker() {
+  Service.unregisterWorker();
+}
 
 IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 DependencyScanningWorker::makeEffectiveVFS(

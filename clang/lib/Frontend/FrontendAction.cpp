@@ -614,8 +614,8 @@ static std::error_code collectModuleHeaderIncludes(
   // if explicit stat information was provided.
   // FIXME: If the name resolves to a file with different stat information,
   // produce a better diagnostic.
-  if (!Module->MissingHeaders.empty()) {
-    auto &MissingHeader = Module->MissingHeaders.front();
+  if (!Module->getMissingHeaders().empty()) {
+    auto &MissingHeader = Module->getMissingHeaders().front();
     Diag.Report(MissingHeader.FileNameLoc, diag::err_module_header_missing)
       << MissingHeader.IsUmbrella << MissingHeader.FileName;
     return std::error_code();
@@ -945,7 +945,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
               AST->getLangOpts().CurrentModule, SourceLocation(),
               /*AllowSearch*/ false);
       assert(ASTModule && "module file does not define its own module");
-      Input = FrontendInputFile(ASTModule->PresumedModuleMapFile, Kind);
+      Input = FrontendInputFile(ASTModule->getPresumedModuleMapFile(), Kind);
     } else {
       auto &OldSM = AST->getSourceManager();
       FileID ID = OldSM.getMainFileID();
@@ -987,9 +987,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     CI.setFileManager(AST->getFileManagerPtr());
     CI.setSourceManager(AST->getSourceManagerPtr());
     CI.setPreprocessor(AST->getPreprocessorPtr());
-    Preprocessor &PP = CI.getPreprocessor();
-    PP.getBuiltinInfo().initializeBuiltins(PP.getIdentifierTable(),
-                                           PP.getLangOpts());
     CI.setASTContext(AST->getASTContextPtr());
 
     setCurrentInput(Input, std::move(AST));
@@ -1192,7 +1189,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     if (!CurrentModule)
       return false;
 
-    CurrentModule->PresumedModuleMapFile = PresumedModuleMapFile;
+    CurrentModule->setPresumedModuleMapFile(PresumedModuleMapFile);
 
     if (OffsetToContents)
       // If the module contents are in the same file, skip to them.
@@ -1294,9 +1291,9 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
         if (!CI.getASTContext().getExternalSource())
           return false;
       }
-      // If modules are enabled, create the AST reader before creating
-      // any builtins, so that all declarations know that they might be
-      // extended by an external source.
+      // If modules are enabled, create the AST reader before Sema creates
+      // any builtin declarations, so that all declarations know that they
+      // might be extended by an external source.
       if (CI.getLangOpts().Modules || !CI.hasASTContext() ||
           !CI.getASTContext().getExternalSource()) {
         CI.createASTReader();
@@ -1308,21 +1305,6 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     CI.setASTConsumer(std::move(Consumer));
     if (!CI.hasASTConsumer())
       return false;
-  }
-
-  // Initialize built-in info as long as we aren't using an external AST
-  // source.
-  if (CI.getLangOpts().Modules || !CI.hasASTContext() ||
-      !CI.getASTContext().getExternalSource()) {
-    Preprocessor &PP = CI.getPreprocessor();
-    PP.getBuiltinInfo().initializeBuiltins(PP.getIdentifierTable(),
-                                           PP.getLangOpts());
-  } else {
-    // FIXME: If this is a problem, recover from it by creating a multiplex
-    // source.
-    assert((!CI.getLangOpts().Modules || CI.getASTReader()) &&
-           "modules enabled but created an external source that "
-           "doesn't support modules");
   }
 
   // If we were asked to load any module files, do so now.

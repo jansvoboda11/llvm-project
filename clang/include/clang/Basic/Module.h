@@ -27,11 +27,14 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/Allocator.h"
 #include <array>
 #include <cassert>
 #include <cstdint>
 #include <ctime>
 #include <iterator>
+#include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -56,11 +59,36 @@ class TargetInfo;
 class ExternalSubmoduleSource {
 public:
   virtual Module *getSubmodule(uint32_t GlobalID) = 0;
+
+  /// Visit the (resolved) top-level header filenames of the given submodule.
+  virtual void
+  visitTopHeaderFilenames(uint32_t GlobalID,
+                          llvm::function_ref<void(StringRef)> Visitor) = 0;
+
   virtual ~ExternalSubmoduleSource() = default;
 };
 
 /// Describes the name of a module.
 using ModuleId = SmallVector<std::pair<std::string, SourceLocation>, 2>;
+
+class ModuleFileKey;
+
+/// A non-owning view of a \c ModuleFileKey, for lookups that shouldn't need to
+/// allocate.
+struct ModuleFileKeyRef {
+  /// The entity used for deduplication.
+  const void *Ptr;
+  /// The path relative to the module cache path for implicit module file, empty
+  /// for other kinds of module files.
+  StringRef ImplicitModulePathSuffix;
+
+  ModuleFileKeyRef(const void *ModuleFile) : Ptr(ModuleFile) {}
+
+  ModuleFileKeyRef(const void *ModuleCacheDir, StringRef PathSuffix)
+      : Ptr(ModuleCacheDir), ImplicitModulePathSuffix(PathSuffix) {}
+
+  inline ModuleFileKeyRef(const ModuleFileKey &Key);
+};
 
 /// Deduplication key for a loaded module file in \c ModuleManager.
 ///
@@ -91,6 +119,14 @@ public:
   ModuleFileKey(const void *ModuleCacheDir, StringRef PathSuffix)
       : Ptr(ModuleCacheDir), ImplicitModulePathSuffix(PathSuffix) {}
 
+  explicit ModuleFileKey(ModuleFileKeyRef Ref)
+      : Ptr(Ref.Ptr), ImplicitModulePathSuffix(Ref.ImplicitModulePathSuffix) {}
+
+  const void *getPtr() const { return Ptr; }
+  StringRef getImplicitModulePathSuffix() const {
+    return ImplicitModulePathSuffix;
+  }
+
   bool operator==(const ModuleFileKey &Other) const {
     return Ptr == Other.Ptr &&
            ImplicitModulePathSuffix == Other.ImplicitModulePathSuffix;
@@ -100,6 +136,10 @@ public:
     return !operator==(Other);
   }
 };
+
+ModuleFileKeyRef::ModuleFileKeyRef(const ModuleFileKey &Key)
+    : Ptr(Key.getPtr()),
+      ImplicitModulePathSuffix(Key.getImplicitModulePathSuffix()) {}
 
 /// Identifies a module file to be loaded.
 ///
@@ -328,10 +368,14 @@ public:
 /// Required to construct a Module.
 ///
 /// This tag type is only constructible by ModuleMap, guaranteeing it ownership
-/// of all Module instances.
+/// of all Module instances. It also provides the ModuleMap's allocator, which
+/// outlives the modules, for their auxiliary data.
 class ModuleConstructorTag {
-  explicit ModuleConstructorTag() = default;
+  llvm::BumpPtrAllocator &Alloc;
+
+  explicit ModuleConstructorTag(llvm::BumpPtrAllocator &Alloc) : Alloc(Alloc) {}
   friend ModuleMap;
+  friend Module;
 };
 
 /// Describes a module or submodule.
@@ -345,10 +389,15 @@ public:
   /// The location of the module definition.
   SourceLocation DefinitionLoc;
 
+private:
+  /// The ID used when referencing this module within a VisibleModuleSet.
+  unsigned VisibilityID;
+
+public:
   // FIXME: Consider if reducing the size of this enum (having Partition and
   // Named modules only) then representing interface/implementation separately
   // is more efficient.
-  enum ModuleKind {
+  enum ModuleKind : unsigned {
     /// This is a module that was defined by a module map and built out
     /// of header files.
     ModuleMapModule,
@@ -381,9 +430,6 @@ public:
     ImplicitGlobalModuleFragment,
   };
 
-  /// The kind of this module.
-  ModuleKind Kind = ModuleMapModule;
-
   /// The parent of this module. This will be NULL for the top-level
   /// module.
   Module *Parent;
@@ -392,35 +438,6 @@ public:
   /// which the module is notionally built, and relative to which its headers
   /// are found.
   OptionalDirectoryEntryRef Directory;
-
-  /// The presumed file name for the module map defining this module.
-  /// Only non-empty when building from preprocessed source.
-  std::string PresumedModuleMapFile;
-
-  /// The umbrella header or directory.
-  std::variant<std::monostate, FileEntryRef, DirectoryEntryRef> Umbrella;
-
-  /// The location of the umbrella header or directory declaration.
-  SourceLocation UmbrellaDeclLoc;
-
-  /// Directories this module depends on the listing of.
-  std::vector<std::string> DirectoryDependencies;
-
-  /// The module signature.
-  ASTFileSignature Signature;
-
-  /// The name of the umbrella entry, as written in the module map.
-  std::string UmbrellaAsWritten;
-
-  // The path to the umbrella entry relative to the root module's \c Directory.
-  std::string UmbrellaRelativeToRootModuleDirectory;
-
-  /// The module through which entities defined in this module will
-  /// eventually be exposed, for use in "private" modules.
-  std::string ExportAsModule;
-
-  /// For the debug info, the path to this module's .apinotes file, if any.
-  std::string APINotesFile;
 
   /// Does this Module is a named module of a standard named module?
   bool isNamedModule() const {
@@ -454,28 +471,22 @@ public:
 
 private:
   /// The submodules of this module, indexed by name.
-  std::vector<ModuleRef> SubModules;
+  SmallVector<ModuleRef, 0> SubModules;
 
   /// A mapping from the submodule name to the index into the
-  /// \c SubModules vector at which that submodule resides.
-  llvm::StringMap<unsigned> SubModuleIndex;
+  /// \c SubModules vector at which that submodule resides. The entries are
+  /// allocated by the \c ModuleMap, which frees them all at once.
+  llvm::StringMap<unsigned, llvm::BumpPtrAllocator &> SubModuleIndex;
 
-  /// The AST file name and key if this is a top-level module which has a
-  /// corresponding serialized AST file, or null otherwise.
-  std::optional<ModuleFileName> ASTFileName;
-  std::optional<ModuleFileKey> ASTFileKey;
+  /// Top-level header filenames that aren't resolved to FileEntries yet.
+  SmallVector<std::string, 1> TopHeaderNames;
 
-  /// The top-level headers associated with this module.
-  llvm::SmallSetVector<FileEntryRef, 2> TopHeaders;
+  /// The external source of top-level header filenames that aren't resolved
+  /// to FileEntries yet. They're only read on demand by \c getTopHeaders().
+  ExternalSubmoduleSource *TopHeadersSource = nullptr;
 
-  /// top-level header filenames that aren't resolved to FileEntries yet.
-  std::vector<std::string> TopHeaderNames;
-
-  /// Cache of modules visible to lookup in this module.
-  mutable llvm::DenseSet<const Module*> VisibleModulesCache;
-
-  /// The ID used when referencing this module within a VisibleModuleSet.
-  unsigned VisibilityID;
+  /// The ID of this module in \c TopHeadersSource.
+  uint32_t TopHeadersSourceID = 0;
 
 public:
   enum HeaderKind {
@@ -497,8 +508,8 @@ private:
   static const int NumHeaderKinds = HK_Excluded + 1;
   // The begin index for a HeaderKind also acts the end index of HeaderKind - 1.
   // The extra element at the end acts as the end index of the last HeaderKind.
-  unsigned HeaderKindBeginIndex[NumHeaderKinds + 1] = {};
-  SmallVector<Header, 2> HeadersStorage;
+  uint16_t HeaderKindBeginIndex[NumHeaderKinds + 1] = {};
+  SmallVector<Header, 1> HeadersStorage;
 
 public:
   ArrayRef<Header> getAllHeaders() const { return HeadersStorage; }
@@ -510,6 +521,8 @@ public:
   }
   void addHeader(HeaderKind HK, Header H) {
     assert(HK < NumHeaderKinds && "Invalid Module::HeaderKind");
+    assert(HeadersStorage.size() < std::numeric_limits<uint16_t>::max() &&
+           "Too many headers in a module");
     auto EndIt = HeadersStorage.begin() + HeaderKindBeginIndex[HK + 1];
     HeadersStorage.insert(EndIt, std::move(H));
     for (unsigned HKI = HK + 1; HKI != NumHeaderKinds + 1; ++HKI)
@@ -535,27 +548,10 @@ public:
     std::optional<time_t> ModTime;
   };
 
-  /// Headers that are mentioned in the module map file but that we have not
-  /// yet attempted to resolve to a file on the file system.
-  SmallVector<UnresolvedHeaderDirective, 0> UnresolvedHeaders;
-
-  /// Headers that are mentioned in the module map file but could not be
-  /// found on the file system.
-  SmallVector<UnresolvedHeaderDirective, 0> MissingHeaders;
-
   struct Requirement {
     std::string FeatureName;
     bool RequiredState;
   };
-
-  /// The set of language features required to use this module.
-  ///
-  /// If any of these requirements are not available, the \c IsAvailable bit
-  /// will be false to indicate that this (sub)module is not available.
-  SmallVector<Requirement, 2> Requirements;
-
-  /// A module with the same name that shadows this module.
-  Module *ShadowingModule = nullptr;
 
   /// Whether this module has declared itself unimportable, either because
   /// it's missing a requirement from \p Requirements or because it's been
@@ -641,6 +637,20 @@ public:
   LLVM_PREFERRED_TYPE(bool)
   unsigned NamedModuleHasInit : 1;
 
+  /// Whether the module map declares a plain \c export * for this module
+  /// that hasn't been resolved yet. It's kept apart from \c UnresolvedExports,
+  /// since it's by far the most common export declaration.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned UnresolvedWildcardExport : 1;
+
+  /// The kind of this module.
+  ModuleKind Kind : 4;
+
+  /// Autolinking uses the framework name for linking purposes
+  /// when this is false and the export_as name otherwise.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned UseExportAsModuleLinkName : 1;
+
   /// Describes the visibility of the various names within a
   /// particular module.
   enum NameVisibilityKind {
@@ -653,16 +663,9 @@ public:
   /// The visibility of names within this particular module.
   NameVisibilityKind NameVisibility;
 
-  /// The location of the inferred submodule.
-  SourceLocation InferredSubmoduleLoc;
-
   /// The set of modules imported by this module, and on which this
   /// module depends.
-  llvm::SmallVector<ModuleRef, 2> Imports;
-
-  /// The set of top-level modules that affected the compilation of this module,
-  /// but were not imported.
-  llvm::SmallVector<ModuleRef, 2> AffectingClangModules;
+  llvm::SmallVector<ModuleRef, 0> Imports;
 
   /// Describes an exported module.
   ///
@@ -671,7 +674,7 @@ public:
   using ExportDecl = std::pair<ModuleRef, bool>;
 
   /// The set of export declarations.
-  SmallVector<ExportDecl, 2> Exports;
+  SmallVector<ExportDecl, 1> Exports;
 
   /// Describes an exported module that has not yet been resolved
   /// (perhaps because the module it refers to has not yet been loaded).
@@ -687,19 +690,6 @@ public:
     /// module itself).
     bool Wildcard;
   };
-
-  /// The set of export declarations that have yet to be resolved.
-  SmallVector<UnresolvedExportDecl, 1> UnresolvedExports;
-
-  /// The directly used modules.
-  SmallVector<Module *, 2> DirectUses;
-
-  /// The set of use declarations that have yet to be resolved.
-  SmallVector<ModuleId, 0> UnresolvedDirectUses;
-
-  /// When \c NoUndeclaredIncludes is true, the set of modules this module tried
-  /// to import but didn't because they are not direct uses.
-  llvm::SmallSetVector<const Module *, 2> UndeclaredUses;
 
   /// A library or framework to link against when an entity from this
   /// module is used.
@@ -718,18 +708,6 @@ public:
     bool IsFramework = false;
   };
 
-  /// The set of libraries or frameworks to link against when
-  /// an entity from this module is used.
-  llvm::SmallVector<LinkLibrary, 2> LinkLibraries;
-
-  /// Autolinking uses the framework name for linking purposes
-  /// when this is false and the export_as name otherwise.
-  bool UseExportAsModuleLinkName = false;
-
-  /// The set of "configuration macros", which are macros that
-  /// (intentionally) change how this module is built.
-  std::vector<std::string> ConfigMacros;
-
   /// An unresolved conflict with another module.
   struct UnresolvedConflict {
     /// The (unresolved) module id.
@@ -738,10 +716,6 @@ public:
     /// The message provided to the user when there is a conflict.
     std::string Message;
   };
-
-  /// The list of conflicts for which the module-id has not yet been
-  /// resolved.
-  SmallVector<UnresolvedConflict, 0> UnresolvedConflicts;
 
   /// A conflict between two modules.
   struct Conflict {
@@ -752,8 +726,370 @@ public:
     std::string Message;
   };
 
+private:
+  /// Out-of-line storage for a group of members that are only used by few
+  /// modules, to keep \c Module small.
+  ///
+  /// The storage is allocated on the first write through \c getOrCreate() or
+  /// \c set(), and kept for the lifetime of the module.
+  template <typename T> class LazyMembers {
+    std::unique_ptr<T> Storage;
+
+  public:
+    /// Whether the members have been allocated.
+    bool allocated() const { return bool(Storage); }
+
+    /// The members, or an empty instance if they haven't been allocated.
+    const T &get() const {
+      if (Storage)
+        return *Storage;
+      static const T Empty;
+      return Empty;
+    }
+
+    /// The members, allocated if needed.
+    T &getOrCreate() {
+      if (!Storage)
+        Storage = std::make_unique<T>();
+      return *Storage;
+    }
+
+    /// Moves the member \p M out, leaving it empty.
+    template <typename MemberT> MemberT take(MemberT T::*M) {
+      if (!Storage)
+        return MemberT();
+      return std::exchange((*Storage).*M, MemberT());
+    }
+
+    /// Empties the member \p M, without allocating the storage.
+    template <typename MemberT> void clear(MemberT T::*M) {
+      if (Storage)
+        ((*Storage).*M).clear();
+    }
+
+    /// Sets the member \p M to \p Value, without allocating the storage if
+    /// \p Value is empty.
+    template <typename MemberT, typename ValueT>
+    void set(MemberT T::*M, ValueT &&Value) {
+      if (!Storage && Value.empty())
+        return;
+      getOrCreate().*M = std::forward<ValueT>(Value);
+    }
+  };
+
+  /// Members that are empty or unset in the vast majority of modules, kept out
+  /// of line to keep \c Module small.
+  struct ColdMembers {
+    /// The umbrella header or directory.
+    std::variant<std::monostate, FileEntryRef, DirectoryEntryRef> Umbrella;
+
+    /// The location of the umbrella header or directory declaration.
+    SourceLocation UmbrellaDeclLoc;
+
+    /// The location of the inferred submodule.
+    SourceLocation InferredSubmoduleLoc;
+
+    /// The name of the umbrella entry, as written in the module map.
+    std::string UmbrellaAsWritten;
+
+    // The path to the umbrella entry relative to the root module's \c
+    // Directory.
+    std::string UmbrellaRelativeToRootModuleDirectory;
+
+    /// The module through which entities defined in this module will
+    /// eventually be exposed, for use in "private" modules.
+    std::string ExportAsModule;
+
+    /// The top-level headers associated with this module.
+    llvm::SmallSetVector<FileEntryRef, 1> TopHeaders;
+
+    /// Cache of modules visible to lookup in this module.
+    llvm::DenseSet<const Module *> VisibleModulesCache;
+
+    /// Headers that are mentioned in the module map file but that we have not
+    /// yet attempted to resolve to a file on the file system.
+    SmallVector<UnresolvedHeaderDirective, 0> UnresolvedHeaders;
+
+    /// Headers that are mentioned in the module map file but could not be
+    /// found on the file system.
+    SmallVector<UnresolvedHeaderDirective, 0> MissingHeaders;
+
+    /// The set of language features required to use this module.
+    ///
+    /// If any of these requirements are not available, the \c IsAvailable bit
+    /// will be false to indicate that this (sub)module is not available.
+    SmallVector<Requirement, 0> Requirements;
+
+    /// A module with the same name that shadows this module.
+    Module *ShadowingModule = nullptr;
+
+    /// The set of top-level modules that affected the compilation of this
+    /// module, but were not imported.
+    llvm::SmallVector<ModuleRef, 0> AffectingClangModules;
+
+    /// The set of export declarations that have yet to be resolved, other than
+    /// a plain \c export * (see \c UnresolvedWildcardExport).
+    SmallVector<UnresolvedExportDecl, 0> UnresolvedExports;
+
+    /// The directly used modules.
+    SmallVector<Module *, 0> DirectUses;
+
+    /// The set of use declarations that have yet to be resolved.
+    SmallVector<ModuleId, 0> UnresolvedDirectUses;
+
+    /// When \c NoUndeclaredIncludes is true, the set of modules this module
+    /// tried to import but didn't because they are not direct uses.
+    llvm::SetVector<const Module *> UndeclaredUses;
+
+    /// The set of libraries or frameworks to link against when
+    /// an entity from this module is used.
+    llvm::SmallVector<LinkLibrary, 0> LinkLibraries;
+
+    /// The list of conflicts for which the module-id has not yet been
+    /// resolved.
+    SmallVector<UnresolvedConflict, 0> UnresolvedConflicts;
+
+    /// The list of conflicts.
+    SmallVector<Conflict, 0> Conflicts;
+  };
+
+  /// Mutable because the visible modules cache is built lazily.
+  mutable LazyMembers<ColdMembers> Cold;
+
+public:
+  using UmbrellaStorage =
+      std::variant<std::monostate, FileEntryRef, DirectoryEntryRef>;
+
+  /// The umbrella header or directory, if any.
+  const UmbrellaStorage &getUmbrella() const { return Cold.get().Umbrella; }
+  bool hasUmbrella() const {
+    return !std::holds_alternative<std::monostate>(getUmbrella());
+  }
+  /// The location of the umbrella header or directory declaration.
+  SourceLocation getUmbrellaDeclLoc() const {
+    return Cold.get().UmbrellaDeclLoc;
+  }
+  /// Set the umbrella header or directory, its location, its name as written
+  /// in the module map, and its path relative to the root module's
+  /// \c Directory.
+  void setUmbrella(UmbrellaStorage U, SourceLocation Loc,
+                   StringRef NameAsWritten,
+                   StringRef PathRelativeToRootModuleDirectory) {
+    ColdMembers &C = Cold.getOrCreate();
+    C.Umbrella = U;
+    C.UmbrellaDeclLoc = Loc;
+    C.UmbrellaAsWritten = NameAsWritten.str();
+    C.UmbrellaRelativeToRootModuleDirectory =
+        PathRelativeToRootModuleDirectory.str();
+  }
+
+  /// The location of the inferred submodule declaration, if any.
+  SourceLocation getInferredSubmoduleLoc() const {
+    return Cold.get().InferredSubmoduleLoc;
+  }
+  void setInferredSubmoduleLoc(SourceLocation Loc) {
+    Cold.getOrCreate().InferredSubmoduleLoc = Loc;
+  }
+
+  /// The module through which entities defined in this module will
+  /// eventually be exposed, for use in "private" modules.
+  StringRef getExportAsModule() const { return Cold.get().ExportAsModule; }
+  void setExportAsModule(StringRef Name) {
+    Cold.set(&ColdMembers::ExportAsModule, Name);
+  }
+
+  /// Headers that are mentioned in the module map file but that we have not
+  /// yet attempted to resolve to a file on the file system.
+  ArrayRef<UnresolvedHeaderDirective> getUnresolvedHeaders() const {
+    return Cold.get().UnresolvedHeaders;
+  }
+  void addUnresolvedHeader(UnresolvedHeaderDirective Header) {
+    Cold.getOrCreate().UnresolvedHeaders.push_back(std::move(Header));
+  }
+  SmallVector<UnresolvedHeaderDirective, 0> takeUnresolvedHeaders() {
+    return Cold.take(&ColdMembers::UnresolvedHeaders);
+  }
+
+  /// Headers that are mentioned in the module map file but could not be
+  /// found on the file system.
+  ArrayRef<UnresolvedHeaderDirective> getMissingHeaders() const {
+    return Cold.get().MissingHeaders;
+  }
+  void addMissingHeaders(ArrayRef<UnresolvedHeaderDirective> Headers) {
+    if (!Headers.empty())
+      llvm::append_range(Cold.getOrCreate().MissingHeaders, Headers);
+  }
+  void clearMissingHeaders() { Cold.clear(&ColdMembers::MissingHeaders); }
+
+  /// The set of language features required to use this module.
+  ///
+  /// If any of these requirements are not available, the \c IsAvailable bit
+  /// will be false to indicate that this (sub)module is not available.
+  ArrayRef<Requirement> getRequirements() const {
+    return Cold.get().Requirements;
+  }
+  void clearRequirements() { Cold.clear(&ColdMembers::Requirements); }
+
+  /// A module with the same name that shadows this module.
+  Module *getShadowingModule() const { return Cold.get().ShadowingModule; }
+  void setShadowingModule(Module *M) {
+    if (M || Cold.allocated())
+      Cold.getOrCreate().ShadowingModule = M;
+  }
+
+  /// The set of top-level modules that affected the compilation of this
+  /// module, but were not imported.
+  ArrayRef<ModuleRef> getAffectingClangModules() const {
+    return Cold.get().AffectingClangModules;
+  }
+  void addAffectingClangModule(ModuleRef M) {
+    Cold.getOrCreate().AffectingClangModules.push_back(M);
+  }
+
+  /// The set of export declarations that have yet to be resolved, other than
+  /// a plain \c export * (see \c UnresolvedWildcardExport).
+  ArrayRef<UnresolvedExportDecl> getUnresolvedExports() const {
+    return Cold.get().UnresolvedExports;
+  }
+  void addUnresolvedExport(UnresolvedExportDecl Export) {
+    Cold.getOrCreate().UnresolvedExports.push_back(std::move(Export));
+  }
+  SmallVector<UnresolvedExportDecl, 0> takeUnresolvedExports() {
+    return Cold.take(&ColdMembers::UnresolvedExports);
+  }
+  void clearUnresolvedExports() { Cold.clear(&ColdMembers::UnresolvedExports); }
+
+  /// The directly used modules.
+  ArrayRef<Module *> getDirectUses() const { return Cold.get().DirectUses; }
+  void addDirectUse(Module *M) { Cold.getOrCreate().DirectUses.push_back(M); }
+
+  /// The set of use declarations that have yet to be resolved.
+  ArrayRef<ModuleId> getUnresolvedDirectUses() const {
+    return Cold.get().UnresolvedDirectUses;
+  }
+  void addUnresolvedDirectUse(ModuleId Use) {
+    Cold.getOrCreate().UnresolvedDirectUses.push_back(std::move(Use));
+  }
+  SmallVector<ModuleId, 0> takeUnresolvedDirectUses() {
+    return Cold.take(&ColdMembers::UnresolvedDirectUses);
+  }
+
+  /// When \c NoUndeclaredIncludes is true, the set of modules this module tried
+  /// to import but didn't because they are not direct uses.
+  ArrayRef<const Module *> getUndeclaredUses() const {
+    return Cold.get().UndeclaredUses.getArrayRef();
+  }
+
+  /// The set of libraries or frameworks to link against when
+  /// an entity from this module is used.
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return Cold.get().LinkLibraries;
+  }
+  void addLinkLibrary(LinkLibrary Library) {
+    Cold.getOrCreate().LinkLibraries.push_back(std::move(Library));
+  }
+  void clearLinkLibraries() { Cold.clear(&ColdMembers::LinkLibraries); }
+
+  /// The list of conflicts for which the module-id has not yet been
+  /// resolved.
+  ArrayRef<UnresolvedConflict> getUnresolvedConflicts() const {
+    return Cold.get().UnresolvedConflicts;
+  }
+  void addUnresolvedConflict(UnresolvedConflict Conflict) {
+    Cold.getOrCreate().UnresolvedConflicts.push_back(std::move(Conflict));
+  }
+  SmallVector<UnresolvedConflict, 0> takeUnresolvedConflicts() {
+    return Cold.take(&ColdMembers::UnresolvedConflicts);
+  }
+  void clearUnresolvedConflicts() {
+    Cold.clear(&ColdMembers::UnresolvedConflicts);
+  }
+
   /// The list of conflicts.
-  std::vector<Conflict> Conflicts;
+  ArrayRef<Conflict> getConflicts() const { return Cold.get().Conflicts; }
+  void addConflict(Conflict C) {
+    Cold.getOrCreate().Conflicts.push_back(std::move(C));
+  }
+  void clearConflicts() { Cold.clear(&ColdMembers::Conflicts); }
+
+private:
+  /// Members that are only set on top-level modules, kept out of line because
+  /// the vast majority of modules are submodules.
+  struct TopLevelMembers {
+    /// The presumed file name for the module map defining this module.
+    /// Only non-empty when building from preprocessed source.
+    std::string PresumedModuleMapFile;
+
+    /// Directories this module depends on the listing of.
+    SmallVector<std::string, 0> DirectoryDependencies;
+
+    /// The AST file name and key if this is a top-level module which has a
+    /// corresponding serialized AST file, or null otherwise.
+    std::optional<ModuleFileName> ASTFileName;
+    std::optional<ModuleFileKey> ASTFileKey;
+
+    /// The signature of the AST file this module was deserialized from.
+    ASTFileSignature Signature;
+
+    /// For the debug info, the path to this module's .apinotes file, if any.
+    std::string APINotesFile;
+
+    /// The set of "configuration macros", which are macros that
+    /// (intentionally) change how this module is built.
+    SmallVector<std::string, 0> ConfigMacros;
+  };
+
+  LazyMembers<TopLevelMembers> TopLevelOnly;
+
+public:
+  /// The presumed file name for the module map defining this module.
+  /// Only non-empty when building from preprocessed source.
+  StringRef getPresumedModuleMapFile() const {
+    return TopLevelOnly.get().PresumedModuleMapFile;
+  }
+  void setPresumedModuleMapFile(StringRef File) {
+    TopLevelOnly.set(&TopLevelMembers::PresumedModuleMapFile, File);
+  }
+
+  /// For the debug info, the path to this module's .apinotes file, if any.
+  StringRef getAPINotesFile() const { return TopLevelOnly.get().APINotesFile; }
+  void setAPINotesFile(StringRef File) {
+    TopLevelOnly.set(&TopLevelMembers::APINotesFile, File);
+  }
+
+  /// The set of "configuration macros", which are macros that
+  /// (intentionally) change how this module is built. Only top-level modules
+  /// can declare them.
+  ArrayRef<std::string> getConfigMacros() const {
+    return TopLevelOnly.get().ConfigMacros;
+  }
+  void addConfigMacro(StringRef Macro) {
+    TopLevelOnly.getOrCreate().ConfigMacros.push_back(Macro.str());
+  }
+  void addConfigMacros(ArrayRef<StringRef> Macros) {
+    if (!Macros.empty())
+      llvm::append_range(TopLevelOnly.getOrCreate().ConfigMacros, Macros);
+  }
+  void clearConfigMacros() {
+    TopLevelOnly.clear(&TopLevelMembers::ConfigMacros);
+  }
+
+  /// The signature of the AST file this module was deserialized from, or a
+  /// null signature if it wasn't deserialized from an AST file.
+  ///
+  /// All submodules are deserialized from the same AST file as their top-level
+  /// module, so the signature is only stored on the top-level module.
+  ASTFileSignature getSignature() const {
+    if (!IsFromModuleFile)
+      return ASTFileSignature();
+    return getTopLevelModule()->TopLevelOnly.get().Signature;
+  }
+
+  /// Set the signature of the AST file the top-level module of this module was
+  /// deserialized from.
+  void setSignature(ASTFileSignature NewSignature) {
+    getTopLevelModule()->TopLevelOnly.getOrCreate().Signature = NewSignature;
+  }
 
   /// Construct a new module or submodule.
   Module(ModuleConstructorTag, StringRef Name, SourceLocation DefinitionLoc,
@@ -956,14 +1292,14 @@ public:
 
   /// The serialized AST file name for this module, if one was created.
   const ModuleFileName *getASTFileName() const {
-    const Module *TopLevel = getTopLevelModule();
-    return TopLevel->ASTFileName ? &*TopLevel->ASTFileName : nullptr;
+    const auto &Name = getTopLevelModule()->TopLevelOnly.get().ASTFileName;
+    return Name ? &*Name : nullptr;
   }
 
   /// The serialized AST file key for this module, if one was created.
   const ModuleFileKey *getASTFileKey() const {
-    const Module *TopLevel = getTopLevelModule();
-    return TopLevel->ASTFileKey ? &*TopLevel->ASTFileKey : nullptr;
+    const auto &Key = getTopLevelModule()->TopLevelOnly.get().ASTFileKey;
+    return Key ? &*Key : nullptr;
   }
 
   /// Set the serialized module file for the top-level module of this module.
@@ -971,24 +1307,26 @@ public:
     assert(((!getASTFileName() && !getASTFileKey()) ||
             *getASTFileKey() == NewKey) &&
            "file path changed");
-    Module *TopLevel = getTopLevelModule();
-    TopLevel->ASTFileName = NewName;
-    TopLevel->ASTFileKey = NewKey;
+    TopLevelMembers &Data = getTopLevelModule()->TopLevelOnly.getOrCreate();
+    Data.ASTFileName = std::move(NewName);
+    Data.ASTFileKey = std::move(NewKey);
   }
 
   /// Retrieve the umbrella directory as written.
   std::optional<DirectoryName> getUmbrellaDirAsWritten() const {
-    if (const auto *Dir = std::get_if<DirectoryEntryRef>(&Umbrella))
-      return DirectoryName{UmbrellaAsWritten,
-                           UmbrellaRelativeToRootModuleDirectory, *Dir};
+    const ColdMembers &C = Cold.get();
+    if (const auto *Dir = std::get_if<DirectoryEntryRef>(&C.Umbrella))
+      return DirectoryName{C.UmbrellaAsWritten,
+                           C.UmbrellaRelativeToRootModuleDirectory, *Dir};
     return std::nullopt;
   }
 
   /// Retrieve the umbrella header as written.
   std::optional<Header> getUmbrellaHeaderAsWritten() const {
-    if (const auto *Hdr = std::get_if<FileEntryRef>(&Umbrella))
-      return Header{UmbrellaAsWritten, UmbrellaRelativeToRootModuleDirectory,
-                    *Hdr};
+    const ColdMembers &C = Cold.get();
+    if (const auto *Hdr = std::get_if<FileEntryRef>(&C.Umbrella))
+      return Header{C.UmbrellaAsWritten,
+                    C.UmbrellaRelativeToRootModuleDirectory, *Hdr};
     return std::nullopt;
   }
 
@@ -1003,7 +1341,7 @@ public:
   void addDirectoryDependency(StringRef Path);
 
   ArrayRef<std::string> getDirectoryDependencies() const {
-    return DirectoryDependencies;
+    return TopLevelOnly.get().DirectoryDependencies;
   }
 
   /// Add a top-level header associated with this module.
@@ -1013,6 +1351,10 @@ public:
   void addTopHeaderFilename(StringRef Filename) {
     TopHeaderNames.push_back(std::string(Filename));
   }
+
+  /// Let \p Source provide the top-level header filenames of this module
+  /// (with ID \p ID in \p Source) when they're first needed.
+  void setExternalTopHeaders(ExternalSubmoduleSource *Source, uint32_t ID);
 
   /// The top-level headers associated with this module.
   ArrayRef<FileEntryRef> getTopHeaders(FileManager &FileMgr);
@@ -1066,15 +1408,15 @@ public:
   /// module currently being built, if it's queried before we see all
   /// of its imports.
   bool isModuleVisible(const Module *M) const {
-    if (VisibleModulesCache.empty())
+    if (Cold.get().VisibleModulesCache.empty())
       buildVisibleModulesCache();
-    return VisibleModulesCache.count(M);
+    return Cold.get().VisibleModulesCache.count(M);
   }
 
   unsigned getVisibilityID() const { return VisibilityID; }
 
-  using submodule_iterator = std::vector<ModuleRef>::iterator;
-  using submodule_const_iterator = std::vector<ModuleRef>::const_iterator;
+  using submodule_iterator = SmallVectorImpl<ModuleRef>::iterator;
+  using submodule_const_iterator = SmallVectorImpl<ModuleRef>::const_iterator;
 
   llvm::iterator_range<submodule_iterator> submodules() {
     return llvm::make_range(SubModules.begin(), SubModules.end());
@@ -1168,13 +1510,21 @@ private:
 } // namespace clang
 
 template <> struct llvm::DenseMapInfo<clang::ModuleFileKey> {
-  static unsigned getHashValue(const clang::ModuleFileKey &Val) {
+  static unsigned getHashValue(const clang::ModuleFileKeyRef &Val) {
     return hash_combine(Val.Ptr, Val.ImplicitModulePathSuffix);
+  }
+  static unsigned getHashValue(const clang::ModuleFileKey &Val) {
+    return getHashValue(clang::ModuleFileKeyRef(Val));
   }
 
   static bool isEqual(const clang::ModuleFileKey &LHS,
                       const clang::ModuleFileKey &RHS) {
     return LHS == RHS;
+  }
+  static bool isEqual(const clang::ModuleFileKeyRef &LHS,
+                      const clang::ModuleFileKey &RHS) {
+    return LHS.Ptr == RHS.Ptr &&
+           LHS.ImplicitModulePathSuffix == RHS.ImplicitModulePathSuffix;
   }
 };
 

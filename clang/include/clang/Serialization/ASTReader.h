@@ -775,7 +775,10 @@ private:
   /// If the pointer at index I is non-NULL, then it refers to the
   /// IdentifierInfo for the identifier with ID=I+1 that has already
   /// been loaded.
-  std::vector<IdentifierInfo *> IdentifiersLoaded;
+  ///
+  /// Typically only a few percent of the identifiers are ever loaded, and they
+  /// cluster, so this is paged to only allocate the parts that are used.
+  llvm::PagedVector<IdentifierInfo *> IdentifiersLoaded;
 
   /// A vector containing macros that have already been
   /// loaded.
@@ -783,7 +786,10 @@ private:
   /// If the pointer at index I is non-NULL, then it refers to the
   /// MacroInfo for the identifier with ID=I+1 that has already
   /// been loaded.
-  std::vector<MacroInfo *> MacrosLoaded;
+  ///
+  /// Typically very few macros are ever loaded, so this is paged to only
+  /// allocate the parts that are used.
+  llvm::PagedVector<MacroInfo *> MacrosLoaded;
 
   using LoadedMacroInfo =
       std::pair<IdentifierInfo *, serialization::SubmoduleID>;
@@ -1215,6 +1221,17 @@ private:
   /// The generation number of each identifier, which keeps track of
   /// the last time we loaded information about this identifier.
   llvm::DenseMap<const IdentifierInfo *, unsigned> IdentifierGeneration;
+
+  /// The number of module files whose header file info tables have been
+  /// read so far. Each of them records the value of this counter in its
+  /// \c ModuleFile::HeaderFileInfoGeneration.
+  unsigned HeaderFileInfoGeneration = 0;
+
+  /// For each file not found in any header file info table the last time it
+  /// was looked up, the header file info generation at the time of that
+  /// lookup. Module files of that generation or older don't need to be
+  /// searched for that file again.
+  llvm::DenseMap<const FileEntry *, unsigned> HeaderFileInfoMissGeneration;
 
   /// Contains declarations and definitions that could be
   /// "interesting" to the ASTConsumer, when we get that AST consumer.
@@ -2411,6 +2428,10 @@ public:
 
   /// Retrieve the submodule that corresponds to a global submodule ID.
   Module *getSubmodule(uint32_t GlobalID) override;
+
+  void
+  visitTopHeaderFilenames(uint32_t GlobalID,
+                          llvm::function_ref<void(StringRef)> Visitor) override;
 
   /// Retrieve the module that corresponds to the given module ID.
   ///

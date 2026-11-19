@@ -215,6 +215,17 @@ public:
     return llvm::createFileError(Filename, Ref.getError());
   }
 
+  /// Like \c getFileRef, but returns a bare \c std::error_code on failure.
+  /// This avoids allocating an \c llvm::Error for callers that look up many
+  /// files that may not exist and only inspect the error code, e.g. header
+  /// search.
+  llvm::ErrorOr<FileEntryRef> getFileRefOrErrorCode(StringRef Filename,
+                                                    bool OpenFile = false,
+                                                    bool CacheFailure = true,
+                                                    bool IsText = true) {
+    return getFileRefImpl(Filename, OpenFile, CacheFailure, IsText);
+  }
+
   /// Get the FileEntryRef for stdin, returning an error if stdin cannot be
   /// read.
   ///

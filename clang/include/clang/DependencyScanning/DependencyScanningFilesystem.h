@@ -11,24 +11,70 @@
 
 #include "clang/Basic/LLVM.h"
 #include "clang/Lex/DependencyDirectivesScanner.h"
+#include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
+#include <string>
+#include <utility>
 #include <variant>
+#include <vector>
 
 namespace clang {
 namespace dependencies {
 
 class DependencyScanningService;
 
-using DependencyDirectivesTy =
-    SmallVector<dependency_directives_scan::Directive, 20>;
+/// The scanned dependency directives of a file and the tokens they refer to,
+/// stored exactly sized in a single allocation that's never resized.
+class CachedDependencyDirectives final
+    : private llvm::TrailingObjects<CachedDependencyDirectives,
+                                    dependency_directives_scan::Directive,
+                                    dependency_directives_scan::Token> {
+  friend TrailingObjects;
+
+  /// Whether the scan succeeded.
+  bool Success;
+  unsigned NumDirectives;
+
+  CachedDependencyDirectives(bool Success, unsigned NumDirectives)
+      : Success(Success), NumDirectives(NumDirectives) {}
+
+  size_t numTrailingObjects(
+      OverloadToken<dependency_directives_scan::Directive>) const {
+    return NumDirectives;
+  }
+
+public:
+  /// Creates the result of a successful scan. Copies \p Tokens and
+  /// \p Directives, which must refer to \p Tokens, into a single allocation,
+  /// and makes the copied directives refer to the copied tokens.
+  static std::unique_ptr<CachedDependencyDirectives>
+  create(ArrayRef<dependency_directives_scan::Token> Tokens,
+         ArrayRef<dependency_directives_scan::Directive> Directives);
+
+  /// Creates the result of a failed scan.
+  static std::unique_ptr<CachedDependencyDirectives> createFailed();
+
+  /// \returns The directives if the scan succeeded.
+  std::optional<ArrayRef<dependency_directives_scan::Directive>>
+  getDirectives() const {
+    if (!Success)
+      return std::nullopt;
+    return ArrayRef(getTrailingObjects<dependency_directives_scan::Directive>(),
+                    NumDirectives);
+  }
+
+  void operator delete(void *Ptr) { ::operator delete(Ptr); }
+};
 
 /// Contents and directive tokens of a cached file entry. Single instance can
 /// be shared between multiple entries.
@@ -36,15 +82,14 @@ struct CachedFileContents {
   CachedFileContents(std::unique_ptr<llvm::MemoryBuffer> Contents)
       : Original(std::move(Contents)), DepDirectives(nullptr) {}
 
-  /// Owning storage for the original contents.
+  /// Owning storage for the original contents. The buffer has no name.
   std::unique_ptr<llvm::MemoryBuffer> Original;
 
-  /// The mutex that must be locked before mutating directive tokens.
-  std::mutex ValueLock;
-  SmallVector<dependency_directives_scan::Token, 10> DepDirectiveTokens;
-  /// Accessor to the directive tokens that's atomic to avoid data races.
+  /// Accessor to the scanned directives that's atomic to avoid data races.
+  /// Scanning for directives is guarded by the shared cache's
+  /// \c DependencyScanningFilesystemSharedCache::getDirectivesLock().
   /// \p CachedFileContents has ownership of the pointer.
-  std::atomic<const std::optional<DependencyDirectivesTy> *> DepDirectives;
+  std::atomic<const CachedDependencyDirectives *> DepDirectives;
 
   ~CachedFileContents() { delete DepDirectives.load(); }
 };
@@ -98,10 +143,8 @@ public:
     assert(!isError() && "error");
     assert(!isDirectory() && "not a file");
     assert(Contents && "contents not initialized");
-    if (auto *Directives = Contents->DepDirectives.load()) {
-      if (Directives->has_value())
-        return ArrayRef<dependency_directives_scan::Directive>(**Directives);
-    }
+    if (auto *Directives = Contents->DepDirectives.load())
+      return Directives->getDirectives();
     return std::nullopt;
   }
 
@@ -199,7 +242,12 @@ public:
     };
 
     /// Map from filenames to their cached state.
-    llvm::StringMap<FilenameCacheState, llvm::BumpPtrAllocator> CacheByFilename;
+    ///
+    /// The entries are allocated individually, so that the slots of uncached
+    /// negative stats can be freed once the stat has been resolved. Slots with
+    /// an entry or a real path are never erased, and \c StringMap never moves
+    /// its entries, so their keys live as long as the shard.
+    llvm::StringMap<FilenameCacheState> CacheByFilename;
 
     /// Map from unique IDs to their cached state.
     llvm::DenseMap<llvm::sys::fs::UniqueID, UIDCacheState> EntriesByUID;
@@ -214,15 +262,19 @@ public:
     llvm::SpecificBumpPtrAllocator<CachedRealPath> RealPathStorage;
 
     /// Returns the real path associated with the filename or nullptr if none is
-    /// found.
-    const CachedRealPath *findRealPathByFilename(StringRef Filename) const;
+    /// found. If found, sets \p StoredFilename to the copy of \p Filename owned
+    /// by this shard, which lives as long as the shard.
+    const CachedRealPath *
+    findRealPathByFilename(StringRef Filename, StringRef &StoredFilename) const;
 
     /// Returns the real path associated with the filename if there is some.
     /// Otherwise, constructs new one with the given one, associates it with the
-    /// filename and returns the result.
+    /// filename and returns the result. Sets \p StoredFilename to the copy of
+    /// \p Filename owned by this shard, which lives as long as the shard.
     const CachedRealPath &
     getOrEmplaceRealPathForFilename(StringRef Filename,
-                                    llvm::ErrorOr<StringRef> RealPath);
+                                    llvm::ErrorOr<StringRef> RealPath,
+                                    StringRef &StoredFilename);
   };
 
   DependencyScanningFilesystemSharedCache();
@@ -230,6 +282,11 @@ public:
   /// Returns shard for the given key.
   CacheShard &getShardForFilename(StringRef Filename) const;
   CacheShard &getShardForUID(llvm::sys::fs::UniqueID UID) const;
+
+  /// Returns the mutex that must be locked before scanning \p Contents for
+  /// directives. The mutexes are striped, so that the cached contents don't
+  /// each need their own.
+  std::mutex &getDirectivesLock(const CachedFileContents &Contents) const;
 
   struct OutOfDateEntry {
     // A null terminated string that contains a path.
@@ -260,17 +317,39 @@ public:
   std::vector<OutOfDateEntry>
   getOutOfDateEntries(llvm::vfs::FileSystem &UnderlyingFS) const;
 
+  /// Records that nothing gets created in the absolute directory \p Dir while
+  /// this cache is alive, e.g. because it's an SDK or the compiler's resource
+  /// directory. Missing files in it are then cached, independently of
+  /// \c DependencyScanningServiceOptions::CacheNegativeStats. Ignores relative
+  /// paths and root directories.
+  void addStableDirectory(StringRef Dir);
+
+  /// Returns whether \p Path is spelled as a path in a directory passed to
+  /// \c addStableDirectory(). Paths with ".." components never are.
+  bool isInStableDirectory(StringRef Path) const;
+
 private:
   std::unique_ptr<CacheShard[]> CacheShards;
   unsigned NumShards;
+
+  /// The directories passed to \c addStableDirectory(), without trailing
+  /// separators.
+  std::vector<std::string> StableDirs;
+  mutable std::shared_mutex StableDirsLock;
+
+  static constexpr unsigned NumDirectivesLocks = 256;
+  std::unique_ptr<std::mutex[]> DirectivesLocks;
 };
 
 /// Reference to a CachedFileSystemEntry.
 /// If the underlying entry is an opened file, this wrapper returns the file
 /// contents and the scanned preprocessor directives.
+///
+/// Doesn't own the filename, so it must not outlive the string passed to
+/// \c DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry().
 class EntryRef {
   /// The filename used to access this entry.
-  std::string Filename;
+  StringRef Filename;
 
   /// The underlying cached entry.
   const CachedFileSystemEntry &Entry;
@@ -351,7 +430,9 @@ public:
   /// used to speed up preprocessing, if available.
   std::optional<ArrayRef<dependency_directives_scan::Directive>>
   getDirectiveTokens(const Twine &Path) {
-    if (llvm::ErrorOr<EntryRef> Entry = getOrCreateFileSystemEntry(Path.str()))
+    SmallString<256> OwnedFilename;
+    StringRef Filename = Path.toStringRef(OwnedFilename);
+    if (llvm::ErrorOr<EntryRef> Entry = getOrCreateFileSystemEntry(Filename))
       if (ensureDirectiveTokensArePopulated(*Entry))
         return Entry->getDirectiveTokens();
     return std::nullopt;
@@ -367,10 +448,13 @@ private:
   /// or the result of an in-flight wait), or claims the producer slot and
   /// computes the entry via the underlying filesystem.
   /// \p FilenameForLookup is always absolute, and may differ from
-  /// \p OriginalFilename if the latter is relative.
+  /// \p OriginalFilename if the latter is relative. Unless an error is
+  /// returned, sets \p StoredFilename to a copy of \p FilenameForLookup that
+  /// outlives this filesystem's local caches.
   llvm::ErrorOr<const CachedFileSystemEntry *>
   resolveFilenameThroughSharedCache(StringRef OriginalFilename,
-                                    StringRef FilenameForLookup);
+                                    StringRef FilenameForLookup,
+                                    StringRef &StoredFilename);
 
   /// Resolves the cache entry for the on-disk file identified by \p Stat
   /// through the UID-keyed shared cache. Reads the file's contents on the
@@ -413,19 +497,26 @@ private:
   /// The service associated with this VFS.
   DependencyScanningService &Service;
 
-  /// Per-filename state cached locally by this worker thread, so repeated
-  /// queries can be served without touching the shared cache. The entry and
-  /// real path are arena-owned by the shared cache (or by this worker for
-  /// results from \c LocalFS) and outlive the local cache, so borrowing raw
-  /// pointers here is safe.
-  struct LocalEntry {
-    const CachedFileSystemEntry *File = nullptr;
-    const CachedRealPath *RealPath = nullptr;
-  };
+  /// Per-filename entries and real paths cached locally by this worker thread,
+  /// so repeated queries can be served without touching the shared cache.
+  ///
+  /// The keys are absolute filenames that don't own their characters: they
+  /// point to the keys of the shared cache's filename map, which are never
+  /// freed, or into \c LocalFilenameStorage for results from \c LocalFS. This
+  /// way, the workers don't each keep their own copy of every path. Similarly,
+  /// the entries and real paths are arena-owned by the shared cache (or by this
+  /// worker for results from \c LocalFS) and outlive the local caches, so
+  /// borrowing raw pointers here is safe.
+  ///
+  /// Only results that the shared cache keeps are cached locally; uncached
+  /// negative stats are looked up again every time.
+  llvm::DenseMap<llvm::CachedHashStringRef, const CachedFileSystemEntry *>
+      LocalEntries;
+  llvm::DenseMap<llvm::CachedHashStringRef, const CachedRealPath *>
+      LocalRealPaths;
 
-  /// The local cache is used by the worker thread to cache file system queries
-  /// locally instead of querying the global cache every time.
-  llvm::StringMap<LocalEntry, llvm::BumpPtrAllocator> LocalCache;
+  /// The backing storage for local cache keys resolved from local FS only.
+  llvm::BumpPtrAllocator LocalFilenameStorage;
 
   /// The working directory to use for making relative paths absolute before
   /// using them for cache lookups.
@@ -458,6 +549,83 @@ private:
   llvm::ErrorOr<StringRef>
   tryGetFilenameForLookup(StringRef OriginalFilename,
                           llvm::SmallVectorImpl<char> &PathBuf) const;
+};
+
+/// A pool of worker filesystems for the scanning compiles that run on threads
+/// of their own (the asynchronous module compiles).
+///
+/// A fresh worker filesystem starts with empty local caches, so all of its
+/// lookups go to the shared cache and its locks. Reusing the filesystems of
+/// finished compiles lets later compiles hit in the local caches instead.
+/// Worker filesystems aren't thread-safe, so each one is checked out by a
+/// single compile at a time.
+///
+/// The pooled filesystems are created like the asynchronous compiles created
+/// them before: over \c DependencyScanningServiceOptions::MakeVFS, without a
+/// local FS. Nothing in their local caches depends on the compile that used
+/// them (the entries come from the service-wide shared cache and are keyed by
+/// absolute path), and per-compile filesystems such as the command line's VFS
+/// overlays are layered on top of them, not inside. The only state a compile
+/// could change is the working directory: a filesystem whose working directory
+/// changed isn't reused.
+class DependencyScanningWorkerFilesystemPool {
+public:
+  /// Exclusive use of a pooled worker filesystem. Unless discarded, the
+  /// filesystem goes back to the pool on destruction, provided nothing else
+  /// still references it.
+  class Lease {
+  public:
+    Lease() = default;
+    Lease(Lease &&Other) { *this = std::move(Other); }
+    Lease &operator=(Lease &&Other) {
+      if (this != &Other) {
+        reset();
+        Pool = std::exchange(Other.Pool, nullptr);
+        FS = std::move(Other.FS);
+        WorkingDir = std::move(Other.WorkingDir);
+      }
+      return *this;
+    }
+    ~Lease() { reset(); }
+
+    DependencyScanningWorkerFilesystem &operator*() const { return *FS; }
+    DependencyScanningWorkerFilesystem *operator->() const { return FS.get(); }
+    IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> get() const {
+      return FS;
+    }
+
+    /// Returns the filesystem to the pool (if it can be reused) and releases
+    /// this lease.
+    void reset();
+
+    /// Releases this lease without returning the filesystem to the pool,
+    /// e.g. because the compile using it crashed.
+    void discard() {
+      Pool = nullptr;
+      FS = nullptr;
+    }
+
+  private:
+    friend class DependencyScanningWorkerFilesystemPool;
+
+    DependencyScanningWorkerFilesystemPool *Pool = nullptr;
+    IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> FS;
+    /// The working directory of \c FS when it was checked out, if any.
+    std::optional<std::string> WorkingDir;
+  };
+
+  /// Checks out a worker filesystem, reusing one returned earlier if possible.
+  Lease acquire(DependencyScanningService &Service);
+
+  /// Returns the number of filesystems available for reuse.
+  size_t getNumAvailable() {
+    std::lock_guard<std::mutex> Guard(Lock);
+    return Available.size();
+  }
+
+private:
+  std::mutex Lock;
+  std::vector<IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem>> Available;
 };
 
 } // end namespace dependencies

@@ -10,6 +10,7 @@
 #include "clang/DependencyScanning/DependencyScanningService.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
+#include <atomic>
 #include <optional>
 
 using namespace clang;
@@ -29,7 +30,9 @@ DependencyScanningWorkerFilesystem::readFile(StringRef Filename,
     return MaybeStat.getError();
   auto Stat = std::move(*MaybeStat);
 
-  auto MaybeBuffer = File->getBuffer(Stat.getName());
+  // The cached buffer doesn't need a name: each opened file gets its own
+  // buffer that's named after the requested path (see \c DepScanFile).
+  auto MaybeBuffer = File->getBuffer("");
   if (!MaybeBuffer)
     return MaybeBuffer.getError();
   auto Buffer = std::move(*MaybeBuffer);
@@ -39,6 +42,12 @@ DependencyScanningWorkerFilesystem::readFile(StringRef Filename,
     Stat = llvm::vfs::Status::copyWithNewSize(Stat, Buffer->getBufferSize());
 
   return TentativeEntry(Stat, std::move(Buffer));
+}
+
+/// Returns the key for looking up \p Filename in the worker's local caches.
+/// Uses the same hash function as \c StringMap.
+static llvm::CachedHashStringRef getLocalCacheKey(StringRef Filename) {
+  return llvm::CachedHashStringRef(Filename, llvm::xxh3_64bits(Filename));
 }
 
 bool DependencyScanningWorkerFilesystem::ensureDirectiveTokensArePopulated(
@@ -55,31 +64,64 @@ bool DependencyScanningWorkerFilesystem::ensureDirectiveTokensArePopulated(
   if (Contents->DepDirectives.load())
     return true;
 
-  std::lock_guard<std::mutex> GuardLock(Contents->ValueLock);
+  std::lock_guard<std::mutex> GuardLock(
+      Service.getSharedCache().getDirectivesLock(*Contents));
 
   // Double-checked locking.
   if (Contents->DepDirectives.load())
     return true;
 
-  SmallVector<dependency_directives_scan::Directive, 64> Directives;
   // Scan the file for preprocessor directives that might affect the
-  // dependencies.
-  if (scanSourceForDependencyDirectives(Contents->Original->getBuffer(),
-                                        Contents->DepDirectiveTokens,
-                                        Directives)) {
-    Contents->DepDirectiveTokens.clear();
-    // FIXME: Propagate the diagnostic if desired by the client.
-    Contents->DepDirectives.store(new std::optional<DependencyDirectivesTy>());
-    return false;
-  }
+  // dependencies. The vectors grow geometrically, so the result is copied into
+  // exactly sized storage, which lives as long as the cache.
+  SmallVector<dependency_directives_scan::Token, 256> Tokens;
+  SmallVector<dependency_directives_scan::Directive, 64> Directives;
+  bool Failed = scanSourceForDependencyDirectives(
+      Contents->Original->getBuffer(), Tokens, Directives);
+  // FIXME: Propagate the diagnostic if desired by the client.
+  std::unique_ptr<CachedDependencyDirectives> Result =
+      Failed ? CachedDependencyDirectives::createFailed()
+             : CachedDependencyDirectives::create(Tokens, Directives);
 
   // This function performed double-checked locking using `DepDirectives`.
   // Assigning it must be the last thing this function does, otherwise other
   // threads may skip the critical section (`DepDirectives != nullptr`), leading
   // to a data race.
-  Contents->DepDirectives.store(
-      new std::optional<DependencyDirectivesTy>(std::move(Directives)));
-  return true;
+  Contents->DepDirectives.store(Result.release());
+  return !Failed;
+}
+
+std::unique_ptr<CachedDependencyDirectives> CachedDependencyDirectives::create(
+    ArrayRef<dependency_directives_scan::Token> Tokens,
+    ArrayRef<dependency_directives_scan::Directive> Directives) {
+  void *Mem =
+      ::operator new(totalSizeToAlloc<dependency_directives_scan::Directive,
+                                      dependency_directives_scan::Token>(
+          Directives.size(), Tokens.size()));
+  auto *Result =
+      new (Mem) CachedDependencyDirectives(/*Success=*/true, Directives.size());
+  dependency_directives_scan::Token *NewTokens =
+      Result->getTrailingObjects<dependency_directives_scan::Token>();
+  llvm::uninitialized_copy(Tokens, NewTokens);
+  dependency_directives_scan::Directive *NewDirectives =
+      Result->getTrailingObjects<dependency_directives_scan::Directive>();
+  for (const dependency_directives_scan::Directive &D : Directives) {
+    assert(D.Tokens.data() >= Tokens.data() && D.Tokens.end() <= Tokens.end() &&
+           "directive doesn't refer to the given tokens");
+    new (NewDirectives++) dependency_directives_scan::Directive(
+        D.Kind, ArrayRef(NewTokens + (D.Tokens.data() - Tokens.data()),
+                         D.Tokens.size()));
+  }
+  return std::unique_ptr<CachedDependencyDirectives>(Result);
+}
+
+std::unique_ptr<CachedDependencyDirectives>
+CachedDependencyDirectives::createFailed() {
+  void *Mem =
+      ::operator new(totalSizeToAlloc<dependency_directives_scan::Directive,
+                                      dependency_directives_scan::Token>(0, 0));
+  return std::unique_ptr<CachedDependencyDirectives>(
+      new (Mem) CachedDependencyDirectives(/*Success=*/false, 0));
 }
 
 DependencyScanningFilesystemSharedCache::
@@ -92,6 +134,7 @@ DependencyScanningFilesystemSharedCache::
   NumShards =
       std::max(2u, llvm::hardware_concurrency().compute_thread_count() / 4);
   CacheShards = std::make_unique<CacheShard[]>(NumShards);
+  DirectivesLocks = std::make_unique<std::mutex[]>(NumDirectivesLocks);
 }
 
 DependencyScanningFilesystemSharedCache::CacheShard &
@@ -108,6 +151,11 @@ DependencyScanningFilesystemSharedCache::getShardForUID(
   return CacheShards[Hash % NumShards];
 }
 
+std::mutex &DependencyScanningFilesystemSharedCache::getDirectivesLock(
+    const CachedFileContents &Contents) const {
+  return DirectivesLocks[llvm::hash_value(&Contents) % NumDirectivesLocks];
+}
+
 std::vector<DependencyScanningFilesystemSharedCache::OutOfDateEntry>
 DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     llvm::vfs::FileSystem &UnderlyingFS) const {
@@ -119,8 +167,7 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
     for (const auto &[Path, State] : Shard.CacheByFilename) {
       const CachedFileSystemEntry *Entry = State.Entry;
       // Skip slots without a resolved entry: real-path-only entries from
-      // getRealPath, or uncached negative stats. Runs post-scan, so no
-      // in-progress slots remain.
+      // getRealPath. Runs post-scan, so no in-progress slots remain.
       if (!Entry)
         continue;
       llvm::ErrorOr<llvm::vfs::Status> Status = UnderlyingFS.status(Path);
@@ -157,6 +204,43 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
   return InvalidDiagInfo;
 }
 
+void DependencyScanningFilesystemSharedCache::addStableDirectory(
+    StringRef Dir) {
+  while (!Dir.empty() && llvm::sys::path::is_separator(Dir.back()))
+    Dir = Dir.drop_back();
+  if (!llvm::sys::path::is_absolute_gnu(Dir) ||
+      !llvm::sys::path::has_relative_path(Dir))
+    return;
+  {
+    std::shared_lock<std::shared_mutex> Lock(StableDirsLock);
+    if (llvm::is_contained(StableDirs, Dir))
+      return;
+  }
+  std::unique_lock<std::shared_mutex> Lock(StableDirsLock);
+  if (!llvm::is_contained(StableDirs, Dir))
+    StableDirs.emplace_back(Dir);
+}
+
+bool DependencyScanningFilesystemSharedCache::isInStableDirectory(
+    StringRef Path) const {
+  auto IsInDir = [Path](StringRef Dir) {
+    if (!Path.starts_with(Dir) || Path.size() == Dir.size() ||
+        !llvm::sys::path::is_separator(Path[Dir.size()]))
+      return false;
+    // Don't let ".." escape the directory.
+    for (size_t Begin = Dir.size(), End; Begin < Path.size(); Begin = End + 1) {
+      End = Begin;
+      while (End < Path.size() && !llvm::sys::path::is_separator(Path[End]))
+        ++End;
+      if (Path.slice(Begin, End) == "..")
+        return false;
+    }
+    return true;
+  };
+  std::shared_lock<std::shared_mutex> Lock(StableDirsLock);
+  return llvm::any_of(StableDirs, IsInDir);
+}
+
 namespace {
 using InProgressEntry =
     DependencyScanningFilesystemSharedCache::InProgressEntry;
@@ -164,15 +248,16 @@ using SlotResolved = llvm::ErrorOr<const CachedFileSystemEntry *>;
 using SlotProducer = std::shared_ptr<InProgressEntry>;
 using SlotAcquisitionResult = std::variant<SlotResolved, SlotProducer>;
 
-/// Returns a resolved entry if one is already present or in-flight under
-/// \p K; otherwise installs a fresh \c InProgressEntry and returns it as a
-/// producer slot.
-template <typename Map, typename Key>
-SlotAcquisitionResult acquireSlot(std::mutex &CacheLock, Map &M, const Key &K) {
+/// Returns a resolved entry if one is already present or in-flight in the
+/// state returned by \p GetState; otherwise installs a fresh
+/// \c InProgressEntry and returns it as a producer slot. \p GetState is called
+/// with \p CacheLock held and returns the (possibly newly inserted) state.
+template <typename GetStateFn>
+SlotAcquisitionResult acquireSlot(std::mutex &CacheLock, GetStateFn GetState) {
   std::shared_ptr<InProgressEntry> Pending;
   {
     std::lock_guard<std::mutex> ShardLock(CacheLock);
-    auto &State = M[K];
+    auto &State = GetState();
 
     // Cache hit.
     if (State.Entry)
@@ -197,19 +282,25 @@ SlotAcquisitionResult acquireSlot(std::mutex &CacheLock, Map &M, const Key &K) {
 
 const CachedRealPath *
 DependencyScanningFilesystemSharedCache::CacheShard::findRealPathByFilename(
-    StringRef Filename) const {
+    StringRef Filename, StringRef &StoredFilename) const {
   assert(llvm::sys::path::is_absolute_gnu(Filename));
   std::lock_guard<std::mutex> LockGuard(CacheLock);
   auto It = CacheByFilename.find(Filename);
-  return It == CacheByFilename.end() ? nullptr : It->getValue().RealPath;
+  if (It == CacheByFilename.end())
+    return nullptr;
+  StoredFilename = It->getKey();
+  return It->getValue().RealPath;
 }
 
 const CachedRealPath &DependencyScanningFilesystemSharedCache::CacheShard::
     getOrEmplaceRealPathForFilename(StringRef Filename,
-                                    llvm::ErrorOr<llvm::StringRef> RealPath) {
+                                    llvm::ErrorOr<llvm::StringRef> RealPath,
+                                    StringRef &StoredFilename) {
   std::lock_guard<std::mutex> LockGuard(CacheLock);
 
-  const CachedRealPath *&StoredRealPath = CacheByFilename[Filename].RealPath;
+  auto &Stored = *CacheByFilename.try_emplace(Filename).first;
+  StoredFilename = Stored.getKey();
+  const CachedRealPath *&StoredRealPath = Stored.getValue().RealPath;
   if (!StoredRealPath) {
     auto OwnedRealPath = [&]() -> CachedRealPath {
       if (!RealPath)
@@ -271,8 +362,9 @@ const CachedFileSystemEntry *
 DependencyScanningWorkerFilesystem::resolveUIDThroughSharedCache(
     StringRef OriginalFilename, const llvm::vfs::Status &Stat) {
   auto &UIDShard = Service.getSharedCache().getShardForUID(Stat.getUniqueID());
-  auto UIDSlot = acquireSlot(UIDShard.CacheLock, UIDShard.EntriesByUID,
-                             Stat.getUniqueID());
+  auto UIDSlot = acquireSlot(UIDShard.CacheLock, [&]() -> auto & {
+    return UIDShard.EntriesByUID[Stat.getUniqueID()];
+  });
   if (auto *Resolved = std::get_if<SlotResolved>(&UIDSlot)) {
     assert(*Resolved && **Resolved &&
            "in-progress UID slot fulfilled without an entry");
@@ -312,18 +404,24 @@ DependencyScanningWorkerFilesystem::createCachedFSEntryForLocal(
 
 llvm::ErrorOr<const CachedFileSystemEntry *>
 DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
-    StringRef OriginalFilename, StringRef FilenameForLookup) {
+    StringRef OriginalFilename, StringRef FilenameForLookup,
+    StringRef &StoredFilename) {
   if (LocalFS) {
     if (auto Stat = LocalFS->status(OriginalFilename)) {
+      StoredFilename = FilenameForLookup.copy(LocalFilenameStorage);
       return createCachedFSEntryForLocal(OriginalFilename, *Stat);
     }
   }
   assert(llvm::sys::path::is_absolute_gnu(FilenameForLookup));
   auto &FilenameShard =
       Service.getSharedCache().getShardForFilename(FilenameForLookup);
-  auto FilenameSlot =
-      acquireSlot(FilenameShard.CacheLock, FilenameShard.CacheByFilename,
-                  FilenameForLookup);
+  auto FilenameSlot = acquireSlot(FilenameShard.CacheLock, [&]() -> auto & {
+    auto &Stored =
+        *FilenameShard.CacheByFilename.try_emplace(FilenameForLookup).first;
+    // The shard never erases or moves its entries, so the key outlives us.
+    StoredFilename = Stored.getKey();
+    return Stored.getValue();
+  });
   if (auto *Resolved = std::get_if<SlotResolved>(&FilenameSlot))
     return *Resolved;
   auto FilenameProducer = std::move(std::get<SlotProducer>(FilenameSlot));
@@ -332,13 +430,21 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
   //   - Stat succeeded: delegate to the UID resolver.
   //   - Stat failed, cacheable: defer error-entry allocation to the critical
   //     section below so allocate+bind+reset share one shard-lock acquisition.
+  //     Missing files in stable directories (e.g. the SDK) are always
+  //     cacheable, since nothing gets created there during a build.
   //   - Stat failed, not cacheable: publish the error to current waiters but
   //     don't persist; a later separate query re-runs the stat (so a file
   //     created mid-scan becomes visible).
   auto Stat = BaseFS->status(OriginalFilename);
+  auto IsMissingFromStableDirectory = [&] {
+    return (Stat.getError() == std::errc::no_such_file_or_directory ||
+            Stat.getError() == std::errc::not_a_directory) &&
+           Service.getSharedCache().isInStableDirectory(FilenameForLookup);
+  };
   const bool ShouldCacheNegativeStat =
-      !Stat && Service.getOpts().CacheNegativeStats &&
-      shouldCacheNegativeStatsForPath(OriginalFilename);
+      !Stat && ((Service.getOpts().CacheNegativeStats &&
+                 shouldCacheNegativeStatsForPath(OriginalFilename)) ||
+                IsMissingFromStableDirectory());
   llvm::ErrorOr<const CachedFileSystemEntry *> Result = std::error_code{};
   if (Stat)
     Result = resolveUIDThroughSharedCache(OriginalFilename, *Stat);
@@ -350,7 +456,10 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
   // share one shard-lock acquisition.
   {
     std::lock_guard<std::mutex> ShardLock(FilenameShard.CacheLock);
-    auto &State = FilenameShard.CacheByFilename[FilenameForLookup];
+    auto It = FilenameShard.CacheByFilename.find(FilenameForLookup);
+    assert(It != FilenameShard.CacheByFilename.end() &&
+           "in-progress filename slot was erased");
+    auto &State = It->getValue();
     assert(!State.Entry && "filename slot already published an entry");
     if (ShouldCacheNegativeStat) {
       auto *Entry = new (FilenameShard.EntryStorage.Allocate())
@@ -361,6 +470,11 @@ DependencyScanningWorkerFilesystem::resolveFilenameThroughSharedCache(
       State.Entry = *Result;
     }
     State.InProgress.reset();
+    // Don't keep an empty slot for an uncached negative stat. Waiters hold
+    // their own reference to the in-flight slot, and no local cache refers to
+    // this key, since it only caches results that the shard keeps.
+    if (!State.Entry && !State.RealPath)
+      FilenameShard.CacheByFilename.erase(It);
   }
   FilenameProducer->publish(Result);
   return Result;
@@ -374,15 +488,18 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
   if (!FilenameForLookup)
     return FilenameForLookup.getError();
 
-  auto &Local = LocalCache[*FilenameForLookup];
-  if (Local.File)
-    return EntryRef(OriginalFilename, *Local.File).unwrapError();
+  llvm::CachedHashStringRef LocalKey = getLocalCacheKey(*FilenameForLookup);
+  auto It = LocalEntries.find(LocalKey);
+  if (It != LocalEntries.end())
+    return EntryRef(OriginalFilename, *It->second).unwrapError();
 
-  auto MaybeEntry =
-      resolveFilenameThroughSharedCache(OriginalFilename, *FilenameForLookup);
+  StringRef StoredFilename;
+  auto MaybeEntry = resolveFilenameThroughSharedCache(
+      OriginalFilename, *FilenameForLookup, StoredFilename);
   if (!MaybeEntry)
     return MaybeEntry.getError();
-  Local.File = *MaybeEntry;
+  LocalEntries.try_emplace(
+      llvm::CachedHashStringRef(StoredFilename, LocalKey.hash()), *MaybeEntry);
   return EntryRef(OriginalFilename, **MaybeEntry).unwrapError();
 }
 
@@ -445,11 +562,11 @@ DepScanFile::create(EntryRef Entry) {
   if (Entry.isDirectory())
     return std::make_error_code(std::errc::is_a_directory);
 
-  auto Result = std::make_unique<DepScanFile>(
-      llvm::MemoryBuffer::getMemBuffer(Entry.getContents(),
-                                       Entry.getStatus().getName(),
-                                       /*RequiresNullTerminator=*/false),
-      Entry.getStatus());
+  llvm::vfs::Status Stat = Entry.getStatus();
+  auto Buffer = llvm::MemoryBuffer::getMemBuffer(
+      Entry.getContents(), Stat.getName(), /*RequiresNullTerminator=*/false);
+  auto Result =
+      std::make_unique<DepScanFile>(std::move(Buffer), std::move(Stat));
 
   return llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>(
       std::unique_ptr<llvm::vfs::File>(std::move(Result)));
@@ -486,9 +603,17 @@ DependencyScanningWorkerFilesystem::getRealPath(const Twine &Path,
   };
 
   // If we already have the result in local cache, no work required.
-  auto &Local = LocalCache[*FilenameForLookup];
-  if (Local.RealPath)
-    return HandleCachedRealPath(*Local.RealPath);
+  llvm::CachedHashStringRef LocalKey = getLocalCacheKey(*FilenameForLookup);
+  auto It = LocalRealPaths.find(LocalKey);
+  if (It != LocalRealPaths.end())
+    return HandleCachedRealPath(*It->second);
+
+  auto CacheLocally = [&](StringRef StoredFilename,
+                          const CachedRealPath &RealPath) {
+    LocalRealPaths.try_emplace(
+        llvm::CachedHashStringRef(StoredFilename, LocalKey.hash()), &RealPath);
+    return HandleCachedRealPath(RealPath);
+  };
 
   // Resolve through the local VFS without going through the shared cache.
   if (LocalFS && LocalFS->exists(OriginalFilename)) {
@@ -496,19 +621,18 @@ DependencyScanningWorkerFilesystem::getRealPath(const Twine &Path,
     CachedRealPath RealPath = EC;
     if (!EC)
       RealPath = std::string(Output.begin(), Output.end());
-    Local.RealPath = new (LocalRealPathStorage.Allocate())
-        CachedRealPath(std::move(RealPath));
-    return HandleCachedRealPath(*Local.RealPath);
+    return CacheLocally(FilenameForLookup->copy(LocalFilenameStorage),
+                        *new (LocalRealPathStorage.Allocate())
+                            CachedRealPath(std::move(RealPath)));
   }
 
   // If we have the result in the shared cache, cache it locally.
   auto &Shard =
       Service.getSharedCache().getShardForFilename(*FilenameForLookup);
+  StringRef StoredFilename;
   if (const auto *ShardRealPath =
-          Shard.findRealPathByFilename(*FilenameForLookup)) {
-    Local.RealPath = ShardRealPath;
-    return HandleCachedRealPath(*Local.RealPath);
-  }
+          Shard.findRealPathByFilename(*FilenameForLookup, StoredFilename))
+    return CacheLocally(StoredFilename, *ShardRealPath);
 
   // If we don't know the real path, compute it...
   std::error_code EC = BaseFS->getRealPath(OriginalFilename, Output);
@@ -520,9 +644,8 @@ DependencyScanningWorkerFilesystem::getRealPath(const Twine &Path,
   // this race and already wrote its own result there, just adopt it. Write
   // whatever is in the shared cache into the local one.
   const auto &RealPath = Shard.getOrEmplaceRealPathForFilename(
-      *FilenameForLookup, ComputedRealPath);
-  Local.RealPath = &RealPath;
-  return HandleCachedRealPath(*Local.RealPath);
+      *FilenameForLookup, ComputedRealPath, StoredFilename);
+  return CacheLocally(StoredFilename, RealPath);
 }
 
 std::error_code DependencyScanningWorkerFilesystem::setCurrentWorkingDirectory(
@@ -567,3 +690,44 @@ DependencyScanningWorkerFilesystem::tryGetFilenameForLookup(
 }
 
 const char DependencyScanningWorkerFilesystem::ID = 0;
+
+DependencyScanningWorkerFilesystemPool::Lease
+DependencyScanningWorkerFilesystemPool::acquire(
+    DependencyScanningService &Service) {
+  Lease L;
+  L.Pool = this;
+  {
+    std::lock_guard<std::mutex> Guard(Lock);
+    if (!Available.empty()) {
+      L.FS = std::move(Available.back());
+      Available.pop_back();
+    }
+  }
+  if (!L.FS)
+    L.FS = llvm::makeIntrusiveRefCnt<DependencyScanningWorkerFilesystem>(
+        Service, Service.getOpts().MakeVFS());
+  if (llvm::ErrorOr<std::string> WorkingDir =
+          L.FS->getCurrentWorkingDirectory())
+    L.WorkingDir = std::move(*WorkingDir);
+  return L;
+}
+
+void DependencyScanningWorkerFilesystemPool::Lease::reset() {
+  if (!Pool)
+    return;
+  DependencyScanningWorkerFilesystemPool *P = std::exchange(Pool, nullptr);
+  IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> F = std::move(FS);
+  // Only reuse the filesystem if it's back in the state it was checked out in:
+  // no compile references it anymore, and it has the same working directory.
+  if (F->UseCount() != 1)
+    return;
+  // Pairs with the release of the last other reference, so that the next user
+  // of the filesystem doesn't race with whoever held that reference.
+  std::atomic_thread_fence(std::memory_order_acquire);
+  llvm::ErrorOr<std::string> CurrentWorkingDir =
+      F->getCurrentWorkingDirectory();
+  if (!WorkingDir || !CurrentWorkingDir || *CurrentWorkingDir != *WorkingDir)
+    return;
+  std::lock_guard<std::mutex> Guard(P->Lock);
+  P->Available.push_back(std::move(F));
+}

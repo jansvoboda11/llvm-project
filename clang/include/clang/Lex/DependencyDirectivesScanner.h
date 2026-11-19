@@ -19,6 +19,8 @@
 
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include <cassert>
+#include <cstdint>
 
 namespace clang {
 class FileManager;
@@ -32,18 +34,41 @@ class DiagnosticsEngine;
 namespace dependency_directives_scan {
 
 /// Token lexed as part of dependency directive scanning.
-struct Token {
-  /// Offset into the original source input.
-  unsigned Offset;
-  unsigned Length;
-  tok::TokenKind Kind;
-  unsigned short Flags;
-
+///
+/// The dependency scanner keeps the tokens of every scanned file in memory for
+/// the lifetime of its filesystem cache, so this is kept to 8 bytes. Only the
+/// token kinds and \c clang::Token flags produced by the raw lexer need to be
+/// representable, and tokens longer than \c MaxLength bytes are not supported:
+/// the scanner fails on files with such tokens in their directives, which makes
+/// clients fall back to lexing the original source.
+class Token {
+public:
   Token(unsigned Offset, unsigned Length, tok::TokenKind Kind,
         unsigned short Flags)
-      : Offset(Offset), Length(Length), Kind(Kind), Flags(Flags) {}
+      : Offset(Offset), Length(Length), Kind(Kind), Flags(packFlags(Flags)) {
+    assert(isRepresentable(Length, Kind, Flags) && "token not representable");
+  }
 
+  /// The maximum length of a token.
+  static constexpr unsigned MaxLength = UINT16_MAX;
+
+  /// Whether a token with the given properties can be stored.
+  static bool isRepresentable(unsigned Length, tok::TokenKind Kind,
+                              unsigned short Flags) {
+    return Length <= MaxLength && Kind <= UINT8_MAX &&
+           (Flags & ~RepresentableFlags) == 0;
+  }
+
+  /// Offset into the original source input.
+  unsigned getOffset() const { return Offset; }
+  unsigned getLength() const { return Length; }
   unsigned getEnd() const { return Offset + Length; }
+  tok::TokenKind getKind() const { return static_cast<tok::TokenKind>(Kind); }
+  /// The \c clang::Token::TokenFlags of the token.
+  unsigned short getFlags() const {
+    return (Flags & ~PackedPhysicalStartOfLine) |
+           (Flags & PackedPhysicalStartOfLine ? PhysicalStartOfLine : 0);
+  }
 
   bool is(tok::TokenKind K) const { return Kind == K; }
   bool isNot(tok::TokenKind K) const { return Kind != K; }
@@ -52,7 +77,33 @@ struct Token {
                   "requires at least one tok::TokenKind specified");
     return (is(Ks) || ...);
   }
+
+  /// The \c clang::Token flags that are stored as they are, in the lowest 7
+  /// bits. These include all the flags that the raw lexer produces except for
+  /// \c PhysicalStartOfLine.
+  static constexpr unsigned short DirectFlags = 0x7f;
+  /// \c clang::Token::PhysicalStartOfLine, which is stored in the 8th bit.
+  /// Both are checked against \c clang::Token in the implementation.
+  static constexpr unsigned short PhysicalStartOfLine = 0x2000;
+
+private:
+  static constexpr uint8_t PackedPhysicalStartOfLine = 0x80;
+  static constexpr unsigned short RepresentableFlags =
+      DirectFlags | PhysicalStartOfLine;
+
+  static uint8_t packFlags(unsigned short Flags) {
+    return (Flags & DirectFlags) |
+           (Flags & PhysicalStartOfLine ? PackedPhysicalStartOfLine : 0);
+  }
+
+  uint32_t Offset;
+  uint16_t Length;
+  uint8_t Kind;
+  /// The flags that are representable, packed into 8 bits.
+  uint8_t Flags;
 };
+
+static_assert(sizeof(Token) == 8, "Token should stay compact");
 
 /// Represents the kind of preprocessor directive or a module declaration that
 /// is tracked by the scanner in its token output.

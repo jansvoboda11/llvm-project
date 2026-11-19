@@ -152,6 +152,55 @@ TEST(is_absolute_gnu, Works) {
   }
 }
 
+TEST(is_absolute, Works) {
+  // Test tuple <Path, ExpectedPosixValue, ExpectedWindowsValue>.
+  const std::tuple<StringRef, bool, bool> Paths[] = {
+      std::make_tuple("", false, false),
+      std::make_tuple("/", true, false),
+      std::make_tuple("/foo", true, false),
+      std::make_tuple("/foo/", true, false),
+      std::make_tuple("//", true, false),
+      std::make_tuple("///", true, false),
+      std::make_tuple("///foo", true, false),
+      std::make_tuple("//net", false, false),
+      std::make_tuple("//net/", true, true),
+      std::make_tuple("//net/foo", true, true),
+      std::make_tuple("//net//foo", true, true),
+      std::make_tuple("\\", false, false),
+      std::make_tuple("\\\\", false, false),
+      std::make_tuple("\\\\net", false, false),
+      std::make_tuple("\\\\net\\foo", false, true),
+      std::make_tuple("\\/net/foo", false, false),
+      std::make_tuple("\\\\foo", false, false),
+      std::make_tuple("foo", false, false),
+      std::make_tuple("foo/bar", false, false),
+      std::make_tuple(".", false, false),
+      std::make_tuple("./foo", false, false),
+      std::make_tuple("c:", false, false),
+      std::make_tuple("c:/", false, true),
+      std::make_tuple("c:\\", false, true),
+      std::make_tuple("c:\\foo", false, true),
+      std::make_tuple("c:foo", false, false),
+      std::make_tuple("c:foo/", false, false)};
+
+  for (const auto &Path : Paths) {
+    SCOPED_TRACE(std::get<0>(Path));
+    EXPECT_EQ(path::is_absolute(std::get<0>(Path), path::Style::posix),
+              std::get<1>(Path));
+    EXPECT_EQ(path::is_absolute(std::get<0>(Path), path::Style::windows),
+              std::get<2>(Path));
+    EXPECT_EQ(path::is_absolute(std::get<0>(Path), path::Style::windows_slash),
+              std::get<2>(Path));
+    EXPECT_EQ(path::is_relative(std::get<0>(Path), path::Style::posix),
+              !std::get<1>(Path));
+
+    constexpr int Native = is_style_posix(path::Style::native) ? 1 : 2;
+    EXPECT_EQ(path::is_absolute(std::get<0>(Path), path::Style::native),
+              std::get<Native>(Path));
+    EXPECT_EQ(path::is_absolute(std::get<0>(Path)), std::get<Native>(Path));
+  }
+}
+
 TEST(Support, Path) {
   SmallVector<StringRef, 40> paths;
   paths.push_back("");
@@ -384,6 +433,19 @@ TEST(Support, FilenameParent) {
 
   EXPECT_EQ("\\", path::filename("\\\\\\", path::Style::windows));
   EXPECT_EQ("", path::parent_path("\\\\\\", path::Style::windows));
+
+  // Both separators are recognized in Windows styles, only '/' in POSIX.
+  EXPECT_EQ("baz", path::filename("foo\\bar/baz", path::Style::windows));
+  EXPECT_EQ("foo\\bar",
+            path::parent_path("foo\\bar/baz", path::Style::windows));
+  EXPECT_EQ("baz", path::filename("foo/bar\\baz", path::Style::windows));
+  EXPECT_EQ("foo/bar", path::parent_path("foo/bar\\baz", path::Style::windows));
+  EXPECT_EQ("bar\\baz", path::filename("foo/bar\\baz", path::Style::posix));
+  EXPECT_EQ("foo", path::parent_path("foo/bar\\baz", path::Style::posix));
+  EXPECT_EQ("foo\\bar", path::filename("foo\\bar", path::Style::posix));
+  EXPECT_EQ("", path::parent_path("foo\\bar", path::Style::posix));
+  EXPECT_EQ("foo", path::filename("c:foo", path::Style::windows));
+  EXPECT_EQ("c:", path::parent_path("c:foo", path::Style::windows));
 }
 
 static std::vector<StringRef>
@@ -411,6 +473,71 @@ TEST(Support, PathIterator) {
   EXPECT_THAT(GetComponents("//net/"), testing::ElementsAre("//net", "/"));
   EXPECT_THAT(GetComponents("//net/c/foo.txt"),
               testing::ElementsAre("//net", "/", "c", "foo.txt"));
+  EXPECT_THAT(GetComponents("a\\b/c", path::Style::windows),
+              testing::ElementsAre("a", "b", "c"));
+  EXPECT_THAT(GetComponents("a\\b/c", path::Style::posix),
+              testing::ElementsAre("a\\b", "c"));
+  EXPECT_THAT(GetComponents("\\\\net\\foo\\", path::Style::windows),
+              testing::ElementsAre("\\\\net", "\\", "foo", "."));
+  EXPECT_THAT(GetComponents("\\\\net\\foo\\", path::Style::posix),
+              testing::ElementsAre("\\\\net\\foo\\"));
+  EXPECT_THAT(GetComponents("/\\a", path::Style::windows),
+              testing::ElementsAre("/", "a"));
+  EXPECT_THAT(GetComponents("/\\a", path::Style::posix),
+              testing::ElementsAre("/", "\\a"));
+  EXPECT_THAT(GetComponents("//net\\a/b", path::Style::posix),
+              testing::ElementsAre("//net\\a", "/", "b"));
+  EXPECT_THAT(GetComponents("//net\\a/b", path::Style::windows),
+              testing::ElementsAre("//net", "\\", "a", "b"));
+}
+
+TEST(Support, PathAppend) {
+  // Test tuple <Path, Component, Style, Expected>.
+  const std::tuple<StringRef, StringRef, path::Style, StringRef> Cases[] = {
+      std::make_tuple("", "foo", path::Style::posix, "foo"),
+      std::make_tuple("foo", "bar", path::Style::posix, "foo/bar"),
+      std::make_tuple("foo/", "bar", path::Style::posix, "foo/bar"),
+      std::make_tuple("foo/", "//bar", path::Style::posix, "foo/bar"),
+      std::make_tuple("foo/", "//", path::Style::posix, "foo/"),
+      std::make_tuple("foo", "/bar", path::Style::posix, "foo/bar"),
+      std::make_tuple("foo", "", path::Style::posix, "foo/"),
+      std::make_tuple("foo", "//net", path::Style::posix, "foo//net"),
+      std::make_tuple("foo", "c:bar", path::Style::posix, "foo/c:bar"),
+      std::make_tuple("foo", "\\bar", path::Style::posix, "foo/\\bar"),
+      std::make_tuple("foo\\", "bar", path::Style::posix, "foo\\/bar"),
+      std::make_tuple("foo/", "\\bar", path::Style::posix, "foo/\\bar"),
+      std::make_tuple("", "foo", path::Style::windows_backslash, "foo"),
+      std::make_tuple("foo", "bar", path::Style::windows_backslash, "foo\\bar"),
+      std::make_tuple("foo", "bar", path::Style::windows_slash, "foo/bar"),
+      std::make_tuple("foo\\", "\\/bar", path::Style::windows_backslash,
+                      "foo\\bar"),
+      std::make_tuple("foo/", "\\bar", path::Style::windows_slash, "foo/bar"),
+      std::make_tuple("foo", "\\bar", path::Style::windows_backslash,
+                      "foo\\bar"),
+      std::make_tuple("foo", "", path::Style::windows_backslash, "foo\\"),
+      std::make_tuple("foo", "c:bar", path::Style::windows_backslash,
+                      "fooc:bar"),
+      std::make_tuple("foo", "c:", path::Style::windows_slash, "fooc:"),
+      std::make_tuple("c:", "foo", path::Style::windows_backslash, "c:\\foo"),
+      std::make_tuple("", "c:foo", path::Style::windows_backslash, "c:foo")};
+
+  for (const auto &Case : Cases) {
+    SCOPED_TRACE(std::get<0>(Case) + " + " + std::get<1>(Case));
+    SmallString<32> Path(std::get<0>(Case));
+    path::append(Path, std::get<2>(Case), std::get<1>(Case));
+    EXPECT_EQ(Path, std::get<3>(Case));
+  }
+
+  SmallString<32> Path;
+  path::append(Path, path::Style::posix, "a", "/b", "c/", "//d");
+  EXPECT_EQ(Path, "a/b/c/d");
+  Path.clear();
+  path::append(Path, path::Style::windows_backslash, "a", "/b", "c/", "\\d");
+  EXPECT_EQ(Path, "a/b\\c/d");
+
+  Path = "foo";
+  path::append(Path, "bar");
+  EXPECT_EQ(Path, ("foo" + path::get_separator() + "bar").str());
 }
 
 TEST(Support, AbsolutePathIteratorEnd) {
@@ -2027,6 +2154,13 @@ TEST(Support, RemoveDots) {
   EXPECT_EQ("/a/c",
             remove_dots("/../a/b//../././/c", true, path::Style::posix));
   EXPECT_EQ("/", remove_dots("/", true, path::Style::posix));
+
+  // Backslashes are only separators in Windows styles.
+  EXPECT_EQ("a\\.\\b/c", remove_dots("a\\.\\b/./c", true, path::Style::posix));
+  EXPECT_EQ("a/b/c",
+            remove_dots("a\\.\\b/./c", true, path::Style::windows_slash));
+  EXPECT_EQ("a\\b\\c",
+            remove_dots("a\\.\\b/./c", true, path::Style::windows_backslash));
 
   // FIXME: Leaving behind this double leading slash seems like a bug.
   EXPECT_EQ("//foo/bar",

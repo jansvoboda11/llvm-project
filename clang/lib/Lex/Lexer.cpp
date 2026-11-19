@@ -4665,14 +4665,15 @@ LexNextToken:
 
 const char *Lexer::convertDependencyDirectiveToken(
     const dependency_directives_scan::Token &DDTok, Token &Result) {
-  const char *TokPtr = BufferStart + DDTok.Offset;
-  Result = Token::create(DDTok.Kind, getSourceLocation(TokPtr), DDTok.Length);
-  Result.setFlag((Token::TokenFlags)DDTok.Flags);
+  const char *TokPtr = BufferStart + DDTok.getOffset();
+  Result = Token::create(DDTok.getKind(), getSourceLocation(TokPtr),
+                         DDTok.getLength());
+  Result.setFlag((Token::TokenFlags)DDTok.getFlags());
   if (Result.is(tok::raw_identifier))
     Result.setRawIdentifierData(TokPtr);
   else if (Result.isLiteral())
     Result.setLiteralData(TokPtr);
-  BufferPtr = TokPtr + DDTok.Length;
+  BufferPtr = TokPtr + DDTok.getLength();
   return TokPtr;
 }
 
@@ -4697,14 +4698,14 @@ bool Lexer::LexDependencyDirectiveToken(Token &Result) {
 
   const dependency_directives_scan::Token &DDTok =
       DepDirectives.front().Tokens[NextDepDirectiveTokenIndex++];
-  if (NextDepDirectiveTokenIndex > 1 || DDTok.Kind != tok::hash) {
+  if (NextDepDirectiveTokenIndex > 1 || DDTok.isNot(tok::hash)) {
     // Read something other than a preprocessor directive hash.
     MIOpt.ReadToken();
   }
 
-  const char *DDTokPtr = BufferStart + DDTok.Offset;
+  const char *DDTokPtr = BufferStart + DDTok.getOffset();
   if (ParsingFilename && *DDTokPtr == '<') {
-    Result.setFlag((clang::Token::TokenFlags)DDTok.Flags);
+    Result.setFlag((clang::Token::TokenFlags)DDTok.getFlags());
     Result.clearFlag(clang::Token::NeedsCleaning);
     BufferPtr = DDTokPtr;
     if (!LexAngledStringLiteral(Result, BufferPtr + 1)) {
@@ -4718,7 +4719,7 @@ bool Lexer::LexDependencyDirectiveToken(Token &Result) {
     while (true) {
       const dependency_directives_scan::Token &NextTok =
           DepDirectives.front().Tokens[NextDepDirectiveTokenIndex];
-      if (BufferStart + NextTok.Offset >= BufferPtr)
+      if (BufferStart + NextTok.getOffset() >= BufferPtr)
         break;
       ++NextDepDirectiveTokenIndex;
     }
